@@ -11,4 +11,6 @@ What to do after cloning
  >frontend
  >venv
 
-2. install the requirements
+2. pip install requirements.txt 
+3. cd frontend
+4. npm install 

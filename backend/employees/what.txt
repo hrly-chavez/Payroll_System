@@ -1,0 +1,15 @@
+“Who the employees are”
+
+    Put here:
+
+        Employee profile
+
+        Department
+
+        Shift
+
+        Employee basic info
+
+ Rule:
+
+    If it describes an employee, put it here.

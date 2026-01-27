@@ -1,0 +1,17 @@
+“When employees work”
+
+    Put here:
+
+        Time in / time out
+
+        Attendance table
+
+        Attendance events (late, OT, holiday, corrections)
+
+        Attendance requests & approvals
+
+        Holidays (PH / USA)
+
+ Rule:
+
+    If it is about time, date, or work hours, put it here.

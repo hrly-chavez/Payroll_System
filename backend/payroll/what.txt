@@ -1,0 +1,21 @@
+“How employees get paid”
+
+    Put here:
+
+        Salary
+
+        Deductions
+
+        Allowances
+
+        Payroll period (cutoff)
+
+        Payroll computation
+
+        Payslip
+
+        Reports & analytics
+
+Rule:
+
+    If it affects money or salary, put it here.

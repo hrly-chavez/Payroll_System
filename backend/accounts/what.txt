@@ -1,0 +1,15 @@
+“Who can log in and what they can do”
+
+    Put here:
+
+        User model(shared rani)
+
+        Login / logout
+
+        Roles (Admin, HR, Employee, CEO)
+
+        Permissions
+
+Rule for the team:
+
+    If it’s about accounts, login, or roles, put it here.

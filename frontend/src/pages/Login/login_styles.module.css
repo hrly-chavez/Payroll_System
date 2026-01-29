@@ -1,0 +1,66 @@
+.container {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+}
+
+/* LEFT SIDE */
+.leftPanel {
+  flex: 1;
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo {
+  width: 240px;
+  margin-bottom: 12px;
+}
+
+.tagline {
+  font-size: 14px;
+  color: #555;
+}
+
+/* RIGHT SIDE */
+.rightPanel {
+  flex: 1;
+  background-color: #3f78a8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.rightPanel :global(.ant-form-item-label > label) {
+  color: #ffffff !important;
+}
+
+.title {
+  color: #ffffff !important;
+  margin-bottom: 24px;
+}
+
+.form {
+  width: 300px;
+}
+
+.loginBtn {
+  border-radius: 20px;
+  height: 40px;
+}
+
+/* MOBILE RESPONSIVE */
+@media (max-width: 768px) {
+  .container {
+    flex-direction: column;
+  }
+
+  .leftPanel,
+  .rightPanel {
+    flex: none;
+    height: 50vh;
+  }
+}

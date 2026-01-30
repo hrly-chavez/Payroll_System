@@ -44,6 +44,16 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
       },
     },
     {
+      key: 'department',
+      label: 'Department',
+      icon: <TeamOutlined />,
+      roles: ['ADMIN', 'SUPER_ADMIN'],
+      hrefs: {
+        ADMIN: '/admin/department',
+        SUPER_ADMIN: '/super-admin/department',
+      },
+    },
+    {
       key: 'calendar',
       label: 'Calendar',
       icon: <CalendarOutlined />,
@@ -82,16 +92,6 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
       hrefs: {
         ADMIN: '/admin/reports',
         SUPER_ADMIN: '/super-admin/reports',
-      },
-    },
-    {
-      key: 'department',
-      label: 'Department',
-      icon: <TeamOutlined />,
-      roles: ['ADMIN', 'SUPER_ADMIN'],
-      hrefs: {
-        ADMIN: '/admin/department',
-        SUPER_ADMIN: '/super-admin/department',
       },
     },
   ];

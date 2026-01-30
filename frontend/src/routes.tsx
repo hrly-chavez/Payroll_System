@@ -4,8 +4,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from "./pages/Login/Login";
 // employee
 import EmpDashboard from "./pages/Employee/Dashboard/Dashboard";
-import EmpCalendar from "./pages/Employee/Calendar/Calendar";
 import EmpAttendance from "./pages/Employee/Attendance/Attendance";
+import EmpRequests from "./pages/Employee/Requests/Requests";
+import EmpPayslips from "./pages/Employee/Payslips/Payslips";
 
 //admin / hr
 import AdDashboard from "./pages/HR/Dashboard/Dashboard";
@@ -15,6 +16,7 @@ import AdReport from "./pages/HR/Reports/Reports";
 import AdDepartment from "./pages/HR/Department/Department";
 import AdDepartmentAddDept from "./pages/HR/Department/AddDepartment";
 import AdDepartmentEmployee from "./pages/HR/AdminDepartmentEmployee/AdminDepartmentEmployee";
+import AdRequests from "./pages/HR/Requests/Requests";
 
 //super admin
 import SupDashboard from "./pages/SuperAdmin/Dashboard/Dashboard";
@@ -32,8 +34,9 @@ const Router: React.FC = () => {
                 {/* employee ui */}
                 <Route path="/Login" element={<Login />} />
                 <Route path="/employee_dashboard" element={<EmpDashboard />} />
-                <Route path="/employee/calendar" element={<EmpCalendar />} />
                 <Route path="/employee/attendance" element={<EmpAttendance />} />
+                <Route path="/employee/requests" element={<EmpRequests />} />
+                <Route path="/employee/payslips" element={<EmpPayslips />} />
 
                 {/* admin ui */}
                 <Route path="/admin/dashboard" element={<AdDashboard />} />
@@ -42,6 +45,7 @@ const Router: React.FC = () => {
                 <Route path="/admin/reports" element={<AdReport />} />
                 <Route path="/admin/department" element={<AdDepartment />} />
                 <Route path="/admin/department-employee" element={<AdDepartmentEmployee />} />
+                <Route path="/admin/requests" element={<AdRequests />} />
 
 
                 {/* super admin ui */}

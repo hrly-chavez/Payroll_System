@@ -3,55 +3,68 @@ import { Layout, Table, Input, Button } from "antd";
 import type { TableProps } from "antd";
 import { PlusOutlined, SearchOutlined, SlidersOutlined } from "@ant-design/icons";
 import Sidebar from "../../../components/Sidebar/Sidebar";
-import styles from "./Department.module.css";
-import AddDepartment from "./AddDepartment";
+import styles from "./Admin_DepartmentEmployee.module.css";  
 import { useState } from "react";
+import AddAddDeptEmployee from "./AddAdDeptEmployee";
 
 
 interface DataType {
   key: string;
+  empname: string;
+  manager: string;
+  position: string;
+  status: string;
   deptname: string;
-  description: string;
-  workshift: string;
-  ManagerName: string;
+  shift: number;
+  hireddate: string;
+
 }
 
 const columns: TableProps<DataType>["columns"] = [
+  { title: "Employee Name", dataIndex: "empname", key: "empname" },
+  { title: "Manager", dataIndex: "manager", key: "manager" },
+  { title: "Position", dataIndex: "position", key: "position" },
+  { title: "Status", dataIndex: "status", key: "status" },
   { title: "Department", dataIndex: "deptname", key: "deptname" },
-  { title: "Description", dataIndex: "description", key: "description" },
-  { title: "Workshift", dataIndex: "workshift", key: "workshift" },
-  { title: "Manager", dataIndex: "ManagerName", key: "ManagerName" },
+  { title: "Shift", dataIndex: "address", key: "address" },
+  { title: "Hired Date", dataIndex: "hireddate", key: "hireddate" },
 ];
 
 
 const data: DataType[] = [
   {
     key: "1",
+    empname: "Alpha",
+    manager: "John Doe",
+    position: "IT",
+    status: "Active",
     deptname: "Agents Department",
-    description:
-      "Acts as the frontline support and communication hub, immediately managing high volumes of incoming and outgoing calls.",
-    workshift: "Night | 12:00 a.m - 9:00 a.m",
-    ManagerName: "Melichenko Alexandr",
+    shift: 1,
+    hireddate: "01/15/2020",
   },
   {
     key: "2",
-    deptname: "Finance Department",
-    description:
-      "Acts as the engine of operational stability, focusing on maintaining liquidity and processing transactions.",
-    workshift: "Morning | 9:00 a.m - 6:00 p.m",
-    ManagerName: "Shurenkova Larisa",
+    empname: "Beta",
+    manager: "John Doe",
+    position: "IT",
+    status: "Active",
+    deptname: "Agents Department",
+    shift: 1,
+    hireddate: "01/15/2020",
   },
   {
     key: "3",
-    deptname: "IT Department",
-    description:
-      "Acts as the engine of operational stability, focusing on maintaining liquidity and processing transactions.",
-    workshift: "Morning | 9:00 a.m - 6:00 p.m",
-    ManagerName: "Shurenkova Larisa",
+    empname: "Charlie",
+    manager: "John Doe",
+    position: "IT",
+    status: "Active",
+    deptname: "Agents Department",
+    shift: 1,
+    hireddate: "01/15/2020",
   },
 ];
 
-const Department: React.FC = () => {
+const AdminDepartmentEmployee: React.FC = () => {
   const [open, setOpen] = useState(false);
   return (
     <Layout className={styles.layout}>
@@ -82,7 +95,7 @@ const Department: React.FC = () => {
           className={styles.addBtn}
           onClick={() => setOpen(true)}
         >
-          Add Department
+          Add Employee
         </Button>
         </div>
 
@@ -92,10 +105,10 @@ const Department: React.FC = () => {
           pagination={false}
           className={styles.table}
         />
-        <AddDepartment open={open} onClose={() => setOpen(false)} />
+        <AddAddDeptEmployee open={open} onClose={() => setOpen(false)} />
       </Layout.Content>
     </Layout>
   );
 };
 
-export default Department;
+export default AdminDepartmentEmployee;

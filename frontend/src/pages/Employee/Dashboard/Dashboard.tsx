@@ -1,9 +1,10 @@
 import React from 'react';
-import { Layout, Menu } from 'antd';
+import { Layout } from 'antd';
 import Chart from '../../../components/Chart';
+import Sidebar from '../../../components/Sidebar/Sidebar';
 import * as echarts from 'echarts';
 
-const { Header, Content, Footer, Sider } = Layout;
+const { Header, Content, Footer } = Layout;
 
 const Dashboard: React.FC = () => {
   // ✅ ComposeOption type
@@ -23,12 +24,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider>
-        <Menu theme="dark" mode="inline" defaultSelectedKeys={['1']}>
-          <Menu.Item key="1">Dashboard</Menu.Item>
-          <Menu.Item key="2">Settings</Menu.Item>
-        </Menu>
-      </Sider>
+      <Sidebar />
 
       <Layout>
         <Header style={{ background: '#fff', padding: '0 16px' }}>Dashboard Header</Header>

@@ -1,6 +1,6 @@
 .container {
   display: flex;
-  height: 100vh;
+  min-height: 100vh;
   width: 100%;
 }
 
@@ -9,19 +9,14 @@
   flex: 1;
   background-color: #ffffff;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
+  padding: 2vw;
 }
 
 .logo {
-  width: 240px;
-  margin-bottom: 12px;
-}
-
-.tagline {
-  font-size: 14px;
-  color: #555;
+  width: clamp(260px, 30vw, 420px); /* scales but keeps same look */
+  height: auto;
 }
 
 /* RIGHT SIDE */
@@ -31,36 +26,84 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  padding-top: clamp(40px, 6vh, 90px);
+  padding-left: 2vw;
+  padding-right: 2vw;
 }
 
+.rightLogo {
+  width: clamp(180px, 16vw, 300px);
+  height: auto;
+  margin-bottom: clamp(20px, 3vh, 40px);
+}
+
+/* FORM WIDTH */
+.form {
+  margin-top: -40px;
+  width: min(90%, 380px);
+}
+
+/* LABEL STYLING */
 .rightPanel :global(.ant-form-item-label > label) {
   color: #ffffff !important;
+  font-size: clamp(14px, 1vw, 16px);
+  font-weight: 500;
 }
 
-.title {
-  color: #ffffff !important;
-  margin-bottom: 24px;
+/* INPUT WRAPPER */
+.rightPanel :global(.ant-input-affix-wrapper) {
+  height: clamp(44px, 5vh, 50px);
+  border-radius: 10px;
 }
 
-.form {
-  width: 300px;
+/* INPUT TEXT */
+.rightPanel :global(.ant-input) {
+  font-size: clamp(14px, 1vw, 16px);
 }
 
+/* PLACEHOLDER */
+.rightPanel :global(.ant-input::placeholder) {
+  font-size: clamp(13px, 0.9vw, 15px);
+}
+
+/* LOGIN BUTTON */
 .loginBtn {
-  border-radius: 20px;
-  height: 40px;
+  border-radius: 24px;
+  height: clamp(46px, 5.5vh, 52px);
+  font-size: clamp(14px, 1vw, 16px);
+  border: none !important;
+  color: #fff !important;
+  font-weight: 500;
+  background: linear-gradient(135deg, #59A5D8, #FFFFFF);
+  position: relative;
+  overflow: hidden;
 }
 
-/* MOBILE RESPONSIVE */
-@media (max-width: 768px) {
+.loginBtn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #FFFFFF, #59A5D8);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+.loginBtn:hover::before {
+  opacity: 1;
+}
+
+@media (max-width: 720px) {
   .container {
     flex-direction: column;
   }
 
-  .leftPanel,
+  .leftPanel {
+    padding: 40px 0;
+  }
+
   .rightPanel {
-    flex: none;
-    height: 50vh;
+    padding-top: 40px;
   }
 }

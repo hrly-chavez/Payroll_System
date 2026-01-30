@@ -32,7 +32,7 @@ class Shift_Workday(models.Model):
     day_of_week = models.CharField(max_length=10,choices=DAYS_OF_WEEK)
     is_workday = models.BooleanField(default=True)
     created_at = models.DateField(auto_now_add=True)
-    shift_id = models.ForeignKey(Shift, on_delete=models.CASCADE, related_name="workdays")
+    shift = models.ForeignKey(Shift, on_delete=models.CASCADE, related_name="workdays")
 
     class Meta:
         constraints = [
@@ -51,7 +51,7 @@ class Employee(models.Model):
     ]
 
     id = models.AutoField(primary_key=True)
-    id_no = models.CharField()
+    id_no = models.CharField(max_length=50,unique=True)
     fname = models.CharField(max_length=50)
     lname = models.CharField(max_length=50)
     initial = models.CharField(max_length=1)

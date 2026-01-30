@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState} from 'react';
 import { Layout, Menu } from 'antd';
 import {
   HomeOutlined,
@@ -28,8 +28,21 @@ interface MenuItemConfig {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ role }) => {
-  const currentRole: UserRole =
-    (role ?? (localStorage.getItem('role') as UserRole) ?? 'SUPER_ADMIN') as UserRole;
+  // const currentRole: UserRole =
+  //   (role ?? (localStorage.getItem('role') as UserRole) ?? 'EMPLOYEE') as UserRole;
+
+  const [currentRole, setCurrentRole] = useState<UserRole>('EMPLOYEE');
+
+  useEffect(() => {
+    if (role) {
+      setCurrentRole(role);
+    } else {
+      const storedRole = localStorage.getItem('role') as UserRole | null;
+      if (storedRole) {
+        setCurrentRole(storedRole);
+      }
+    }
+  }, [role]);
 
   const menuConfig: MenuItemConfig[] = [
     {

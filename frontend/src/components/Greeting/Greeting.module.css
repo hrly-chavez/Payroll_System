@@ -1,0 +1,17 @@
+.card {
+  padding: 16px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.05);
+  margin-bottom: 16px;
+}
+
+.greeting {
+  font-weight: 600;
+  font-size: 16px;
+  color: #222;
+}
+
+.name {
+  color: #1890ff;
+}

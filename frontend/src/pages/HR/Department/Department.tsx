@@ -96,6 +96,7 @@ const Department: React.FC = () => {
             dataSource={data}
             pagination={false}
             className={styles.table}
+            scroll={{ x: 'max-content' }}
           />
 
           <AddDepartment open={open} onClose={() => setOpen(false)} />

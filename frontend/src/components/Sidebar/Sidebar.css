@@ -140,3 +140,27 @@
     z-index: 1050;
   }
 }
+
+/* Desktop behavior: fix the sidebar so it remains visible while scrolling */
+@media (min-width: 768px) {
+  .custom-sider {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    height: 100vh;
+    z-index: 100;
+    overflow-y: auto; /* allow the sider to scroll independently when content is long */
+  }
+
+  /* push the adjacent main layout to make room for the fixed sider */
+  .custom-sider + .ant-layout {
+    margin-left: 250px;
+    transition: margin-left 0.28s ease;
+  }
+
+  /* collapsed sider leaves a smaller left margin */
+  .custom-sider.collapsed + .ant-layout {
+    margin-left: 80px;
+  }
+}

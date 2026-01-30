@@ -1,6 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import * as echarts from 'echarts';
 
+// ECharts optional extensions (dataTool provides helpers for data processing, etc.)
+// We're using the built-in extension to enable extra features without adding new deps
+import 'echarts/extension/dataTool';
+
 interface ChartProps {
   // Compose option for bar, line, and pie charts
   option: echarts.ComposeOption<

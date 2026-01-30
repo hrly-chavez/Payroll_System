@@ -71,6 +71,7 @@ const data: DataType[] = [
 const AdminDepartmentEmployee: React.FC = () => {
   const { deptId } = useParams();
   const [open, setOpen] = useState(false);
+  const role = localStorage.getItem('role');
   return (
     <Layout className={styles.layout} style={{ minHeight: '100vh' }}>
       <Sidebar />
@@ -94,15 +95,17 @@ const AdminDepartmentEmployee: React.FC = () => {
               </Button>
             </div>
 
-            {/* RIGHT SIDE BUTTON */}
-            <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            className={styles.addBtn}
-            onClick={() => setOpen(true)}
-          >
-            Add Employee
-          </Button>
+            {/* RIGHT SIDE BUTTON (hidden for Super Admin) */}
+            {role !== 'SUPER_ADMIN' && (
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                className={styles.addBtn}
+                onClick={() => setOpen(true)}
+              >
+                Add Employee
+              </Button>
+            )}
           </div>
 
           <Table<DataType>
@@ -110,8 +113,9 @@ const AdminDepartmentEmployee: React.FC = () => {
             dataSource={data}
             pagination={false}
             className={styles.table}
+            scroll={{ x: 'max-content' }}
           />
-          <AddAddDeptEmployee open={open} onClose={() => setOpen(false)} />
+          {role !== 'SUPER_ADMIN' && <AddAddDeptEmployee open={open} onClose={() => setOpen(false)} />}
         </Layout.Content>
       </Layout>
     </Layout>

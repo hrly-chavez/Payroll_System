@@ -54,6 +54,7 @@ const Router: React.FC = () => {
                 <Route path="/super-admin/attendance" element={<SupAttendance />} />
                 <Route path="/super-admin/reports" element={<SupReport />} />
                 <Route path="/super-admin/department" element={<SupDepartment />} />
+                <Route path="/super-admin/department-employee" element={<AdDepartmentEmployee />} />
                 <Route path="/super-admin/system" element={<SupSystemConfig />} />
                 
 

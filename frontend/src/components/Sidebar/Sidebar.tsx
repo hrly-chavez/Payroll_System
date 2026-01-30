@@ -33,7 +33,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
   // const currentRole: UserRole =
   //   (role ?? (localStorage.getItem('role') as UserRole) ?? 'EMPLOYEE') as UserRole;
 
-  const [currentRole, setCurrentRole] = useState<UserRole>('EMPLOYEE');
+  const [currentRole, setCurrentRole] = useState<UserRole>('SUPER_ADMIN');
 
   useEffect(() => {
     if (role) {

@@ -3,6 +3,7 @@ import { Layout } from 'antd';
 import Chart from '../../../components/Chart';
 import Sidebar from '../../../components/Sidebar/Sidebar';
 import Topbar from '../../../components/Topbar/Topbar';
+import Greeting from '../../../components/Greeting/Greeting';
 import * as echarts from 'echarts';
 
 const { Header, Content, Footer } = Layout;
@@ -31,6 +32,8 @@ const Dashboard: React.FC = () => {
         <Topbar title="Dashboard" />
 
         <Content style={{ margin: '16px' }}>
+          <Greeting />
+
           <div style={{ padding: 24, background: '#fff' }}>
             <h2>Dashboard Charts</h2>
             <Chart option={chartOption} style={{ height: 400, marginTop: 24 }} />

@@ -1,0 +1,53 @@
+.layout {
+  min-height: 100vh;
+}
+
+.content {
+  padding: 24px;
+  background: #f7f9fb;
+}
+
+.topBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.leftControls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.searchInput {
+  width: 260px;
+}
+
+.filterBtn {
+  border-radius: 6px;
+}
+
+.addBtn {
+  border-radius: 6px;
+  padding: 0 16px;
+  font-weight: 500;
+  background-color: #386FA4;
+}
+.addBtn:hover {
+  background-color: #2f5f8d !important;   /* darker shade */
+  border-color: #2f5f8d !important;
+}
+
+
+/* Table styling */
+.table {
+  background: #ffffff;
+  padding: 16px;
+  border-radius: 10px;
+}
+
+/* Make description column wrap nicely */
+:global(.ant-table-cell) {
+  vertical-align: top;
+}

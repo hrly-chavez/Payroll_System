@@ -1,6 +1,6 @@
 .container {
   display: flex;
-  height: 100vh;
+  min-height: 100vh;
   width: 100%;
 }
 
@@ -10,23 +10,13 @@
   background-color: #ffffff;
   display: flex;
   align-items: center;
-  justify-content: center; /* Perfect center */
+  justify-content: center;
+  padding: 2vw;
 }
 
 .logo {
-  width: 350px;
-  margin: 0;
-}
-
-.rightLogo {
-  width: 260px;
-  margin-top: 40px;  
-  margin-bottom: -50px;
-}
-
-.tagline {
-  font-size: 14px;
-  color: #555;
+  width: clamp(260px, 30vw, 420px); /* scales but keeps same look */
+  height: auto;
 }
 
 /* RIGHT SIDE */
@@ -37,52 +27,59 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding-top: 5vh;
+  padding-top: clamp(40px, 6vh, 90px);
+  padding-left: 2vw;
+  padding-right: 2vw;
+}
+
+.rightLogo {
+  width: clamp(180px, 16vw, 300px);
+  height: auto;
+  margin-bottom: clamp(20px, 3vh, 40px);
 }
 
 /* FORM WIDTH */
 .form {
-  width: 360px;
+  margin-top: -40px;
+  width: min(90%, 380px);
 }
 
 /* LABEL STYLING */
 .rightPanel :global(.ant-form-item-label > label) {
   color: #ffffff !important;
-  font-size: 16px;
+  font-size: clamp(14px, 1vw, 16px);
   font-weight: 500;
 }
 
-/* INPUT WRAPPER (important for Password field) */
+/* INPUT WRAPPER */
 .rightPanel :global(.ant-input-affix-wrapper) {
-  height: 46px;
+  height: clamp(44px, 5vh, 50px);
   border-radius: 10px;
 }
 
-/* ACTUAL INPUT TEXT */
+/* INPUT TEXT */
 .rightPanel :global(.ant-input) {
-  font-size: 16px;
+  font-size: clamp(14px, 1vw, 16px);
 }
 
-/* PLACEHOLDER TEXT */
+/* PLACEHOLDER */
 .rightPanel :global(.ant-input::placeholder) {
-  font-size: 15px;
+  font-size: clamp(13px, 0.9vw, 15px);
 }
 
 /* LOGIN BUTTON */
 .loginBtn {
-  border-radius: 22px;
-  height: 46px;
+  border-radius: 24px;
+  height: clamp(46px, 5.5vh, 52px);
+  font-size: clamp(14px, 1vw, 16px);
   border: none !important;
   color: #fff !important;
   font-weight: 500;
-  font-size: 16px;
   background: linear-gradient(135deg, #59A5D8, #FFFFFF);
   position: relative;
   overflow: hidden;
-  z-index: 1;
 }
 
-/* Hover gradient animation */
 .loginBtn::before {
   content: "";
   position: absolute;
@@ -97,15 +94,16 @@
   opacity: 1;
 }
 
-/* MOBILE RESPONSIVE */
-@media (max-width: 768px) {
+@media (max-width: 720px) {
   .container {
     flex-direction: column;
   }
 
-  .leftPanel,
+  .leftPanel {
+    padding: 40px 0;
+  }
+
   .rightPanel {
-    flex: none;
-    height: 50vh;
+    padding-top: 40px;
   }
 }

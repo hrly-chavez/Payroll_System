@@ -9,14 +9,19 @@
   flex: 1;
   background-color: #ffffff;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: center; /* Perfect center */
 }
 
 .logo {
-  width: 240px;
-  margin-bottom: 12px;
+  width: 350px;
+  margin: 0;
+}
+
+.rightLogo {
+  width: 260px;
+  margin-top: 40px;  
+  margin-bottom: -50px;
 }
 
 .tagline {
@@ -31,25 +36,65 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  padding-top: 5vh;
 }
 
+/* FORM WIDTH */
+.form {
+  width: 360px;
+}
+
+/* LABEL STYLING */
 .rightPanel :global(.ant-form-item-label > label) {
   color: #ffffff !important;
+  font-size: 16px;
+  font-weight: 500;
 }
 
-.title {
-  color: #ffffff !important;
-  margin-bottom: 24px;
+/* INPUT WRAPPER (important for Password field) */
+.rightPanel :global(.ant-input-affix-wrapper) {
+  height: 46px;
+  border-radius: 10px;
 }
 
-.form {
-  width: 300px;
+/* ACTUAL INPUT TEXT */
+.rightPanel :global(.ant-input) {
+  font-size: 16px;
 }
 
+/* PLACEHOLDER TEXT */
+.rightPanel :global(.ant-input::placeholder) {
+  font-size: 15px;
+}
+
+/* LOGIN BUTTON */
 .loginBtn {
-  border-radius: 20px;
-  height: 40px;
+  border-radius: 22px;
+  height: 46px;
+  border: none !important;
+  color: #fff !important;
+  font-weight: 500;
+  font-size: 16px;
+  background: linear-gradient(135deg, #59A5D8, #FFFFFF);
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+
+/* Hover gradient animation */
+.loginBtn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #FFFFFF, #59A5D8);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+.loginBtn:hover::before {
+  opacity: 1;
 }
 
 /* MOBILE RESPONSIVE */

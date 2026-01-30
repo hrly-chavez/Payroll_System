@@ -7,12 +7,14 @@ import EmpDashboard from "./pages/Employee/Dashboard/Dashboard";
 import EmpCalendar from "./pages/Employee/Calendar/Calendar";
 import EmpAttendance from "./pages/Employee/Attendance/Attendance";
 
-//admin / rh
+//admin / hr
 import AdDashboard from "./pages/HR/Dashboard/Dashboard";
 import AdCalendar from "./pages/HR/Calendar/Calendar";
 import AdAttendance from "./pages/HR/Attendance/Attendance";
 import AdReport from "./pages/HR/Reports/Reports";
 import AdDepartment from "./pages/HR/Department/Department";
+import AdDepartmentAddDept from "./pages/HR/Department/AddDepartment";
+import AdDepartmentEmployee from "./pages/HR/AdminDepartmentEmployee/AdminDepartmentEmployee";
 
 //super admin
 import SupDashboard from "./pages/SuperAdmin/Dashboard/Dashboard";
@@ -39,6 +41,8 @@ const Router: React.FC = () => {
                 <Route path="/admin/attendance" element={<AdAttendance />} />
                 <Route path="/admin/reports" element={<AdReport />} />
                 <Route path="/admin/department" element={<AdDepartment />} />
+                <Route path="/admin/department-employee" element={<AdDepartmentEmployee />} />
+
 
                 {/* super admin ui */}
                 <Route path="/super-admin/dashboard" element={<SupDashboard />} />

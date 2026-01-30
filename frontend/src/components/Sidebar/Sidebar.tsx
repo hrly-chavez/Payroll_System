@@ -8,6 +8,7 @@ import {
   BarChartOutlined,
   TeamOutlined,
 } from '@ant-design/icons';
+import { Link, useLocation } from 'react-router-dom';
 import logo from '../../components/attitechlogo.png';
 import './Sidebar.css';
 
@@ -28,6 +29,7 @@ interface MenuItemConfig {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ role }) => {
+  const location = useLocation();
   // const currentRole: UserRole =
   //   (role ?? (localStorage.getItem('role') as UserRole) ?? 'EMPLOYEE') as UserRole;
 
@@ -109,36 +111,95 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
     },
   ];
 
-  const visibleItems = menuConfig.filter((item) =>
+  const visibleItems = menuConfig.filter(item =>
     item.roles.includes(currentRole)
   );
 
+  const selectedKey =
+    menuConfig.find(item =>
+      Object.values(item.hrefs).includes(location.pathname)
+    )?.key ?? 'dashboard';
+
+  const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' && window.innerWidth < 768);
+  const [collapsed, setCollapsed] = useState<boolean>(isMobile);
+
+  React.useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) setCollapsed(true);
+    };
+
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const showOverlay = isMobile && !collapsed;
+
+  React.useEffect(() => {
+    const body = document.body;
+    // only add a class when the mobile sidebar is opened (overlay)
+    body.classList.remove('sidebar-open-mobile');
+
+    if (isMobile && !collapsed) {
+      body.classList.add('sidebar-open-mobile');
+    }
+
+    return () => {
+      body.classList.remove('sidebar-open-mobile');
+    };
+  }, [collapsed, isMobile]);
+
   return (
-    <Sider className="custom-sider" width={250} theme="dark">
-      <div className="logo-container">
-        <img src={logo} alt="AttiTech" />
-      </div>
+    <>
+      {showOverlay && (
+        <div
+          className="sider-overlay"
+          onClick={() => setCollapsed(true)}
+          aria-hidden
+        />
+      )}
 
-      <Menu
+      <Sider
+        className={`custom-sider ${collapsed ? 'collapsed' : ''} ${isMobile ? 'mobile' : ''}`}
+        width={250}
         theme="dark"
-        mode="inline"
-        defaultSelectedKeys={['dashboard']}
-        style={{ background: 'transparent', borderRight: 'none', paddingTop: 4 }}
-        className="custom-menu"
+        collapsible
+        collapsedWidth={isMobile ? 0 : 80}
+        breakpoint="md"
+        collapsed={collapsed}
+        onCollapse={value => setCollapsed(value)}
+        onBreakpoint={broken => {
+          setIsMobile(broken);
+          if (broken) setCollapsed(true);
+        }}
       >
-        {visibleItems.map((item) => {
-          const href = item.hrefs[currentRole];
+        <div className="logo-container">
+          <img src={logo} alt="AttiTech" />
+        </div>
 
-          if (!href) return null;
 
-          return (
-            <Menu.Item key={item.key} icon={item.icon}>
-              <a href={href}>{item.label}</a>
-            </Menu.Item>
-          );
-        })}
-      </Menu>
-    </Sider>
+        <Menu
+          theme="dark"
+          mode="inline"
+          selectedKeys={[selectedKey]}
+          className="custom-menu"
+          inlineCollapsed={collapsed}
+          style={{ background: 'transparent', borderRight: 'none', paddingTop: 4 }}
+        >
+          {visibleItems.map(item => {
+            const href = item.hrefs[currentRole];
+            if (!href) return null;
+
+            return (
+              <Menu.Item key={item.key} icon={item.icon}>
+                <Link to={href}>{item.label}</Link>
+              </Menu.Item>
+            );
+          })}
+        </Menu>
+      </Sider>
+    </>
   );
 };
 

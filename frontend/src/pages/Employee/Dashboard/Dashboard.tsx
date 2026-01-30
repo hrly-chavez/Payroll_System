@@ -2,6 +2,7 @@ import React from 'react';
 import { Layout } from 'antd';
 import Chart from '../../../components/Chart';
 import Sidebar from '../../../components/Sidebar/Sidebar';
+import Topbar from '../../../components/Topbar/Topbar';
 import * as echarts from 'echarts';
 
 const { Header, Content, Footer } = Layout;
@@ -27,7 +28,7 @@ const Dashboard: React.FC = () => {
       <Sidebar />
 
       <Layout>
-        <Header style={{ background: '#fff', padding: '0 16px' }}>Dashboard Header</Header>
+        <Topbar title="Dashboard" />
 
         <Content style={{ margin: '16px' }}>
           <div style={{ padding: 24, background: '#fff' }}>

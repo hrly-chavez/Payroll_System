@@ -1,0 +1,25 @@
+.modal {
+  border-radius: 10px;
+}
+
+.form {
+  margin-top: 10px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.saveBtn {
+  background-color: #386FA4 !important;
+  border-color: #386FA4 !important;
+  border-radius: 6px;
+}
+
+.addBtn:hover {
+  background-color: #2f5f8d !important;   /* darker shade */
+  border-color: #2f5f8d !important;
+}
+

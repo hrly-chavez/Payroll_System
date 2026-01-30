@@ -11,7 +11,6 @@
   align-items: center;
   margin-bottom: 24px;
   background: #ffffff;
-  padding: 0px;
   border-radius: 50%;
   width: 110px;
   height: 110px;
@@ -22,7 +21,6 @@
 .custom-sider .logo-container img {
   width: 110px;
   height: auto;
-  display: block;
 }
 
 .custom-menu {
@@ -34,19 +32,111 @@
   font-size: 22px !important;
   height: 48px !important;
   line-height: 48px !important;
-  color: rgba(255,255,255,0.95) !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+  transition:
+    transform 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .custom-sider .custom-menu .ant-menu-item a {
-  color: rgba(255,255,255,0.95) !important;
+  color: rgba(255, 255, 255, 0.95) !important;
   font-size: 18px !important;
 }
 
-.custom-sider .custom-menu .ant-menu-item:hover,
-.custom-sider .custom-menu .ant-menu-item a:hover {
-  color: #ffffff !important;
+.custom-sider .custom-menu .ant-menu-item:hover {
+  transform: translateY(-2px) scale(1.02);
+  background: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.15);
+}
+
+.custom-sider .custom-menu .ant-menu-item .anticon {
+  transition: transform 0.2s ease;
+}
+
+.custom-sider .custom-menu .ant-menu-item:hover .anticon {
+  transform: scale(1.15);
 }
 
 .custom-sider .custom-menu .ant-menu-item-selected {
-  background: rgba(255,255,255,0.08) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.custom-sider .custom-menu .ant-menu-item-selected:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* Responsive adjustments */
+
+.custom-sider .logo-container,
+.custom-sider .logo-container img {
+  transition: width 0.28s ease, height 0.28s ease, transform 0.28s ease;
+}
+
+.custom-sider.collapsed .logo-container {
+  width: 70px;
+  height: 70px;
+}
+
+.custom-sider.collapsed .logo-container img {
+  width: 70px;
+}
+
+@media (max-width: 991px) {
+  .custom-sider {
+    width: 80px !important;
+    min-width: 80px !important;
+  }
+
+  .custom-sider .logo-container {
+    width: 70px;
+    height: 70px;
+  }
+
+  .custom-sider .custom-menu .ant-menu-item {
+    font-size: 16px !important;
+    height: 48px !important;
+  }
+
+
+}
+
+@media (max-width: 767px) {
+  .custom-sider {
+    position: fixed;
+    z-index: 1100;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    transform: translateX(0);
+    transition: transform 0.28s ease;
+    width: 250px !important;
+  }
+
+  .custom-sider.mobile.collapsed {
+    transform: translateX(-100%);
+  }
+
+  .custom-sider .logo-container {
+    width: 60px;
+    height: 60px;
+  }
+
+  .custom-sider .logo-container img {
+    width: 60px;
+  }
+
+  .custom-sider .custom-menu .ant-menu-item a {
+    font-size: 14px !important;
+  }
+
+
+
+  .sider-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 1050;
+  }
 }

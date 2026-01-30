@@ -1,0 +1,59 @@
+.app-topbar {
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+  height: 100px;
+  transition: padding 0.28s ease;
+}
+
+/* On small screens we don't push the topbar by default; when mobile sidebar opens we shift it */
+@media (max-width: 767px) {
+  .sidebar-open-mobile .app-topbar {
+    margin-left: 250px;
+  }
+
+  /* optionally hide title when mobile sidebar is open to save space */
+  .sidebar-open-mobile .topbar-title {
+    display: none;
+  }
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topbar-title {
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  margin-right: 20px;
+  gap: 15px;
+}
+
+.topbar-icon {
+  font-size: 23px;
+  color: rgba(0,0,0,0.65);
+  cursor: pointer;
+  /* slight left nudge to visually align with title */
+  transform: translateX(-4px);
+  transition: transform .12s ease, color .12s ease;
+}
+
+.topbar-icon:hover {
+  color: #1890ff;
+  transform: translateX(-4px) scale(1.12);
+}
+
+.topbar-avatar {
+  margin-left: 0;
+}

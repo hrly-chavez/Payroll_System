@@ -3,6 +3,7 @@ import { Layout, Table, Input, Button } from "antd";
 import type { TableProps } from "antd";
 import { PlusOutlined, SearchOutlined, SlidersOutlined } from "@ant-design/icons";
 import Sidebar from "../../../components/Sidebar/Sidebar";
+import Topbar from '../../../components/Topbar/Topbar';
 import styles from "./Admin_DepartmentEmployee.module.css";  
 import { useState } from "react";
 import AddAddDeptEmployee from "./AddAdDeptEmployee";
@@ -67,46 +68,48 @@ const data: DataType[] = [
 const AdminDepartmentEmployee: React.FC = () => {
   const [open, setOpen] = useState(false);
   return (
-    <Layout className={styles.layout}>
+    <Layout className={styles.layout} style={{ minHeight: '100vh' }}>
       <Sidebar />
+      <Layout>
+        <Topbar title="Department > Employee" />
+        <Layout.Content className={styles.content}>
+          <div className={styles.topBar}>
+            {/* LEFT SIDE CONTROLS */}
+            <div className={styles.leftControls}>
+              <Input
+                placeholder="Search"
+                prefix={<SearchOutlined />}
+                className={styles.searchInput}
+              />
 
-      <Layout.Content className={styles.content}>
-        <div className={styles.topBar}>
-          {/* LEFT SIDE CONTROLS */}
-          <div className={styles.leftControls}>
-            <Input
-              placeholder="Search"
-              prefix={<SearchOutlined />}
-              className={styles.searchInput}
-            />
+              <Button
+                icon={<SlidersOutlined />}
+                className={styles.filterBtn}
+              >
+                Filter
+              </Button>
+            </div>
 
+            {/* RIGHT SIDE BUTTON */}
             <Button
-              icon={<SlidersOutlined />}
-              className={styles.filterBtn}
-            >
-              Filter
-            </Button>
+            type="primary"
+            icon={<PlusOutlined />}
+            className={styles.addBtn}
+            onClick={() => setOpen(true)}
+          >
+            Add Employee
+          </Button>
           </div>
 
-          {/* RIGHT SIDE BUTTON */}
-          <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          className={styles.addBtn}
-          onClick={() => setOpen(true)}
-        >
-          Add Employee
-        </Button>
-        </div>
-
-        <Table<DataType>
-          columns={columns}
-          dataSource={data}
-          pagination={false}
-          className={styles.table}
-        />
-        <AddAddDeptEmployee open={open} onClose={() => setOpen(false)} />
-      </Layout.Content>
+          <Table<DataType>
+            columns={columns}
+            dataSource={data}
+            pagination={false}
+            className={styles.table}
+          />
+          <AddAddDeptEmployee open={open} onClose={() => setOpen(false)} />
+        </Layout.Content>
+      </Layout>
     </Layout>
   );
 };

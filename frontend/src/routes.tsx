@@ -2,14 +2,51 @@ import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Login from "./pages/Login/Login";
-import Dashboard from "./pages/Employee/Dashboard/Dashboard";
+// employee
+import EmpDashboard from "./pages/Employee/Dashboard/Dashboard";
+import EmpCalendar from "./pages/Employee/Calendar/Calendar";
+import EmpAttendance from "./pages/Employee/Attendance/Attendance";
+
+//admin / rh
+import AdDashboard from "./pages/HR/Dashboard/Dashboard";
+import AdCalendar from "./pages/HR/Calendar/Calendar";
+import AdAttendance from "./pages/HR/Attendance/Attendance";
+import AdReport from "./pages/HR/Reports/Reports";
+import AdDepartment from "./pages/HR/Department/Department";
+
+//super admin
+import SupDashboard from "./pages/SuperAdmin/Dashboard/Dashboard";
+import SupCalendar from "./pages/SuperAdmin/Calendar/Calendar";
+import SupAttendance from "./pages/SuperAdmin/Attendance/Attendance";
+import SupReport from "./pages/SuperAdmin/Reports/Reports";
+import SupDepartment from "./pages/SuperAdmin/Department/Department";
 
 const Router: React.FC = () => {
     return (
         <BrowserRouter>
             <Routes>
+
+                {/* employee ui */}
                 <Route path="/Login" element={<Login />} />
-                <Route path="/employee_dashboard" element={<Dashboard />} />
+                <Route path="/employee_dashboard" element={<EmpDashboard />} />
+                <Route path="/employee/calendar" element={<EmpCalendar />} />
+                <Route path="/employee/attendance" element={<EmpAttendance />} />
+
+                {/* admin ui */}
+                <Route path="/admin/dashboard" element={<AdDashboard />} />
+                <Route path="/admin/calendar" element={<AdCalendar />} />
+                <Route path="/admin/attendance" element={<AdAttendance />} />
+                <Route path="/admin/reports" element={<AdReport />} />
+                <Route path="/admin/department" element={<AdDepartment />} />
+
+                {/* super admin ui */}
+                <Route path="/super-admin/dashboard" element={<SupDashboard />} />
+                <Route path="/super-admin/calendar" element={<SupCalendar />} />
+                <Route path="/super-admin/attendance" element={<SupAttendance />} />
+                <Route path="/super-admin/reports" element={<SupReport />} />
+                <Route path="/super-admin/department" element={<SupDepartment />} />
+                
+
             </Routes>
         </BrowserRouter>
     );

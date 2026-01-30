@@ -53,7 +53,7 @@ const Department: React.FC = () => {
       dataIndex: "deptname",
       key: "deptname",
       render: (text, record) => (
-        <a onClick={() => navigate(`/admin/department/${record.key}`)}>
+        <a onClick={() => navigate(`/admin/department-employee`)}>
           {text}
         </a>
       ),

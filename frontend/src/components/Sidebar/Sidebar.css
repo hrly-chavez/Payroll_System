@@ -1,0 +1,52 @@
+.custom-sider {
+  background: #3f78a3 !important;
+  padding-top: 24px !important;
+  box-shadow: none !important;
+  height: 100vh;
+}
+
+.custom-sider .logo-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 24px;
+  background: #ffffff;
+  padding: 0px;
+  border-radius: 50%;
+  width: 110px;
+  height: 110px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.custom-sider .logo-container img {
+  width: 110px;
+  height: auto;
+  display: block;
+}
+
+.custom-menu {
+  background: transparent !important;
+  border-right: none !important;
+}
+
+.custom-sider .custom-menu .ant-menu-item {
+  font-size: 22px !important;
+  height: 48px !important;
+  line-height: 48px !important;
+  color: rgba(255,255,255,0.95) !important;
+}
+
+.custom-sider .custom-menu .ant-menu-item a {
+  color: rgba(255,255,255,0.95) !important;
+  font-size: 18px !important;
+}
+
+.custom-sider .custom-menu .ant-menu-item:hover,
+.custom-sider .custom-menu .ant-menu-item a:hover {
+  color: #ffffff !important;
+}
+
+.custom-sider .custom-menu .ant-menu-item-selected {
+  background: rgba(255,255,255,0.08) !important;
+}

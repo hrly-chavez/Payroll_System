@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'employees',
     'payroll',
     'approvals',
+    'shared_model',
 ]
 
 MIDDLEWARE = [

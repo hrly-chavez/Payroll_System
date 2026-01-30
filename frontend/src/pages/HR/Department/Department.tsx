@@ -1,13 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 import { Layout, Table, Input, Button } from "antd";
 import type { TableProps } from "antd";
 import { PlusOutlined, SearchOutlined, SlidersOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
-import Topbar from '../../../components/Topbar/Topbar';
+import Topbar from "../../../components/Topbar/Topbar";
 import styles from "./Department.module.css";
 import AddDepartment from "./AddDepartment";
-import { useState } from "react"; 
-
 
 interface DataType {
   key: string;
@@ -16,14 +15,6 @@ interface DataType {
   workshift: string;
   ManagerName: string;
 }
-
-const columns: TableProps<DataType>["columns"] = [
-  { title: "Department", dataIndex: "deptname", key: "deptname" },
-  { title: "Description", dataIndex: "description", key: "description" },
-  { title: "Workshift", dataIndex: "workshift", key: "workshift" },
-  { title: "Manager", dataIndex: "ManagerName", key: "ManagerName" },
-];
-
 
 const data: DataType[] = [
   {
@@ -53,39 +44,51 @@ const data: DataType[] = [
 ];
 
 const Department: React.FC = () => {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+
+  const columns: TableProps<DataType>["columns"] = [
+    {
+      title: "Department",
+      dataIndex: "deptname",
+      key: "deptname",
+      render: (text, record) => (
+        <a onClick={() => navigate(`/admin/department/${record.key}`)}>
+          {text}
+        </a>
+      ),
+    },
+    { title: "Description", dataIndex: "description", key: "description" },
+    { title: "Workshift", dataIndex: "workshift", key: "workshift" },
+    { title: "Manager", dataIndex: "ManagerName", key: "ManagerName" },
+  ];
+
   return (
-    <Layout className={styles.layout} style={{ minHeight: '100vh' }}>
+    <Layout className={styles.layout} style={{ minHeight: "100vh" }}>
       <Sidebar />
       <Layout>
         <Topbar title="Department" />
         <Layout.Content className={styles.content}>
           <div className={styles.topBar}>
-            {/* LEFT SIDE CONTROLS */}
             <div className={styles.leftControls}>
               <Input
                 placeholder="Search"
                 prefix={<SearchOutlined />}
                 className={styles.searchInput}
               />
-
-              <Button
-                icon={<SlidersOutlined />}
-                className={styles.filterBtn}
-              >
+              <Button icon={<SlidersOutlined />} className={styles.filterBtn}>
                 Filter
               </Button>
             </div>
 
-            {/* RIGHT SIDE BUTTON */}
             <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            className={styles.addBtn}
-            onClick={() => setOpen(true)}
-          >
-            Add Department
-          </Button>
+              type="primary"
+              icon={<PlusOutlined />}
+              className={styles.addBtn}
+              onClick={() => setOpen(true)}
+            >
+              Add Department
+            </Button>
           </div>
 
           <Table<DataType>
@@ -94,6 +97,7 @@ const Department: React.FC = () => {
             pagination={false}
             className={styles.table}
           />
+
           <AddDepartment open={open} onClose={() => setOpen(false)} />
         </Layout.Content>
       </Layout>

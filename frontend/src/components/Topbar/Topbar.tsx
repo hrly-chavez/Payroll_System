@@ -1,6 +1,7 @@
 import React from 'react';
-import { Layout, Typography, Avatar, Badge } from 'antd';
-import { BellFilled } from '@ant-design/icons';
+import { Layout, Typography, Avatar, Badge, Button } from 'antd';
+import { BellFilled, ArrowLeftOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import './Topbar.css';
 
 const { Header } = Layout;
@@ -8,15 +9,24 @@ const { Text } = Typography;
 
 interface TopbarProps {
   title?: string;
+  showBack?: boolean;   // ✅ ADD THIS
 }
 
-const Topbar: React.FC<TopbarProps> = ({ title = 'Dashboard' }) => { // can change here topbar name 
+const Topbar: React.FC<TopbarProps> = ({ title = 'Dashboard', showBack }) => {
+  const navigate = useNavigate(); // ✅ REQUIRED FOR BACK BUTTON
+
   return (
     <Header className="app-topbar">
       <div className="topbar-left">
-        <Text className="topbar-title">
-          {title}
-        </Text>
+        {showBack && (
+          <Button
+            type="text"
+            icon={<ArrowLeftOutlined />}
+            className="topbar-back"
+            onClick={() => navigate(-1)}
+          />
+        )}
+        <Text className="topbar-title">{title}</Text>
       </div>
 
       <div className="topbar-right">

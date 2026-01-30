@@ -8,6 +8,11 @@
   height: 100px;
   transition: padding 0.28s ease;
 }
+.topbar-back {
+  font-size: 18px;
+  margin-right: 8px;
+}
+
 
 /* On small screens we don't push the topbar by default; when mobile sidebar opens we shift it */
 @media (max-width: 767px) {

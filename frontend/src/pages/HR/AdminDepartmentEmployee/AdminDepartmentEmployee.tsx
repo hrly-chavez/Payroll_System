@@ -7,6 +7,8 @@ import Topbar from '../../../components/Topbar/Topbar';
 import styles from "./Admin_DepartmentEmployee.module.css";  
 import { useState } from "react";
 import AddAddDeptEmployee from "./AddAdDeptEmployee";
+import { useParams } from "react-router-dom";
+
 
 
 interface DataType {
@@ -20,6 +22,7 @@ interface DataType {
   hireddate: string;
 
 }
+
 
 const columns: TableProps<DataType>["columns"] = [
   { title: "Employee Name", dataIndex: "empname", key: "empname" },
@@ -66,12 +69,13 @@ const data: DataType[] = [
 ];
 
 const AdminDepartmentEmployee: React.FC = () => {
+  const { deptId } = useParams();
   const [open, setOpen] = useState(false);
   return (
     <Layout className={styles.layout} style={{ minHeight: '100vh' }}>
       <Sidebar />
       <Layout>
-        <Topbar title="Department > Employee" />
+      <Topbar title={`Employees`} showBack />
         <Layout.Content className={styles.content}>
           <div className={styles.topBar}>
             {/* LEFT SIDE CONTROLS */}

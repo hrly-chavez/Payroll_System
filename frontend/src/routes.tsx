@@ -41,7 +41,8 @@ const Router: React.FC = () => {
                 <Route path="/admin/attendance" element={<AdAttendance />} />
                 <Route path="/admin/reports" element={<AdReport />} />
                 <Route path="/admin/department" element={<AdDepartment />} />
-                <Route path="/admin/department-employee" element={<AdDepartmentEmployee />} />
+                <Route path="/admin/department/:deptId" element={<AdDepartmentEmployee />} />
+                
 
 
                 {/* super admin ui */}

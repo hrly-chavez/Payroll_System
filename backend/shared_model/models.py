@@ -103,5 +103,30 @@ class User(models.Model):
     class Meta:
         db_table = 'users'
     
+class Employee_Salary(models.Model):
+    PAY_TYPES = [
+        ("Monthly","Monthly"),
+        ("SemiMonthly","SemiMonthly"),
+        ("Daily","Daily"),
+        ("Hourly","Hourly"),
+    ]
 
+    id = models.AutoField(primary_key=True)
+    pay_type =  models.CharField(max_length=20, choices=PAY_TYPES)
+    #per_day = models.IntegerField()
+    base_rate = models.IntegerField()
+    effective_from = models.DateField()
     
+class Deduction_Type(models.Model):
+    calculation_choices = [
+        ("Fixed","Fixed"),
+        ("Percent","Percent"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=50)
+    code = models.CharField(max_length=100,unique=True)
+    calulation_type = models.CharField(max_length=20, choices=calculation_choices)
+    is_active = models.BooleanField(default=True)
+    create_at = models.DateField(auto_now_add=True)
+

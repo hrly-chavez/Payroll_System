@@ -1,7 +1,11 @@
 import React, { useState } from "react";
 import { Layout, Table, Input, Button } from "antd";
 import type { TableProps } from "antd";
-import { PlusOutlined, SearchOutlined, SlidersOutlined } from "@ant-design/icons";
+import {
+  PlusOutlined,
+  SearchOutlined,
+  SlidersOutlined,
+} from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
@@ -52,18 +56,42 @@ const Department: React.FC = () => {
       title: "Department",
       dataIndex: "deptname",
       key: "deptname",
+      width: 200,
+      render: (text) => (
+        <a onClick={() => navigate(`/admin/department-employee`)}>
+          {text}
+        </a>
+      ),
       render: (text) => <span className={styles.rowLink}>{text}</span>,
     },
-    { title: "Description", dataIndex: "description", key: "description" },
-    { title: "Workshift", dataIndex: "workshift", key: "workshift" },
-    { title: "Manager", dataIndex: "ManagerName", key: "ManagerName" },
+    {
+      title: "Description",
+      dataIndex: "description",
+      key: "description",
+      responsive: ["md"], // hides on mobile
+    },
+    {
+      title: "Workshift",
+      dataIndex: "workshift",
+      key: "workshift",
+      width: 220,
+    },
+    {
+      title: "Manager",
+      dataIndex: "ManagerName",
+      key: "ManagerName",
+      width: 220,
+      responsive: ["lg"], // hides on small screens
+    },
   ];
 
   return (
-    <Layout className={styles.layout} style={{ minHeight: "100vh" }}>
+    <Layout className={styles.layout}>
       <Sidebar />
+
       <Layout>
         <Topbar title="Department" />
+
         <Layout.Content className={styles.content}>
           <div className={styles.topBar}>
             <div className={styles.leftControls}>

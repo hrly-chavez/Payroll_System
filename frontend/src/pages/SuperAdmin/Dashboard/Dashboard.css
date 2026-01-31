@@ -1,0 +1,58 @@
+.dashboard-layout {
+  min-height: 100vh;
+}
+
+.dashboard-content {
+  margin: 16px;
+}
+
+/* Cards */
+.card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.analytics-card {
+  min-height: 360px;
+}
+
+.card-title {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.calendar-card {
+  margin-bottom: 16px;
+}
+
+.calendar-title {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+/* Stats */
+.stats-row {
+  margin-top: 16px;
+}
+
+.stat-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #888;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.stat-value.danger {
+  color: #ff4d4f;
+}

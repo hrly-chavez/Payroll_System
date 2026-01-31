@@ -7,11 +7,13 @@
   background: #f7f9fb;
 }
 
+/* Top controls */
 .topBar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 18px;
+  gap: 12px;
 }
 
 .leftControls {
@@ -32,15 +34,15 @@
   border-radius: 6px;
   padding: 0 16px;
   font-weight: 500;
-  background-color: #386FA4;
+  background-color: #386fa4;
 }
+
 .addBtn:hover {
-  background-color: #2f5f8d !important;   /* darker shade */
+  background-color: #2f5f8d !important;
   border-color: #2f5f8d !important;
 }
 
-
-/* Table styling */
+/* Table container */
 .table {
   background: #ffffff;
   padding: 16px;
@@ -55,19 +57,38 @@
   background: #f4f8ff !important;
 }
 
+/* Desktop: no scroll */
+.table :global(.ant-table-container) {
+  overflow-x: visible;
+}
+
+/* Tablet & mobile: horizontal scroll */
+@media (max-width: 1024px) {
+  .table :global(.ant-table-container) {
+    overflow-x: auto;
+  }
+
+  .table :global(.ant-table) {
+    min-width: 720px;
+  }
+=======
 :global(.ant-table-cell) {
   vertical-align: top;
 }
 
-/* Responsive adjustments */
+/* Mobile layout */
 @media (max-width: 768px) {
+  .content {
+    padding: 16px;
+  }
+
   .topBar {
     flex-direction: column;
     align-items: stretch;
-    gap: 12px;
   }
 
   .leftControls {
+    width: 100%;
     justify-content: space-between;
   }
 
@@ -77,6 +98,13 @@
 
   .addBtn {
     width: 100%;
-    padding: 8px 12px;
+    padding: 10px;
   }
-} 
+}
+
+/* Extra small phones */
+@media (max-width: 480px) {
+  .table {
+    padding: 8px;
+  }
+}

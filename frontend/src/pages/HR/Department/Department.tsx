@@ -62,6 +62,7 @@ const Department: React.FC = () => {
           {text}
         </a>
       ),
+      render: (text) => <span className={styles.rowLink}>{text}</span>,
     },
     {
       title: "Description",
@@ -119,6 +120,10 @@ const Department: React.FC = () => {
             dataSource={data}
             pagination={false}
             className={styles.table}
+            onRow={(record) => ({
+              onClick: () => navigate(`/admin/department-employee/${record.key}`),
+              style: { cursor: "pointer" },
+            })}
           />
 
           <AddDepartment open={open} onClose={() => setOpen(false)} />

@@ -46,15 +46,8 @@
   padding: 16px;
   border-radius: 10px;
 }
-.rowLink {
-  color: #222;
-  font-weight: 500;
-}
 
-:global(.ant-table-tbody > tr:hover > td) {
-  background: #f4f8ff !important;
-}
-
+/* Make description column wrap nicely */
 :global(.ant-table-cell) {
   vertical-align: top;
 }

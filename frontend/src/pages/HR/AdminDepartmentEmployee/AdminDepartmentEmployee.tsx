@@ -1,14 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 import { Layout, Table, Input, Button } from "antd";
 import type { TableProps } from "antd";
 import { PlusOutlined, SearchOutlined, SlidersOutlined } from "@ant-design/icons";
+import { useNavigate, useParams } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
-import Topbar from '../../../components/Topbar/Topbar';
-import styles from "./Admin_DepartmentEmployee.module.css";  
-import { useState } from "react";
+import Topbar from "../../../components/Topbar/Topbar";
+import styles from "./Admin_DepartmentEmployee.module.css";
 import AddAddDeptEmployee from "./AddAdDeptEmployee";
-import { useParams } from "react-router-dom";
-
 
 
 interface DataType {
@@ -20,20 +18,7 @@ interface DataType {
   deptname: string;
   shift: number;
   hireddate: string;
-
 }
-
-
-const columns: TableProps<DataType>["columns"] = [
-  { title: "Employee Name", dataIndex: "empname", key: "empname" },
-  { title: "Manager", dataIndex: "manager", key: "manager" },
-  { title: "Position", dataIndex: "position", key: "position" },
-  { title: "Status", dataIndex: "status", key: "status" },
-  { title: "Department", dataIndex: "deptname", key: "deptname" },
-  { title: "Shift", dataIndex: "address", key: "address" },
-  { title: "Hired Date", dataIndex: "hireddate", key: "hireddate" },
-];
-
 
 const data: DataType[] = [
   {
@@ -70,39 +55,53 @@ const data: DataType[] = [
 
 const AdminDepartmentEmployee: React.FC = () => {
   const { deptId } = useParams();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+
+
+  const columns: TableProps<DataType>["columns"] = [
+    {
+      title: "Employee Name",
+      dataIndex: "empname",
+      key: "empname",
+      render: (text) => (
+        <span className={styles.empLink}>{text}</span>
+      ),
+    },
+    { title: "Manager", dataIndex: "manager", key: "manager" },
+    { title: "Position", dataIndex: "position", key: "position" },
+    { title: "Status", dataIndex: "status", key: "status" },
+    { title: "Department", dataIndex: "deptname", key: "deptname" },
+    { title: "Shift", dataIndex: "shift", key: "shift" },
+    { title: "Hired Date", dataIndex: "hireddate", key: "hireddate" },
+  ];
+
   return (
-    <Layout className={styles.layout} style={{ minHeight: '100vh' }}>
+    <Layout className={styles.layout} style={{ minHeight: "100vh" }}>
       <Sidebar />
       <Layout>
-      <Topbar title={`Employees`} showBack />
+        <Topbar title="Employees" showBack />
         <Layout.Content className={styles.content}>
           <div className={styles.topBar}>
-            {/* LEFT SIDE CONTROLS */}
             <div className={styles.leftControls}>
               <Input
                 placeholder="Search"
                 prefix={<SearchOutlined />}
                 className={styles.searchInput}
               />
-
-              <Button
-                icon={<SlidersOutlined />}
-                className={styles.filterBtn}
-              >
+              <Button icon={<SlidersOutlined />} className={styles.filterBtn}>
                 Filter
               </Button>
             </div>
 
-            {/* RIGHT SIDE BUTTON */}
             <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            className={styles.addBtn}
-            onClick={() => setOpen(true)}
-          >
-            Add Employee
-          </Button>
+              type="primary"
+              icon={<PlusOutlined />}
+              className={styles.addBtn}
+              onClick={() => setOpen(true)}
+            >
+              Add Employee
+            </Button>
           </div>
 
           <Table<DataType>
@@ -110,7 +109,12 @@ const AdminDepartmentEmployee: React.FC = () => {
             dataSource={data}
             pagination={false}
             className={styles.table}
+            onRow={(record) => ({
+              onClick: () => navigate(`/admin/employee/employee-details`),
+              style: { cursor: "pointer" },
+            })}
           />
+
           <AddAddDeptEmployee open={open} onClose={() => setOpen(false)} />
         </Layout.Content>
       </Layout>

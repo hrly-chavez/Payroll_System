@@ -16,3 +16,6 @@ class DepartmentAdmin(admin.ModelAdmin):
 admin.site.register(Shift)
 admin.site.register(Shift_Workday)
 admin.site.register(Employee)
+
+
+

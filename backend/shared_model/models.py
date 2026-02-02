@@ -115,9 +115,11 @@ class Employee_Salary(models.Model):
     pay_type =  models.CharField(max_length=20, choices=PAY_TYPES)
     #per_day = models.IntegerField()
     base_rate = models.PositiveIntegerField()
-    effective_from = models.DateField(auto_now=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    employee = models.ForeignKey( "Employee", on_delete=models.CASCADE,related_name="salaries")
+    effective_from = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True,null=True,
+    blank=True)
+    employee = models.ForeignKey( "Employee", on_delete=models.CASCADE,related_name="salaries",null=True,
+    blank=True)
     
     class Meta:
         constraints = [
@@ -226,3 +228,50 @@ class Employee_Allowance(models.Model):
                 name="unique_employee_allowance_start"
             )
         ]
+
+class Attendance(models.Model):
+    STATUS_CHOICES = [
+        ("PRESENT", "Present"),
+        ("ABSENT", "Absent"),
+        ("HALF_DAY", "Half Day"),
+        ("REST_DAY", "Rest Day"),
+        ("HOLIDAY", "Holiday"),
+    ]
+    id = models.AutoField(primary_key=True)
+    date = models.DateField()
+    status = models.CharField(max_length=20,choices=STATUS_CHOICES)
+    time_in = models.TimeField()
+    time_out = models.TimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="attendances")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employee", "date"],
+                name="unique_attendance_per_employee_per_day"
+            )
+        ]
+
+class Attendance_Event(models.Model):
+    TYPE_CHOICES = [
+        ("Late","Late"),
+        ("OverTime","OverTime"),
+        ("UnderTime","UnderTime"),
+        ("Worked Holiday","Worked Holiday"),
+    ]
+    APPROVAL_STATUS_CHOICES = [
+        ("Pending","Pending"),
+        ("Approved","Approved"),
+        ("Declined","Declined"),
+    ]
+    id = models.AutoField(primary_key=True)
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    minutes = models.TimeField()
+    start_time = models.TimeField(null=True,blank=True)
+    end_time = models.TimeField(null=True,blank=True)
+    approval_status = models.CharField(max_length=20,choices=APPROVAL_STATUS_CHOICES) 
+    event_remarks = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_attendance_events")
+    attendance = models.ForeignKey(Attendance,on_delete=models.CASCADE,related_name="events")

@@ -1,4 +1,4 @@
-import React, { useEffect, useState} from 'react';
+import React, { useEffect, useState } from 'react';
 import { Layout, Menu } from 'antd';
 import {
   HomeOutlined,
@@ -7,6 +7,8 @@ import {
   SettingOutlined,
   BarChartOutlined,
   TeamOutlined,
+  FileTextOutlined,
+  DollarOutlined,
 } from '@ant-design/icons';
 import { Link, useLocation } from 'react-router-dom';
 import logo from '../../components/attitechlogo.png';
@@ -30,9 +32,6 @@ interface MenuItemConfig {
 
 const Sidebar: React.FC<SidebarProps> = ({ role }) => {
   const location = useLocation();
-  // const currentRole: UserRole =
-  //   (role ?? (localStorage.getItem('role') as UserRole) ?? 'EMPLOYEE') as UserRole;
-
   const [currentRole, setCurrentRole] = useState<UserRole>('SUPER_ADMIN');
 
   useEffect(() => {
@@ -108,10 +107,12 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
         SUPER_ADMIN: '/super-admin/reports',
       },
     },
+
+    /* 🔥 UPDATED ICON */
     {
       key: 'Requests',
       label: 'Requests',
-      icon: <BarChartOutlined />,
+      icon: <FileTextOutlined />,
       roles: ['ADMIN', 'SUPER_ADMIN', 'EMPLOYEE'],
       hrefs: {
         EMPLOYEE: '/employee/requests',
@@ -119,10 +120,12 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
         SUPER_ADMIN: '/super-admin/requests',
       },
     },
-        {
+
+    /* 🔥 UPDATED ICON */
+    {
       key: 'Payslip',
       label: 'Payslip',
-      icon: <BarChartOutlined />,
+      icon: <DollarOutlined />,
       roles: ['EMPLOYEE'],
       hrefs: {
         EMPLOYEE: '/employee/payslips',
@@ -139,10 +142,12 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
       Object.values(item.hrefs).includes(location.pathname)
     )?.key ?? 'dashboard';
 
-  const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' && window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState<boolean>(
+    typeof window !== 'undefined' && window.innerWidth < 768
+  );
   const [collapsed, setCollapsed] = useState<boolean>(isMobile);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const onResize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
@@ -155,9 +160,8 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
 
   const showOverlay = isMobile && !collapsed;
 
-  React.useEffect(() => {
+  useEffect(() => {
     const body = document.body;
-    // only add a class when the mobile sidebar is opened (overlay)
     body.classList.remove('sidebar-open-mobile');
 
     if (isMobile && !collapsed) {
@@ -196,7 +200,6 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
         <div className="logo-container">
           <img src={logo} alt="AttiTech" />
         </div>
-
 
         <Menu
           theme="dark"

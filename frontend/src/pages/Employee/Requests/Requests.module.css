@@ -1,0 +1,12 @@
+.content {
+  margin: 16px;
+}
+
+.card {
+  padding: 8px;
+  border-radius: 10px;
+}
+
+.row {
+  font-size: 14px;
+}

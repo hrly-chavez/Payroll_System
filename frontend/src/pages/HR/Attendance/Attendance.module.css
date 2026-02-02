@@ -1,0 +1,22 @@
+.content {
+  margin: 16px;
+}
+
+.tableCard {
+  margin-top: 16px;
+  border-radius: 10px;
+}
+
+.tableHeader {
+  margin-bottom: 16px;
+}
+
+.nameCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rowStyle:hover {
+  background-color: #f5faff !important;
+}

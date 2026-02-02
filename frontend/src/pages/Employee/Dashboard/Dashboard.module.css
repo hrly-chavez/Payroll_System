@@ -6,22 +6,22 @@
   margin-top: 16px;
 }
 
-.bottomSection {
-  margin-top: 16px;
+.sectionCard {
+  margin-bottom: 16px;
 }
 
-/* Time Layout */
+/* Time */
 .timeRow {
   display: flex;
   gap: 16px;
   justify-content: center;
-  margin-bottom: 20px;
   flex-wrap: wrap;
+  margin-bottom: 16px;
 }
 
 .timeBox {
   text-align: center;
-  border: 1px solid #386FA4;
+  border: 1px solid #cdcdcd;
   padding: 16px 24px;
   border-radius: 10px;
   min-width: 140px;
@@ -37,29 +37,70 @@
   font-size: 28px;
 }
 
+/* Buttons */
+.buttonRow {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
 .punchInBtn {
-  background-color: #386FA4 !important;
-  border-color: #888c91 !important;
+  background-color: #386fa4 !important;
+  border-color: #386fa4 !important;
   color: white !important;
 }
 
 .punchOutBtn {
-  background-color: #c0c0c0 !important;
-  border-color: #888c91 !important;
+  background-color: #a9a9a9 !important;
+  border-color: #868686 !important;
   color: white !important;
 }
 
-.buttonRow {
-  margin-top: 16px;
-  gap: 16px;
+/* Legend + Holidays */
+.legendSection {
+  margin-bottom: 8px;
 }
 
-/* Ant Card polish */
-:global(.ant-card) {
-  border-radius: 12px;
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
-:global(.ant-card-head-title) {
-  font-weight: 600;
+.legendGreen,
+.legendRed,
+.legendYellow,
+.legendGray {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
 }
 
+.legendGreen { background: #3fa34d; }
+.legendRed { background: #d9534f; }
+.legendYellow { background: #f0ad4e; }
+.legendGray { background: #aaa; }
+
+.holidayList {
+  padding-left: 16px;
+  line-height: 1.8;
+}
+
+/* Make calendar shorter */
+.smallCalendar :global(.ant-picker-calendar) {
+  height: 280px;   /* adjust if needed */
+}
+
+.smallCalendar :global(.ant-picker-panel) {
+  height: 70%;
+}
+
+.smallCalendar :global(.ant-picker-content) {
+  height: 200px;
+}
+
+/* Reduce header spacing */
+.smallCalendar :global(.ant-picker-calendar-header) {
+  padding: 6px 10px;
+}

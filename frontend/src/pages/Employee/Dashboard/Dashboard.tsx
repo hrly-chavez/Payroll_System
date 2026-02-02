@@ -1,59 +1,54 @@
 import React, { useEffect, useState } from "react";
-import { Layout, Card, Row, Col, Button, Tag, Calendar, Statistic } from "antd";
+import { Layout, Card, Row, Col, Button, Tag, Calendar, Statistic, Divider } from "antd";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 import Greeting from "../../../components/Greeting/Greeting";
 import styles from "./Dashboard.module.css";
+import { LoginOutlined, LogoutOutlined } from "@ant-design/icons";
 
-const { Content, Footer } = Layout;
-
-const timezones = {
-  PH: "Asia/Manila",
-  USA: "America/New_York",
-};
+const { Content } = Layout;
 
 const Dashboard: React.FC = () => {
-  const [phTime, setPhTime] = useState("--:--:--");
-  const [usaTime, setUsaTime] = useState("--:--:--");
+  const [phTime, setPhTime] = useState<Date | null>(null);
+  const [usaTime, setUsaTime] = useState<Date | null>(null);
 
-  const fetchTime = async (timezone: string, setter: (t: string) => void) => {
+  const fetchBaseTime = async (timezone: string, setter: (d: Date) => void) => {
     try {
       const res = await fetch(`https://worldtimeapi.org/api/timezone/${timezone}`);
       const data = await res.json();
-
-      const date = new Date(data.datetime);
-
-      const formatted = new Intl.DateTimeFormat("en-US", {
-        hour: "numeric",
-        minute: "numeric",
-        second: "numeric",
-        hour12: true,
-        timeZone: timezone, 
-      }).format(date);
-
-      setter(formatted);
+      setter(new Date(data.datetime));
     } catch (err) {
       console.error("Time API error", err);
     }
   };
 
+  useEffect(() => {
+    fetchBaseTime("Asia/Manila", setPhTime);
+    fetchBaseTime("America/New_York", setUsaTime);
+  }, []);
 
   useEffect(() => {
-    fetchTime(timezones.PH, setPhTime);
-    fetchTime(timezones.USA, setUsaTime);
-
     const interval = setInterval(() => {
-      fetchTime(timezones.PH, setPhTime);
-      fetchTime(timezones.USA, setUsaTime);
-    }, 60000);
-
+      setPhTime((prev) => (prev ? new Date(prev.getTime() + 1000) : prev));
+      setUsaTime((prev) => (prev ? new Date(prev.getTime() + 1000) : prev));
+    }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const formatTime = (date: Date | null, timezone: string) =>
+    date
+      ? new Intl.DateTimeFormat("en-US", {
+          hour: "numeric",
+          minute: "numeric",
+          second: "numeric",
+          hour12: true,
+          timeZone: timezone,
+        }).format(date)
+      : "--:--:--";
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
       <Sidebar />
-
       <Layout>
         <Topbar title="Dashboard" />
 
@@ -68,53 +63,70 @@ const Dashboard: React.FC = () => {
             <Col span={6}><Card><Statistic title="Leave request pending" value={0} /></Card></Col>
           </Row>
 
-          {/* Main Section */}
           <Row gutter={16} className={styles.mainSection}>
-            {/* Attendance */}
+
+            {/* LEFT COLUMN */}
             <Col xs={24} md={12}>
-              <Card title="Attendance">
+              <Card title="Attendance" className={styles.sectionCard}>
                 <div className={styles.timeRow}>
                   <div className={styles.timeBox}>
                     <span>PH Time 🇵🇭</span>
-                    <h2>{phTime}</h2>
+                    <h2>{formatTime(phTime, "Asia/Manila")}</h2>
                   </div>
-
                   <div className={styles.timeBox}>
                     <span>USA Time 🇺🇸</span>
-                    <h2>{usaTime}</h2>
+                    <h2>{formatTime(usaTime, "America/New_York")}</h2>
                   </div>
                 </div>
 
-                <Row justify="center" className={styles.buttonRow}>
-                  <Button className={styles.punchInBtn}>Punch in</Button>
-                  <Button className={styles.punchOutBtn}>Punch out</Button>
-                </Row>
+                <div className={styles.buttonRow}>
+                  <Button icon={<LoginOutlined />} className={styles.punchInBtn} size="large">
+                    Punch in
+                  </Button>
+                  <Button icon={<LogoutOutlined />} className={styles.punchOutBtn} size="large">
+                    Punch out
+                  </Button>
+                </div>
               </Card>
-            </Col>
 
-            {/* Calendar */}
-            <Col xs={24} md={12}>
-              <Card title="Calendar">
-                <Calendar fullscreen={false} />
-              </Card>
-            </Col>
-          </Row>
-
-          {/* Bottom */}
-          <Row gutter={16} className={styles.bottomSection}>
-            <Col xs={24} md={12}>
-              <Card title="Payslip Status">
+              <Card title="Payslip Status" className={styles.sectionCard}>
                 <Tag color="processing">PROCESSING</Tag>
                 <div>January 1, 2026</div>
               </Card>
-            </Col>
 
-            <Col xs={24} md={12}>
-              <Card title="Payslip Cut Off">
+              <Card title="Payslip Cut Off" className={styles.sectionCard}>
                 <h3>08:00</h3>
                 <div>January 1, 2026</div>
               </Card>
             </Col>
+
+            {/* RIGHT COLUMN */}
+            <Col xs={24} md={12}>
+              <Card title="Calendar" className={styles.sectionCard}>
+                <div className={styles.smallCalendar}>
+                  <Calendar fullscreen={false} />
+                </div>
+              </Card>
+
+              {/* 🔥 Combined Legend + Holidays */}
+              <Card title="Legend & Holidays" className={styles.sectionCard}>
+                <div className={styles.legendSection}>
+                  <div className={styles.legendItem}><span className={styles.legendGreen}></span> PH Holiday</div>
+                  <div className={styles.legendItem}><span className={styles.legendRed}></span> US Holiday</div>
+                  <div className={styles.legendItem}><span className={styles.legendYellow}></span> Work Day</div>
+                  <div className={styles.legendItem}><span className={styles.legendGray}></span> Non-Work</div>
+                </div>
+
+                <Divider />
+
+                <ul className={styles.holidayList}>
+                  <li>Jan 1 — New Year's Day</li>
+                  <li>Feb 10 — Chinese New Year</li>
+                  <li>Mar 29 — Good Friday</li>
+                </ul>
+              </Card>
+            </Col>
+
           </Row>
         </Content>
       </Layout>

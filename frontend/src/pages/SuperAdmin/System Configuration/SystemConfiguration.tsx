@@ -90,12 +90,7 @@ const SystemConfiguration: React.FC = () => {
               >
                 Payroll Rules
               </button>
-              <button
-                className={activeTab === 'cutoff' ? 'active' : ''}
-                onClick={() => setActiveTab('cutoff')}
-              >
-                Cutoff Schedules
-              </button>
+
             </div>
 
             {/* Section Header */}

@@ -1,0 +1,42 @@
+.content {
+  margin: 16px;
+}
+
+.notificationCard {
+  border-radius: 12px;
+  padding: 12px 0;
+}
+
+.notificationItem {
+  background: #f8f8f8;
+  border-radius: 8px;
+  margin: 12px 16px;
+  padding: 16px 20px !important;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.notificationItem:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.textBlock h4 {
+  margin: 0;
+  font-weight: 600;
+}
+
+.textBlock p {
+  margin: 4px 0 0;
+  color: #666;
+}
+
+.deleteBtn {
+  font-size: 18px;
+  color: #888;
+}
+
+.deleteBtn:hover {
+  color: #ff4d4f;
+}

@@ -1,0 +1,64 @@
+.content {
+  margin: 16px;
+}
+
+.mainSection {
+  margin-top: 16px;
+}
+
+.bottomSection {
+  margin-top: 16px;
+}
+
+/* Time Layout */
+.timeRow {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.timeBox {
+  text-align: center;
+  border: 1px solid #386FA4;
+  padding: 16px 24px;
+  border-radius: 10px;
+  min-width: 140px;
+}
+
+.timeBox span {
+  font-size: 14px;
+  color: #888;
+}
+
+.timeBox h2 {
+  margin-top: 8px;
+  font-size: 28px;
+}
+
+.punchInBtn {
+  background-color: #386FA4 !important;
+  border-color: #888c91 !important;
+  color: white !important;
+}
+
+.punchOutBtn {
+  background-color: #c0c0c0 !important;
+  border-color: #888c91 !important;
+  color: white !important;
+}
+
+.buttonRow {
+  margin-top: 16px;
+  gap: 16px;
+}
+
+/* Ant Card polish */
+:global(.ant-card) {
+  border-radius: 12px;
+}
+
+:global(.ant-card-head-title) {
+  font-weight: 600;
+}

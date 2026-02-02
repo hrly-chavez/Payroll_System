@@ -106,7 +106,7 @@ class User(models.Model):
 class Employee_Salary(models.Model):
     PAY_TYPES = [
         ("Monthly","Monthly"),
-        ("SemiMonthly","SemiMonthly"),
+        ("Per Period","Per Period"),
         ("Daily","Daily"),
         ("Hourly","Hourly"),
     ]
@@ -114,8 +114,19 @@ class Employee_Salary(models.Model):
     id = models.AutoField(primary_key=True)
     pay_type =  models.CharField(max_length=20, choices=PAY_TYPES)
     #per_day = models.IntegerField()
-    base_rate = models.IntegerField()
-    effective_from = models.DateField()
+    base_rate = models.PositiveIntegerField()
+    effective_from = models.DateField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    employee = models.ForeignKey( "Employee", on_delete=models.CASCADE,related_name="salaries")
+    
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employee", "effective_from"],
+                name="unique_salary_start_per_employee"
+            )
+        ]
+    
     
 class Deduction_Type(models.Model):
     calculation_choices = [
@@ -130,3 +141,88 @@ class Deduction_Type(models.Model):
     is_active = models.BooleanField(default=True)
     create_at = models.DateField(auto_now_add=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["code"],
+                name="unique_deduction_code"
+            )
+        ]
+
+class Employee_Deduction(models.Model):
+    frequency_choices = [
+        ("Monthly","Monthly"),
+        ("Per Period","Per Period"),
+        ("One Time","One Time"),
+    ]
+    status_choices = [
+        ("Active","Active"),
+        ("Inactive","Inactive"),
+    ]
+    id = models.AutoField(primary_key=True)
+    amount = models.PositiveIntegerField()
+    frequency = models.CharField(max_length=20, choices=frequency_choices)
+    effective_from = models.DateField()
+    effective_to = models.DateField(null=True,blank=True)
+    status = models.CharField(max_length=15, choices=status_choices)
+    created_at = models.DateField(auto_now_add=True)
+
+    # Loan-only fields
+    total_loan_amount = models.PositiveIntegerField(null=True,blank=True)
+    balance = models.PositiveIntegerField(null=True,blank=True)
+    amortization_per_period = models.PositiveIntegerField(null=True,blank=True)
+
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="deductions")
+    deduction_type = models.ForeignKey(Deduction_Type,on_delete=models.PROTECT,related_name="employee_deductions") 
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employee", "deduction_type", "effective_from"],
+                name="unique_employee_deduction_start"
+            )
+        ]
+
+class Allowance_Type(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=50)
+    code = models.CharField(max_length=50)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["code"],
+                name="unique_allowance_code"
+            )
+        ]
+
+class Employee_Allowance(models.Model):
+    frequency_choices = [
+        ("Monthly","Monthly"),
+        ("Per Period","Per Period"),
+        ("One Time","One Time"),
+    ]
+    status_choices = [
+        ("Active","Active"),
+        ("Inactive","Inactive"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    amount = models.PositiveIntegerField()
+    frequency = models.CharField(max_length=20, choices=frequency_choices)
+    effective_from = models.DateField()
+    effective_to = models.DateField(null=True,blank=True)
+    status = models.CharField(max_length=15, choices=status_choices)
+    created_at = models.DateField(auto_now_add=True)
+    allowance_type = models.ForeignKey(Allowance_Type,on_delete=models.PROTECT,related_name="employee_allowances")
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="allowances")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employee", "allowance_type", "effective_from"],
+                name="unique_employee_allowance_start"
+            )
+        ]

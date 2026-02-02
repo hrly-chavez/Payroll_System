@@ -1,6 +1,6 @@
 import React from 'react';
-import { Layout, Typography, Avatar, Badge, Button } from 'antd';
-import { BellFilled, ArrowLeftOutlined } from '@ant-design/icons';
+import { Layout, Typography, Avatar, Badge, Button, Dropdown, MenuProps } from 'antd';
+import { BellFilled, ArrowLeftOutlined, LogoutOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import './Topbar.css';
 
@@ -9,11 +9,31 @@ const { Text } = Typography;
 
 interface TopbarProps {
   title?: string;
-  showBack?: boolean;   // ✅ ADD THIS
+  showBack?: boolean;
+  onLogout?: () => void; // optional callback for additional logout logic
 }
 
-const Topbar: React.FC<TopbarProps> = ({ title = 'Dashboard', showBack }) => {
-  const navigate = useNavigate(); // ✅ REQUIRED FOR BACK BUTTON
+const Topbar: React.FC<TopbarProps> = ({ title = 'Dashboard', showBack, onLogout }) => {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+
+    if (onLogout) onLogout();
+
+    navigate('/', { replace: true });
+  };
+
+  // ✅ Ant Design v5 style menu items
+  const items: MenuProps['items'] = [
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: 'Logout',
+      onClick: handleLogout,
+    },
+  ];
 
   return (
     <Header className="app-topbar">
@@ -33,7 +53,11 @@ const Topbar: React.FC<TopbarProps> = ({ title = 'Dashboard', showBack }) => {
         <Badge dot>
           <BellFilled className="topbar-icon" />
         </Badge>
-        <Avatar className="topbar-avatar">U</Avatar>
+
+        {/* ✅ v5 style Dropdown */}
+        <Dropdown menu={{ items }} placement="bottomRight" trigger={['click']}>
+          <Avatar className="topbar-avatar" style={{ cursor: 'pointer' }}>U</Avatar>
+        </Dropdown>
       </div>
     </Header>
   );

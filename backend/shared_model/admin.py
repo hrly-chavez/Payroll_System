@@ -6,3 +6,7 @@ class UserAdmin(admin.ModelAdmin):
     list_display = ('user_id', 'user_name', 'role', 'is_active', 'employee')
     list_filter = ('role', 'is_active')
     search_fields = ('user_name',)
+
+admin.site.register(Shift)
+admin.site.register(Shift_Workday)
+admin.site.register(Department)

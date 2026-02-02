@@ -7,10 +7,11 @@ class Department(models.Model):
     name = models.CharField(max_length=50)
     is_active = models.BooleanField(default=True)
     created_at = models.DateField(auto_now_add=True)
-    shift_id = models.ForeignKey("Shift", on_delete=models.PROTECT,related_name="departments")
+    shift_id = models.ForeignKey("Shift", on_delete=models.SET_NULL,related_name="departments",null=True,blank=True)
 
 class Shift(models.Model):
     id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=50)
     start_time = models.TimeField()
     end_time = models.TimeField()
     break_minutes = models.PositiveIntegerField(default=0)
@@ -18,21 +19,31 @@ class Shift(models.Model):
     is_overnight = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 
-class Shift_Workday(models.Model):
-    DAYS_OF_WEEK = [
-        ("SAT","Saturday"),
-        ("MON","Monday"),
-        ("TUE","Tuesday"),
-        ("WED","Wednesday"),
-        ("THUR","Thursday"),
-        ("FRI","Friday"),
-        ("SUN","Sunday"),
-    ]
+class ShiftWorkday(models.Model):
+
+    class DayOfWeek(models.IntegerChoices):
+        MONDAY = 1, "Monday"
+        TUESDAY = 2, "Tuesday"
+        WEDNESDAY = 3, "Wednesday"
+        THURSDAY = 4, "Thursday"
+        FRIDAY = 5, "Friday"
+        SATURDAY = 6, "Saturday"
+        SUNDAY = 7, "Sunday"
+
     id = models.AutoField(primary_key=True)
-    day_of_week = models.CharField(max_length=10,choices=DAYS_OF_WEEK)
+    day_of_week = models.PositiveSmallIntegerField(choices=DayOfWeek.choices)
     is_workday = models.BooleanField(default=True)
-    created_at = models.DateField(auto_now_add=True)
-    shift = models.ForeignKey(Shift, on_delete=models.CASCADE, related_name="workdays")
+    created_at = models.DateTimeField(auto_now_add=True)
+    shift = models.ForeignKey(Shift,on_delete=models.CASCADE,related_name="workdays")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["shift", "day_of_week"],
+                name="unique_shift_day_of_week"
+            )
+        ]
+
 
     class Meta:
         constraints = [
@@ -65,7 +76,7 @@ class Employee(models.Model):
     email = models.CharField(max_length=50)
     created_at = models.DateField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
-    shift = models.ForeignKey( Shift, on_delete=models.PROTECT,related_name="employees")
+    shift = models.ForeignKey( Shift, on_delete=models.SET_NULL,related_name="employees",null=True,blank=True)
     department = models.ForeignKey( Department,on_delete=models.PROTECT,related_name="employees")
 
 class User(models.Model):
@@ -262,7 +273,7 @@ class Attendance_Event(models.Model):
     ]
     APPROVAL_STATUS_CHOICES = [
         ("Pending","Pending"),
-        ("Approved","Approved"),
+        ("Approved","Approved"),    
         ("Declined","Declined"),
     ]
     id = models.AutoField(primary_key=True)
@@ -275,3 +286,91 @@ class Attendance_Event(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_attendance_events")
     attendance = models.ForeignKey(Attendance,on_delete=models.CASCADE,related_name="events")
+
+class Leave_Type(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=20)
+    code = models.CharField(max_length=20)
+    is_paid = models.BooleanField(default=False)
+    pay_rate = models.DecimalField(max_digits=4, decimal_places=2,default=1.00)
+    requires_approval = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateField(auto_now=True)
+
+class Leave_Request(models.Model):
+    half_day_choices = [
+        ("AM","AM"),
+        ("PM","PM"),
+    ]
+    STATUS_CHOICES = [
+        ("Pending","Pending"),
+        ("Approved","Approved"),
+        ("Declined","Declined"),
+        ("Cancelled","Cancelled"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    date_from = models.DateField()
+    date_to = models.DateField()
+    is_half_day = models.BooleanField(default=False)
+    half_day_part = models.CharField(max_length=5, choices=half_day_choices, null=True, blank=True)
+    reason = models.TextField()
+    status = models.CharField(max_length=15,choices=STATUS_CHOICES,null=True,blank=True)
+    requested_at = models.DateTimeField(auto_now=True)
+    approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_leave_requests")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="leave_requests")
+
+class Leave_Day(models.Model):
+    id = models.AutoField(primary_key=True)
+    date = models.DateField()
+    units = models.DecimalField(max_digits=3,decimal_places=2,default=1.00)
+    is_paid = models.BooleanField(default=False)
+    pay_rate = models.DecimalField(max_digits=4,decimal_places=2,default=0.00)
+    created_at = models.DateTimeField()
+    leave_request = models.ForeignKey("LeaveRequest",on_delete=models.CASCADE, related_name="days")
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="leave_days")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employee", "leave_date"],
+                name="unique_leave_day_per_employee_per_date"
+            )
+        ]
+
+class Holiday(models.Model):
+    holiday_types = [
+        ("Regular","Regular"),
+        ("Speacial Non-Working","Speacial Non-Working"),
+        ("Special Working","Special Working"),
+        ("Company Holiday","Company Holiday"),
+    ]
+    HOLIDAY_BASE_CHOICES = [
+        ("PH", "Philippines"),
+        ("US", "United States"),
+        ("COMPANY", "Company"),
+    ]
+    id = models.AutoField(primary_key=True)
+    date = models.DateField()
+    name = models.CharField(max_length=50)
+    type = models.CharField(max_length=50, choices=holiday_types)
+    base = models.CharField(max_length=20,choices=HOLIDAY_BASE_CHOICES)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["holiday_date", "holiday_base"],
+                name="unique_holiday_per_base_per_date"
+            )
+        ]
+class Company_Note(models.Model):
+    id = models.AutoField(primary_key=True)
+    note = models.TextField()
+    created_at = models.DateField(auto_now_add=True)
+    user = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="company_notes")
+
+
+

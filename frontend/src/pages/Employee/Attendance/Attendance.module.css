@@ -1,0 +1,33 @@
+.content {
+  margin: 16px;
+}
+
+.headerRow {
+  margin-bottom: 20px;
+}
+
+.monthPicker {
+  display: flex;
+  gap: 12px;
+}
+
+.attendanceDot {
+  width: 8px;
+  height: 8px;
+  background: #1890ff;
+  border-radius: 50%;
+  margin-top: 4px;
+}
+
+.requestBtn {
+  background-color: #386fa4 !important;
+  border-color: #386fa4 !important;
+}
+
+.requestBtn:hover {
+  background-color: #2f5d8c !important;
+}
+
+.historyCard {
+  margin-top: 20px;
+}

@@ -108,23 +108,35 @@ const Dashboard: React.FC = () => {
                 </div>
               </Card>
 
-              {/* 🔥 Combined Legend + Holidays */}
+              
               <Card title="Legend & Holidays" className={styles.sectionCard}>
+              <div className={styles.legendHolidayGrid}>
+
+                {/* LEFT: Legend */}
                 <div className={styles.legendSection}>
-                  <div className={styles.legendItem}><span className={styles.legendGreen}></span> PH Holiday</div>
-                  <div className={styles.legendItem}><span className={styles.legendRed}></span> US Holiday</div>
-                  <div className={styles.legendItem}><span className={styles.legendYellow}></span> Work Day</div>
-                  <div className={styles.legendItem}><span className={styles.legendGray}></span> Non-Work</div>
+                  <div className={styles.legendItem}>
+                    <span className={styles.legendGreen}></span> PH Holiday
+                  </div>
+                  <div className={styles.legendItem}>
+                    <span className={styles.legendRed}></span> US Holiday
+                  </div>
+                  <div className={styles.legendItem}>
+                    <span className={styles.legendYellow}></span> Work Day
+                  </div>
+                  <div className={styles.legendItem}>
+                    <span className={styles.legendGray}></span> Non-Work
+                  </div>
                 </div>
 
-                <Divider />
-
+                {/* RIGHT: Holidays */}
                 <ul className={styles.holidayList}>
                   <li>Jan 1 — New Year's Day</li>
                   <li>Feb 10 — Chinese New Year</li>
                   <li>Mar 29 — Good Friday</li>
                 </ul>
-              </Card>
+
+              </div>
+            </Card>
             </Col>
 
           </Row>

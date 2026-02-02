@@ -1,0 +1,62 @@
+.attendance-layout {
+  min-height: 100vh;
+}
+
+.attendance-content {
+  margin: 16px;
+}
+
+/* Stats cards */
+.stats-row {
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  text-align: left;
+}
+
+.stat-card p {
+  margin: 0;
+  color: #888;
+  font-size: 14px;
+}
+
+.stat-card h2 {
+  margin: 0;
+  color: #1677ff;
+  font-size: 28px;
+}
+
+/* Table card */
+.table-card {
+  margin-top: 16px;
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.search-input {
+  max-width: 250px;
+}
+
+/* Name cell */
+.name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Responsive tweaks */
+@media (max-width: 768px) {
+  .search-input {
+    width: 100%;
+  }
+
+  .table-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+}

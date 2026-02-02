@@ -1,11 +1,7 @@
 import React, { useState } from "react";
 import { Layout, Table, Input, Button } from "antd";
 import type { TableProps } from "antd";
-import {
-  PlusOutlined,
-  SearchOutlined,
-  SlidersOutlined,
-} from "@ant-design/icons";
+import { PlusOutlined, SearchOutlined, SlidersOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
@@ -56,40 +52,18 @@ const Department: React.FC = () => {
       title: "Department",
       dataIndex: "deptname",
       key: "deptname",
-      render: (text, record) => (
-        <a onClick={() => navigate(`/admin/department-employee`)}>
-          {text}
-        </a>
-      ),
+      render: (text) => <span className={styles.rowLink}>{text}</span>,
     },
-    {
-      title: "Description",
-      dataIndex: "description",
-      key: "description",
-      responsive: ["md"], // hides on mobile
-    },
-    {
-      title: "Workshift",
-      dataIndex: "workshift",
-      key: "workshift",
-      width: 220,
-    },
-    {
-      title: "Manager",
-      dataIndex: "ManagerName",
-      key: "ManagerName",
-      width: 220,
-      responsive: ["lg"], // hides on small screens
-    },
+    { title: "Description", dataIndex: "description", key: "description" },
+    { title: "Workshift", dataIndex: "workshift", key: "workshift" },
+    { title: "Manager", dataIndex: "ManagerName", key: "ManagerName" },
   ];
 
   return (
-    <Layout className={styles.layout}>
+    <Layout className={styles.layout} style={{ minHeight: "100vh" }}>
       <Sidebar />
-
       <Layout>
         <Topbar title="Department" />
-
         <Layout.Content className={styles.content}>
           <div className={styles.topBar}>
             <div className={styles.leftControls}>
@@ -118,6 +92,10 @@ const Department: React.FC = () => {
             dataSource={data}
             pagination={false}
             className={styles.table}
+            onRow={(record) => ({
+              onClick: () => navigate(`/admin/department-employee/${record.key}`),
+              style: { cursor: "pointer" },
+            })}
           />
 
           <AddDepartment open={open} onClose={() => setOpen(false)} />

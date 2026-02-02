@@ -1,14 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 import { Layout, Table, Input, Button } from "antd";
 import type { TableProps } from "antd";
 import { PlusOutlined, SearchOutlined, SlidersOutlined } from "@ant-design/icons";
+import { useNavigate, useParams } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
-import Topbar from '../../../components/Topbar/Topbar';
-import styles from "./Admin_DepartmentEmployee.module.css";  
-import { useState } from "react";
+import Topbar from "../../../components/Topbar/Topbar";
+import styles from "./Admin_DepartmentEmployee.module.css";
 import AddAddDeptEmployee from "./AddAdDeptEmployee";
-import { useParams } from "react-router-dom";
-
 
 
 interface DataType {
@@ -20,20 +18,7 @@ interface DataType {
   deptname: string;
   shift: number;
   hireddate: string;
-
 }
-
-
-const columns: TableProps<DataType>["columns"] = [
-  { title: "Employee Name", dataIndex: "empname", key: "empname" },
-  { title: "Manager", dataIndex: "manager", key: "manager" },
-  { title: "Position", dataIndex: "position", key: "position" },
-  { title: "Status", dataIndex: "status", key: "status" },
-  { title: "Department", dataIndex: "deptname", key: "deptname" },
-  { title: "Shift", dataIndex: "address", key: "address" },
-  { title: "Hired Date", dataIndex: "hireddate", key: "hireddate" },
-];
-
 
 const data: DataType[] = [
   {
@@ -70,9 +55,8 @@ const data: DataType[] = [
 
 const AdminDepartmentEmployee: React.FC = () => {
   const { deptId } = useParams();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-<<<<<<< HEAD
-  const role = localStorage.getItem('role');
 
 
   const columns: TableProps<DataType>["columns"] = [
@@ -92,54 +76,32 @@ const AdminDepartmentEmployee: React.FC = () => {
     { title: "Hired Date", dataIndex: "hireddate", key: "hireddate" },
   ];
 
-=======
->>>>>>> parent of 50b4051 (admin: department, employee, and employee's detail page ui & routings)
   return (
-    <Layout className={styles.layout} style={{ minHeight: '100vh' }}>
+    <Layout className={styles.layout} style={{ minHeight: "100vh" }}>
       <Sidebar />
       <Layout>
-      <Topbar title={`Employees`} showBack />
+        <Topbar title="Employees" showBack />
         <Layout.Content className={styles.content}>
           <div className={styles.topBar}>
-            {/* LEFT SIDE CONTROLS */}
             <div className={styles.leftControls}>
               <Input
                 placeholder="Search"
                 prefix={<SearchOutlined />}
                 className={styles.searchInput}
               />
-
-              <Button
-                icon={<SlidersOutlined />}
-                className={styles.filterBtn}
-              >
+              <Button icon={<SlidersOutlined />} className={styles.filterBtn}>
                 Filter
               </Button>
             </div>
 
-<<<<<<< HEAD
-            {/* RIGHT SIDE BUTTON (hidden for Super Admin) */}
-            {role !== 'SUPER_ADMIN' && (
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                className={styles.addBtn}
-                onClick={() => setOpen(true)}
-              >
-                Add Employee
-              </Button>
-            )}
-=======
-            {/* RIGHT SIDE BUTTON */}
             <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            className={styles.addBtn}
-            onClick={() => setOpen(true)}
-          >
-            Add Employee
-          </Button>
->>>>>>> parent of 50b4051 (admin: department, employee, and employee's detail page ui & routings)
+              type="primary"
+              icon={<PlusOutlined />}
+              className={styles.addBtn}
+              onClick={() => setOpen(true)}
+            >
+              Add Employee
+            </Button>
           </div>
 
           <Table<DataType>
@@ -147,14 +109,13 @@ const AdminDepartmentEmployee: React.FC = () => {
             dataSource={data}
             pagination={false}
             className={styles.table}
-<<<<<<< HEAD
-            scroll={{ x: 'max-content' }}
+            onRow={(record) => ({
+              onClick: () => navigate(`/admin/employee/employee-details`),
+              style: { cursor: "pointer" },
+            })}
           />
-          {role !== 'SUPER_ADMIN' && <AddAddDeptEmployee open={open} onClose={() => setOpen(false)} />}
-=======
-          />
+
           <AddAddDeptEmployee open={open} onClose={() => setOpen(false)} />
->>>>>>> parent of 50b4051 (admin: department, employee, and employee's detail page ui & routings)
         </Layout.Content>
       </Layout>
     </Layout>

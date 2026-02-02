@@ -47,28 +47,17 @@
   border-radius: 10px;
 }
 
+.empLink {
+  color: #222;          /* normal text color */
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.empLink:hover {
+  color: #386FA4;       /* subtle hover like app theme */
+}
+
 
 :global(.ant-table-cell) {
   vertical-align: top;
-}
-
-@media (max-width: 768px) {
-  .topBar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .leftControls {
-    justify-content: space-between;
-  }
-
-  .searchInput {
-    width: 100%;
-  }
-
-  .addBtn {
-    width: 100%;
-    padding: 8px 12px;
-  }
 }

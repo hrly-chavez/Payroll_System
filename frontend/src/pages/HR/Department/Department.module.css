@@ -7,13 +7,11 @@
   background: #f7f9fb;
 }
 
-/* Top controls */
 .topBar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 18px;
-  gap: 12px;
 }
 
 .leftControls {
@@ -34,74 +32,29 @@
   border-radius: 6px;
   padding: 0 16px;
   font-weight: 500;
-  background-color: #386fa4;
+  background-color: #386FA4;
 }
-
 .addBtn:hover {
-  background-color: #2f5f8d !important;
+  background-color: #2f5f8d !important;   /* darker shade */
   border-color: #2f5f8d !important;
 }
 
-/* Table container */
+
+/* Table styling */
 .table {
   background: #ffffff;
   padding: 16px;
   border-radius: 10px;
+}
+.rowLink {
+  color: #222;
+  font-weight: 500;
 }
 
 :global(.ant-table-tbody > tr:hover > td) {
   background: #f4f8ff !important;
 }
 
-/* Desktop: no scroll */
-.table :global(.ant-table-container) {
-  overflow-x: visible;
-}
-
-/* Tablet & mobile: horizontal scroll */
-@media (max-width: 1024px) {
-  .table :global(.ant-table-container) {
-    overflow-x: auto;
-  }
-
-  .table :global(.ant-table) {
-    min-width: 720px;
-  }
-
 :global(.ant-table-cell) {
   vertical-align: top;
-}
-
-/* Mobile layout */
-@media (max-width: 768px) {
-  .content {
-    padding: 16px;
-  }
-
-  .topBar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .leftControls {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .searchInput {
-    width: 100%;
-  }
-
-  .addBtn {
-    width: 100%;
-    padding: 10px;
-  }
-}
-
-/* Extra small phones */
-@media (max-width: 480px) {
-  .table {
-    padding: 8px;
-  }
-}
 }

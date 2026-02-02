@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layout, Card, Table, Input, Avatar, Row, Col } from 'antd';
+import { Layout, Card, Table, Input, Avatar, Row, Col, Statistic } from 'antd';
 import Sidebar from '../../../components/Sidebar/Sidebar';
 import Topbar from '../../../components/Topbar/Topbar';
 import './Attendance.css';
@@ -94,31 +94,11 @@ const Attendance: React.FC = () => {
         <Content className="attendance-content">
           
           {/* Stats Cards */}
-          <Row gutter={[16, 16]} className="stats-row">
-            <Col xs={24} sm={12} md={6}>
-              <Card className="stat-card">
-                <p>Total Present</p>
-                <h2>00</h2>
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card className="stat-card">
-                <p>Total Lates</p>
-                <h2>00</h2>
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card className="stat-card">
-                <p>Total Absences</p>
-                <h2>00</h2>
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card className="stat-card">
-                <p>Total Irregularities</p>
-                <h2>00</h2>
-              </Card>
-            </Col>
+          <Row gutter={16}>
+            <Col span={6}><Card><Statistic title="Total Present" value={0} /></Card></Col>
+            <Col span={6}><Card><Statistic title="Total Lates" value={0} /></Card></Col>
+            <Col span={6}><Card><Statistic title="Total Absences" value={0} /></Card></Col>
+            <Col span={6}><Card><Statistic title="Leave request pending" value={0} /></Card></Col>
           </Row>
 
           {/* Table Section */}

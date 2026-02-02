@@ -46,30 +46,15 @@
   padding: 16px;
   border-radius: 10px;
 }
+.rowLink {
+  color: #222;
+  font-weight: 500;
+}
 
-/* Make description column wrap nicely */
+:global(.ant-table-tbody > tr:hover > td) {
+  background: #f4f8ff !important;
+}
+
 :global(.ant-table-cell) {
   vertical-align: top;
 }
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .topBar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .leftControls {
-    justify-content: space-between;
-  }
-
-  .searchInput {
-    width: 100%;
-  }
-
-  .addBtn {
-    width: 100%;
-    padding: 8px 12px;
-  }
-} 

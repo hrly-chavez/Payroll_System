@@ -103,5 +103,175 @@ class User(models.Model):
     class Meta:
         db_table = 'users'
     
+class Employee_Salary(models.Model):
+    PAY_TYPES = [
+        ("Monthly","Monthly"),
+        ("Per Period","Per Period"),
+        ("Daily","Daily"),
+        ("Hourly","Hourly"),
+    ]
 
+    id = models.AutoField(primary_key=True)
+    pay_type =  models.CharField(max_length=20, choices=PAY_TYPES)
+    #per_day = models.IntegerField()
+    base_rate = models.PositiveIntegerField()
+    effective_from = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True,null=True,
+    blank=True)
+    employee = models.ForeignKey( "Employee", on_delete=models.CASCADE,related_name="salaries",null=True,
+    blank=True)
     
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employee", "effective_from"],
+                name="unique_salary_start_per_employee"
+            )
+        ]
+    
+    
+class Deduction_Type(models.Model):
+    calculation_choices = [
+        ("Fixed","Fixed"),
+        ("Percent","Percent"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=50)
+    code = models.CharField(max_length=100,unique=True)
+    calulation_type = models.CharField(max_length=20, choices=calculation_choices)
+    is_active = models.BooleanField(default=True)
+    create_at = models.DateField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["code"],
+                name="unique_deduction_code"
+            )
+        ]
+
+class Employee_Deduction(models.Model):
+    frequency_choices = [
+        ("Monthly","Monthly"),
+        ("Per Period","Per Period"),
+        ("One Time","One Time"),
+    ]
+    status_choices = [
+        ("Active","Active"),
+        ("Inactive","Inactive"),
+    ]
+    id = models.AutoField(primary_key=True)
+    amount = models.PositiveIntegerField()
+    frequency = models.CharField(max_length=20, choices=frequency_choices)
+    effective_from = models.DateField()
+    effective_to = models.DateField(null=True,blank=True)
+    status = models.CharField(max_length=15, choices=status_choices)
+    created_at = models.DateField(auto_now_add=True)
+
+    # Loan-only fields
+    total_loan_amount = models.PositiveIntegerField(null=True,blank=True)
+    balance = models.PositiveIntegerField(null=True,blank=True)
+    amortization_per_period = models.PositiveIntegerField(null=True,blank=True)
+
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="deductions")
+    deduction_type = models.ForeignKey(Deduction_Type,on_delete=models.PROTECT,related_name="employee_deductions") 
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employee", "deduction_type", "effective_from"],
+                name="unique_employee_deduction_start"
+            )
+        ]
+
+class Allowance_Type(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=50)
+    code = models.CharField(max_length=50)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["code"],
+                name="unique_allowance_code"
+            )
+        ]
+
+class Employee_Allowance(models.Model):
+    frequency_choices = [
+        ("Monthly","Monthly"),
+        ("Per Period","Per Period"),
+        ("One Time","One Time"),
+    ]
+    status_choices = [
+        ("Active","Active"),
+        ("Inactive","Inactive"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    amount = models.PositiveIntegerField()
+    frequency = models.CharField(max_length=20, choices=frequency_choices)
+    effective_from = models.DateField()
+    effective_to = models.DateField(null=True,blank=True)
+    status = models.CharField(max_length=15, choices=status_choices)
+    created_at = models.DateField(auto_now_add=True)
+    allowance_type = models.ForeignKey(Allowance_Type,on_delete=models.PROTECT,related_name="employee_allowances")
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="allowances")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employee", "allowance_type", "effective_from"],
+                name="unique_employee_allowance_start"
+            )
+        ]
+
+class Attendance(models.Model):
+    STATUS_CHOICES = [
+        ("PRESENT", "Present"),
+        ("ABSENT", "Absent"),
+        ("HALF_DAY", "Half Day"),
+        ("REST_DAY", "Rest Day"),
+        ("HOLIDAY", "Holiday"),
+    ]
+    id = models.AutoField(primary_key=True)
+    date = models.DateField()
+    status = models.CharField(max_length=20,choices=STATUS_CHOICES)
+    time_in = models.TimeField()
+    time_out = models.TimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="attendances")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employee", "date"],
+                name="unique_attendance_per_employee_per_day"
+            )
+        ]
+
+class Attendance_Event(models.Model):
+    TYPE_CHOICES = [
+        ("Late","Late"),
+        ("OverTime","OverTime"),
+        ("UnderTime","UnderTime"),
+        ("Worked Holiday","Worked Holiday"),
+    ]
+    APPROVAL_STATUS_CHOICES = [
+        ("Pending","Pending"),
+        ("Approved","Approved"),
+        ("Declined","Declined"),
+    ]
+    id = models.AutoField(primary_key=True)
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    minutes = models.TimeField()
+    start_time = models.TimeField(null=True,blank=True)
+    end_time = models.TimeField(null=True,blank=True)
+    approval_status = models.CharField(max_length=20,choices=APPROVAL_STATUS_CHOICES) 
+    event_remarks = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_attendance_events")
+    attendance = models.ForeignKey(Attendance,on_delete=models.CASCADE,related_name="events")

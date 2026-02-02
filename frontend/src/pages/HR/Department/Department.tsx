@@ -53,7 +53,7 @@ const Department: React.FC = () => {
       key: "id",
     },
     {
-      title: "Department Name",
+      title: "Department",
       dataIndex: "name",
       key: "name",
       render: (text, record) => (
@@ -62,6 +62,7 @@ const Department: React.FC = () => {
         </a>
       ),
     },
+
     {
       title: "Shift",
       dataIndex: "shift",
@@ -113,7 +114,7 @@ const Department: React.FC = () => {
             loading={loading}
             pagination={false}
             className={styles.table}
-            scroll={{ x: "max-content" }}
+            scroll={{ x: 'max-content' }}
           />
 
           <AddDepartment

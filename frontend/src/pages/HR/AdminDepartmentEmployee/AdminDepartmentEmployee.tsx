@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Layout, Table, Input, Button } from "antd";
+import React, { useEffect, useState } from "react";
+import { Layout, Table, Input, Button, message } from "antd";
 import type { TableProps } from "antd";
 import { PlusOutlined, SearchOutlined, SlidersOutlined } from "@ant-design/icons";
 import { useNavigate, useParams } from "react-router-dom";
@@ -8,72 +8,66 @@ import Topbar from "../../../components/Topbar/Topbar";
 import styles from "./Admin_DepartmentEmployee.module.css";
 import AddAddDeptEmployee from "./AddAdDeptEmployee";
 
-
-interface DataType {
-  key: string;
-  empname: string;
+interface EmployeeType {
+  id: number;
+  name: string;
   manager: string;
   position: string;
   status: string;
-  deptname: string;
-  shift: number;
-  hireddate: string;
+  department: string;
+  shift: string;
+  hired_date: string;
 }
 
-const data: DataType[] = [
-  {
-    key: "1",
-    empname: "Alpha",
-    manager: "John Doe",
-    position: "IT",
-    status: "Active",
-    deptname: "Agents Department",
-    shift: 1,
-    hireddate: "01/15/2020",
-  },
-  {
-    key: "2",
-    empname: "Beta",
-    manager: "John Doe",
-    position: "IT",
-    status: "Active",
-    deptname: "Agents Department",
-    shift: 1,
-    hireddate: "01/15/2020",
-  },
-  {
-    key: "3",
-    empname: "Charlie",
-    manager: "John Doe",
-    position: "IT",
-    status: "Active",
-    deptname: "Agents Department",
-    shift: 1,
-    hireddate: "01/15/2020",
-  },
-];
-
 const AdminDepartmentEmployee: React.FC = () => {
-  const { deptId } = useParams();
+  const { deptId } = useParams<{ deptId: string }>();
   const navigate = useNavigate();
+  const [employees, setEmployees] = useState<EmployeeType[]>([]);
+  const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
 
+  const fetchEmployees = async () => {
+    if (!deptId) return;
 
-  const columns: TableProps<DataType>["columns"] = [
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `http://localhost:8000/api/employees/employees/by-department/${deptId}/`
+      );
+      if (!res.ok) throw new Error("Failed to fetch employees");
+      const data = await res.json();
+      setEmployees(data);
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to load employees");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEmployees();
+  }, [deptId]);
+
+  const filteredEmployees = employees.filter((emp) =>
+    emp.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const columns: TableProps<EmployeeType>["columns"] = [
     {
       title: "Employee Name",
-      dataIndex: "empname",
-      key: "empname",
+      dataIndex: "name",
+      key: "name",
       render: (text) => (
         <span className={styles.empLink}>{text}</span>
       ),
     },
-    { title: "Manager", dataIndex: "manager", key: "manager" },
     { title: "Position", dataIndex: "position", key: "position" },
     { title: "Status", dataIndex: "status", key: "status" },
-    { title: "Department", dataIndex: "deptname", key: "deptname" },
+    { title: "Department", dataIndex: "department", key: "department" },
     { title: "Shift", dataIndex: "shift", key: "shift" },
-    { title: "Hired Date", dataIndex: "hireddate", key: "hireddate" },
+    { title: "Hired Date", dataIndex: "hired_date", key: "hired_date" },
   ];
 
   return (
@@ -81,6 +75,7 @@ const AdminDepartmentEmployee: React.FC = () => {
       <Sidebar />
       <Layout>
         <Topbar title="Employees" showBack />
+
         <Layout.Content className={styles.content}>
           <div className={styles.topBar}>
             <div className={styles.leftControls}>
@@ -88,6 +83,8 @@ const AdminDepartmentEmployee: React.FC = () => {
                 placeholder="Search"
                 prefix={<SearchOutlined />}
                 className={styles.searchInput}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
               <Button icon={<SlidersOutlined />} className={styles.filterBtn}>
                 Filter
@@ -104,18 +101,29 @@ const AdminDepartmentEmployee: React.FC = () => {
             </Button>
           </div>
 
-          <Table<DataType>
+          <Table<EmployeeType>
             columns={columns}
-            dataSource={data}
+            dataSource={filteredEmployees}
+            rowKey="id"
+            loading={loading}
             pagination={false}
             className={styles.table}
             onRow={(record) => ({
-              onClick: () => navigate(`/admin/employee/employee-details`),
+              onClick: () =>
+                navigate(
+                  `/admin/employee/employee-details/${record.id}`
+                ),
               style: { cursor: "pointer" },
             })}
           />
 
-          <AddAddDeptEmployee open={open} onClose={() => setOpen(false)} />
+          <AddAddDeptEmployee
+            open={open}
+            onClose={() => {
+              setOpen(false);
+              fetchEmployees();
+            }}
+          />
         </Layout.Content>
       </Layout>
     </Layout>

@@ -8,10 +8,16 @@ import Topbar from "../../../components/Topbar/Topbar";
 import AddDepartment from "./AddDepartment";
 import styles from "./Department.module.css";
 
+interface ShiftType {
+  id: number;
+  start_time: string;
+  end_time: string;
+}
+
 interface DepartmentType {
   id: number;
   name: string;
-  shift: number | { id: number; start_time: string; end_time: string };
+  shift: ShiftType | number;
 }
 
 const Department: React.FC = () => {
@@ -21,7 +27,6 @@ const Department: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  // Fetch departments from backend
   const fetchDepartments = async () => {
     setLoading(true);
     try {
@@ -29,9 +34,9 @@ const Department: React.FC = () => {
       if (!res.ok) throw new Error("Failed to fetch departments");
       const data = await res.json();
       setDepartments(data);
-    } catch (error) {
-      console.error(error);
-      message.error("Error fetching departments");
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to load departments");
     } finally {
       setLoading(false);
     }
@@ -41,7 +46,6 @@ const Department: React.FC = () => {
     fetchDepartments();
   }, []);
 
-  // Filtered departments by search
   const filteredDepartments = departments.filter((dept) =>
     dept.name.toLowerCase().includes(search.toLowerCase())
   );
@@ -51,30 +55,29 @@ const Department: React.FC = () => {
       title: "ID",
       dataIndex: "id",
       key: "id",
+      width: 80,
     },
     {
       title: "Department",
       dataIndex: "name",
       key: "name",
-      render: (text, record) => (
-        <a onClick={() => navigate(`/admin/department-employee`)}>
-          {text}
-        </a>
+      render: (text) => (
+        <span className={styles.rowLink}>{text}</span>
       ),
     },
-
     {
-      title: "Shift",
+      title: "Workshift",
       dataIndex: "shift",
       key: "shift",
       render: (shift) => {
-        // Handle if shift is just an ID or full object
+        if (!shift) return "—";
         if (typeof shift === "object") {
           return `${shift.start_time} - ${shift.end_time}`;
         }
-        return shift; // fallback ID
+        return shift;
       },
     },
+
   ];
 
   return (
@@ -82,6 +85,7 @@ const Department: React.FC = () => {
       <Sidebar />
       <Layout>
         <Topbar title="Department" />
+
         <Layout.Content className={styles.content}>
           <div className={styles.topBar}>
             <div className={styles.leftControls}>
@@ -114,14 +118,18 @@ const Department: React.FC = () => {
             loading={loading}
             pagination={false}
             className={styles.table}
-            scroll={{ x: 'max-content' }}
+            onRow={(record) => ({
+              onClick: () =>
+                navigate(`/admin/department-employee/${record.id}`),
+              style: { cursor: "pointer" },
+            })}
           />
 
           <AddDepartment
             open={open}
             onClose={() => {
               setOpen(false);
-              fetchDepartments(); // refresh table after adding
+              fetchDepartments();
             }}
           />
         </Layout.Content>

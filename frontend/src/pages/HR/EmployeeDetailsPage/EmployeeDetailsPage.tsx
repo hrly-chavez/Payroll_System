@@ -1,6 +1,5 @@
-import { useNavigate } from "react-router-dom";
-import React from "react";
-import { Layout, Card, Tabs, Button, Table } from "antd";
+import React, { useEffect, useState } from "react";
+import { Layout, Card, Tabs, Button, Table, message, Spin } from "antd";
 import { useParams } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
@@ -13,17 +12,50 @@ import {
   MailOutlined,
   PhoneOutlined,
   HomeOutlined,
-  CheckCircleFilled,StopOutlined,
   CheckCircleOutlined,
+  StopOutlined,
   EditOutlined,
 } from "@ant-design/icons";
 
-
 const { Content } = Layout;
 
+interface EmployeeData {
+  id: number;
+  name: string;
+  department_name: string;
+  position: string;
+  status: string;
+  shift_info: string | null;
+  hired_date: string;
+  bank_info: string;
+  email: string;
+  contact_no: string;
+  address: string;
+}
+
 const EmployeeDetailsPage: React.FC = () => {
-  const { empId } = useParams();
-  const {empName} = useParams();
+  const { employeeId } = useParams<{ employeeId: string }>();
+  const [employee, setEmployee] = useState<EmployeeData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchEmployee = async () => {
+      try {
+        if (!employeeId) return;
+        const res = await fetch(`http://localhost:8000/api/employees/employees/${employeeId}/details/`);
+        if (!res.ok) throw new Error("Failed to fetch employee details");
+        const data: EmployeeData = await res.json();
+        setEmployee(data);
+      } catch (error) {
+        console.error(error);
+        message.error("Error fetching employee details");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEmployee();
+  }, [employeeId]);
 
   const salaryColumns = [
     { title: "Salary", dataIndex: "salary", key: "salary" },
@@ -33,8 +65,12 @@ const EmployeeDetailsPage: React.FC = () => {
   const salaryData = [
     { key: "1", salary: "₱15,000", type: "Monthly" },
   ];
-  
-  const employeeStatus: "active" | "deactivated" = "active";
+
+  if (loading) return <Spin tip="Loading..." style={{ marginTop: 100 }} />;
+
+  if (!employee) return <p style={{ marginTop: 100 }}>Employee not found.</p>;
+
+  const employeeStatus: "active" | "deactivated" = employee.status.toLowerCase() === "active" ? "active" : "deactivated";
 
   return (
     <Layout className={styles.layout}>
@@ -48,121 +84,94 @@ const EmployeeDetailsPage: React.FC = () => {
             <Card className={styles.profileCard}>
               <div className={styles.profileHeader}>
                 <img src="/avatar.jpg" className={styles.avatar} alt="avatar" />
-
                 <div className={styles.nameSection}>
-                    <div className={styles.nameTop}>
-                    <h3 className={styles.name}>Kimi Räikkönen</h3>
-
-                    <Button
-                        type="text"
-                        icon={<EditOutlined />}
-                        className={styles.editBtn}
-                    />
-                    </div>
-
-                    <span className={styles.empId}>ID : 3258-0400</span>
+                  <div className={styles.nameTop}>
+                    <h3 className={styles.name}>{employee.name}</h3>
+                    <Button type="text" icon={<EditOutlined />} className={styles.editBtn} />
+                  </div>
+                  <span className={styles.empId}>ID : {employee.id}</span>
                 </div>
-                </div>
+              </div>
 
               <div className={styles.infoBlock}>
                 <h4>Info</h4>
+
                 <div className={styles.infoRow}>
-                <div className={styles.iconBox}>
-                    <UserOutlined />
-                </div>
-                <div>
+                  <div className={styles.iconBox}><UserOutlined /></div>
+                  <div>
                     <span className={styles.label}>Position</span>
-                    <p>IT</p>
-                </div>
+                    <p>{employee.position}</p>
+                  </div>
                 </div>
 
                 <div className={styles.infoRow}>
-                <div className={styles.iconBox}>
-                    <BankOutlined />
-                </div>
-                <div>
+                  <div className={styles.iconBox}><BankOutlined /></div>
+                  <div>
                     <span className={styles.label}>Bank Info</span>
-                    <p>BDO - 1010101010</p>
-                </div>
+                    <p>{employee.bank_info}</p>
+                  </div>
                 </div>
 
                 <div className={styles.infoRow}>
-                <div className={styles.iconBox}>
-                    <ClockCircleOutlined />
-                </div>
-                <div>
+                  <div className={styles.iconBox}><ClockCircleOutlined /></div>
+                  <div>
                     <span className={styles.label}>Workshift</span>
-                    <p>Regular</p>
-                </div>
+                    <p>{employee.shift_info || "Not assigned"}</p>
+                  </div>
                 </div>
 
                 <div className={styles.infoRow}>
-                <div className={styles.iconBox}>
-                    <CalendarOutlined />
-                </div>
-                <div>
+                  <div className={styles.iconBox}><CalendarOutlined /></div>
+                  <div>
                     <span className={styles.label}>Hired Date</span>
-                    <p>12 February 2023</p>
+                    <p>{employee.hired_date}</p>
+                  </div>
                 </div>
-                </div>
-                </div>
+              </div>
 
-                <div className={styles.infoBlock}>
+              <div className={styles.infoBlock}>
                 <h4>Contact</h4>
 
                 <div className={styles.infoRow}>
-                <div className={styles.iconBox}>
-                    <MailOutlined />
-                </div>
-                <div>
+                  <div className={styles.iconBox}><MailOutlined /></div>
+                  <div>
                     <span className={styles.label}>Email</span>
-                    <p>sample@gmail.com</p>
-                </div>
+                    <p>{employee.email}</p>
+                  </div>
                 </div>
 
                 <div className={styles.infoRow}>
-                <div className={styles.iconBox}>
-                    <PhoneOutlined />
-                </div>
-                <div>
+                  <div className={styles.iconBox}><PhoneOutlined /></div>
+                  <div>
                     <span className={styles.label}>Contact</span>
-                    <p>+628283386756</p>
-                </div>
+                    <p>{employee.contact_no}</p>
+                  </div>
                 </div>
 
                 <div className={styles.infoRow}>
-                <div className={styles.iconBox}>
-                    <HomeOutlined />
-                </div>
-                <div>
+                  <div className={styles.iconBox}><HomeOutlined /></div>
+                  <div>
                     <span className={styles.label}>Address</span>
-                    <p>Cebu City, Philippines</p>
+                    <p>{employee.address}</p>
+                  </div>
                 </div>
-                </div>
+
                 <div className={styles.statusRow}>
-                <div className={styles.iconBox}>
+                  <div className={styles.iconBox}>
                     {employeeStatus === "active" ? (
-                    <CheckCircleOutlined className={styles.activeIcon} />
+                      <CheckCircleOutlined className={styles.activeIcon} />
                     ) : (
-                    <StopOutlined className={styles.inactiveIcon} />
+                      <StopOutlined className={styles.inactiveIcon} />
                     )}
-                </div>
-
-                <div>
+                  </div>
+                  <div>
                     <span className={styles.label}>Status</span>
-                    <p
-                    className={
-                        employeeStatus === "active"
-                        ? styles.activeText
-                        : styles.inactiveText
-                    }
-                    >
-                    {employeeStatus === "active" ? "Active" : "Deactivated"}
+                    <p className={employeeStatus === "active" ? styles.activeText : styles.inactiveText}>
+                      {employeeStatus === "active" ? "Active" : "Deactivated"}
                     </p>
+                  </div>
                 </div>
-                </div>
-
-                </div>
+              </div>
             </Card>
 
             {/* RIGHT SIDE */}
@@ -180,7 +189,6 @@ const EmployeeDetailsPage: React.FC = () => {
                     pagination={false}
                   />
                 </Tabs.TabPane>
-
                 <Tabs.TabPane tab="Allowance" key="2" />
                 <Tabs.TabPane tab="Tax" key="3" />
                 <Tabs.TabPane tab="Payslips" key="4" />

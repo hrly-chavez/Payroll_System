@@ -56,3 +56,57 @@
 .stat-value.danger {
   color: #ff4d4f;
 }
+
+/* Holiday Detail Modal */
+.holiday-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.holiday-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.holiday-field label {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #000;
+}
+
+.holiday-field input {
+  height: 40px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #d9d9d9;
+  background: #fafafa;
+  color: #555;
+  font-size: 14px;
+}
+
+/* Footer buttons */
+.holiday-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Decline textarea */
+.decline-textarea {
+  min-height: 100px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #d9d9d9;
+  background: #fafafa;
+  color: #555;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.decline-textarea:focus {
+  outline: none;
+  border-color: #1677ff;
+  background: #fff;
+}

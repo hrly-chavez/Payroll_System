@@ -8,19 +8,16 @@
   height: 100px;
   transition: padding 0.28s ease;
 }
+
 .topbar-back {
   font-size: 18px;
   margin-right: 8px;
 }
 
-
-/* On small screens we don't push the topbar by default; when mobile sidebar opens we shift it */
 @media (max-width: 767px) {
   .sidebar-open-mobile .app-topbar {
     margin-left: 250px;
   }
-
-  /* optionally hide title when mobile sidebar is open to save space */
   .sidebar-open-mobile .topbar-title {
     display: none;
   }
@@ -49,7 +46,6 @@
   font-size: 23px;
   color: rgba(0,0,0,0.65);
   cursor: pointer;
-  /* slight left nudge to visually align with title */
   transform: translateX(-4px);
   transition: transform .12s ease, color .12s ease;
 }
@@ -61,4 +57,5 @@
 
 .topbar-avatar {
   margin-left: 0;
+  cursor: pointer;
 }

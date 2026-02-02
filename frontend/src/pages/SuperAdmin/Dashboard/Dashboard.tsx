@@ -105,6 +105,10 @@ const Dashboard: React.FC = () => {
   const [isHolidayModalOpen, setIsHolidayModalOpen] = React.useState(false);
   const [isHolidayDetailModalOpen, setIsHolidayDetailModalOpen] =
     React.useState(false);
+
+  const [isDeclineModalOpen, setIsDeclineModalOpen] = React.useState(false);
+  const [declineReason, setDeclineReason] = React.useState('');
+
   const [selectedHoliday, setSelectedHoliday] =
     React.useState<HolidayRequest | null>(null);
 
@@ -182,8 +186,7 @@ const Dashboard: React.FC = () => {
   };
 
   const handleDecline = () => {
-    console.log('Declined:', selectedHoliday);
-    setIsHolidayDetailModalOpen(false);
+    setIsDeclineModalOpen(true);
   };
 
   return (
@@ -212,7 +215,6 @@ const Dashboard: React.FC = () => {
                 </div>
 
               <Row gutter={[16, 16]} className="stats-row">
-                {/* Holiday Requests */}
                 <Col span={12}>
                   <div
                     className="stat-card clickable"
@@ -223,7 +225,6 @@ const Dashboard: React.FC = () => {
                   </div>
                 </Col>
 
-                {/* Payroll Requests (UNCHANGED) */}
                 <Col span={12}>
                   <div className="stat-card">
                     <div className="stat-label">Pending Payroll</div>
@@ -255,28 +256,83 @@ const Dashboard: React.FC = () => {
 
           {/* Holiday Detail Modal */}
           <Modal
-            title="Holiday Request"
+            title={<span style={{ fontWeight: 700 }}>HOLIDAY REQUEST(S)</span>}
             open={isHolidayDetailModalOpen}
             onCancel={() => setIsHolidayDetailModalOpen(false)}
-            footer={[
-              <Button key="decline" onClick={handleDecline}>
-                Decline
-              </Button>,
-              <Button key="approve" type="primary" onClick={handleApprove}>
-                Approve
-              </Button>,
-            ]}
-            width={500}
+            footer={
+              <div className="holiday-modal-footer">
+                <Button onClick={handleDecline}>Decline</Button>
+                <Button type="primary" onClick={handleApprove}>
+                  Approve
+                </Button>
+              </div>
+            }
+            width={520}
           >
             {selectedHoliday && (
-              <>
-                <p><strong>Holiday Name</strong><br />{selectedHoliday.name}</p>
-                <p><strong>Holiday Date</strong><br />{selectedHoliday.date}</p>
-                <p><strong>Holiday Type</strong><br />{selectedHoliday.type}</p>
-                <p><strong>Holiday Base</strong><br />{selectedHoliday.base}</p>
-              </>
+              <div className="holiday-detail">
+                <div className="holiday-field">
+                  <label>Holiday Name</label>
+                  <input value={selectedHoliday.name.toUpperCase()} disabled />
+                </div>
+
+                <div className="holiday-field">
+                  <label>Holiday Date</label>
+                  <input value={selectedHoliday.date.toUpperCase()} disabled />
+                </div>
+
+                <div className="holiday-field">
+                  <label>Holiday Type</label>
+                  <input value={selectedHoliday.type.toUpperCase()} disabled />
+                </div>
+
+                <div className="holiday-field">
+                  <label>Holiday Base</label>
+                  <input value={selectedHoliday.base.toUpperCase()} disabled />
+                </div>
+              </div>
             )}
           </Modal>
+
+          {/* Decline Reason Modal */}
+          <Modal
+            title={<span style={{ fontWeight: 700 }}>Reason for Declining</span>}
+            open={isDeclineModalOpen}
+            centered
+            onCancel={() => setIsDeclineModalOpen(false)}
+            footer={null}
+            width={520}
+          >
+            <div className="holiday-detail">
+              <div className="holiday-field">
+                <textarea
+                  className="decline-textarea"
+                  placeholder="Enter reason for declining"
+                  value={declineReason}
+                  onChange={(e) => setDeclineReason(e.target.value)}
+                />
+              </div>
+
+              <div className="holiday-modal-footer">
+                <Button
+                  type="primary"
+                  onClick={() => {
+                    console.log('Declined:', selectedHoliday, declineReason);
+                    setIsDeclineModalOpen(false);
+                    setIsHolidayDetailModalOpen(false);
+                    setDeclineReason('');
+                  }}
+                >
+                  Save
+                </Button>
+
+                <Button onClick={() => setIsDeclineModalOpen(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </Modal>
+
         </Content>
       </Layout>
     </Layout>

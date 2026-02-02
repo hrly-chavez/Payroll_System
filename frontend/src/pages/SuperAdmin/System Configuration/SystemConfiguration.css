@@ -1,0 +1,110 @@
+.system-layout {
+  min-height: 100vh;
+}
+
+.system-content {
+  margin: 16px;
+}
+
+.config-container {
+  background: #fff;
+  padding: 24px;
+  border-radius: 6px;
+}
+
+/* Header buttons */
+.config-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+/* Tabs */
+.config-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.config-tabs button {
+  border: 1px solid #d9d9d9;
+  background: #fff;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.config-tabs button.active {
+  border-color: #1677ff;
+  color: #1677ff;
+  background: #e6f4ff;
+}
+
+/* Section header */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #e6f0ff;
+  padding: 10px 16px;
+  margin-bottom: 12px;
+  border-radius: 4px;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Table */
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.config-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.config-table th,
+.config-table td {
+  border: 1px solid #f0f0f0;
+  padding: 10px;
+  white-space: nowrap;
+}
+
+.config-table th {
+  background: #fafafa;
+  font-weight: 600;
+  text-align: left;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .config-actions {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .config-tabs {
+    flex-wrap: wrap;
+  }
+}

@@ -81,7 +81,7 @@ class User(models.Model):
     user_password = models.CharField(max_length=255)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='EMPLOYEE')
     is_active = models.BooleanField(default=True)
-    employee = models.OneToOneField( Employee, on_delete=models.CASCADE,related_name="user")
+    employee = models.OneToOneField( Employee, on_delete=models.CASCADE,related_name="user", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

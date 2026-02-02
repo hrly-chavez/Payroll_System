@@ -1,66 +1,79 @@
-import React, { useState } from "react";
-import { Layout, Table, Input, Button } from "antd";
+import React, { useEffect, useState } from "react";
+import { Layout, Table, Input, Button, message } from "antd";
 import type { TableProps } from "antd";
 import { PlusOutlined, SearchOutlined, SlidersOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
-import styles from "./Department.module.css";
 import AddDepartment from "./AddDepartment";
+import styles from "./Department.module.css";
 
-interface DataType {
-  key: string;
-  deptname: string;
-  description: string;
-  workshift: string;
-  ManagerName: string;
+interface DepartmentType {
+  id: number;
+  name: string;
+  shift: number | { id: number; start_time: string; end_time: string };
 }
-
-const data: DataType[] = [
-  {
-    key: "1",
-    deptname: "Agents Department",
-    description:
-      "Acts as the frontline support and communication hub, immediately managing high volumes of incoming and outgoing calls.",
-    workshift: "Night | 12:00 a.m - 9:00 a.m",
-    ManagerName: "Melichenko Alexandr",
-  },
-  {
-    key: "2",
-    deptname: "Finance Department",
-    description:
-      "Acts as the engine of operational stability, focusing on maintaining liquidity and processing transactions.",
-    workshift: "Morning | 9:00 a.m - 6:00 p.m",
-    ManagerName: "Shurenkova Larisa",
-  },
-  {
-    key: "3",
-    deptname: "IT Department",
-    description:
-      "Acts as the engine of operational stability, focusing on maintaining liquidity and processing transactions.",
-    workshift: "Morning | 9:00 a.m - 6:00 p.m",
-    ManagerName: "Shurenkova Larisa",
-  },
-];
 
 const Department: React.FC = () => {
   const navigate = useNavigate();
+  const [departments, setDepartments] = useState<DepartmentType[]>([]);
+  const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
 
-  const columns: TableProps<DataType>["columns"] = [
+  // Fetch departments from backend
+  const fetchDepartments = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("http://localhost:8000/api/employees/departments/");
+      if (!res.ok) throw new Error("Failed to fetch departments");
+      const data = await res.json();
+      setDepartments(data);
+    } catch (error) {
+      console.error(error);
+      message.error("Error fetching departments");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDepartments();
+  }, []);
+
+  // Filtered departments by search
+  const filteredDepartments = departments.filter((dept) =>
+    dept.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const columns: TableProps<DepartmentType>["columns"] = [
     {
-      title: "Department",
-      dataIndex: "deptname",
-      key: "deptname",
+      title: "ID",
+      dataIndex: "id",
+      key: "id",
+    },
+    {
+      title: "Department Name",
+      dataIndex: "name",
+      key: "name",
       render: (text, record) => (
         <a onClick={() => navigate(`/admin/department-employee`)}>
           {text}
         </a>
       ),
     },
-    { title: "Description", dataIndex: "description", key: "description" },
-    { title: "Workshift", dataIndex: "workshift", key: "workshift" },
-    { title: "Manager", dataIndex: "ManagerName", key: "ManagerName" },
+    {
+      title: "Shift",
+      dataIndex: "shift",
+      key: "shift",
+      render: (shift) => {
+        // Handle if shift is just an ID or full object
+        if (typeof shift === "object") {
+          return `${shift.start_time} - ${shift.end_time}`;
+        }
+        return shift; // fallback ID
+      },
+    },
   ];
 
   return (
@@ -75,6 +88,8 @@ const Department: React.FC = () => {
                 placeholder="Search"
                 prefix={<SearchOutlined />}
                 className={styles.searchInput}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
               <Button icon={<SlidersOutlined />} className={styles.filterBtn}>
                 Filter
@@ -91,15 +106,23 @@ const Department: React.FC = () => {
             </Button>
           </div>
 
-          <Table<DataType>
+          <Table<DepartmentType>
             columns={columns}
-            dataSource={data}
+            dataSource={filteredDepartments}
+            rowKey="id"
+            loading={loading}
             pagination={false}
             className={styles.table}
-            scroll={{ x: 'max-content' }}
+            scroll={{ x: "max-content" }}
           />
 
-          <AddDepartment open={open} onClose={() => setOpen(false)} />
+          <AddDepartment
+            open={open}
+            onClose={() => {
+              setOpen(false);
+              fetchDepartments(); // refresh table after adding
+            }}
+          />
         </Layout.Content>
       </Layout>
     </Layout>

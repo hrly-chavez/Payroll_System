@@ -5,11 +5,92 @@ import Sidebar from '../../../components/Sidebar/Sidebar';
 import Topbar from '../../../components/Topbar/Topbar';
 import Greeting from '../../../components/Greeting/Greeting';
 import * as echarts from 'echarts';
+import dayjs, { Dayjs } from 'dayjs';
+
 const { Content } = Layout;
 
 const Dashboard: React.FC = () => {
   const [chartOption, setChartOption] = React.useState<echarts.ComposeOption<echarts.BarSeriesOption>>();
   const [chartHeight, setChartHeight] = React.useState<number>(360);
+
+  //holiday
+  type ApiHoliday = {
+    date: string; // YYYY-MM-DD
+    localName: string;
+    name: string;
+  };
+
+  type Holiday = {
+    name: string;
+    country: 'US' | 'PH';
+  };
+
+  const [holidays, setHolidays] = React.useState<Record<string, Holiday[]>>({});
+
+  const fetchHolidays = async () => {
+    const year = dayjs().year();
+
+    try {
+      const [usRes, phRes] = await Promise.all([
+        fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/US`),
+        fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/PH`)
+      ]);
+
+      const usHolidays: ApiHoliday[] = await usRes.json();
+      const phHolidays: ApiHoliday[] = await phRes.json();
+
+      const holidayMap: Record<string, Holiday[]> = {};
+
+      usHolidays.forEach(h => {
+        holidayMap[h.date] = [
+          ...(holidayMap[h.date] || []),
+          { name: h.localName, country: 'US' }
+        ];
+      });
+
+      phHolidays.forEach(h => {
+        holidayMap[h.date] = [
+          ...(holidayMap[h.date] || []),
+          { name: h.localName, country: 'PH' }
+        ];
+      });
+
+      setHolidays(holidayMap);
+    } catch (error) {
+      console.error('Failed to load holidays', error);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchHolidays();
+  }, []);
+
+  const dateCellRender = (value: dayjs.Dayjs) => {
+    const dateKey = value.format('YYYY-MM-DD');
+    const dayHolidays = holidays[dateKey];
+
+    if (!dayHolidays) return null;
+
+    return (
+      <div>
+        {dayHolidays.map((h, i) => (
+          <div
+            key={i}
+            style={{
+              fontSize: 10,
+              color: h.country === 'US' ? '#910002' : '#389100',
+              lineHeight: '12px'
+            }}
+          >
+            {h.country === 'US' ? '🎌' : 'PH'} {h.name}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+
+
 
   const baseData = [60, 12, 5, 8, 15];
 
@@ -96,7 +177,7 @@ const Dashboard: React.FC = () => {
               <Col xs={24} lg={8}>
                 <div style={{ padding: 24, background: '#fff', borderRadius: 8 }}>
                   <h3 style={{ textAlign: 'center', marginBottom: 12 }}>January 2023</h3>
-                  <Calendar fullscreen={false} />
+                  <Calendar fullscreen={false} dateCellRender={dateCellRender}/>
                 </div>
 
                 <Row gutter={[16, 16]} style={{ marginTop: 16 }}>

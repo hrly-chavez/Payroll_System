@@ -16,9 +16,7 @@ import AdReport from "./pages/HR/Reports/Reports";
 import AdDepartment from "./pages/HR/Department/Department";
 import AdDepartmentAddDept from "./pages/HR/Department/AddDepartment";
 import AdDepartmentEmployee from "./pages/HR/AdminDepartmentEmployee/AdminDepartmentEmployee";
-import EmployeeDetailsPage from "./pages/HR/EmployeeDetailsPage/EmployeeDetailsPage";
 import AdRequests from "./pages/HR/Requests/Requests";
-
 
 //super admin
 import SupDashboard from "./pages/SuperAdmin/Dashboard/Dashboard";
@@ -27,7 +25,6 @@ import SupAttendance from "./pages/SuperAdmin/Attendance/Attendance";
 import SupReport from "./pages/SuperAdmin/Reports/Reports";
 import SupDepartment from "./pages/SuperAdmin/Department/Department";
 import SupSystemConfig from "./pages/SuperAdmin/System Configuration/SystemConfiguration";
-import AdminDepartmentEmployee from "./pages/HR/AdminDepartmentEmployee/AdminDepartmentEmployee";
 
 const Router: React.FC = () => {
     return (
@@ -47,8 +44,7 @@ const Router: React.FC = () => {
                 <Route path="/admin/attendance" element={<AdAttendance />} />
                 <Route path="/admin/reports" element={<AdReport />} />
                 <Route path="/admin/department" element={<AdDepartment />} />
-                <Route path="/admin/department-employee/:deptId" element={<AdminDepartmentEmployee />} />
-                <Route path="/admin/employee/employee-details" element={<EmployeeDetailsPage />} />
+                <Route path="/admin/department-employee" element={<AdDepartmentEmployee />} />
                 <Route path="/admin/requests" element={<AdRequests />} />
 
 

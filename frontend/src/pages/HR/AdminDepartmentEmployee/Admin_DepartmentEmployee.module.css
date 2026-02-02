@@ -47,16 +47,6 @@
   border-radius: 10px;
 }
 
-.empLink {
-  color: #222;          /* normal text color */
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.empLink:hover {
-  color: #386FA4;       /* subtle hover like app theme */
-}
-
 
 :global(.ant-table-cell) {
   vertical-align: top;

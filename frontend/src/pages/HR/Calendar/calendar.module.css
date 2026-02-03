@@ -1,0 +1,77 @@
+.content {
+  margin: 16px;
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+}
+
+/* Header */
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.monthTitle {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* Calendar Grid */
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border: 1px solid #eee;
+}
+
+.dayHeader {
+  padding: 8px;
+  text-align: center;
+  font-weight: 600;
+  background: #f8f9fb;
+}
+
+.dayCell {
+  height: 80px;
+  border: 1px solid #f0f0f0;
+  padding: 6px;
+}
+
+/* Legend */
+.legendRow {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+
+.box {
+  width: 14px;
+  height: 14px;
+  display: inline-block;
+  margin-right: 6px;
+  border-radius: 3px;
+}
+
+.ph { background: #2e7d32; }
+.us { background: #c62828; }
+.work { background: #fbc02d; }
+.nonWork { background: #616161; }
+.open { background: #b2dfdb; }
+.close { background: #bbdefb; }
+.lock { background: #d7ccc8; }
+
+/* Table */
+.tableSection {
+  margin-top: 16px;
+}
+
+.search {
+  margin-bottom: 10px;
+}

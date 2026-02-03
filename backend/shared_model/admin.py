@@ -16,6 +16,16 @@ class DepartmentAdmin(admin.ModelAdmin):
 admin.site.register(Shift)
 admin.site.register(Shift_Workday)
 admin.site.register(Employee)
+admin.site.register(Address)
 
+@admin.register(Province)
+class Province(admin.ModelAdmin):
+    list_display = ('name',)
 
+@admin.register(City)
+class City(admin.ModelAdmin):
+    list_display = ('name',)
 
+@admin.register(Barangay)
+class Barangay(admin.ModelAdmin):
+    list_display = ('name',)

@@ -1,6 +1,24 @@
 from rest_framework import serializers
 from shared_model.models import *
 
+#---------------------address
+
+class ProvinceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Province
+        fields = ['id', 'name']
+
+class CitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = City
+        fields = ['id', 'name', 'province']
+
+class BarangaySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Barangay
+        fields = ['id', 'name', 'city']
+
+
 class ShiftSerializer(serializers.ModelSerializer):
     class Meta:
         model = Shift
@@ -48,3 +66,67 @@ class EmployeeSerializer(serializers.ModelSerializer):
         if obj.shift:
             return f"{obj.shift.start_time} - {obj.shift.end_time}"
         return None
+    
+class AddressSerializer(serializers.Serializer):
+    province = serializers.CharField()
+    city = serializers.CharField()
+    barangay = serializers.CharField()
+    street = serializers.CharField(required=False, allow_blank=True)
+    sitio = serializers.CharField(required=False, allow_blank=True)
+    zip_code = serializers.CharField(required=False, allow_blank=True)
+
+    def create(self, validated_data):
+        province_name = validated_data.pop("province")
+        city_name = validated_data.pop("city")
+        barangay_name = validated_data.pop("barangay")
+
+        province, _ = Province.objects.get_or_create(name=province_name)
+        city, _ = City.objects.get_or_create(
+            name=city_name,
+            province=province
+        )
+        barangay, _ = Barangay.objects.get_or_create(
+            name=barangay_name,
+            city=city
+        )
+
+        address = Address.objects.create(
+            province=province,
+            city=city,
+            barangay=barangay,
+            **validated_data
+        )
+
+        return address
+    
+class EmployeeCreateSerializer(serializers.ModelSerializer):
+    address = AddressSerializer()
+
+    class Meta:
+        model = Employee
+        fields = [
+            "id_no",
+            "fname",
+            "initial",
+            "lname",
+            "suffix",
+            "status",
+            "contact_no",
+            "email",
+            "hired_date",
+            "position",
+            "bank_info",
+            "shift",
+            "department",
+            "address",
+        ]
+
+    def create(self, validated_data):
+        address_data = validated_data.pop("address")
+        address = AddressSerializer().create(address_data)
+
+        employee = Employee.objects.create(
+            address=address,
+            **validated_data
+        )
+        return employee

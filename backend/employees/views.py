@@ -1,8 +1,30 @@
-from rest_framework import viewsets
+from rest_framework import viewsets, status, generics
 from shared_model.models import *
 from .serializers import *
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
+#--------------------------Address
+# List all provinces
+class ProvinceListAPIView(generics.ListAPIView):
+    queryset = Province.objects.all()
+    serializer_class = ProvinceSerializer
+
+# List cities for a province
+class CityListByProvinceAPIView(generics.ListAPIView):
+    serializer_class = CitySerializer
+
+    def get_queryset(self):
+        province_id = self.kwargs.get("province_id")
+        return City.objects.filter(province_id=province_id)
+
+# List barangays for a city
+class BarangayListByCityAPIView(generics.ListAPIView):
+    serializer_class = BarangaySerializer
+
+    def get_queryset(self):
+        city_id = self.kwargs.get("city_id")
+        return Barangay.objects.filter(city_id=city_id)
 
 #--------------------------Department
 class DepartmentViewSet(viewsets.ModelViewSet):
@@ -16,7 +38,12 @@ class ShiftViewSet(viewsets.ModelViewSet):
 
 class EmployeeViewSet(viewsets.ModelViewSet):
     queryset = Employee.objects.filter(is_active=True)
-    serializer_class = EmployeeSerializer
+    
+    # Use different serializer for list/details vs creation
+    def get_serializer_class(self):
+        if self.action == "create":
+            return EmployeeCreateSerializer
+        return EmployeeSerializer
 
     @action(
         detail=False,
@@ -28,13 +55,22 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(employees, many=True)
         return Response(serializer.data)
     
-    # New: Get a single employee by ID
     @action(
-        detail=True,  # <--- detail=True because we are fetching one employee
+        detail=True,
         methods=["get"],
         url_path=r"details"
     )
     def details(self, request, pk=None):
-        employee = self.get_object()  # pk comes from the URL
+        employee = self.get_object()
         serializer = self.get_serializer(employee)
         return Response(serializer.data)
+    
+    # --- Add nested address handling ---
+    def create(self, request, *args, **kwargs):
+        serializer = EmployeeCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        employee = serializer.save()
+        return Response(
+            {"message": "Employee created successfully"},
+            status=status.HTTP_201_CREATED
+        )

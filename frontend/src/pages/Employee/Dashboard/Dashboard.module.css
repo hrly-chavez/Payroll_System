@@ -10,7 +10,37 @@
   margin-bottom: 16px;
 }
 
-/* Time */
+/* Make top row columns equal height */
+.flexCol {
+  display: flex;
+}
+
+/* Equal Attendance & Calendar */
+.equalTopCard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* Shrink calendar height */
+.equalTopCard :global(.ant-picker-calendar) {
+  height: 260px;
+}
+
+.equalTopCard :global(.ant-picker-content) {
+  height: 200px;
+}
+
+/* Calendar dropdown header */
+.calendarHeader {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+/* Time layout */
 .timeRow {
   display: flex;
   gap: 16px;
@@ -56,7 +86,7 @@
   color: white !important;
 }
 
-/* Legend + Holidays */
+/* Legend */
 .legendSection {
   margin-bottom: 8px;
 }
@@ -81,26 +111,3 @@
 .legendRed { background: #d9534f; }
 .legendYellow { background: #f0ad4e; }
 .legendGray { background: #aaa; }
-
-.holidayList {
-  padding-left: 16px;
-  line-height: 1.8;
-}
-
-/* Make calendar shorter */
-.smallCalendar :global(.ant-picker-calendar) {
-  height: 280px;   /* adjust if needed */
-}
-
-.smallCalendar :global(.ant-picker-panel) {
-  height: 70%;
-}
-
-.smallCalendar :global(.ant-picker-content) {
-  height: 200px;
-}
-
-/* Reduce header spacing */
-.smallCalendar :global(.ant-picker-calendar-header) {
-  padding: 6px 10px;
-}

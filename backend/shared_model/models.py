@@ -1,3 +1,4 @@
+
 from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
 
@@ -366,7 +367,7 @@ class Leave_Day(models.Model):
 class Holiday(models.Model):
     holiday_types = [
         ("Regular","Regular"),
-        ("Speacial Non-Working","Speacial Non-Working"),
+        ("Special Non-Working","Special Non-Working"),
         ("Special Working","Special Working"),
         ("Company Holiday","Company Holiday"),
     ]
@@ -380,6 +381,8 @@ class Holiday(models.Model):
     name = models.CharField(max_length=50)
     type = models.CharField(max_length=50, choices=holiday_types)
     base = models.CharField(max_length=20,choices=HOLIDAY_BASE_CHOICES)
+    remarks = models.TextField(null=True,blank=True)
+    status = models.CharField(max_length=20,choices=[("Pending","Pending"),("Approved","Approved"),("Declined","Declined")],default="Pending")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

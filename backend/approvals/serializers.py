@@ -1,17 +1,9 @@
-from rest_framework import generics
+from rest_framework import serializers
 from shared_model.models import Holiday
-from .serializers import HolidaySerializer
+# views.py
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
-class HolidayListView(generics.ListAPIView):
-    queryset = Holiday.objects.all().order_by('-date')
-    serializer_class = HolidaySerializer
-    # public access → no permission_classes
-
-# views.py
-
 
 class HolidayUpdateStatusView(APIView):
     """
@@ -30,3 +22,18 @@ class HolidayUpdateStatusView(APIView):
         holiday.status = new_status
         holiday.save()
         return Response({'detail': 'Status updated', 'status': holiday.status})
+
+
+class HolidaySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Holiday
+        fields = (
+            'id',
+            'name',
+            'date',
+            'type',
+            'base',
+            'is_active',
+            'created_at',
+            'status',
+        )

@@ -1,5 +1,7 @@
+//frontend/src/routes.tsx
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 /* AUTH */
 import Login from "./pages/Login/Login";
@@ -42,14 +44,22 @@ const Router: React.FC = () => {
         {/* ================= NOTIFICATIONS ================= */}
         <Route path="/notification" element={<NotificationPage />} />
 
+
         {/* ================= EMPLOYEE ROUTES ================= */}
-        <Route path="/employee_dashboard" element={<EmpDashboard />} />
-        <Route path="/employee/attendance" element={<EmpAttendance />} />
+        <Route path="/employee_dashboard" element={<ProtectedRoute allowedRoles={["EMPLOYEE"]}>
+            <EmpDashboard />
+        </ProtectedRoute>} />
+
+        <Route path="/employee/attendance" element={<ProtectedRoute allowedRoles={["EMPLOYEE"]}>
+            <EmpAttendance />
+        </ProtectedRoute>} />
         <Route path="/employee/requests" element={<EmpRequests />} />
         <Route path="/employee/payslips" element={<EmpPayslips />} />
 
         {/* ================= ADMIN ROUTES ================= */}
-        <Route path="/admin/dashboard" element={<AdDashboard />} />
+        <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={["ADMIN"]}>
+      <AdDashboard />
+    </ProtectedRoute>} />
         <Route path="/admin/calendar" element={<AdCalendar />} />
         <Route path="/admin/attendance" element={<AdAttendance />} />
         <Route path="/admin/reports" element={<AdReport />} />

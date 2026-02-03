@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
-
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 
 class Province(models.Model):
     name = models.CharField(max_length=100)
@@ -30,6 +30,7 @@ class Department(models.Model):
     
     def __str__(self):
         return self.name
+
 class Shift(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=50)
@@ -42,6 +43,7 @@ class Shift(models.Model):
 
     def __str__(self):
         return self.name
+
 class Shift_Workday(models.Model):
 
     class DayOfWeek(models.IntegerChoices):
@@ -77,6 +79,7 @@ class Employee(models.Model):
     ("WIDOWED", "Widowed"),
     ("SEPARATED", "Separated"),
     ]
+    #TODO: Optional: Add EMP_STATUS (Regular, Probationary, Resigned),EMP_TERMINATION_DATE
 
     id = models.AutoField(primary_key=True)
     id_no = models.CharField(max_length=50,unique=True)
@@ -99,8 +102,25 @@ class Employee(models.Model):
     def __str__(self):
         return f"{self.fname} {self.lname}"
     
-class User(models.Model):
+class UserManager(BaseUserManager):
+    #Mao ni ang makita na UI sa django-admin kung mag og User
+    def create_user(self, user_name, password=None, role="EMPLOYEE", **extra_fields):
+        if not user_name:
+            raise ValueError("user_name is required")
 
+        user = self.model(user_name=user_name, role=role, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, user_name, password=None, **extra_fields):
+        user = self.create_user(user_name=user_name, password=password, role="SUPER_ADMIN", **extra_fields)
+        user.is_staff = True
+        user.is_superuser = True
+        user.save(using=self._db)
+        return user
+
+class User(AbstractBaseUser, PermissionsMixin):
     ROLE_CHOICES = (
         ('EMPLOYEE', 'Employee'),
         ('ADMIN', 'Admin'),
@@ -109,31 +129,36 @@ class User(models.Model):
 
     user_id = models.AutoField(primary_key=True)
     user_name = models.CharField(max_length=150, unique=True)
-    user_password = models.CharField(max_length=255)
+
+    # IMPORTANT: Django expects field name "password"
+    password = models.CharField(max_length=128)
+
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='EMPLOYEE')
     is_active = models.BooleanField(default=True)
-    employee = models.OneToOneField( Employee, on_delete=models.CASCADE,related_name="user", null=True, blank=True)
+    is_staff = models.BooleanField(default=False)
+
+    employee = models.OneToOneField(
+        "shared_model.Employee",
+        on_delete=models.CASCADE,
+        related_name="user",
+        null=True,
+        blank=True
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    def set_password(self, raw_password):
-        self.user_password = make_password(raw_password)
+    objects = UserManager()
 
-    def check_password(self, raw_password):
-        return check_password(raw_password, self.user_password)
-    
-    def save(self, *args, **kwargs):
-        if self.user_password and not self.user_password.startswith("pbkdf2_"):
-            self.set_password(self.user_password)
-        super().save(*args, **kwargs)
+    USERNAME_FIELD = "user_name"
+    REQUIRED_FIELDS = []
 
+    class Meta:
+        db_table = "users"
 
     def __str__(self):
         return f"{self.user_name} ({self.role})"
-
-    class Meta:
-        db_table = 'users'
-    
+      
 class Employee_Salary(models.Model):
     PAY_TYPES = [
         ("Monthly","Monthly"),
@@ -159,8 +184,7 @@ class Employee_Salary(models.Model):
                 name="unique_salary_start_per_employee"
             )
         ]
-    
-    
+       
 class Deduction_Type(models.Model):
     calculation_choices = [
         ("Fixed","Fixed"),
@@ -268,11 +292,12 @@ class Attendance(models.Model):
         ("REST_DAY", "Rest Day"),
         ("HOLIDAY", "Holiday"),
     ]
+    #TODO:  TOTAL_WORK_HOURS → total hours worked that day, OVERTIME_HOURS → total overtime for that day
     id = models.AutoField(primary_key=True)
     date = models.DateField()
-    status = models.CharField(max_length=20,choices=STATUS_CHOICES)
-    time_in = models.TimeField()
-    time_out = models.TimeField()
+    status = models.CharField(max_length=20,choices=STATUS_CHOICES,default="PRESENT")
+    time_in = models.TimeField(null=True, blank=True)
+    time_out = models.TimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="attendances")
 
@@ -298,7 +323,7 @@ class Attendance_Event(models.Model):
     ]
     id = models.AutoField(primary_key=True)
     type = models.CharField(max_length=20, choices=TYPE_CHOICES)
-    minutes = models.TimeField()
+    minutes = models.PositiveIntegerField(default=0)
     start_time = models.TimeField(null=True,blank=True)
     end_time = models.TimeField(null=True,blank=True)
     approval_status = models.CharField(max_length=20,choices=APPROVAL_STATUS_CHOICES) 
@@ -375,6 +400,7 @@ class Holiday(models.Model):
         ("US", "United States"),
         ("COMPANY", "Company"),
     ]
+    #TODO: HOLIDAY_RATE_MULTIPLIER,IS_NATIONAL / IS_LOCAL
     id = models.AutoField(primary_key=True)
     date = models.DateField()
     name = models.CharField(max_length=50)
@@ -390,12 +416,12 @@ class Holiday(models.Model):
                 name="unique_holiday_per_base_per_date"
             )
         ]
+
 class Company_Note(models.Model):
     id = models.AutoField(primary_key=True)
     note = models.TextField()
     created_at = models.DateField(auto_now_add=True)
     user = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="company_notes")
-
 
 class Payroll_Period(models.Model):
     period_status_choices = [
@@ -454,8 +480,9 @@ class Payroll(models.Model):
         ("Disapproved","Disapproved"),
         ("Paid","Paid"),
         ("Void","Void"),
-        
     ]
+    #TODO: PAYROLL_GROSS_PAY, PAYROLL_TOTAL_DEDUCTIONS
+    
     id = models.AutoField(primary_key=True)
     status = models.CharField(max_length=20 ,choices=status_choices, default="Draft")
     basic_pay = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
@@ -475,3 +502,5 @@ class Payroll(models.Model):
                 name="unique_payroll_per_period_per_employee"
             )
         ]
+
+#TODO: PAYROLL_RUN_LOG

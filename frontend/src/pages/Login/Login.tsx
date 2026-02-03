@@ -5,6 +5,7 @@ import { Form, Input, Button, message } from "antd";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import styles from "./login_styles.module.css";
+import api from "../../api/axios";
 
 interface LoginFormValues {
   username: string;
@@ -19,29 +20,34 @@ export default function Login() {
   const onFinish = async (values: LoginFormValues) => {
     setLoading(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/accounts/login/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_name: values.username,
-          user_password: values.password,
-        }),
+      // 1️⃣ Get JWT tokens
+      const tokenRes = await api.post("/auth/token/", {
+        user_name: values.username,
+        password: values.password,
       });
 
-      const data = await response.json();
+      const { access, refresh } = tokenRes.data;
 
-      if (!response.ok) {
-        message.error(data.error || "Login failed");
-        return;
-      }
+      localStorage.setItem("access_token", access);
+      localStorage.setItem("refresh_token", refresh);
 
-      localStorage.setItem("role", data.user.role);
-      localStorage.setItem("user_name", data.user.user_name);
+      // 2️⃣ Get logged-in user info
+      const meRes = await api.get("/accounts/me/");
+
+      localStorage.setItem("user_name", meRes.data.user_name);
+      localStorage.setItem("role", meRes.data.role);
+
+      // 3️⃣ Role-based redirect
+      const role = meRes.data.role;
+
+      if (role === "EMPLOYEE") navigate("/employee_dashboard");
+      else if (role === "ADMIN") navigate("/admin/dashboard");
+      else if (role === "SUPER_ADMIN") navigate("/super-admin/dashboard");
+      else navigate("/");
 
       message.success("Login successful");
-      navigate(data.redirect_to);
-    } catch {
-      message.error("Server error. Please try again.");
+    } catch (err: any) {
+      message.error(err?.response?.data?.detail || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -50,7 +56,6 @@ export default function Login() {
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        {/* LEFT BRAND PANEL */}
         <div className={styles.brandSide}>
           <img
             src="/images/attitechHD.png"
@@ -59,7 +64,6 @@ export default function Login() {
           />
         </div>
 
-        {/* RIGHT FORM PANEL */}
         <div className={styles.formSide}>
           <h2 className={styles.loginTitle}>LOGIN</h2>
 
@@ -68,10 +72,7 @@ export default function Login() {
               name="username"
               rules={[{ required: true, message: "Enter username" }]}
             >
-              <Input
-                placeholder="Username"
-                prefix={<UserOutlined />}
-              />
+              <Input prefix={<UserOutlined />} placeholder="Username" />
             </Form.Item>
 
             <Form.Item
@@ -79,8 +80,8 @@ export default function Login() {
               rules={[{ required: true, message: "Enter password" }]}
             >
               <Input.Password
-                placeholder="Password"
                 prefix={<LockOutlined />}
+                placeholder="Password"
                 visibilityToggle={{
                   visible: passwordVisible,
                   onVisibleChange: setPasswordVisible,

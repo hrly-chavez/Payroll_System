@@ -27,7 +27,9 @@ class Department(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateField(auto_now_add=True)
     shift_id = models.ForeignKey("Shift", on_delete=models.SET_NULL,related_name="departments",null=True,blank=True)
-
+    
+    def __str__(self):
+        return self.name
 class Shift(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=50)
@@ -38,6 +40,8 @@ class Shift(models.Model):
     is_overnight = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 
+    def __str__(self):
+        return self.name
 class Shift_Workday(models.Model):
 
     class DayOfWeek(models.IntegerChoices):
@@ -54,7 +58,10 @@ class Shift_Workday(models.Model):
     is_workday = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     shift = models.ForeignKey(Shift,on_delete=models.CASCADE,related_name="workdays")
-
+    
+    def __str__(self):
+        return f"{self.shift.name} - {self.get_day_of_week_display()} ({'Workday' if self.is_workday else 'Off'})"
+    
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -88,7 +95,10 @@ class Employee(models.Model):
     is_active = models.BooleanField(default=True)
     shift = models.ForeignKey( Shift, on_delete=models.SET_NULL,related_name="employees",null=True,blank=True)
     department = models.ForeignKey( Department,on_delete=models.PROTECT,related_name="employees")
-
+    
+    def __str__(self):
+        return f"{self.fname} {self.lname}"
+    
 class User(models.Model):
 
     ROLE_CHOICES = (
@@ -135,12 +145,12 @@ class Employee_Salary(models.Model):
     id = models.AutoField(primary_key=True)
     pay_type =  models.CharField(max_length=20, choices=PAY_TYPES)
     #per_day = models.IntegerField()
-    base_rate = models.PositiveIntegerField()
+    base_rate = models.DecimalField(max_digits=12, decimal_places=2)
     effective_from = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True,null=True,
     blank=True)
-    employee = models.ForeignKey( "Employee", on_delete=models.CASCADE,related_name="salaries",null=True,
-    blank=True)
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="salaries")
+
     
     class Meta:
         constraints = [
@@ -183,7 +193,7 @@ class Employee_Deduction(models.Model):
         ("Inactive","Inactive"),
     ]
     id = models.AutoField(primary_key=True)
-    amount = models.PositiveIntegerField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     frequency = models.CharField(max_length=20, choices=frequency_choices)
     effective_from = models.DateField()
     effective_to = models.DateField(null=True,blank=True)
@@ -191,9 +201,9 @@ class Employee_Deduction(models.Model):
     created_at = models.DateField(auto_now_add=True)
 
     # Loan-only fields
-    total_loan_amount = models.PositiveIntegerField(null=True,blank=True)
-    balance = models.PositiveIntegerField(null=True,blank=True)
-    amortization_per_period = models.PositiveIntegerField(null=True,blank=True)
+    total_loan_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    balance = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    amortization_per_period = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
 
     employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="deductions")
     deduction_type = models.ForeignKey(Deduction_Type,on_delete=models.PROTECT,related_name="employee_deductions") 
@@ -233,7 +243,7 @@ class Employee_Allowance(models.Model):
     ]
 
     id = models.AutoField(primary_key=True)
-    amount = models.PositiveIntegerField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     frequency = models.CharField(max_length=20, choices=frequency_choices)
     effective_from = models.DateField()
     effective_to = models.DateField(null=True,blank=True)
@@ -296,6 +306,9 @@ class Attendance_Event(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_attendance_events")
     attendance = models.ForeignKey(Attendance,on_delete=models.CASCADE,related_name="events")
+    
+    def __str__(self):
+        return self.type
 
 class Leave_Type(models.Model):
     id = models.AutoField(primary_key=True)
@@ -433,10 +446,32 @@ class Pay_Rule(models.Model):
     applies_to = models.ForeignKey(Department,on_delete=models.PROTECT,null=True,blank=True,related_name="pay_rules")
     employee = models.ForeignKey("Employee",on_delete=models.SET_NULL,null=True,blank=True,related_name="pay_rules")
 
-# class Paryoll(models.Model):
-#     status_choices = [
-#         ("Draft","Draft"),
-#         ()
-#     ]
-#     id = models.AutoField(primary_key=True)
-#     status = models.CharField(max_length=20)
+class Payroll(models.Model):
+    status_choices = [
+        ("Draft","Draft"),
+        ("Generated","Generated"),
+        ("Approved","Approved"),
+        ("Disapproved","Disapproved"),
+        ("Paid","Paid"),
+        ("Void","Void"),
+        
+    ]
+    id = models.AutoField(primary_key=True)
+    status = models.CharField(max_length=20 ,choices=status_choices, default="Draft")
+    basic_pay = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    total_earnings = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    total_deductions = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    net_pay = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    generated_at = models.DateField(auto_now_add=True)
+    approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_payrolls")
+    approved_at = models.DateField(null=True, blank=True)
+    payroll_period = models.ForeignKey(Payroll_Period,on_delete=models.PROTECT,related_name="payrolls")
+    employee = models.ForeignKey(Employee,on_delete=models.PROTECT,related_name="payrolls")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["payroll_period", "employee"],
+                name="unique_payroll_per_period_per_employee"
+            )
+        ]

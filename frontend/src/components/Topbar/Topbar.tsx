@@ -1,5 +1,5 @@
-import React from 'react';
-import { Layout, Typography, Avatar, Badge, Button, Dropdown, MenuProps } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Layout, Typography, Avatar, Badge, Button, Dropdown } from 'antd';
 import { BellFilled, ArrowLeftOutlined, LogoutOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import './Topbar.css';
@@ -10,23 +10,40 @@ const { Text } = Typography;
 interface TopbarProps {
   title?: string;
   showBack?: boolean;
-  onLogout?: () => void; // optional callback for additional logout logic
+  onLogout?: () => void;
 }
 
 const Topbar: React.FC<TopbarProps> = ({ title = 'Dashboard', showBack, onLogout }) => {
   const navigate = useNavigate();
+  const [notifCount, setNotifCount] = useState(0);
 
   const handleLogout = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
-
     if (onLogout) onLogout();
-
     navigate('/', { replace: true });
   };
 
-  // ✅ Ant Design v5 style menu items
-  const items: MenuProps['items'] = [
+  // 🔔 Fetch unread notification count from backend
+  useEffect(() => {
+    const fetchNotifCount = async () => {
+      try {
+        const res = await fetch('http://127.0.0.1:8000/api/notifications/unread-count/', {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          },
+        });
+        const data = await res.json();
+        setNotifCount(data.count);
+      } catch {
+        console.log('Failed to load notification count');
+      }
+    };
+
+    fetchNotifCount();
+  }, []);
+
+  const items = [
     {
       key: 'logout',
       icon: <LogoutOutlined />,
@@ -50,11 +67,15 @@ const Topbar: React.FC<TopbarProps> = ({ title = 'Dashboard', showBack, onLogout
       </div>
 
       <div className="topbar-right">
-        <Badge dot>
-          <BellFilled className="topbar-icon" />
+        {/* 🔔 Notification Bell → Redirect to page */}
+        <Badge count={notifCount} size="small">
+          <BellFilled
+            className="topbar-icon"
+            onClick={() => navigate('/notification')}
+          />
         </Badge>
 
-        {/* ✅ v5 style Dropdown */}
+        {/* Avatar Dropdown */}
         <Dropdown menu={{ items }} placement="bottomRight" trigger={['click']}>
           <Avatar className="topbar-avatar" style={{ cursor: 'pointer' }}>U</Avatar>
         </Dropdown>

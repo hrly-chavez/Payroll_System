@@ -47,8 +47,19 @@ const CalendarPage: React.FC = () => {
             </div>
 
             <div className={styles.actions}>
-              <Button type="primary" onClick={() => setPeriodModal(true)}>+ Add Payroll Period</Button>
-              <Button onClick={() => setHolidayModal(true)}>+ Add Holiday</Button>
+              <Button
+                className={styles.payrollBtn}
+                onClick={() => setPeriodModal(true)}
+              >
+                + Add Payroll Period
+              </Button>
+
+              <Button
+                className={styles.holidayBtn}
+                onClick={() => setHolidayModal(true)}
+              >
+                + Add Holiday
+              </Button>
             </div>
           </div>
 

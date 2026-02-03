@@ -1,0 +1,57 @@
+.content {
+  margin: 16px;
+}
+
+.card {
+  background: #fff;
+  padding: 24px;
+  border-radius: 12px;
+}
+
+.tabs {
+  margin-bottom: 16px;
+}
+
+.headerActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.documentsTitle {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.actionsRight {
+  display: flex;
+  gap: 12px;
+}
+
+.nameCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.complete {
+  color: #3fa34d;
+  font-weight: 500;
+}
+
+.issue {
+  color: #d9534f;
+  font-weight: 500;
+}
+
+.addBtn {
+  background-color: #386FA4 !important;
+  border-color: #386FA4 !important;
+  border-radius: 6px;
+}
+
+.addBtn:hover {
+  background-color: #2f5f8d !important; /* darker */
+  border-color: #2f5f8d !important;
+}

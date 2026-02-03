@@ -1,0 +1,81 @@
+.content {
+  margin: 16px;
+}
+
+.mainSection {
+  margin-top: 16px;
+}
+
+/* Equal height smaller cards */
+.compactCard {
+  height: 240px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* Calendar shrink */
+.calendarWrapper {
+  transform: scale(0.88);
+  transform-origin: top left;
+  height: 200px;
+}
+
+/* CLOCK */
+.timeRow {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.timeBox {
+  text-align: center;
+  border: 1px solid #cdcdcd;
+  padding: 10px 16px;
+  border-radius: 10px;
+  min-width: 120px;
+}
+
+.timeBox span {
+  font-size: 12px;
+  color: #777;
+}
+
+.timeBox h2 {
+  font-size: 20px;
+  margin: 6px 0 0;
+}
+
+/* BUTTONS */
+.buttonRow {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.punchInBtn {
+  background-color: #386fa4 !important;
+  border-color: #386fa4 !important;
+  color: white !important;
+}
+
+.punchOutBtn {
+  background-color: #a9a9a9 !important;
+  border-color: #868686 !important;
+  color: white !important;
+}
+
+/* TODAY TABLE */
+.sectionCard {
+  margin-top: 16px;
+  border-radius: 10px;
+}
+
+/* Bottom cards */
+.bottomRow {
+  margin-top: 16px;
+}
+
+.equalCard {
+  height: 100%;
+}

@@ -29,3 +29,13 @@ class City(admin.ModelAdmin):
 @admin.register(Barangay)
 class Barangay(admin.ModelAdmin):
     list_display = ('name',)
+
+@admin.register(Holiday)
+class HolidayAdmin(admin.ModelAdmin):
+    list_display = ('name','date','type','base','is_active','created_at','status')
+    list_filter = ('type','base','is_active',)
+    search_fields = ('name',)
+    ordering = ('-date',)
+    date_hierarchy = 'date'
+    readonly_fields = ('created_at',)
+    list_editable = ('is_active',)

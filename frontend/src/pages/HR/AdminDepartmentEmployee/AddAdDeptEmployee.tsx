@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import {
   Modal,
   Form,
@@ -34,10 +35,55 @@ interface Barangay {
   name: string;
 }
 
+interface Shift {
+  id: number;
+  start_time: string;
+  end_time: string;
+}
+
+interface Department {
+  id: number;
+  name: string;
+}
+
 const AddAdDeptEmployee: React.FC<Props> = ({ open, onClose }) => {
+  //forms sa tanan para inig create
+  const [form] = Form.useForm();
+
+  //drop down sa address
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [cities, setCities] = useState<City[]>([]);
   const [barangays, setBarangays] = useState<Barangay[]>([]);
+
+  //drop down sa shifts
+  const [shifts, setShifts] = useState<Shift[]>([]);
+
+  //drop down sa department
+  const [departments, setDepartments] = useState<Department[]>([]);
+
+
+  //change to hh:mm instead to hh:mm:ss format
+  const formatTime = (t: string) => t.slice(0, 5);
+
+  useEffect(() => {
+    fetch("http://localhost:8000/api/employees/shifts/")
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("Shifts fetched:", data);
+        setShifts(data);
+      })
+      .catch((err) => console.error("Failed to fetch shifts:", err));
+  }, []);
+
+  useEffect(() => {
+    fetch("http://localhost:8000/api/employees/departments/")
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("Departments fetched:", data);
+        setDepartments(data);
+      })
+      .catch((err) => console.error("Failed to fetch departments:", err));
+  }, []);
 
   // Fetch provinces on mount
   useEffect(() => {
@@ -69,6 +115,37 @@ const AddAdDeptEmployee: React.FC<Props> = ({ open, onClose }) => {
       .catch((err) => console.error("Failed to fetch barangays:", err));
   };
 
+  const handleSubmit = async (values: any) => {
+    const payload = {
+      ...values,
+      hired_date: values.hired_date.format("YYYY-MM-DD"),
+    };
+
+    console.log("Submitting payload:", payload);
+
+    try {
+      const res = await fetch("http://localhost:8000/api/employees/employees/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        console.error("Create failed:", err);
+        return;
+      }
+
+      onClose();
+      form.resetFields();
+    } catch (error) {
+      console.error("Error creating employee:", error);
+    }
+  };
+
+
   return (
     <Modal
       title="Employee Details"
@@ -79,7 +156,7 @@ const AddAdDeptEmployee: React.FC<Props> = ({ open, onClose }) => {
       width={800}
       className={styles.modal}
     >
-      <Form layout="vertical" className={styles.form}>
+      <Form layout="vertical" className={styles.form} onFinish={handleSubmit}>
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
@@ -182,9 +259,12 @@ const AddAdDeptEmployee: React.FC<Props> = ({ open, onClose }) => {
 
           <Col xs={24} md={12}>
             <Form.Item label="Shift" name="shift">
-              <Select placeholder="Select shift">
-                <Option value={1}>Morning Shift</Option>
-                <Option value={2}>Night Shift</Option>
+              <Select placeholder="Select shift" optionLabelProp="children">
+                {shifts.map((shift) => (
+                  <Option key={shift.id} value={shift.id}>
+                    {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
+                  </Option>
+                ))}
               </Select>
             </Form.Item>
           </Col>
@@ -195,10 +275,14 @@ const AddAdDeptEmployee: React.FC<Props> = ({ open, onClose }) => {
               name="department"
               rules={[{ required: true }]}
             >
-              <Select placeholder="Select department">
-                <Option value={1}>HR</Option>
-                <Option value={2}>IT</Option>
-              </Select>
+              <Select
+                placeholder="Select department"
+                options={departments.map((dept) => ({
+                  value: dept.id,
+                  label: dept.name,
+                }))}
+                loading={departments.length === 0}
+              />
             </Form.Item>
           </Col>
 

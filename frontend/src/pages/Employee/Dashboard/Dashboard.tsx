@@ -7,8 +7,10 @@ import styles from "./Dashboard.module.css";
 import { LoginOutlined, LogoutOutlined } from "@ant-design/icons";
 import axios from "axios";
 import api from "../../../api/axios";
+import dayjs, { Dayjs } from "dayjs";
 
 const { Content } = Layout;
+const { Option } = Select;
 
 type TodayAttendanceResponse = {
   has_attendance: boolean;
@@ -106,6 +108,15 @@ const Dashboard: React.FC = () => {
   };
 
   useEffect(() => {
+    const fetchTime = async () => {
+      try {
+        const ph = await fetch("https://worldtimeapi.org/api/timezone/Asia/Manila").then(r => r.json());
+        const us = await fetch("https://worldtimeapi.org/api/timezone/America/New_York").then(r => r.json());
+        setPhTime(new Date(ph.datetime));
+        setUsaTime(new Date(us.datetime));
+      } catch {}
+    };
+    fetchTime();
     fetchBaseTime("Asia/Manila", setPhTime);
     fetchBaseTime("America/New_York", setUsaTime);
     fetchTodayAttendance();
@@ -113,20 +124,20 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setPhTime((prev) => (prev ? new Date(prev.getTime() + 1000) : prev));
-      setUsaTime((prev) => (prev ? new Date(prev.getTime() + 1000) : prev));
+      setPhTime(p => p ? new Date(p.getTime() + 1000) : p);
+      setUsaTime(p => p ? new Date(p.getTime() + 1000) : p);
     }, 1000);
     return () => clearInterval(interval);
   }, []);
 
-  const formatTime = (date: Date | null, timezone: string) =>
+  const formatTime = (date: Date | null, tz: string) =>
     date
       ? new Intl.DateTimeFormat("en-US", {
           hour: "numeric",
           minute: "numeric",
           second: "numeric",
           hour12: true,
-          timeZone: timezone,
+          timeZone: tz,
         }).format(date)
       : "--:--:--";
     
@@ -190,8 +201,42 @@ const Dashboard: React.FC = () => {
                   </Button>
                 </div>
               </Card>
+            </Col>
 
-              {/* PAYSLIP STATUS */}
+            {/* RIGHT COLUMN */}
+            <Col xs={24} md={12} className={styles.flexCol}>
+              <Card title="Calendar" className={`${styles.sectionCard} ${styles.equalTopCard}`}>
+                <Calendar
+                  fullscreen={false}
+                  headerRender={({ value, onChange }) => {
+                    const current = value as Dayjs;
+                    const year = current.year();
+                    const month = current.month();
+                    const years = Array.from({ length: 20 }, (_, i) => year - 10 + i);
+
+                    return (
+                      <div className={styles.calendarHeader}>
+                        <Select size="small" value={year} onChange={(y) => onChange(current.year(y))}>
+                          {years.map(y => <Option key={y} value={y}>{y}</Option>)}
+                        </Select>
+
+                        <Select size="small" value={month} onChange={(m) => onChange(current.month(m))}>
+                          {Array.from({ length: 12 }).map((_, i) => (
+                            <Option key={i} value={i}>{dayjs().month(i).format("MMM")}</Option>
+                          ))}
+                        </Select>
+                      </div>
+                    );
+                  }}
+                />
+              </Card>
+            </Col>
+
+          </Row>
+
+          {/* LOWER CARDS */}
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
               <Card title="Payslip Status" className={styles.sectionCard}>
                 <Tag color="processing">PROCESSING</Tag>
                 <div>January 1, 2026</div>
@@ -205,46 +250,18 @@ const Dashboard: React.FC = () => {
 
             </Col>
 
-            {/* RIGHT COLUMN */}
             <Col xs={24} md={12}>
-              <Card title="Calendar" className={styles.sectionCard}>
-                <div className={styles.smallCalendar}>
-                  <Calendar fullscreen={false} />
+              <Card title="Legend & Holidays" className={styles.sectionCard}>
+                <div className={styles.legendSection}>
+                  <div className={styles.legendItem}><span className={styles.legendGreen}></span> PH Holiday</div>
+                  <div className={styles.legendItem}><span className={styles.legendRed}></span> US Holiday</div>
+                  <div className={styles.legendItem}><span className={styles.legendYellow}></span> Work Day</div>
+                  <div className={styles.legendItem}><span className={styles.legendGray}></span> Non-Work</div>
                 </div>
               </Card>
-
-              
-              <Card title="Legend & Holidays" className={styles.sectionCard}>
-              <div className={styles.legendHolidayGrid}>
-
-                {/* LEFT: Legend */}
-                <div className={styles.legendSection}>
-                  <div className={styles.legendItem}>
-                    <span className={styles.legendGreen}></span> PH Holiday
-                  </div>
-                  <div className={styles.legendItem}>
-                    <span className={styles.legendRed}></span> US Holiday
-                  </div>
-                  <div className={styles.legendItem}>
-                    <span className={styles.legendYellow}></span> Work Day
-                  </div>
-                  <div className={styles.legendItem}>
-                    <span className={styles.legendGray}></span> Non-Work
-                  </div>
-                </div>
-
-                {/* RIGHT: Holidays */}
-                <ul className={styles.holidayList}>
-                  <li>Jan 1 — New Year's Day</li>
-                  <li>Feb 10 — Chinese New Year</li>
-                  <li>Mar 29 — Good Friday</li>
-                </ul>
-
-              </div>
-            </Card>
             </Col>
-
           </Row>
+
         </Content>
       </Layout>
     </Layout>

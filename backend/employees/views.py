@@ -36,6 +36,17 @@ class ShiftViewSet(viewsets.ModelViewSet):
     queryset = Shift.objects.filter(is_active=True)
     serializer_class = ShiftSerializer
 
+class ShiftSerializer(serializers.ModelSerializer):
+    display_time = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Shift
+        fields = ["id", "name", "start_time", "end_time", "display_time"]
+
+    def get_display_time(self, obj):
+        return f"{obj.start_time.strftime('%H:%M')} - {obj.end_time.strftime('%H:%M')}"
+
+
 class EmployeeViewSet(viewsets.ModelViewSet):
     queryset = Employee.objects.filter(is_active=True)
     

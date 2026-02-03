@@ -67,13 +67,17 @@ class EmployeeSerializer(serializers.ModelSerializer):
             return f"{obj.shift.start_time} - {obj.shift.end_time}"
         return None
     
-class AddressSerializer(serializers.Serializer):
-    province = serializers.CharField()
-    city = serializers.CharField()
-    barangay = serializers.CharField()
-    street = serializers.CharField(required=False, allow_blank=True)
-    sitio = serializers.CharField(required=False, allow_blank=True)
-    zip_code = serializers.CharField(required=False, allow_blank=True)
+class AddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Address
+        fields = [
+            "province",
+            "city",
+            "barangay",
+            "street",
+            "sitio",
+            "zip_code",
+        ]
 
     def create(self, validated_data):
         province_name = validated_data.pop("province")

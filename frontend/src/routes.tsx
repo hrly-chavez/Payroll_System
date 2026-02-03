@@ -32,6 +32,7 @@ import SupAttendance from "./pages/SuperAdmin/Attendance/Attendance";
 import SupReport from "./pages/SuperAdmin/Reports/Reports";
 import SupDepartment from "./pages/SuperAdmin/Department/Department";
 import SupSystemConfig from "./pages/SuperAdmin/System Configuration/SystemConfiguration";
+import SupRequest from "./pages/SuperAdmin/Request/Request";
 
 const Router: React.FC = () => {
   return (
@@ -75,6 +76,7 @@ const Router: React.FC = () => {
         <Route path="/super-admin/reports" element={<SupReport />} />
         <Route path="/super-admin/department" element={<SupDepartment />} />
         <Route path="/super-admin/system" element={<SupSystemConfig />} />
+        <Route path="/super-admin/requests" element={<SupRequest />} />
 
       </Routes>
     </BrowserRouter>

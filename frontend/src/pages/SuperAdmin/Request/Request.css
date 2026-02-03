@@ -1,0 +1,14 @@
+request.css
+
+.request-layout {
+  min-height: 100vh;
+}
+
+.request-content {
+  padding: 24px;
+  background: #f5f6fa;
+}
+
+.request-card {
+  border-radius: 8px;
+}

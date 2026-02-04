@@ -162,7 +162,7 @@ const Dashboard: React.FC = () => {
           {/* ATTENDANCE + CALENDAR */}
           <Row gutter={16} className={styles.mainSection}>
             <Col xs={24} lg={16}>
-
+              {/* ATTENDANCE */}
               <Card title="Attendance" className={styles.compactCard}>
                 <div className={styles.timeRow}>
                   <div className={styles.timeBox}>
@@ -199,7 +199,7 @@ const Dashboard: React.FC = () => {
               </Card>
 
             </Col>
-
+      {/* CALENDAR */}
             <Col xs={24} lg={8}>
               <Card title="Calendar" className={styles.compactCard}>
                 <div className={styles.calendarWrapper}>

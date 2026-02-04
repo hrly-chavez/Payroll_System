@@ -111,3 +111,55 @@
 .legendRed { background: #d9534f; }
 .legendYellow { background: #f0ad4e; }
 .legendGray { background: #aaa; }
+
+
+/* ================== GREETING (from Greeting.module.css) ================== */
+
+.greetingCard {
+  padding: 16px 20px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.05);
+  margin-bottom: 16px;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.greetingLeft {
+  font-weight: 600;
+  font-size: 16px;
+  color: #222;
+}
+
+.greetingName {
+  color: #1890ff;
+}
+
+/* STATUS BADGE */
+.greetingStatus {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Color Variants */
+.IN {
+  background: #e6f7ee;
+  color: #1f9d55;
+}
+
+.OUT {
+  background: #e6f0ff;
+  color: #2f54eb;
+}
+
+.NOT_IN {
+  background: #fff7e6;
+  color: #d48806;
+}

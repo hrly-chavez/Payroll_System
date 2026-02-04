@@ -1,24 +1,27 @@
 import React, { useEffect, useState } from "react";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
-import Greeting from "../../../components/Greeting/Greeting";
-import {
-  Layout,
-  Row,
-  Col,
-  Card,
-  Statistic,
-  Table,
-  DatePicker,
-  Calendar,
-  List,
-  Button,
-} from "antd";
+import { Layout, Row, Col, Card, Statistic, Table, DatePicker, Calendar, List, Button, message } from "antd";
 import { LoginOutlined, LogoutOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import styles from "./adminDashboard.module.css";
+import api from "../../../api/axios";
+import { formatTime, getAttendanceStatusLabel, formatBackendTime } from "../../helpers";
 
 const { Content } = Layout;
+
+type TodayAttendanceResponse = {
+  has_attendance: boolean;
+  attendance: null | {
+    id: number;
+    date: string;
+    status: string;
+    time_in: string | null;
+    time_out: string | null;
+    employee: number;
+    created_at: string;
+  };
+};
 
 const attendanceData = [
   { key: 1, name: "Jeremy Neigh", in: "9:42 P.M.", out: "7:26 A.M.", status: "Present" },
@@ -41,27 +44,95 @@ const Dashboard: React.FC = () => {
   const [phTime, setPhTime] = useState<Date | null>(null);
   const [usaTime, setUsaTime] = useState<Date | null>(null);
 
-  // ✅ NO API — stable local clock
+  const [attendance, setAttendance] = useState<TodayAttendanceResponse["attendance"]>(null);
+  const [loadingPunchIn, setLoadingPunchIn] = useState(false);
+  const [loadingPunchOut, setLoadingPunchOut] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState(false);
+
+  const fetchBaseTime = async (timezone: string, setter: (d: Date) => void) => {
+    try {
+      const res = await fetch(`https://worldtimeapi.org/api/timezone/${timezone}`);
+      const data = await res.json();
+      setter(new Date(data.datetime));
+    } catch (err) {
+      console.error("Time API error", err);
+    }
+  };
+
+  const fetchTodayAttendance = async () => {
+    setLoadingStatus(true);
+    try {
+      const res = await api.get<TodayAttendanceResponse>("/attendance/today/");
+      setAttendance(res.data.attendance);
+    } catch (err: any) {
+      console.error(err);
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to fetch attendance status.";
+      message.error(msg);
+    } finally {
+      setLoadingStatus(false);
+    }
+  };
+
   useEffect(() => {
-    const updateTime = () => {
-      setPhTime(new Date());
-      setUsaTime(new Date());
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
+    fetchBaseTime("Asia/Manila", setPhTime);
+    fetchBaseTime("America/New_York", setUsaTime);
+    fetchTodayAttendance();
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPhTime((p) => (p ? new Date(p.getTime() + 1000) : p));
+      setUsaTime((p) => (p ? new Date(p.getTime() + 1000) : p));
+    }, 1000);
+
     return () => clearInterval(interval);
   }, []);
 
-  const formatTime = (date: Date | null, tz: string) =>
-    date
-      ? new Intl.DateTimeFormat("en-US", {
-          hour: "numeric",
-          minute: "numeric",
-          second: "numeric",
-          hour12: true,
-          timeZone: tz,
-        }).format(date)
-      : "--:--:--";
+  const handlePunchIn = async () => {
+    setLoadingPunchIn(true);
+    try {
+      const res = await api.post("/attendance/punch-in/", {});
+      message.success(res.data?.message || "Punch in successful.");
+      setAttendance(res.data.attendance);
+    } catch (err: any) {
+      console.error(err);
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Punch in failed.";
+      message.error(msg);
+    } finally {
+      setLoadingPunchIn(false);
+    }
+  };
+
+  const handlePunchOut = async () => {
+    setLoadingPunchOut(true);
+    try {
+      const res = await api.post("/attendance/punch-out/", {});
+      message.success(res.data?.message || "Punch out successful.");
+      setAttendance(res.data.attendance);
+    } catch (err: any) {
+      console.error(err);
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Punch out failed.";
+      message.error(msg);
+    } finally {
+      setLoadingPunchOut(false);
+    }
+  };
+  const name = localStorage.getItem("user_name") || "User";
+
+    const { key: statusKey, label: statusLabel } = getAttendanceStatusLabel(
+      attendance,
+      formatBackendTime
+    );
+      
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -70,7 +141,15 @@ const Dashboard: React.FC = () => {
         <Topbar title="Dashboard" />
 
         <Content className={styles.content}>
-          <Greeting />
+          <div className={styles.greetingCard}>
+            <div className={styles.greetingLeft}>
+              Good to see you, <span className={styles.greetingName}>{name}</span>
+            </div>
+
+            <div className={`${styles.greetingStatus} ${styles[statusKey]}`}>
+              {statusLabel}
+            </div>
+          </div>
 
           {/* STATS */}
           <Row gutter={16}>
@@ -83,6 +162,7 @@ const Dashboard: React.FC = () => {
           {/* ATTENDANCE + CALENDAR */}
           <Row gutter={16} className={styles.mainSection}>
             <Col xs={24} lg={16}>
+
               <Card title="Attendance" className={styles.compactCard}>
                 <div className={styles.timeRow}>
                   <div className={styles.timeBox}>
@@ -96,10 +176,28 @@ const Dashboard: React.FC = () => {
                 </div>
 
                 <div className={styles.buttonRow}>
-                  <Button icon={<LoginOutlined />} className={styles.punchInBtn}>Punch in</Button>
-                  <Button icon={<LogoutOutlined />} className={styles.punchOutBtn}>Punch out</Button>
+                  <Button
+                    icon={<LoginOutlined />}
+                    className={styles.punchInBtn}
+                    onClick={handlePunchIn}
+                    loading={loadingPunchIn}
+                    disabled={loadingStatus || !!attendance?.time_in}
+                  >
+                    Punch in
+                  </Button>
+
+                  <Button
+                    icon={<LogoutOutlined />}
+                    className={styles.punchOutBtn}
+                    onClick={handlePunchOut}
+                    loading={loadingPunchOut}
+                    disabled={loadingStatus || !attendance?.time_in || !!attendance?.time_out}
+                  >
+                    Punch out
+                  </Button>
                 </div>
               </Card>
+
             </Col>
 
             <Col xs={24} lg={8}>

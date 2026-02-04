@@ -6,4 +6,6 @@ urlpatterns = [
     path('superadmin/holidays/', HolidayListView.as_view()),
     path('holidays/create/', HolidayCreateView.as_view()),
 
+
+
 ]

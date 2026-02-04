@@ -1,12 +1,12 @@
+// frontend/src/components/ProtectedRoute.tsx
 import React from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, Outlet } from "react-router-dom";
 
 interface Props {
-  children: React.ReactNode;
   allowedRoles?: string[];
 }
 
-const ProtectedRoute: React.FC<Props> = ({ children, allowedRoles }) => {
+const ProtectedRoute: React.FC<Props> = ({ allowedRoles }) => {
   const token = localStorage.getItem("access_token");
   const role = localStorage.getItem("role");
 
@@ -15,12 +15,12 @@ const ProtectedRoute: React.FC<Props> = ({ children, allowedRoles }) => {
     return <Navigate to="/" replace />;
   }
 
-  // Role-based restriction
+  // Logged in but not authorized
   if (allowedRoles && role && !allowedRoles.includes(role)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/unauthorized" replace />;
   }
 
-  return children;
+  return <Outlet />;
 };
 
 export default ProtectedRoute;

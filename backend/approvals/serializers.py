@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from shared_model.models import Holiday
+from shared_model.models import Holiday,Payroll
 # views.py
 from rest_framework import generics, status
 from rest_framework.response import Response
@@ -33,7 +33,10 @@ class HolidaySerializer(serializers.ModelSerializer):
             'date',
             'type',
             'base',
-            'is_active',
-            'created_at',
             'status',
         )
+
+class PayrollSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payroll
+        fields = ['id', 'employee_name', 'period', 'total_amount', 'status']

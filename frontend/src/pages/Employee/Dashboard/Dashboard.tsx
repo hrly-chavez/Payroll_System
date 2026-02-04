@@ -1,13 +1,14 @@
+//frontend/src/pages/Employee/Dashboard/Dashboard.tsx
 import React, { useEffect, useState } from "react";
 import { Layout, Card, Row, Col, Button, Tag, Calendar, Statistic, Divider, message,Select } from "antd";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
-import Greeting from "../../../components/Greeting/Greeting";
 import styles from "./Dashboard.module.css";
 import { LoginOutlined, LogoutOutlined } from "@ant-design/icons";
 import axios from "axios";
 import api from "../../../api/axios";
 import dayjs, { Dayjs } from "dayjs";
+import { formatBackendTime,formatTime, getAttendanceStatusLabel } from "../../helpers";
 
 const { Content } = Layout;
 const { Option } = Select;
@@ -41,7 +42,7 @@ const Dashboard: React.FC = () => {
       setLoadingStatus(true);
       try {
        try {
-          const res = await api.get<TodayAttendanceResponse>("/api/attendance/today/");
+          const res = await api.get<TodayAttendanceResponse>("/attendance/today/");
           setAttendance(res.data.attendance);
         } catch (err: any) {
           console.error(err);
@@ -59,18 +60,16 @@ const Dashboard: React.FC = () => {
     const handlePunchIn = async () => {
       setLoadingPunchIn(true);
       try {
-       try {
-          const res = await api.post("/api/attendance/punch-in/", {});
-          message.success(res.data?.message || "Punch in successful.");
-          setAttendance(res.data.attendance);
-        } catch (err: any) {
-          console.error(err);
-          const msg = err?.response?.data?.detail || "Punch in failed.";
-          message.error(msg);
-        } 
+        const res = await api.post("/attendance/punch-in/", {});
+        message.success(res.data?.message || "Punch in successful.");
+        setAttendance(res.data.attendance);
       } catch (err: any) {
         console.error(err);
-        message.error(err?.message || "Punch in failed.");
+        const msg =
+          err?.response?.data?.detail ||
+          err?.response?.data?.message ||
+          "Punch in failed.";
+        message.error(msg);
       } finally {
         setLoadingPunchIn(false);
       }
@@ -79,67 +78,70 @@ const Dashboard: React.FC = () => {
     const handlePunchOut = async () => {
       setLoadingPunchOut(true);
       try {
-        try {
-          const res = await api.post("/api/attendance/punch-out/", {});
-          message.success(res.data?.message || "Punch out successful.");
-          setAttendance(res.data.attendance);
-        } catch (err: any) {
-          console.error(err);
-          const msg = err?.response?.data?.detail || "Punch out failed.";
-          message.error(msg);
-        }
-
+        const res = await api.post("/attendance/punch-out/", {});
+        message.success(res.data?.message || "Punch out successful.");
+        setAttendance(res.data.attendance);
       } catch (err: any) {
         console.error(err);
-        message.error(err?.message || "Punch out failed.");
+        const msg =
+          err?.response?.data?.detail ||
+          err?.response?.data?.message ||
+          "Punch out failed.";
+        message.error(msg);
       } finally {
         setLoadingPunchOut(false);
       }
     };
 
-  const fetchBaseTime = async (timezone: string, setter: (d: Date) => void) => {
-    try {
-      const res = await fetch(`https://worldtimeapi.org/api/timezone/${timezone}`);
-      const data = await res.json();
-      setter(new Date(data.datetime));
-    } catch (err) {
-      console.error("Time API error", err);
-    }
-  };
-
-  useEffect(() => {
-    const fetchTime = async () => {
+    const fetchBaseTime = async (timezone: string, setter: (d: Date) => void) => {
       try {
-        const ph = await fetch("https://worldtimeapi.org/api/timezone/Asia/Manila").then(r => r.json());
-        const us = await fetch("https://worldtimeapi.org/api/timezone/America/New_York").then(r => r.json());
-        setPhTime(new Date(ph.datetime));
-        setUsaTime(new Date(us.datetime));
-      } catch {}
+        const res = await fetch(`https://worldtimeapi.org/api/timezone/${timezone}`);
+        const data = await res.json();
+        setter(new Date(data.datetime));
+      } catch (err) {
+        console.error("Time API error", err);
+      }
     };
-    fetchTime();
-    fetchBaseTime("Asia/Manila", setPhTime);
-    fetchBaseTime("America/New_York", setUsaTime);
-    fetchTodayAttendance();
-  }, []);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPhTime(p => p ? new Date(p.getTime() + 1000) : p);
-      setUsaTime(p => p ? new Date(p.getTime() + 1000) : p);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+    useEffect(() => {
+      const fetchTime = async () => {
+        try {
+          const ph = await fetch("https://worldtimeapi.org/api/timezone/Asia/Manila").then(r => r.json());
+          const us = await fetch("https://worldtimeapi.org/api/timezone/America/New_York").then(r => r.json());
+          setPhTime(new Date(ph.datetime));
+          setUsaTime(new Date(us.datetime));
+        } catch {}
+      };
+      fetchTime();
+      fetchBaseTime("Asia/Manila", setPhTime);
+      fetchBaseTime("America/New_York", setUsaTime);
+      fetchTodayAttendance();
+    }, []);
 
-  const formatTime = (date: Date | null, tz: string) =>
-    date
-      ? new Intl.DateTimeFormat("en-US", {
-          hour: "numeric",
-          minute: "numeric",
-          second: "numeric",
-          hour12: true,
-          timeZone: tz,
-        }).format(date)
-      : "--:--:--";
+    useEffect(() => {
+      const interval = setInterval(() => {
+        setPhTime(p => p ? new Date(p.getTime() + 1000) : p);
+        setUsaTime(p => p ? new Date(p.getTime() + 1000) : p);
+      }, 1000);
+      return () => clearInterval(interval);
+    }, []);
+
+ 
+    
+    type StatusType = "NOT_IN" | "IN" | "OUT";
+
+      const name = localStorage.getItem("user_name") || "User";
+
+      const getStatusLabel = (att: TodayAttendanceResponse["attendance"]) => {
+        if (!att || !att.time_in) return "STATUS : Not Clocked In";
+        if (att.time_in && !att.time_out) return `STATUS : Clocked In (${att.time_in})`;
+        return `STATUS : Clocked Out (${att.time_out})`;
+      };
+    
+    const { key: statusKey, label: statusLabel } = getAttendanceStatusLabel(
+      attendance,
+      formatBackendTime
+    );
     
 
   return (
@@ -149,7 +151,17 @@ const Dashboard: React.FC = () => {
         <Topbar title="Dashboard" />
 
         <Content className={styles.content}>
-          <Greeting />
+          <div className={styles.greetingCard}>
+            <div className={styles.greetingLeft}>
+              Good to see you, <span className={styles.greetingName}>{name}</span>
+            </div>
+
+            <div className={`${styles.greetingStatus} ${styles[statusKey]}`}>
+              {statusLabel}
+            </div>
+          </div>
+
+
 
           {/* Stats */}
           <Row gutter={16}>

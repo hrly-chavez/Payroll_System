@@ -41,3 +41,4 @@ class HolidayUpdateStatusView(APIView):
         holiday.status = new_status
         holiday.save()
         return Response({'detail': 'Status updated', 'status': holiday.status})
+

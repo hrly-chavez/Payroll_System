@@ -1,3 +1,4 @@
+//frontend/src/components/Greeting/Greeting.tsx
 import React, { useEffect, useState } from "react";
 import styles from "./Greeting.module.css";
 
@@ -52,7 +53,7 @@ const Greeting: React.FC = () => {
   return (
     <div className={styles.card}>
       <div className={styles.left}>
-        Good to see you, <span className={styles.name}>{name}</span> 👋
+        Good to see you, <span className={styles.name}>{name}</span> 
       </div>
 
       <div className={`${styles.status} ${styles[status]}`}>

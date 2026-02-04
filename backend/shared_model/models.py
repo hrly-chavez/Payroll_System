@@ -118,6 +118,7 @@ class UserManager(BaseUserManager):
         user = self.create_user(user_name=user_name, password=password, role="SUPER_ADMIN", **extra_fields)
         user.is_staff = True
         user.is_superuser = True
+        user.is_active = True  # CRUCIAL
         user.save(using=self._db)
         return user
 

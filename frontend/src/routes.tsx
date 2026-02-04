@@ -1,4 +1,4 @@
-//frontend/src/routes.tsx
+// frontend/src/routes.tsx
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -8,6 +8,9 @@ import Login from "./pages/Login/Login";
 
 /* 🔔 NOTIFICATION PAGE */
 import NotificationPage from "./pages/Notifications/Notifications";
+
+/* UNAUTHORIZED */
+import Unauthorized from "./pages/Login/Unauthorized";
 
 /* ================= EMPLOYEE ================= */
 import EmpDashboard from "./pages/Employee/Dashboard/Dashboard";
@@ -39,44 +42,47 @@ const Router: React.FC = () => {
     <BrowserRouter>
       <Routes>
 
-        {/* ================= LOGIN ================= */}
+        {/* ================= PUBLIC ================= */}
         <Route path="/" element={<Login />} />
-
-        {/* ================= NOTIFICATIONS ================= */}
+        <Route path="/unauthorized" element={<Unauthorized />} />
         <Route path="/notification" element={<NotificationPage />} />
 
-
         {/* ================= EMPLOYEE ROUTES ================= */}
-        <Route path="/employee_dashboard" element={<ProtectedRoute allowedRoles={["EMPLOYEE"]}>
-            <EmpDashboard />
-        </ProtectedRoute>} />
-        <Route path="/employee/attendance" element={<ProtectedRoute allowedRoles={["EMPLOYEE"]}>
-            <EmpAttendance />
-        </ProtectedRoute>} />
+        <Route element={<ProtectedRoute allowedRoles={["EMPLOYEE"]} />}>
+          <Route path="/employee_dashboard" element={<EmpDashboard />} />
+          <Route path="/employee/attendance" element={<EmpAttendance />} />
+          <Route path="/employee/requests" element={<EmpRequests />} />
+          <Route path="/employee/payslips" element={<EmpPayslips />} />
+        </Route>
 
-        <Route path="/employee/requests" element={<EmpRequests />} />
-        <Route path="/employee/payslips" element={<EmpPayslips />} />
-
-        {/* ================= ADMIN ROUTES ================= */}
-        <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={["ADMIN"]}>
-      <AdDashboard />
-    </ProtectedRoute>} />
-        <Route path="/admin/calendar" element={<AdCalendar />} />
-        <Route path="/admin/attendance" element={<AdAttendance />} />
-        <Route path="/admin/reports" element={<AdReport />} />
-        <Route path="/admin/department" element={<AdDepartment />} />
-        <Route path="/admin/department-employee/:deptId" element={<AdDepartmentEmployee />} />
-        <Route path="/admin/employee/employee-details/:employeeId" element={<EmployeeDetailsPage />} />
-        <Route path="/admin/requests" element={<AdRequests />} />
+        {/* ================= ADMIN / HR ROUTES ================= */}
+        <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
+          <Route path="/admin/dashboard" element={<AdDashboard />} />
+          <Route path="/admin/calendar" element={<AdCalendar />} />
+          <Route path="/admin/attendance" element={<AdAttendance />} />
+          <Route path="/admin/reports" element={<AdReport />} />
+          <Route path="/admin/department" element={<AdDepartment />} />
+          <Route
+            path="/admin/department-employee/:deptId"
+            element={<AdDepartmentEmployee />}
+          />
+          <Route
+            path="/admin/employee/employee-details/:employeeId"
+            element={<EmployeeDetailsPage />}
+          />
+          <Route path="/admin/requests" element={<AdRequests />} />
+        </Route>
 
         {/* ================= SUPER ADMIN ROUTES ================= */}
-        <Route path="/super-admin/dashboard" element={<SupDashboard />} />
-        <Route path="/super-admin/calendar" element={<SupCalendar />} />
-        <Route path="/super-admin/attendance" element={<SupAttendance />} />
-        <Route path="/super-admin/reports" element={<SupReport />} />
-        <Route path="/super-admin/department" element={<SupDepartment />} />
-        <Route path="/super-admin/system" element={<SupSystemConfig />} />
-        <Route path="/super-admin/requests" element={<SupRequest />} />
+        <Route element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]} />}>
+          <Route path="/super-admin/dashboard" element={<SupDashboard />} />
+          <Route path="/super-admin/calendar" element={<SupCalendar />} />
+          <Route path="/super-admin/attendance" element={<SupAttendance />} />
+          <Route path="/super-admin/reports" element={<SupReport />} />
+          <Route path="/super-admin/department" element={<SupDepartment />} />
+          <Route path="/super-admin/system" element={<SupSystemConfig />} />
+          <Route path="/super-admin/requests" element={<SupRequest />} />
+        </Route>
 
       </Routes>
     </BrowserRouter>

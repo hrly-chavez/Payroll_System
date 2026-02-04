@@ -3,15 +3,19 @@ from shared_model.models import *
 from .serializers import *
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from accounts.permissions import IsSuperAdmin, IsAdmin;
 
 #--------------------------Address
 # List all provinces
 class ProvinceListAPIView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
     queryset = Province.objects.all()
     serializer_class = ProvinceSerializer
 
 # List cities for a province
 class CityListByProvinceAPIView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
     serializer_class = CitySerializer
 
     def get_queryset(self):
@@ -20,6 +24,7 @@ class CityListByProvinceAPIView(generics.ListAPIView):
 
 # List barangays for a city
 class BarangayListByCityAPIView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
     serializer_class = BarangaySerializer
 
     def get_queryset(self):
@@ -28,15 +33,18 @@ class BarangayListByCityAPIView(generics.ListAPIView):
 
 #--------------------------Department
 class DepartmentViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdmin]
     queryset = Department.objects.all().order_by("-created_at")
     serializer_class = DepartmentSerializer
 
 # para ni sa populate ang shifts sa drop down
 class ShiftViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, IsAdmin]
     queryset = Shift.objects.filter(is_active=True)
     serializer_class = ShiftSerializer
 
 class ShiftSerializer(serializers.ModelSerializer):
+    permission_classes = [IsAuthenticated, IsAdmin]
     display_time = serializers.SerializerMethodField()
 
     class Meta:
@@ -48,6 +56,7 @@ class ShiftSerializer(serializers.ModelSerializer):
 
 
 class EmployeeViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdmin]
     queryset = Employee.objects.filter(is_active=True)
     
     # Use different serializer for list/details vs creation

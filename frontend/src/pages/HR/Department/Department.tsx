@@ -7,6 +7,7 @@ import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 import AddDepartment from "./AddDepartment";
 import styles from "./Department.module.css";
+import api from "../../../api/axios";
 
 interface ShiftType {
   id: number;
@@ -30,10 +31,9 @@ const Department: React.FC = () => {
   const fetchDepartments = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/api/employees/departments/");
-      if (!res.ok) throw new Error("Failed to fetch departments");
-      const data = await res.json();
-      setDepartments(data);
+      // use your axios instance that adds the token automatically
+      const res = await api.get("/employees/departments/");
+      setDepartments(res.data);
     } catch (err) {
       console.error(err);
       message.error("Failed to load departments");
@@ -41,6 +41,7 @@ const Department: React.FC = () => {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchDepartments();

@@ -7,6 +7,7 @@ import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 import styles from "./Admin_DepartmentEmployee.module.css";
 import AddAddDeptEmployee from "./AddAdDeptEmployee";
+import api from "api/axios";
 
 interface EmployeeType {
   id: number;
@@ -32,15 +33,11 @@ const AdminDepartmentEmployee: React.FC = () => {
 
     setLoading(true);
     try {
-      const res = await fetch(
-        `http://localhost:8000/api/employees/employees/by-department/${deptId}/`
-      );
-      if (!res.ok) throw new Error("Failed to fetch employees");
-      const data = await res.json();
-      setEmployees(data);
-    } catch (err) {
+      const res = await api.get(`/employees/employees/by-department/${deptId}/`);
+      setEmployees(res.data); // axios already parses JSON
+    } catch (err: any) {
       console.error(err);
-      message.error("Failed to load employees");
+      message.error(err.response?.data?.message || "Failed to load employees");
     } finally {
       setLoading(false);
     }

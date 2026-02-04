@@ -5,10 +5,11 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from accounts.permissions import IsSuperAdmin;
+from accounts.permissions import IsRole;
 
 class HolidayListView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated, IsSuperAdmin]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN"]
     queryset = Holiday.objects.all().order_by('-date')
     serializer_class = HolidaySerializer
     # public access → no permission_classes
@@ -17,7 +18,8 @@ class HolidayListView(generics.ListAPIView):
 
 
 class HolidayUpdateStatusView(APIView):
-    permission_classes = [IsAuthenticated, IsSuperAdmin]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN"]
     """
     Update status of a single holiday
     """

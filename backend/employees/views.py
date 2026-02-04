@@ -3,19 +3,20 @@ from shared_model.models import *
 from .serializers import *
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from accounts.permissions import IsSuperAdmin, IsAdmin;
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from accounts.permissions import IsRole;
+import random, string
 
 #--------------------------Address
 # List all provinces
 class ProvinceListAPIView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     queryset = Province.objects.all()
     serializer_class = ProvinceSerializer
 
 # List cities for a province
 class CityListByProvinceAPIView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     serializer_class = CitySerializer
 
     def get_queryset(self):
@@ -24,7 +25,7 @@ class CityListByProvinceAPIView(generics.ListAPIView):
 
 # List barangays for a city
 class BarangayListByCityAPIView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     serializer_class = BarangaySerializer
 
     def get_queryset(self):
@@ -33,18 +34,20 @@ class BarangayListByCityAPIView(generics.ListAPIView):
 
 #--------------------------Department
 class DepartmentViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdmin]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["ADMIN"]
     queryset = Department.objects.all().order_by("-created_at")
     serializer_class = DepartmentSerializer
 
 # para ni sa populate ang shifts sa drop down
 class ShiftViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated]
     queryset = Shift.objects.filter(is_active=True)
     serializer_class = ShiftSerializer
 
 class ShiftSerializer(serializers.ModelSerializer):
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["ADMIN"]
     display_time = serializers.SerializerMethodField()
 
     class Meta:
@@ -56,7 +59,8 @@ class ShiftSerializer(serializers.ModelSerializer):
 
 
 class EmployeeViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdmin]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["ADMIN", "SUPER_ADMIN"]
     queryset = Employee.objects.filter(is_active=True)
     
     # Use different serializer for list/details vs creation
@@ -90,7 +94,51 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         serializer = EmployeeCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         employee = serializer.save()
+
+        # --- Determine the role for the user being created ---
+        signed_in_user = request.user
+        requested_role = request.data.get("role", "EMPLOYEE")  # default to EMPLOYEE
+
+        # Role restriction logic
+        if signed_in_user.role == "ADMIN":
+            # Admins can only create EMPLOYEE users
+            if requested_role != "EMPLOYEE":
+                return Response(
+                    {"error": "ADMINs can only create EMPLOYEE users."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        elif signed_in_user.role == "SUPER_ADMIN":
+            # SUPER_ADMIN can create ADMIN or SUPER_ADMIN users
+            if requested_role not in ["ADMIN", "SUPER_ADMIN"]:
+                return Response(
+                    {"error": "SUPER_ADMIN can only create ADMIN or SUPER_ADMIN users."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        else:
+            # Employees cannot create users
+            return Response(
+                {"error": "You do not have permission to create users."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # --- Generate username and random password ---
+        username = f"{employee.fname.lower()}{employee.id}"
+        password = "".join(random.choices(string.ascii_letters + string.digits, k=8))  # 8-char random
+
+        # --- Create User ---
+        user = User.objects.create_user(
+            user_name=username,
+            password=password,
+            role=requested_role,
+            employee=employee
+        )
+
         return Response(
-            {"message": "Employee created successfully"},
+            {
+                "message": "Employee and user created successfully",
+                "employee_id": employee.id,
+                "username": username,
+                "password": password  # send this so it can be communicated to the employee
+            },
             status=status.HTTP_201_CREATED
         )

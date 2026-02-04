@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Modal, Form, Input, Select, Button, message } from "antd";
 import styles from "./Add_department.module.css";
+import api from "../../../api/axios";
 
 interface Props {
   open: boolean;
@@ -15,34 +16,34 @@ const AddDepartment: React.FC<Props> = ({ open, onClose }) => {
   useEffect(() => {
     if (!open) return;
 
-    fetch("http://localhost:8000/api/employees/shifts/") // adjust API URL if needed
-      .then((res) => res.json())
-      .then((data) => setShifts(data))
-      .catch((err) => console.error(err));
+    // Fetch shifts using axios instance
+    const fetchShifts = async () => {
+      try {
+        const res = await api.get("/employees/shifts/"); // no need for base URL
+        setShifts(res.data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchShifts();
   }, [open]);
 
   // Handle form submit
   const onFinish = async (values: any) => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/api/employees/departments/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: values.name,
-          shift_id: values.shift, // <-- this is key
-        }),
+      const res = await api.post("/employees/departments/", {
+        name: values.name,
+        shift_id: values.shift, // <-- this is key
       });
-
-      if (!res.ok) throw new Error("Failed to create department");
 
       message.success("Department created successfully");
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      message.error("Error creating department");
+      // You can display specific error from backend if available
+      message.error(error.response?.data?.message || "Error creating department");
     } finally {
       setLoading(false);
     }

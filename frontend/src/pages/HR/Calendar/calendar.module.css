@@ -106,3 +106,24 @@
   border-color: #2f5f8d !important;
   color: #2f5f8d !important;
 }
+
+.card {
+  margin-top: 20px;
+  border-radius: 12px;
+}
+
+.requestHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.tabSwitch button {
+  margin-right: 8px;
+}
+
+.searchRight {
+  width: 240px;
+}
+

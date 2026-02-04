@@ -8,13 +8,20 @@ from rest_framework.permissions import IsAuthenticated
 from accounts.permissions import IsSuperAdmin;
 
 class HolidayListView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated, IsSuperAdmin]
+    permission_classes = [IsAuthenticated]
     queryset = Holiday.objects.all().order_by('-date')
     serializer_class = HolidaySerializer
-    # public access → no permission_classes
 
 # views.py
 
+class HolidayCreateView(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated]
+    queryset = Holiday.objects.all()
+    serializer_class = HolidaySerializer
+
+    def perform_create(self, serializer):
+        # backend controls status
+        serializer.save(status="Pending", is_active=True)
 
 class HolidayUpdateStatusView(APIView):
     permission_classes = [IsAuthenticated, IsSuperAdmin]

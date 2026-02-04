@@ -33,7 +33,7 @@ const Request: React.FC = () => {
   const fetchRequests = async () => {
     setLoading(true);
     try {
-      const holidaysRes = await api.get("/approvals/superadmin/holidays/");
+      const holidaysRes = await api.get("/approvals/holidays/")
 
       const holidays = holidaysRes.data;
 
@@ -64,7 +64,7 @@ const Request: React.FC = () => {
   ) => {
     try {
       await api.post(
-        `/approvals/superadmin/${requestType.toLowerCase()}/${requestId}/status/`,
+        `/approvals/superadmin/holidays/${requestId}/status/`,
         { status: key }
       );
 

@@ -1,3 +1,4 @@
+//frontend/src/components/Greeting/Greeting.tsx
 import React, { useEffect, useState } from "react";
 import styles from "./Greeting.module.css";
 

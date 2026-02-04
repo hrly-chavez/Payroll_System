@@ -194,9 +194,11 @@ class Deduction_Type(models.Model):
     ]
 
     id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=50)
     code = models.CharField(max_length=100,unique=True)
-    calulation_type = models.CharField(max_length=20, choices=calculation_choices)
+    salary_range_from = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    salary_range_to = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    calculation_type = models.CharField(max_length=20, choices=calculation_choices)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     is_active = models.BooleanField(default=True)
     create_at = models.DateField(auto_now_add=True)
 

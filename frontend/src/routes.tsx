@@ -50,10 +50,10 @@ const Router: React.FC = () => {
         <Route path="/employee_dashboard" element={<ProtectedRoute allowedRoles={["EMPLOYEE"]}>
             <EmpDashboard />
         </ProtectedRoute>} />
-
         <Route path="/employee/attendance" element={<ProtectedRoute allowedRoles={["EMPLOYEE"]}>
             <EmpAttendance />
         </ProtectedRoute>} />
+
         <Route path="/employee/requests" element={<EmpRequests />} />
         <Route path="/employee/payslips" element={<EmpPayslips />} />
 

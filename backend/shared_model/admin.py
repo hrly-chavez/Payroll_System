@@ -77,3 +77,6 @@ class PayrollAdmin(admin.ModelAdmin):
     def total_amount(self, obj):
         return obj.net_pay
     total_amount.short_description = 'Total Amount'
+
+admin.site.register(Attendance)
+admin.site.register(Attendance_Event)

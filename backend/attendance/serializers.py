@@ -7,7 +7,6 @@ class AttendanceSerializer(serializers.ModelSerializer):
         model = Attendance
         fields = "__all__"
 
-
 class PunchInSerializer(serializers.Serializer):
     """
     No input fields needed.
@@ -15,7 +14,6 @@ class PunchInSerializer(serializers.Serializer):
     """
     def validate(self, attrs):
         return attrs
-
 
 class PunchOutSerializer(serializers.Serializer):
     """

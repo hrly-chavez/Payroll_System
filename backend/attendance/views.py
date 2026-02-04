@@ -19,7 +19,6 @@ class PunchInView(APIView):
             "attendance": AttendanceSerializer(attendance).data
         })
 
-
 class PunchOutView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -32,7 +31,6 @@ class PunchOutView(APIView):
             "message": "Punch out successful.",
             "attendance": AttendanceSerializer(attendance).data
         })
-
 
 class TodayAttendanceView(APIView):
     permission_classes = [IsAuthenticated]

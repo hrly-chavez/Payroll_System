@@ -9,6 +9,8 @@ import axios from "axios";
 import api from "../../../api/axios";
 import dayjs, { Dayjs } from "dayjs";
 import { formatBackendTime,formatTime, getAttendanceStatusLabel } from "../../helpers";
+import SharedCalendar from "./../../../components/SharedCalendar/SharedCalendar";
+
 
 const { Content } = Layout;
 const { Option } = Select;
@@ -29,6 +31,7 @@ type TodayAttendanceResponse = {
 const Dashboard: React.FC = () => {
   const [phTime, setPhTime] = useState<Date | null>(null);
   const [usaTime, setUsaTime] = useState<Date | null>(null);
+  const [calendarEvents, setCalendarEvents] = useState([]);
 
   const [attendance, setAttendance] = useState<TodayAttendanceResponse["attendance"]>(null);
   const [loadingPunchIn, setLoadingPunchIn] = useState(false);
@@ -92,6 +95,23 @@ const Dashboard: React.FC = () => {
         setLoadingPunchOut(false);
       }
     };
+    
+    const loadCalendarEvents = async () => {
+  try {
+    const res = await api.get("/approvals/holidays/");
+    const holidays = res.data;
+
+    const events = holidays.map((h: any) => ({
+      date: h.date,
+      type: "holiday",
+      color: h.base === "PH" ? "#2e7d32" : h.base === "US" ? "#c62828" : "#616161",
+    }));
+
+      setCalendarEvents(events);
+    } catch {
+      message.error("Failed to load holidays");
+    }
+  };
 
     const fetchBaseTime = async (timezone: string, setter: (d: Date) => void) => {
       try {
@@ -116,6 +136,7 @@ const Dashboard: React.FC = () => {
       fetchBaseTime("Asia/Manila", setPhTime);
       fetchBaseTime("America/New_York", setUsaTime);
       fetchTodayAttendance();
+      loadCalendarEvents();
     }, []);
 
     useEffect(() => {
@@ -216,33 +237,7 @@ const Dashboard: React.FC = () => {
             </Col>
 
             {/* RIGHT COLUMN */}
-            <Col xs={24} md={12} className={styles.flexCol}>
-              <Card title="Calendar" className={`${styles.sectionCard} ${styles.equalTopCard}`}>
-                <Calendar
-                  fullscreen={false}
-                  headerRender={({ value, onChange }) => {
-                    const current = value as Dayjs;
-                    const year = current.year();
-                    const month = current.month();
-                    const years = Array.from({ length: 20 }, (_, i) => year - 10 + i);
-
-                    return (
-                      <div className={styles.calendarHeader}>
-                        <Select size="small" value={year} onChange={(y) => onChange(current.year(y))}>
-                          {years.map(y => <Option key={y} value={y}>{y}</Option>)}
-                        </Select>
-
-                        <Select size="small" value={month} onChange={(m) => onChange(current.month(m))}>
-                          {Array.from({ length: 12 }).map((_, i) => (
-                            <Option key={i} value={i}>{dayjs().month(i).format("MMM")}</Option>
-                          ))}
-                        </Select>
-                      </div>
-                    );
-                  }}
-                />
-              </Card>
-            </Col>
+            <SharedCalendar events={calendarEvents} />
 
           </Row>
 

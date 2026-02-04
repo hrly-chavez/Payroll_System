@@ -1,19 +1,15 @@
-from rest_framework import generics
-from shared_model.models import Holiday
-from .serializers import HolidaySerializer
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from accounts.permissions import IsSuperAdmin;
+from accounts.permissions import IsSuperAdmin
+from shared_model.models import Holiday
+from .serializers import HolidaySerializer
 
 class HolidayListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated, IsSuperAdmin]
     queryset = Holiday.objects.all().order_by('-date')
     serializer_class = HolidaySerializer
-    # public access → no permission_classes
-
-# views.py
 
 
 class HolidayUpdateStatusView(APIView):
@@ -33,5 +29,10 @@ class HolidayUpdateStatusView(APIView):
 
         holiday.status = new_status
         holiday.save()
-        return Response({'detail': 'Status updated', 'status': holiday.status})
 
+        # Use serializer only for returning data
+        serializer = HolidaySerializer(holiday)
+        return Response({
+            'detail': 'Status updated',
+            'holiday': serializer.data
+        }, status=status.HTTP_200_OK)

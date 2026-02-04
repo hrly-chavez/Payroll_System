@@ -40,43 +40,13 @@ class HolidayAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at',)
     list_editable = ('is_active',)
 
-@admin.register(Payroll_Period)
-class PayrollPeriodAdmin(admin.ModelAdmin):
-    # Columns to display in the list view
-    list_display = ('code', 'start_date', 'end_date', 'pay_date', 'status', 'created_at')
-    
-    # Filter options
-    list_filter = ('status',)
-    
-    # Searchable fields
-    search_fields = ('code',)
-    
-@admin.register(Payroll)
-class PayrollAdmin(admin.ModelAdmin):
-    # Columns to display in the list view
-    list_display = ('get_employee_name', 'get_period', 'total_amount', 'status')
-    
-    # Filter options
-    list_filter = ('status',)
-    
-    # Searchable fields
-    search_fields = ('employee__fname', 'employee__lname', 'payroll_period__code')
-
-    # Methods to display related fields
-    def get_employee_name(self, obj):
-        return f"{obj.employee.fname} {obj.employee.lname}"
-    get_employee_name.short_description = 'Employee Name'
-    get_employee_name.admin_order_field = 'employee__fname'
-
-    def get_period(self, obj):
-        return obj.payroll_period.code
-    get_period.short_description = 'Payroll Period'
-    get_period.admin_order_field = 'payroll_period__code'
-
-    # Total amount = net pay (or could be total_earnings, adjust as needed)
-    def total_amount(self, obj):
-        return obj.net_pay
-    total_amount.short_description = 'Total Amount'
-
 admin.site.register(Attendance)
 admin.site.register(Attendance_Event)
+
+@admin.register(Deduction_Type)
+class DeductionTypeAdmin(admin.ModelAdmin):
+    list_display = ('code', 'calculation_type', 'amount', 'is_active', 'create_at')
+    list_filter = ('calculation_type', 'is_active')
+    search_fields = ('code',)
+    ordering = ('-create_at',)
+    date_hierarchy = 'create_at'

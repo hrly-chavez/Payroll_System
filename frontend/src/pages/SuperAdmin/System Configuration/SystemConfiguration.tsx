@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Layout,
   Button,
@@ -7,13 +7,13 @@ import {
   Input,
   DatePicker,
   Select,
+  message,
+  Spin,
 } from 'antd';
-import {
-  EyeOutlined,
-  EditOutlined,
-} from '@ant-design/icons';
+import { EyeOutlined, EditOutlined } from '@ant-design/icons';
 import Sidebar from '../../../components/Sidebar/Sidebar';
 import Topbar from '../../../components/Topbar/Topbar';
+import API from '../../../api/axios'; // Axios instance pointing to your backend
 import './SystemConfiguration.css';
 
 const { Content } = Layout;
@@ -22,59 +22,86 @@ const { Option } = Select;
 const SystemConfiguration: React.FC = () => {
   const [activeTab, setActiveTab] = useState('contribution');
 
-  // Contribution Modal
+  // Contribution state
+  const [contributions, setContributions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Contribution Modal & Form
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
+  const [amountType, setAmountType] = useState<'manual' | 'percent'>('manual');
 
-  // Payroll Rules Modal
-  const [isPayrollModalOpen, setIsPayrollModalOpen] = useState(false);
-  const [payrollForm] = Form.useForm();
+  const baseSalary = 30000; // Replace with dynamic salary if needed
 
-  /* ---------------- Contribution Handlers ---------------- */
+  // Fetch contributions from backend
+  const fetchContributions = async () => {
+    setLoading(true);
+    try {
+      const res = await API.get('/payroll/superadmin/deductions/');
+      setContributions(res.data);
+    } catch (error) {
+      console.error(error);
+      message.error('Failed to fetch contributions.');
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'contribution') {
+      fetchContributions();
+    }
+  }, [activeTab]);
+
+  // Modal handlers
   const openModal = () => setIsModalOpen(true);
-
   const closeModal = () => {
     form.resetFields();
+    setAmountType('manual');
     setIsModalOpen(false);
   };
 
-  const handleSave = () => {
-    form.validateFields().then(values => {
-      console.log('New Contribution:', values);
+  // Calculate amount from percent
+  const handlePercentChange = (value: string) => {
+    const percent = parseFloat(value);
+    if (!isNaN(percent)) {
+      const calculatedAmount = (baseSalary * percent) / 100;
+      form.setFieldsValue({ amount: calculatedAmount.toFixed(2) });
+    } else {
+      form.setFieldsValue({ amount: '' });
+    }
+  };
+
+  // Save contribution to backend
+  const handleSave = async () => {
+    try {
+      const values = await form.validateFields();
+
+      const payload = {
+        code: values.name, // using name as code
+        salary_range_from: parseFloat(values.salaryFrom),
+        salary_range_to: parseFloat(values.salaryTo),
+        calculation_type: values.amountType === 'manual' ? 'Fixed' : 'Percent',
+        amount: parseFloat(values.amount),
+        is_active: true,
+      };
+
+      await API.post('payroll/superadmin/deductions/', payload);
+      message.success('Contribution added successfully');
+      fetchContributions();
       closeModal();
-    });
-  };
-
-  /* ---------------- Payroll Handlers ---------------- */
-  const openPayrollModal = () => setIsPayrollModalOpen(true);
-
-  const closePayrollModal = () => {
-    payrollForm.resetFields();
-    setIsPayrollModalOpen(false);
-  };
-
-  const handlePayrollSave = () => {
-    payrollForm.validateFields().then(values => {
-      console.log('New Payroll Rule:', values);
-      closePayrollModal();
-    });
+    } catch (error: any) {
+      console.error(error);
+      message.error('Failed to add contribution.');
+    }
   };
 
   return (
     <Layout className="system-layout">
       <Sidebar />
-
       <Layout>
         <Topbar title="System Configuration" />
-
         <Content className="system-content">
           <div className="config-container">
-
-            {/* Header Buttons */}
-            <div className="config-actions">
-              <Button type="primary">Apply Configurations</Button>
-              <Button>Reset Configurations</Button>
-            </div>
 
             {/* Tabs */}
             <div className="config-tabs">
@@ -90,7 +117,6 @@ const SystemConfiguration: React.FC = () => {
               >
                 Payroll Rules
               </button>
-
             </div>
 
             {/* Section Header */}
@@ -98,18 +124,11 @@ const SystemConfiguration: React.FC = () => {
               <h3>
                 {activeTab === 'contribution' && 'Contribution Table'}
                 {activeTab === 'payroll' && 'Payroll Rules'}
-                {activeTab === 'cutoff' && 'Cutoff Schedules'}
               </h3>
 
               {activeTab === 'contribution' && (
                 <Button type="primary" onClick={openModal}>
-                  Add New Contributions
-                </Button>
-              )}
-
-              {activeTab === 'payroll' && (
-                <Button type="primary" onClick={openPayrollModal}>
-                  Add New Rule
+                  Add New Contribution
                 </Button>
               )}
             </div>
@@ -117,41 +136,116 @@ const SystemConfiguration: React.FC = () => {
             {/* ================= Contribution Table ================= */}
             {activeTab === 'contribution' && (
               <div className="table-wrapper">
-                <table className="config-table">
-                  <thead>
-                    <tr>
-                      <th>Deductions (Benefits)</th>
-                      <th>Salary Range</th>
-                      <th>Amount Type</th>
-                      <th>Amount</th>
-                      <th>Salary Range (From)</th>
-                      <th>Salary Range (To)</th>
-                      <th>Effective Date</th>
-                      <th>Frequency</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>SSS</td>
-                      <td>₱5,000 - ₱35,000</td>
-                      <td>Percentage</td>
-                      <td>5%</td>
-                      <td>₱5,000</td>
-                      <td>₱35,000</td>
-                      <td>March 16, 2026</td>
-                      <td>Monthly</td>
-                      <td className="actions">
-                        <EyeOutlined />
-                        <EditOutlined />
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                {loading ? (
+                  <Spin />
+                ) : (
+                  <table className="config-table">
+                    <thead>
+                      <tr>
+                        <th>Code</th>
+                        <th>Salary From</th>
+                        <th>Salary To</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {contributions.map((c) => (
+                        <tr key={c.id}>
+                          <td>{c.code}</td>
+                          <td>₱{c.salary_range_from}</td>
+                          <td>₱{c.salary_range_to}</td>
+                          <td>{c.calculation_type}</td>
+                          <td>₱{c.amount}</td>
+                          <td className="actions">
+                            <EyeOutlined />
+                            <EditOutlined />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             )}
 
-            {/* ================= Payroll Rules Table ================= */}
+            {/* ================= Contribution Modal ================= */}
+            <Modal
+              title="Add Contribution"
+              open={isModalOpen}
+              onCancel={closeModal}
+              onOk={handleSave}
+              okText="Save"
+            >
+              <Form form={form} layout="vertical">
+                <Form.Item
+                  label="Deductions (Code)"
+                  name="name"
+                  rules={[{ required: true }]}
+                >
+                  <Input placeholder="SSS, PhilHealth, Pag-IBIG" />
+                </Form.Item>
+
+                <Form.Item
+                  label="Salary Range (From)"
+                  name="salaryFrom"
+                  rules={[{ required: true }]}
+                >
+                  <Input placeholder="5000" />
+                </Form.Item>
+
+                <Form.Item
+                  label="Salary Range (To)"
+                  name="salaryTo"
+                  rules={[{ required: true }]}
+                >
+                  <Input placeholder="35000" />
+                </Form.Item>
+
+                <Form.Item
+                  label="Type"
+                  name="amountType"
+                  rules={[{ required: true }]}
+                >
+                  <Select onChange={(value) => setAmountType(value)}>
+                    <Option value="manual">Fixed</Option>
+                    <Option value="percent">Percent</Option>
+                  </Select>
+                </Form.Item>
+
+                {amountType === 'manual' && (
+                  <Form.Item
+                    label="Amount"
+                    name="amount"
+                    rules={[{ required: true }]}
+                  >
+                    <Input placeholder="Amount" />
+                  </Form.Item>
+                )}
+
+                {amountType === 'percent' && (
+                  <>
+                    <Form.Item
+                      label="Percent (%)"
+                      name="percent"
+                      rules={[{ required: true }]}
+                    >
+                      <Input
+                        placeholder="Ex: 5"
+                        onChange={(e) => handlePercentChange(e.target.value)}
+                      />
+                    </Form.Item>
+
+                    <Form.Item label="Amount" name="amount">
+                      <Input placeholder="Auto calculated" disabled />
+                    </Form.Item>
+                  </>
+                )}
+              </Form>
+            </Modal>
+
+            {/* ================= Payroll Rules Table & Modal ================= */}
             {activeTab === 'payroll' && (
               <div className="table-wrapper">
                 <table className="config-table">
@@ -181,121 +275,10 @@ const SystemConfiguration: React.FC = () => {
                         <EditOutlined />
                       </td>
                     </tr>
-
-                    <tr>
-                      <td>Regular Holiday Pay</td>
-                      <td>Holiday</td>
-                      <td>Earning</td>
-                      <td>Multiplier</td>
-                      <td>₱1.30</td>
-                      <td>All</td>
-                      <td>March 1, 2026</td>
-                      <td className="actions">
-                        <EyeOutlined />
-                        <EditOutlined />
-                      </td>
-                    </tr>
                   </tbody>
                 </table>
               </div>
             )}
-
-            {/* ================= Contribution Modal ================= */}
-            <Modal
-              title="Add Contribution"
-              open={isModalOpen}
-              onCancel={closeModal}
-              onOk={handleSave}
-              okText="Save"
-            >
-              <Form form={form} layout="vertical">
-                <Form.Item label="Deductions (Benefits)" name="name" rules={[{ required: true }]}>
-                  <Input placeholder="SSS, PhilHealth, Pag-IBIG" />
-                </Form.Item>
-
-                <Form.Item label="Amount Type" name="amountType" rules={[{ required: true }]}>
-                  <Select placeholder="Select type">
-                    <Option value="percentage">Percentage</Option>
-                    <Option value="peso">Peso</Option>
-                  </Select>
-                </Form.Item>
-
-                <Form.Item label="Amount" name="amount" rules={[{ required: true }]}>
-                  <Input placeholder="Ex: 5 or 200" />
-                </Form.Item>
-
-                <Form.Item label="Salary Range (From)" name="salaryFrom" rules={[{ required: true }]}>
-                  <Input placeholder="₱5,000" />
-                </Form.Item>
-
-                <Form.Item label="Salary Range (To)" name="salaryTo" rules={[{ required: true }]}>
-                  <Input placeholder="₱35,000" />
-                </Form.Item>
-
-                <Form.Item label="Effective Date" name="effectiveDate" rules={[{ required: true }]}>
-                  <DatePicker style={{ width: '100%' }} />
-                </Form.Item>
-
-                <Form.Item label="Frequency" name="frequency" rules={[{ required: true }]}>
-                  <Select placeholder="Select frequency">
-                    <Option value="monthly">Monthly</Option>
-                    <Option value="per_pay_period">Per Pay Period</Option>
-                  </Select>
-                </Form.Item>
-              </Form>
-            </Modal>
-
-            {/* ================= Payroll Rule Modal ================= */}
-            <Modal
-              title="Add Payroll Rule"
-              open={isPayrollModalOpen}
-              onCancel={closePayrollModal}
-              onOk={handlePayrollSave}
-              okText="Save"
-            >
-              <Form form={payrollForm} layout="vertical">
-                <Form.Item label="Rule Name" name="ruleName" rules={[{ required: true }]}>
-                  <Input placeholder="Late Deduction" />
-                </Form.Item>
-
-                <Form.Item label="Event Type" name="eventType" rules={[{ required: true }]}>
-                  <Select placeholder="Select event">
-                    <Option value="late">Late</Option>
-                    <Option value="undertime">Undertime</Option>
-                    <Option value="holiday">Holiday</Option>
-                  </Select>
-                </Form.Item>
-
-                <Form.Item label="Category" name="category" rules={[{ required: true }]}>
-                  <Select placeholder="Select category">
-                    <Option value="deduction">Deduction</Option>
-                    <Option value="earning">Earning</Option>
-                  </Select>
-                </Form.Item>
-
-                <Form.Item label="Rate Type" name="rateType" rules={[{ required: true }]}>
-                  <Select placeholder="Select rate type">
-                    <Option value="per_minute">Per Minute</Option>
-                    <Option value="multiplier">Multiplier</Option>
-                  </Select>
-                </Form.Item>
-
-                <Form.Item label="Rate Value" name="rateValue" rules={[{ required: true }]}>
-                  <Input placeholder="₱5.00 or 1.30" />
-                </Form.Item>
-
-                <Form.Item label="Scope" name="scope" rules={[{ required: true }]}>
-                  <Select>
-                    <Option value="all">All</Option>
-                    <Option value="department">By Department</Option>
-                  </Select>
-                </Form.Item>
-
-                <Form.Item label="Effective From" name="effectiveFrom" rules={[{ required: true }]}>
-                  <DatePicker style={{ width: '100%' }} />
-                </Form.Item>
-              </Form>
-            </Modal>
 
           </div>
         </Content>

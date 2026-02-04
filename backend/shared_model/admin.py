@@ -39,3 +39,6 @@ class HolidayAdmin(admin.ModelAdmin):
     date_hierarchy = 'date'
     readonly_fields = ('created_at',)
     list_editable = ('is_active',)
+
+admin.site.register(Attendance)
+admin.site.register(Attendance_Event)

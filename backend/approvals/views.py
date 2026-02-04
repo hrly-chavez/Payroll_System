@@ -4,8 +4,11 @@ from .serializers import HolidaySerializer
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from accounts.permissions import IsSuperAdmin;
 
 class HolidayListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated, IsSuperAdmin]
     queryset = Holiday.objects.all().order_by('-date')
     serializer_class = HolidaySerializer
     # public access → no permission_classes
@@ -14,6 +17,7 @@ class HolidayListView(generics.ListAPIView):
 
 
 class HolidayUpdateStatusView(APIView):
+    permission_classes = [IsAuthenticated, IsSuperAdmin]
     """
     Update status of a single holiday
     """

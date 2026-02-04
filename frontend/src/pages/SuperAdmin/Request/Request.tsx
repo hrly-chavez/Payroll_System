@@ -5,6 +5,7 @@ import Sidebar from '../../../components/Sidebar/Sidebar';
 import Topbar from '../../../components/Topbar/Topbar';
 import dayjs from 'dayjs';
 import './Request.css';
+import api from "../../../api/axios";
 
 const { Content } = Layout;
 const { Option } = Select;
@@ -12,10 +13,10 @@ const { Option } = Select;
 interface RequestItem {
   id: number;
   type: 'Holiday' | 'Leave' | 'Payroll';
-  name: string;           // Holiday name, Leave type, Payroll title
-  date: string;           // request date
+  name: string;           
+  date: string;       
   status: string;
-  base?: string;          // optional
+  base?: string;          
   is_active: boolean;
   created_at: string;
 }
@@ -32,60 +33,56 @@ const Request: React.FC = () => {
   const fetchRequests = async () => {
     setLoading(true);
     try {
-      // Fetch all requests from different endpoints
-      const [holidaysRes ] = await Promise.all([
-        fetch('http://localhost:8000/api/approvals/superadmin/holidays/'),
+      const holidaysRes = await api.get("/approvals/superadmin/holidays/");
 
-      ]);
+      const holidays = holidaysRes.data;
 
-      if (!holidaysRes.ok ) {
-        throw new Error('Failed to fetch requests');
-      }
-
-      const holidays = await holidaysRes.json();
-
-
-      // Map each request type into unified format
       const allRequests: RequestItem[] = [
-        ...holidays.map((h: any) => ({ ...h, type: 'Holiday' })),
-
+        ...holidays.map((h: any) => ({ ...h, type: "Holiday" })),
       ];
 
-      // Sort by latest created_at
-      allRequests.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      allRequests.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() -
+          new Date(a.created_at).getTime()
+      );
 
       setRequests(allRequests);
     } catch (error) {
       console.error(error);
-      message.error('Failed to fetch requests');
+      message.error("Failed to fetch requests");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleStatusChange = async (key: string, requestId: number, requestType: string) => {
+
+  const handleStatusChange = async (
+    key: string,
+    requestId: number,
+    requestType: string
+  ) => {
     try {
-      const response = await fetch(
-        `http://localhost:8000/api/approvals/superadmin/${requestType.toLowerCase()}/${requestId}/status/`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: key }),
-        }
+      await api.post(
+        `/approvals/superadmin/${requestType.toLowerCase()}/${requestId}/status/`,
+        { status: key }
       );
 
-      if (!response.ok) throw new Error('Failed to update status');
-
-      setRequests(prev =>
-        prev.map(r => (r.id === requestId && r.type === requestType ? { ...r, status: key } : r))
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === requestId && r.type === requestType
+            ? { ...r, status: key }
+            : r
+        )
       );
 
       message.success(`${requestType} request ${key}`);
     } catch (error) {
       console.error(error);
-      message.error('Failed to update status');
+      message.error("Failed to update status");
     }
   };
+
 
   const filteredRequests = filter === 'All' ? requests : requests.filter(r => r.type === filter);
 

@@ -41,7 +41,7 @@ const Dashboard: React.FC = () => {
       setLoadingStatus(true);
       try {
        try {
-          const res = await api.get<TodayAttendanceResponse>("/api/attendance/today/");
+          const res = await api.get<TodayAttendanceResponse>("/attendance/today/");
           setAttendance(res.data.attendance);
         } catch (err: any) {
           console.error(err);
@@ -59,18 +59,16 @@ const Dashboard: React.FC = () => {
     const handlePunchIn = async () => {
       setLoadingPunchIn(true);
       try {
-       try {
-          const res = await api.post("/api/attendance/punch-in/", {});
-          message.success(res.data?.message || "Punch in successful.");
-          setAttendance(res.data.attendance);
-        } catch (err: any) {
-          console.error(err);
-          const msg = err?.response?.data?.detail || "Punch in failed.";
-          message.error(msg);
-        } 
+        const res = await api.post("/attendance/punch-in/", {});
+        message.success(res.data?.message || "Punch in successful.");
+        setAttendance(res.data.attendance);
       } catch (err: any) {
         console.error(err);
-        message.error(err?.message || "Punch in failed.");
+        const msg =
+          err?.response?.data?.detail ||
+          err?.response?.data?.message ||
+          "Punch in failed.";
+        message.error(msg);
       } finally {
         setLoadingPunchIn(false);
       }
@@ -79,19 +77,16 @@ const Dashboard: React.FC = () => {
     const handlePunchOut = async () => {
       setLoadingPunchOut(true);
       try {
-        try {
-          const res = await api.post("/api/attendance/punch-out/", {});
-          message.success(res.data?.message || "Punch out successful.");
-          setAttendance(res.data.attendance);
-        } catch (err: any) {
-          console.error(err);
-          const msg = err?.response?.data?.detail || "Punch out failed.";
-          message.error(msg);
-        }
-
+        const res = await api.post("/attendance/punch-out/", {});
+        message.success(res.data?.message || "Punch out successful.");
+        setAttendance(res.data.attendance);
       } catch (err: any) {
         console.error(err);
-        message.error(err?.message || "Punch out failed.");
+        const msg =
+          err?.response?.data?.detail ||
+          err?.response?.data?.message ||
+          "Punch out failed.";
+        message.error(msg);
       } finally {
         setLoadingPunchOut(false);
       }

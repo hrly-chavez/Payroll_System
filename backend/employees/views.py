@@ -35,7 +35,7 @@ class BarangayListByCityAPIView(generics.ListAPIView):
 #--------------------------Department
 class DepartmentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["ADMIN"]
+    allowed_roles = ["ADMIN", "SUPER_ADMIN"]
     queryset = Department.objects.all().order_by("-created_at")
     serializer_class = DepartmentSerializer
 

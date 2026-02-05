@@ -511,4 +511,38 @@ class Payroll(models.Model):
             )
         ]
 
+class PayrollPeriodEmployee(models.Model):
+    STATUS_CHOICES = [
+        ("Pending", "Pending"),        # default – HR has not verified
+        ("Verified", "Verified"),      # HR verified
+        ("Processing", "Processing"),  # payroll & payslip generated, waiting CEO
+        ("Approved", "Approved"),      # CEO approved
+        ("Declined", "Declined"),      # CEO declined
+    ]
+
+    id = models.AutoField(primary_key=True)
+    period = models.ForeignKey(Payroll_Period,on_delete=models.CASCADE,related_name="period_employees")
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="payroll_periods")
+    status = models.CharField(max_length=20,choices=STATUS_CHOICES,default="Pending")
+    verified_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="verified_payroll_period_employees")
+    verified_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_payroll_period_employees")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    declined_reason = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["period", "employee"],
+                name="unique_employee_per_payroll_period"
+            )
+        ]
+        ordering = ["employee__lname", "employee__fname"]
+
+    def __str__(self):
+        return f"{self.employee} - {self.period} ({self.status})"
+
+
 #TODO: PAYROLL_RUN_LOG

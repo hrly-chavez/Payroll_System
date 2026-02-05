@@ -7,7 +7,7 @@
 }
 
 .sectionCard {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 /* Make top row columns equal height */
@@ -25,11 +25,11 @@
 
 /* Shrink calendar height */
 .equalTopCard :global(.ant-picker-calendar) {
-  height: 260px;
+  height: 200px;
 }
 
 .equalTopCard :global(.ant-picker-content) {
-  height: 200px;
+  height: 150px;
 }
 
 /* Calendar dropdown header */
@@ -163,3 +163,4 @@
   background: #fff7e6;
   color: #d48806;
 }
+

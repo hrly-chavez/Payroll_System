@@ -106,3 +106,27 @@ class PayrollPeriodEligibleEmployeesView(APIView):
             "eligible_employees": EligibleEmployeeSerializer(ppe_qs, many=True).data
         })
     
+#==========================================PAYRULE========================================
+
+# List and Create
+class PayRuleListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PayRuleSerializer
+    queryset = Pay_Rule.objects.all().order_by('-created_at')
+
+# Retrieve, Update, Delete
+class PayRuleDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PayRuleSerializer
+    queryset = Pay_Rule.objects.all()
+
+# Optional: Update only 'is_active' status
+class PayRuleUpdateStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        rule = get_object_or_404(Pay_Rule, pk=pk)
+        rule.is_active = request.data.get('is_active', rule.is_active)
+        rule.save()
+        serializer = PayRuleSerializer(rule)
+        return Response(serializer.data, status=status.HTTP_200_OK)

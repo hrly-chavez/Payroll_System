@@ -51,3 +51,20 @@ class EligibleEmployeeSerializer(serializers.ModelSerializer):
     def get_full_name(self, obj: PayrollPeriodEmployee):
         e = obj.employee
         return f"{e.fname} {e.lname}".strip()
+    
+    
+
+#==========================================PAYRULE ========================================
+
+class PayRuleSerializer(serializers.ModelSerializer):
+    applies_to_name = serializers.CharField(source="applies_to.name", read_only=True)
+    employee_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Pay_Rule
+        fields = '__all__'  # Send all fields to frontend
+
+    def get_employee_name(self, obj):
+        if obj.employee:
+            return f"{obj.employee.fname} {obj.employee.lname}"
+        return None

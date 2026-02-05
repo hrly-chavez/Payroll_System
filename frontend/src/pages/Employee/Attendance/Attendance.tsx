@@ -6,6 +6,8 @@ import styles from "./Attendance.module.css";
 import dayjs from "dayjs";
 import { CalendarOutlined } from "@ant-design/icons";
 import AttendanceCorrection from "./AttendanceCorrection";
+import LeaveRequest from "./LeaveRequest";
+
 
 const { Content } = Layout;
 const { Option } = Select;
@@ -18,6 +20,9 @@ const attendanceData: Record<string, { in: string; out: string }> = {
 
 const Attendance: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCorrectionOpen, setIsCorrectionOpen] = useState(false);
+  const [isLeaveOpen, setIsLeaveOpen] = useState(false);
+
 
   const dateCellRender = (value: dayjs.Dayjs) => {
     const dateStr = value.format("YYYY-MM-DD");
@@ -70,7 +75,16 @@ const Attendance: React.FC = () => {
                 className={styles.requestBtn}
                 onClick={() => setIsModalOpen(true)}
               >
-                Request Attendance correction
+                Request Attendance Correction
+              </Button>
+
+              <Button
+                type="primary"
+                icon={<CalendarOutlined />}
+                className={styles.requestLeaveBtn}
+                onClick={() => setIsLeaveOpen(true)}
+              >
+                Request Leave
               </Button>
             </Row>
 
@@ -84,6 +98,10 @@ const Attendance: React.FC = () => {
           <AttendanceCorrection
             open={isModalOpen}
             onClose={() => setIsModalOpen(false)}
+          />
+          <LeaveRequest
+            open={isLeaveOpen}
+            onClose={() => setIsLeaveOpen(false)}
           />
         </Content>
       </Layout>

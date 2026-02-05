@@ -5,7 +5,6 @@ import {
   Modal,
   Form,
   Input,
-  DatePicker,
   Select,
   message,
   Spin,
@@ -13,7 +12,7 @@ import {
 import { EyeOutlined, EditOutlined } from '@ant-design/icons';
 import Sidebar from '../../../components/Sidebar/Sidebar';
 import Topbar from '../../../components/Topbar/Topbar';
-import API from '../../../api/axios'; // Axios instance pointing to your backend
+import API from '../../../api/axios';
 import './SystemConfiguration.css';
 
 const { Content } = Layout;
@@ -26,25 +25,24 @@ const SystemConfiguration: React.FC = () => {
   const [contributions, setContributions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Contribution Modal & Form
+  // Modal & Form
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
   const [amountType, setAmountType] = useState<'manual' | 'percent'>('manual');
 
-  const baseSalary = 30000; // Replace with dynamic salary if needed
+  // Fetch contributions
+    const fetchContributions = async () => {
+      setLoading(true);
+      try {
+        const res = await API.get('/payroll/superadmin/deductions/');
+        setContributions([...res.data].reverse()); // LATEST FIRST
+      } catch (error) {
+        console.error(error);
+        message.error('Failed to fetch contributions.');
+      }
+      setLoading(false);
+    };
 
-  // Fetch contributions from backend
-  const fetchContributions = async () => {
-    setLoading(true);
-    try {
-      const res = await API.get('/payroll/superadmin/deductions/');
-      setContributions(res.data);
-    } catch (error) {
-      console.error(error);
-      message.error('Failed to fetch contributions.');
-    }
-    setLoading(false);
-  };
 
   useEffect(() => {
     if (activeTab === 'contribution') {
@@ -54,42 +52,36 @@ const SystemConfiguration: React.FC = () => {
 
   // Modal handlers
   const openModal = () => setIsModalOpen(true);
+
   const closeModal = () => {
     form.resetFields();
     setAmountType('manual');
     setIsModalOpen(false);
   };
 
-  // Calculate amount from percent
-  const handlePercentChange = (value: string) => {
-    const percent = parseFloat(value);
-    if (!isNaN(percent)) {
-      const calculatedAmount = (baseSalary * percent) / 100;
-      form.setFieldsValue({ amount: calculatedAmount.toFixed(2) });
-    } else {
-      form.setFieldsValue({ amount: '' });
-    }
-  };
-
-  // Save contribution to backend
+  // Save contribution
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
 
       const payload = {
-        code: values.name, // using name as code
+        code: values.name,
         salary_range_from: parseFloat(values.salaryFrom),
         salary_range_to: parseFloat(values.salaryTo),
-        calculation_type: values.amountType === 'manual' ? 'Fixed' : 'Percent',
-        amount: parseFloat(values.amount),
+        calculation_type:
+          values.amountType === 'manual' ? 'Fixed' : 'Percent',
+        amount: parseFloat(values.amount), // FIXED OR PERCENT VALUE
         is_active: true,
       };
 
-      await API.post('payroll/superadmin/deductions/', payload);
+      const res = await API.post('/payroll/superadmin/deductions/', payload);
+
+      setContributions((prev) => [res.data, ...prev]); // NEW ITEM ON TOP
+
       message.success('Contribution added successfully');
-      fetchContributions();
       closeModal();
-    } catch (error: any) {
+
+    } catch (error) {
       console.error(error);
       message.error('Failed to add contribution.');
     }
@@ -157,7 +149,12 @@ const SystemConfiguration: React.FC = () => {
                           <td>₱{c.salary_range_from}</td>
                           <td>₱{c.salary_range_to}</td>
                           <td>{c.calculation_type}</td>
-                          <td>₱{c.amount}</td>
+                          <td>
+                            {c.calculation_type === 'Percent'
+                              ? `${Number(c.amount)}%`
+                              : `₱${Number(c.amount).toFixed(2)}`}
+                          </td>
+
                           <td className="actions">
                             <EyeOutlined />
                             <EditOutlined />
@@ -214,38 +211,34 @@ const SystemConfiguration: React.FC = () => {
                   </Select>
                 </Form.Item>
 
+                {/* Fixed Amount */}
                 {amountType === 'manual' && (
                   <Form.Item
-                    label="Amount"
+                    label="Amount (₱)"
                     name="amount"
                     rules={[{ required: true }]}
                   >
-                    <Input placeholder="Amount" />
+                    <Input placeholder="Amount in pesos" />
                   </Form.Item>
                 )}
 
+                {/* Percent Based */}
                 {amountType === 'percent' && (
-                  <>
-                    <Form.Item
-                      label="Percent (%)"
-                      name="percent"
-                      rules={[{ required: true }]}
-                    >
-                      <Input
-                        placeholder="Ex: 5"
-                        onChange={(e) => handlePercentChange(e.target.value)}
-                      />
-                    </Form.Item>
-
-                    <Form.Item label="Amount" name="amount">
-                      <Input placeholder="Auto calculated" disabled />
-                    </Form.Item>
-                  </>
+                  <Form.Item
+                    label="Percent (%)"
+                    name="amount"
+                    rules={[
+                      { required: true },
+                      { type: 'number', min: 0, max: 100, transform: Number },
+                    ]}
+                  >
+                    <Input addonAfter="%" placeholder="Ex: 5" />
+                  </Form.Item>
                 )}
               </Form>
             </Modal>
 
-            {/* ================= Payroll Rules Table & Modal ================= */}
+            {/* ================= Payroll Rules ================= */}
             {activeTab === 'payroll' && (
               <div className="table-wrapper">
                 <table className="config-table">

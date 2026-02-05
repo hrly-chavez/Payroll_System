@@ -185,10 +185,12 @@ const SystemConfiguration: React.FC = () => {
       category: rule.category,
       rate_type: rule.rate_type,
       rate_value: rule.rate_value,
-      applies_to: rule.applies_to,
-      employee: rule.employee,
-      effective_from: dayjs(rule.effective_from),
-      effective_to: rule.effective_to ? dayjs(rule.effective_to) : null,
+      applies_to: rule.applies_to || '',
+      employee: rule.employee || '',
+      effective_dates: [
+        rule.effective_from ? dayjs(rule.effective_from) : null,
+        rule.effective_to ? dayjs(rule.effective_to) : null,
+      ],
       is_active: rule.is_active,
     });
     setPayrollModalOpen(true);
@@ -197,6 +199,7 @@ const SystemConfiguration: React.FC = () => {
   const handleSavePayRule = async () => {
     try {
       const values = await payrollForm.validateFields();
+      const [effective_from, effective_to] = values.effective_dates || [];
       const payload = {
         name: values.name,
         event_type: values.event_type,
@@ -205,8 +208,8 @@ const SystemConfiguration: React.FC = () => {
         rate_value: parseFloat(values.rate_value),
         applies_to: values.applies_to || null,
         employee: values.employee || null,
-        effective_from: values.effective_from.format('YYYY-MM-DD'),
-        effective_to: values.effective_to ? values.effective_to.format('YYYY-MM-DD') : null,
+        effective_from: effective_from ? effective_from.format('YYYY-MM-DD') : null,
+        effective_to: effective_to ? effective_to.format('YYYY-MM-DD') : null,
         is_active: values.is_active,
       };
 
@@ -307,6 +310,46 @@ const SystemConfiguration: React.FC = () => {
               </div>
             )}
 
+            {/* ================= Payroll Rules Table ================= */}
+            {activeTab === 'payroll' && (
+              <div className="table-wrapper">
+                {loading ? (
+                  <Spin />
+                ) : (
+                  <table className="config-table">
+                    <thead>
+                      <tr>
+                        <th>Rule Name</th>
+                        <th>Event Type</th>
+                        <th>Category</th>
+                        <th>Rate Type</th>
+                        <th>Rate Value</th>
+                        <th>Scope</th>
+                        <th>Effective From</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {payRules.map((rule) => (
+                        <tr key={rule.id}>
+                          <td>{rule.name}</td>
+                          <td>{rule.event_type}</td>
+                          <td>{rule.category}</td>
+                          <td>{rule.rate_type}</td>
+                          <td>₱{rule.rate_value}</td>
+                          <td>{rule.applies_to_name || 'All'}</td>
+                          <td>{rule.effective_from}</td>
+                          <td className="actions">
+                            <EditOutlined onClick={() => handleEditPayRule(rule)} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+
             {/* ================= Contribution Modal ================= */}
             <Modal
               title={isEditMode ? 'Edit Contribution' : 'Add Contribution'}
@@ -349,138 +392,94 @@ const SystemConfiguration: React.FC = () => {
               </Form>
             </Modal>
 
-            {/* ================= Payroll Rules Table ================= */}
-            {activeTab === 'payroll' && (
-              <div className="table-wrapper">
-                {loading ? (
-                  <Spin />
-                ) : (
-                  <table className="config-table">
-                    <thead>
-                      <tr>
-                        <th>Rule Name</th>
-                        <th>Event Type</th>
-                        <th>Category</th>
-                        <th>Rate Type</th>
-                        <th>Rate Value</th>
-                        <th>Scope</th>
-                        <th>Effective From</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {payRules.map((rule) => (
-                        <tr key={rule.id}>
-                          <td>{rule.name}</td>
-                          <td>{rule.event_type}</td>
-                          <td>{rule.category}</td>
-                          <td>{rule.rate_type}</td>
-                          <td>₱{rule.rate_value}</td>
-                          <td>{rule.applies_to_name || 'All'}</td>
-                          <td>{rule.effective_from}</td>
-                          <td className="actions">
-                            <EditOutlined onClick={() => handleEditPayRule(rule)} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
-
             {/* ================= Payroll Rule Modal ================= */}
-            <Modal
-              title={payRuleEditMode ? 'Edit Payroll Rule' : 'Add Payroll Rule'}
-              open={payrollModalOpen}
-              onCancel={closePayrollModal}
-              onOk={handleSavePayRule}
-              okText="Save"
-              centered
-            >
-              <Form form={payrollForm} layout="vertical">
-                <Form.Item label="Rule Name" name="name" rules={[{ required: true }]}>
-                  <Input />
-                </Form.Item>
+            {activeTab === 'payroll' && (
+              <Modal
+                title={payRuleEditMode ? 'Edit Payroll Rule' : 'Add Payroll Rule'}
+                open={payrollModalOpen}
+                onCancel={closePayrollModal}
+                onOk={handleSavePayRule}
+                okText="Save"
+                centered
+              >
+                <Form form={payrollForm} layout="vertical">
+                  <Form.Item label="Rule Name" name="name" rules={[{ required: true }]}>
+                    <Input />
+                  </Form.Item>
 
-                <Form.Item label="Event Type" name="event_type" rules={[{ required: true }]}>
-                  <Select>
-                    <Option value="Night Differential">Night Differential</Option>
-                    <Option value="Late">Late</Option>
-                    <Option value="Undertime">Undertime</Option>
-                    <Option value="Overtime">Overtime</Option>
-                    <Option value="Regular Holiday">Regular Holiday</Option>
-                    <Option value="Special Holiday">Special Holiday</Option>
-                    <Option value="Special Non Working Holiday">Special Non Working Holiday</Option>
-                    <Option value="Company Holiday">Company Holiday</Option>
-                  </Select>
-                </Form.Item>
+                  <Form.Item label="Event Type" name="event_type" rules={[{ required: true }]}>
+                    <Select>
+                      <Option value="Night Differential">Night Differential</Option>
+                      <Option value="Late">Late</Option>
+                      <Option value="Undertime">Undertime</Option>
+                      <Option value="Overtime">Overtime</Option>
+                      <Option value="Regular Holiday">Regular Holiday</Option>
+                      <Option value="Special Holiday">Special Holiday</Option>
+                      <Option value="Special Non Working Holiday">Special Non Working Holiday</Option>
+                      <Option value="Company Holiday">Company Holiday</Option>
+                    </Select>
+                  </Form.Item>
 
-                <Form.Item label="Category" name="category" rules={[{ required: true }]}>
-                  <Select>
-                    <Option value="Earning">Earning</Option>
-                    <Option value="Deduction">Deduction</Option>
-                  </Select>
-                </Form.Item>
+                  <Form.Item label="Category" name="category" rules={[{ required: true }]}>
+                    <Select>
+                      <Option value="Earning">Earning</Option>
+                      <Option value="Deduction">Deduction</Option>
+                    </Select>
+                  </Form.Item>
 
-                <Form.Item label="Rate Type" name="rate_type" rules={[{ required: true }]}>
-                  <Select>
-                    <Option value="PER_MINUTE">Per Minute</Option>
-                    <Option value="MULTIPLIER">Multiplier</Option>
-                    <Option value="FIXED">Fixed</Option>
-                    <Option value="PER_DAY">Per Day</Option>
-                  </Select>
-                </Form.Item>
+                  <Form.Item label="Rate Type" name="rate_type" rules={[{ required: true }]}>
+                    <Select>
+                      <Option value="PER_MINUTE">Per Minute</Option>
+                      <Option value="MULTIPLIER">Multiplier</Option>
+                      <Option value="FIXED">Fixed</Option>
+                      <Option value="PER_DAY">Per Day</Option>
+                    </Select>
+                  </Form.Item>
 
-                <Form.Item label="Rate Value" name="rate_value" rules={[{ required: true }]}>
-                  <Input type="number" step="0.01" />
-                </Form.Item>
+                  <Form.Item label="Rate Value" name="rate_value" rules={[{ required: true }]}>
+                    <Input type="number" step="0.01" />
+                  </Form.Item>
 
-                <Form.Item label="Applies To (Department)" name="applies_to">
-                  <Select allowClear placeholder="Select Department">
-                    <Option value={null}>All Departments</Option>
-                    {departments.map((dept) => (
-                      <Option key={dept.id} value={dept.id}>
-                        {dept.name}
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
+                  <Form.Item label="Applies To (Department)" name="applies_to">
+                    <Select allowClear placeholder="Select Department">
+                      <Option value="">All Departments</Option>
+                      {departments.map((dept) => (
+                        <Option key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
 
-                <Form.Item label="Employee" name="employee">
-                  <Select allowClear placeholder="Select Employee">
-                    <Option value={null}>All Employees</Option>
-                    {employees.map((emp) => (
-                      <Option key={emp.id} value={emp.id}>
-                        {emp.name} ({emp.department_name})
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
+                  <Form.Item label="Employee" name="employee">
+                    <Select allowClear placeholder="Select Employee">
+                      <Option value="">All Employees</Option>
+                      {employees.map((emp) => (
+                        <Option key={emp.id} value={emp.id}>
+                          {emp.name} ({emp.department_name})
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
 
-                <Form.Item label="Effective From / To">
-                  <RangePicker
-                    format="YYYY-MM-DD"
-                    value={
-                      payrollForm.getFieldValue('effective_from') &&
-                      payrollForm.getFieldValue('effective_to')
-                        ? [payrollForm.getFieldValue('effective_from'), payrollForm.getFieldValue('effective_to')]
-                        : undefined
-                    }
-                    onChange={(dates) =>
-                      payrollForm.setFieldsValue({
-                        effective_from: dates ? dates[0] : null,
-                        effective_to: dates ? dates[1] : null,
-                      })
-                    }
-                  />
-                </Form.Item>
+                  <Form.Item label="Effective From / To" name="effective_dates">
+                    <RangePicker
+                      format="YYYY-MM-DD"
+                      value={payrollForm.getFieldValue('effective_dates')}
+                      onChange={(dates) =>
+                        payrollForm.setFieldsValue({
+                          effective_dates: dates,
+                        })
+                      }
+                    />
+                  </Form.Item>
 
-                <Form.Item name="is_active" valuePropName="checked">
-                  <Checkbox>Is Active</Checkbox>
-                </Form.Item>
-              </Form>
-            </Modal>
+                  <Form.Item name="is_active" valuePropName="checked">
+                    <Checkbox>Is Active</Checkbox>
+                  </Form.Item>
+                </Form>
+              </Modal>
+            )}
           </div>
         </Content>
       </Layout>

@@ -27,22 +27,24 @@ const SystemConfiguration: React.FC = () => {
 
   // Modal & Form
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+
   const [form] = Form.useForm();
   const [amountType, setAmountType] = useState<'manual' | 'percent'>('manual');
 
   // Fetch contributions
-    const fetchContributions = async () => {
-      setLoading(true);
-      try {
-        const res = await API.get('/payroll/superadmin/deductions/');
-        setContributions([...res.data].reverse()); // LATEST FIRST
-      } catch (error) {
-        console.error(error);
-        message.error('Failed to fetch contributions.');
-      }
-      setLoading(false);
-    };
-
+  const fetchContributions = async () => {
+    setLoading(true);
+    try {
+      const res = await API.get('/payroll/superadmin/deductions/');
+      setContributions([...res.data].reverse());
+    } catch (error) {
+      console.error(error);
+      message.error('Failed to fetch contributions.');
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
     if (activeTab === 'contribution') {
@@ -51,15 +53,42 @@ const SystemConfiguration: React.FC = () => {
   }, [activeTab]);
 
   // Modal handlers
-  const openModal = () => setIsModalOpen(true);
+  const openModal = () => {
+    setIsEditMode(false);
+    form.resetFields();
+    setAmountType('manual');
+    setIsModalOpen(true);
+  };
 
   const closeModal = () => {
     form.resetFields();
     setAmountType('manual');
+    setIsEditMode(false);
+    setEditingId(null);
     setIsModalOpen(false);
   };
 
-  // Save contribution
+  // Edit handler
+  const handleEdit = (record: any) => {
+    const type =
+      record.calculation_type === 'Percent' ? 'percent' : 'manual';
+
+    setIsEditMode(true);
+    setEditingId(record.id);
+    setAmountType(type);
+
+    form.setFieldsValue({
+      name: record.code,
+      salaryFrom: record.salary_range_from,
+      salaryTo: record.salary_range_to,
+      amountType: type,
+      amount: record.amount,
+    });
+
+    setIsModalOpen(true);
+  };
+
+  // Save (Add / Edit)
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
@@ -70,20 +99,39 @@ const SystemConfiguration: React.FC = () => {
         salary_range_to: parseFloat(values.salaryTo),
         calculation_type:
           values.amountType === 'manual' ? 'Fixed' : 'Percent',
-        amount: parseFloat(values.amount), // FIXED OR PERCENT VALUE
+        amount: parseFloat(values.amount),
         is_active: true,
       };
 
-      const res = await API.post('/payroll/superadmin/deductions/', payload);
+      if (isEditMode && editingId) {
+        // UPDATE
+        await API.put(
+          `/payroll/superadmin/deductions/${editingId}/`,
+          payload
+        );
 
-      setContributions((prev) => [res.data, ...prev]); // NEW ITEM ON TOP
+        setContributions((prev) =>
+          prev.map((item) =>
+            item.id === editingId ? { ...item, ...payload } : item
+          )
+        );
 
-      message.success('Contribution added successfully');
+        message.success('Contribution updated successfully');
+      } else {
+        // CREATE
+        const res = await API.post(
+          '/payroll/superadmin/deductions/',
+          payload
+        );
+
+        setContributions((prev) => [res.data, ...prev]);
+        message.success('Contribution added successfully');
+      }
+
       closeModal();
-
     } catch (error) {
       console.error(error);
-      message.error('Failed to add contribution.');
+      message.error('Failed to save contribution.');
     }
   };
 
@@ -139,7 +187,7 @@ const SystemConfiguration: React.FC = () => {
                         <th>Salary To</th>
                         <th>Type</th>
                         <th>Amount</th>
-                        <th>Actions</th>
+                        <th style={{ textAlign: 'center' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -154,11 +202,12 @@ const SystemConfiguration: React.FC = () => {
                               ? `${Number(c.amount)}%`
                               : `₱${Number(c.amount).toFixed(2)}`}
                           </td>
-
                           <td className="actions">
-                            <EyeOutlined />
-                            <EditOutlined />
+                            <span className="action-icon">
+                              <EditOutlined onClick={() => handleEdit(c)} />
+                            </span>
                           </td>
+
                         </tr>
                       ))}
                     </tbody>
@@ -169,7 +218,7 @@ const SystemConfiguration: React.FC = () => {
 
             {/* ================= Contribution Modal ================= */}
             <Modal
-              title="Add Contribution"
+              title={isEditMode ? 'Edit Contribution' : 'Add Contribution'}
               open={isModalOpen}
               onCancel={closeModal}
               onOk={handleSave}
@@ -181,7 +230,7 @@ const SystemConfiguration: React.FC = () => {
                   name="name"
                   rules={[{ required: true }]}
                 >
-                  <Input placeholder="SSS, PhilHealth, Pag-IBIG" />
+                  <Input disabled={isEditMode} />
                 </Form.Item>
 
                 <Form.Item
@@ -189,7 +238,7 @@ const SystemConfiguration: React.FC = () => {
                   name="salaryFrom"
                   rules={[{ required: true }]}
                 >
-                  <Input placeholder="5000" />
+                  <Input />
                 </Form.Item>
 
                 <Form.Item
@@ -197,7 +246,7 @@ const SystemConfiguration: React.FC = () => {
                   name="salaryTo"
                   rules={[{ required: true }]}
                 >
-                  <Input placeholder="35000" />
+                  <Input />
                 </Form.Item>
 
                 <Form.Item
@@ -211,18 +260,16 @@ const SystemConfiguration: React.FC = () => {
                   </Select>
                 </Form.Item>
 
-                {/* Fixed Amount */}
                 {amountType === 'manual' && (
                   <Form.Item
                     label="Amount (₱)"
                     name="amount"
                     rules={[{ required: true }]}
                   >
-                    <Input placeholder="Amount in pesos" />
+                    <Input />
                   </Form.Item>
                 )}
 
-                {/* Percent Based */}
                 {amountType === 'percent' && (
                   <Form.Item
                     label="Percent (%)"
@@ -232,7 +279,7 @@ const SystemConfiguration: React.FC = () => {
                       { type: 'number', min: 0, max: 100, transform: Number },
                     ]}
                   >
-                    <Input addonAfter="%" placeholder="Ex: 5" />
+                    <Input addonAfter="%" />
                   </Form.Item>
                 )}
               </Form>
@@ -264,7 +311,6 @@ const SystemConfiguration: React.FC = () => {
                       <td>All</td>
                       <td>March 1, 2026</td>
                       <td className="actions">
-                        <EyeOutlined />
                         <EditOutlined />
                       </td>
                     </tr>

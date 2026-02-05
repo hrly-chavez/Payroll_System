@@ -71,6 +71,8 @@ const Dashboard: React.FC = () => {
   const [isDeclineModalOpen, setIsDeclineModalOpen] = useState(false);
   const [declineReason, setDeclineReason] = useState('');
 
+  const [isPayrollModalOpen, setIsPayrollModalOpen] = useState(false);
+
   /* ------------------ Fetch Holiday Requests ------------------ */
   const fetchHolidayRequests = async () => {
     setHolidayLoading(true);
@@ -248,6 +250,24 @@ const Dashboard: React.FC = () => {
     },
   ];
 
+  /* ------------------ Payroll Table ------------------ */
+  const payrollColumns = [
+    { title: 'Employee', dataIndex: 'employee_name', key: 'employee_name' },
+    {
+      title: 'Period',
+      dataIndex: 'period',
+      key: 'period',
+      render: (period: string) => dayjs(period).format('MMM DD, YYYY'),
+    },
+    {
+      title: 'Total Amount',
+      dataIndex: 'total_amount',
+      key: 'total_amount',
+      render: (amount: number) => `₱${amount.toLocaleString()}`,
+    },
+    { title: 'Status', dataIndex: 'status', key: 'status' },
+  ];
+
   return (
     <Layout className="dashboard-layout">
       <Sidebar />
@@ -309,7 +329,7 @@ const Dashboard: React.FC = () => {
                 <Col span={12}>
                   <div
                     className="stat-card clickable"
-                    onClick={() => navigate('/super-admin/requests')}
+                    onClick={() => setIsPayrollModalOpen(true)}
                   >
                     <div className="stat-label">Pending Payroll</div>
                     <div className="stat-value danger">
@@ -416,6 +436,30 @@ const Dashboard: React.FC = () => {
               value={declineReason}
               onChange={e => setDeclineReason(e.target.value)}
               style={{ width: '100%', minHeight: 100 }}
+            />
+          </Modal>
+
+          {/* ---------------- Pending Payroll Modal ---------------- */}
+          <Modal
+            title="Pending Payroll(s)"
+            open={isPayrollModalOpen}
+            onCancel={() => setIsPayrollModalOpen(false)}
+            footer={[
+              <Button key="see-all" type="link" onClick={() => navigate('/super-admin/requests')}>
+                See All
+              </Button>,
+              <Button key="close" onClick={() => setIsPayrollModalOpen(false)}>
+                Close
+              </Button>,
+            ]}
+            width={800}
+          >
+            <Table
+              columns={payrollColumns}
+              dataSource={pendingPayrolls}
+              loading={payrollLoading}
+              pagination={false}
+              rowKey="id"
             />
           </Modal>
         </Content>

@@ -36,3 +36,14 @@ class PayrollPeriodCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"detail": "This payroll period overlaps with an existing payroll period."})
 
         return attrs
+
+#for clicking the payroll period (shows modal)
+class EligibleEmployeeSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+    department_name = serializers.CharField(source="department.name", read_only=True)
+    class Meta:
+        model = Employee
+        fields = '__all__'
+
+    def get_full_name(self, obj):
+        return f"{obj.fname} {obj.lname}".strip()

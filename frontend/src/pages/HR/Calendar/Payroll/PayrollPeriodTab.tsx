@@ -1,9 +1,11 @@
+// src/pages/HR/Calendar/Payroll/PayrollPeriodTab.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Table, message } from "antd";
+import PayrollPeriodEmployeesModal from "./PayrollPeriodEmployeesModal";
 import dayjs from "dayjs";
-import api from "../../../api/axios";
+import api from "../../../../api/axios";
 
 export type PayrollPeriod = {
   id: number;
@@ -17,10 +19,10 @@ export type PayrollPeriod = {
 };
 
 type Props = {
-  active: boolean;          // parent tells if this tab is currently selected
-  searchText: string;       // value from Input.Search
-  onLoaded?: (count: number) => void; // optional callback
-  refreshKey?: number;      // parent can bump this to force reload
+  active: boolean;
+  searchText: string;
+  onLoaded?: (count: number) => void;
+  refreshKey?: number;
 };
 
 export default function PayrollPeriodTab({
@@ -31,6 +33,9 @@ export default function PayrollPeriodTab({
 }: Props) {
   const [payrollPeriods, setPayrollPeriods] = useState<PayrollPeriod[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const [openEmployeesModal, setOpenEmployeesModal] = useState(false);
+  const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null);
 
   const loadPayrollPeriods = async () => {
     setLoading(true);
@@ -45,7 +50,7 @@ export default function PayrollPeriodTab({
     }
   };
 
-  // load when tab becomes active, and also when parent requests refresh
+  // Load when tab becomes active or refreshKey changes
   useEffect(() => {
     if (active) {
       loadPayrollPeriods();
@@ -54,7 +59,6 @@ export default function PayrollPeriodTab({
   }, [active, refreshKey]);
 
   const payrollColumns = [
-    { title: "Code", dataIndex: "code" },
     {
       title: "Start Date",
       dataIndex: "start_date",
@@ -70,31 +74,54 @@ export default function PayrollPeriodTab({
       dataIndex: "pay_date",
       render: (d: string) => (d ? dayjs(d).format("MM/DD/YYYY") : "-"),
     },
-    { title: "Status", dataIndex: "status" },
+    {
+      title: "Status",
+      dataIndex: "status",
+    },
   ];
 
   const filtered = useMemo(() => {
     const q = (searchText || "").trim().toLowerCase();
     if (!q) return payrollPeriods;
 
-    return payrollPeriods.filter((p) => {
-      return (
-        p.code?.toLowerCase().includes(q) ||
-        p.status?.toLowerCase().includes(q) ||
-        p.start_date?.toLowerCase().includes(q) ||
-        p.end_date?.toLowerCase().includes(q) ||
-        (p.pay_date || "").toLowerCase().includes(q)
-      );
-    });
+    return payrollPeriods.filter((p) =>
+      [
+        p.code,
+        p.status,
+        p.start_date,
+        p.end_date,
+        p.pay_date,
+      ]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q))
+    );
   }, [payrollPeriods, searchText]);
 
   return (
-    <Table
-      columns={payrollColumns}
-      dataSource={filtered}
-      rowKey="id"
-      pagination={false}
-      loading={loading}
-    />
+    <>
+      <Table
+        columns={payrollColumns}
+        dataSource={filtered}
+        rowKey="id"
+        pagination={false}
+        loading={loading}
+        onRow={(record) => ({
+          onClick: () => {
+            setSelectedPeriodId(record.id);
+            setOpenEmployeesModal(true);
+          },
+        })}
+        rowClassName={() => "clickable-row"}
+      />
+
+      <PayrollPeriodEmployeesModal
+        open={openEmployeesModal}
+        periodId={selectedPeriodId}
+        onClose={() => {
+          setOpenEmployeesModal(false);
+          setSelectedPeriodId(null);
+        }}
+      />
+    </>
   );
 }

@@ -5,6 +5,7 @@ from shared_model.models import *
 from .serializers import *
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
+from django.shortcuts import get_object_or_404
 
 
 
@@ -36,7 +37,7 @@ class DeductionUpdateStatusView(APIView):
 
 
 #==========================================PAYROLL PERIOD========================================
-
+#Making Payroll Period
 class PayrollPeriodListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = PayrollPeriodCreateSerializer
@@ -53,3 +54,27 @@ class PayrollPeriodListCreateView(generics.ListCreateAPIView):
             code=code,
             status="Open",
         )
+
+#for clicking the payroll period (shows modal)
+class PayrollPeriodEligibleEmployeesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, period_id):
+        period = get_object_or_404(Payroll_Period, id=period_id)
+
+        employees = Employee.objects.filter(is_active=True).exclude(
+            payrolls__payroll_period=period
+        ).order_by("lname", "fname")
+
+        data = EligibleEmployeeSerializer(employees, many=True).data
+        return Response({
+            "period": {
+                "id": period.id,
+                "code": period.code,
+                "start_date": period.start_date,
+                "end_date": period.end_date,
+                "pay_date": period.pay_date,
+                "status": period.status,
+            },
+            "eligible_employees": data
+        })

@@ -2,14 +2,14 @@
 //frontend/src/pages/HR/Calendar/Calendar.tsx
 import React, { useState, useEffect } from "react";
 import { Layout, Button, Table, Input, message, Card } from "antd";
-import PayrollPeriodTab from "./PayrollPeriodTab";
+import PayrollPeriodTab from "./Payroll/PayrollPeriodTab";
 import HolidayTab from "./HolidayTab";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 import dayjs from "dayjs";
 import styles from "./calendar.module.css";
 import AddHolidayModal from "./AddHolidayModal";
-import AddPayrollPeriodModal from "./AddPayrollPeriodModal";
+import AddPayrollPeriodModal from "./Payroll/AddPayrollPeriodModal";
 import api from "../../../api/axios";
 
 const { Content } = Layout;

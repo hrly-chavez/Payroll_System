@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Modal, Form, DatePicker, ColorPicker, Button, message } from "antd";
-import api from "../../../api/axios";
+import api from "../../../../api/axios";
 
 const { RangePicker } = DatePicker;
 

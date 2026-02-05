@@ -13,10 +13,10 @@ const { Option } = Select;
 interface RequestItem {
   id: number;
   type: 'Holiday' | 'Leave' | 'Payroll';
-  name: string;           
-  date: string;       
+  name: string;
+  date: string;
   status: string;
-  base?: string;          
+  base?: string;
   is_active: boolean;
   created_at: string;
 }
@@ -24,7 +24,8 @@ interface RequestItem {
 const Request: React.FC = () => {
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState<'All' | 'Holiday' | 'Leave' | 'Payroll'>('All');
+  const [filterType, setFilterType] = useState<'All' | 'Holiday' | 'Leave' | 'Payroll'>('All');
+  const [filterStatus, setFilterStatus] = useState<'All' | 'Pending' | 'Approved' | 'Declined'>('All');
 
   useEffect(() => {
     fetchRequests();
@@ -33,21 +34,14 @@ const Request: React.FC = () => {
   const fetchRequests = async () => {
     setLoading(true);
     try {
-      const holidaysRes = await api.get("/approvals/holidays/")
-
+      const holidaysRes = await api.get("/approvals/holidays/");
       const holidays = holidaysRes.data;
 
       const allRequests: RequestItem[] = [
         ...holidays.map((h: any) => ({ ...h, type: "Holiday" })),
       ];
 
-      allRequests.sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() -
-          new Date(a.created_at).getTime()
-      );
-
-      setRequests(allRequests);
+      setRequests(sortRequests(allRequests));
     } catch (error) {
       console.error(error);
       message.error("Failed to fetch requests");
@@ -56,26 +50,32 @@ const Request: React.FC = () => {
     }
   };
 
+  const sortRequests = (data: RequestItem[]) => {
+    const normalizeStatus = (status: string) => status.toLowerCase();
 
-  const handleStatusChange = async (
-    key: string,
-    requestId: number,
-    requestType: string
-  ) => {
+    const statusPriority = (status: string) => {
+      const s = normalizeStatus(status);
+      if (s === 'pending') return 1;
+      if (s === 'approved') return 2;
+      if (s === 'declined') return 3;
+      return 4;
+    };
+
+    return [...data].sort((a, b) => {
+      const statusDiff = statusPriority(a.status) - statusPriority(b.status);
+      if (statusDiff !== 0) return statusDiff;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  };
+
+  const handleStatusChange = async (key: string, requestId: number, requestType: string) => {
     try {
-      await api.post(
-        `/approvals/superadmin/holidays/${requestId}/status/`,
-        { status: key }
-      );
-
+      await api.post(`/approvals/superadmin/holidays/${requestId}/status/`, { status: key });
       setRequests((prev) =>
-        prev.map((r) =>
-          r.id === requestId && r.type === requestType
-            ? { ...r, status: key }
-            : r
+        sortRequests(
+          prev.map((r) => r.id === requestId && r.type === requestType ? { ...r, status: key } : r)
         )
       );
-
       message.success(`${requestType} request ${key}`);
     } catch (error) {
       console.error(error);
@@ -83,21 +83,24 @@ const Request: React.FC = () => {
     }
   };
 
-
-  const filteredRequests = filter === 'All' ? requests : requests.filter(r => r.type === filter);
+  const filteredRequests = requests.filter(r => {
+    const typeMatch = filterType === 'All' || r.type === filterType;
+    const statusMatch = filterStatus === 'All' || r.status === filterStatus;
+    return typeMatch && statusMatch;
+  });
 
   const columns = [
     {
       title: 'Request Type',
       dataIndex: 'type',
       key: 'type',
-      render: (type: string) => <Tag color={type === 'Holiday' ? 'blue' : type === 'Leave' ? 'orange' : 'purple'}>{type}</Tag>,
+      render: (type: string) => (
+        <Tag color={type === 'Holiday' ? 'blue' : type === 'Leave' ? 'orange' : 'purple'}>
+          {type}
+        </Tag>
+      ),
     },
-    {
-      title: 'Name',
-      dataIndex: 'name',
-      key: 'name',
-    },
+    { title: 'Name', dataIndex: 'name', key: 'name' },
     {
       title: 'Date',
       dataIndex: 'date',
@@ -130,7 +133,10 @@ const Request: React.FC = () => {
 
         return (
           <Dropdown
-            menu={{ items: menuItems, onClick: ({ key }) => handleStatusChange(key, record.id, record.type) }}
+            menu={{
+              items: menuItems,
+              onClick: ({ key }) => handleStatusChange(key, record.id, record.type),
+            }}
           >
             <Button>
               {record.status} <DownOutlined />
@@ -150,13 +156,20 @@ const Request: React.FC = () => {
           <Card className="request-card">
             <h2>All Requests</h2>
 
-            {/* Filter dropdown */}
-            <div style={{ marginBottom: 16 }}>
-              <Select value={filter} onChange={(value) => setFilter(value)} style={{ width: 200 }}>
-                <Option value="All">All</Option>
+            {/* Filters */}
+            <div style={{ marginBottom: 16, display: 'flex', gap: '16px' }}>
+              <Select value={filterType} onChange={value => setFilterType(value)} style={{ width: 200 }}>
+                <Option value="All">All Types</Option>
                 <Option value="Holiday">Holiday</Option>
                 <Option value="Leave">Leave</Option>
                 <Option value="Payroll">Payroll</Option>
+              </Select>
+
+              <Select value={filterStatus} onChange={value => setFilterStatus(value)} style={{ width: 200 }}>
+                <Option value="All">All Statuses</Option>
+                <Option value="Pending">Pending</Option>
+                <Option value="Approved">Approved</Option>
+                <Option value="Declined">Declined</Option>
               </Select>
             </div>
 

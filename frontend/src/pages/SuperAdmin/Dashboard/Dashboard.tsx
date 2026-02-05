@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Layout, Row, Col, Calendar, Modal, Table, Button, Spin } from 'antd';
+import { Layout, Row, Col, Calendar, Modal, Table, Button, Spin, message } from 'antd';
 import Chart from '../../../components/Chart';
 import Sidebar from '../../../components/Sidebar/Sidebar';
 import Topbar from '../../../components/Topbar/Topbar';
@@ -7,6 +7,7 @@ import Greeting from '../../../components/Greeting/Greeting';
 import * as echarts from 'echarts';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
+import api from '../../../api/axios'; // <-- import your axios instance
 import './Dashboard.css';
 
 const { Content } = Layout;
@@ -28,22 +29,42 @@ interface Payroll {
   status: string;
 }
 
+interface AttendanceRecord {
+  id: number;
+  employee: number;
+  date: string;
+  status: 'PRESENT' | 'ABSENT' | 'LATE' | 'OVERTIME' | 'UNDERTIME';
+}
+
+// ✅ Define attendance status type
+type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'OVERTIME' | 'UNDERTIME';
+
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
 
-  // Chart state
-  const [chartOption, setChartOption] = useState<echarts.ComposeOption<echarts.BarSeriesOption>>();
+  /* ------------------ Chart state ------------------ */
+  const [chartOption, setChartOption] =
+    useState<echarts.ComposeOption<echarts.BarSeriesOption>>();
   const [chartHeight, setChartHeight] = useState<number>(360);
 
-  // Holiday state
+  /* ------------------ Holiday state ------------------ */
   const [holidayData, setHolidayData] = useState<HolidayRequest[]>([]);
   const [holidayLoading, setHolidayLoading] = useState(false);
 
-  // Payroll state
+  /* ------------------ Payroll state ------------------ */
   const [pendingPayrolls, setPendingPayrolls] = useState<Payroll[]>([]);
   const [payrollLoading, setPayrollLoading] = useState(false);
 
-  // Modal state
+  /* ------------------ Attendance state ------------------ */
+  const [attendanceData, setAttendanceData] = useState<Record<AttendanceStatus, number>>({
+    PRESENT: 0,
+    ABSENT: 0,
+    LATE: 0,
+    OVERTIME: 0,
+    UNDERTIME: 0,
+  });
+
+  /* ------------------ Modal state ------------------ */
   const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
   const [isHolidayDetailModalOpen, setIsHolidayDetailModalOpen] = useState(false);
   const [selectedHoliday, setSelectedHoliday] = useState<HolidayRequest | null>(null);
@@ -54,16 +75,10 @@ const Dashboard: React.FC = () => {
   const fetchHolidayRequests = async () => {
     setHolidayLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/approvals/superadmin/holidays/', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        }
-      });
-      if (!res.ok) throw new Error('Failed to fetch holidays');
-      const holidays: HolidayRequest[] = await res.json();
-      setHolidayData(holidays);
+      const res = await api.get<HolidayRequest[]>('/approvals/superadmin/holidays/');
+      setHolidayData(res.data);
     } catch (error) {
-      console.error(error);
+      console.error('Failed to fetch holidays', error);
     } finally {
       setHolidayLoading(false);
     }
@@ -73,28 +88,47 @@ const Dashboard: React.FC = () => {
   const fetchPendingPayrolls = async () => {
     setPayrollLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/superadmin/pending-payrolls/', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        }
-      });
-      if (!res.ok) throw new Error('Failed to fetch pending payrolls');
-      const data: Payroll[] = await res.json();
-      setPendingPayrolls(data);
+      const res = await api.get<Payroll[]>('/superadmin/pending-payrolls/');
+      setPendingPayrolls(res.data);
     } catch (error) {
-      console.error(error);
+      console.error('Failed to fetch pending payrolls', error);
     } finally {
       setPayrollLoading(false);
+    }
+  };
+
+  /* ------------------ Fetch Attendance Records ------------------ */
+  const fetchAttendanceRecords = async () => {
+    try {
+      const res = await api.get<AttendanceRecord[]>('/employee/attendance/');
+
+      const counts: Record<AttendanceStatus, number> = {
+        PRESENT: 0,
+        ABSENT: 0,
+        LATE: 0,
+        OVERTIME: 0,
+        UNDERTIME: 0,
+      };
+
+      res.data.forEach(item => {
+        if (item.status in counts) {
+          counts[item.status as AttendanceStatus]++;
+        }
+      });
+
+      setAttendanceData(counts);
+    } catch (error) {
+      console.error('Failed to fetch attendance data', error);
     }
   };
 
   useEffect(() => {
     fetchHolidayRequests();
     fetchPendingPayrolls();
+    fetchAttendanceRecords();
   }, []);
 
   /* ------------------ Chart ------------------ */
-  const baseData = [60, 12, 5, 8, 15];
   const computeSettings = (width: number) => {
     if (width >= 1400) return { barWidth: 72, height: 400 };
     if (width >= 1200) return { barWidth: 56, height: 360 };
@@ -102,43 +136,90 @@ const Dashboard: React.FC = () => {
     if (width >= 768) return { barWidth: 36, height: 280 };
     return { barWidth: '40%', height: 220 };
   };
+
   const updateChart = (width: number) => {
     const s = computeSettings(width);
     setChartHeight(s.height);
+
     setChartOption({
-      xAxis: { type: 'category', data: ['PRESENT', 'ABSENT', 'LATE', 'OVERTIME', 'UNDERTIME'] },
+      xAxis: {
+        type: 'category',
+        data: ['PRESENT', 'ABSENT', 'LATE', 'OVERTIME', 'UNDERTIME'],
+      },
       yAxis: { type: 'value' },
-      series: [{ type: 'bar', data: baseData, barWidth: s.barWidth, itemStyle: { color: '#6c8ea3' } }],
+      series: [
+        {
+          type: 'bar',
+          data: [
+            attendanceData.PRESENT,
+            attendanceData.ABSENT,
+            attendanceData.LATE,
+            attendanceData.OVERTIME,
+            attendanceData.UNDERTIME,
+          ],
+          barWidth: s.barWidth,
+          itemStyle: { color: '#6c8ea3' },
+          label: {
+            show: true,
+            position: 'top',
+          },
+        },
+      ],
     });
   };
+
   useEffect(() => {
     updateChart(window.innerWidth);
-    window.addEventListener('resize', () => updateChart(window.innerWidth));
-  }, []);
+    const handleResize = () => updateChart(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [attendanceData]);
+
+  /* ------------------ SAME STATUS UPDATE AS Request.tsx ------------------ */
+  const updateHolidayStatus = async (status: 'Approved' | 'Declined') => {
+    if (!selectedHoliday) return;
+
+    try {
+      await api.post(
+        `/approvals/superadmin/holidays/${selectedHoliday.id}/status/`,
+        {
+          status,
+          reason: status === 'Declined' ? declineReason : null,
+        }
+      );
+
+      setHolidayData(prev =>
+        prev.map(h =>
+          h.id === selectedHoliday.id ? { ...h, status } : h
+        )
+      );
+
+      message.success(`Holiday request ${status}`);
+
+      setIsHolidayDetailModalOpen(false);
+      setIsDeclineModalOpen(false);
+      setDeclineReason('');
+      setSelectedHoliday(null);
+    } catch (error) {
+      console.error('Failed to update status', error);
+      message.error('Failed to update status');
+    }
+  };
+
+  const handleApprove = async () => updateHolidayStatus('Approved');
+  const handleDecline = async () => updateHolidayStatus('Declined');
 
   /* ------------------ Holiday Table ------------------ */
   const holidayColumns = [
-    {
-      title: 'Name',
-      dataIndex: 'name',
-      key: 'name',
-    },
+    { title: 'Name', dataIndex: 'name', key: 'name' },
     {
       title: 'Date',
       dataIndex: 'date',
       key: 'date',
       render: (date: string) => dayjs(date).format('MMM DD, YYYY'),
     },
-    {
-      title: 'Type',
-      dataIndex: 'type',
-      key: 'type',
-    },
-    {
-      title: 'Base',
-      dataIndex: 'base',
-      key: 'base',
-    },
+    { title: 'Type', dataIndex: 'type', key: 'type' },
+    { title: 'Base', dataIndex: 'base', key: 'base' },
     {
       title: 'Status',
       key: 'status',
@@ -167,57 +248,6 @@ const Dashboard: React.FC = () => {
     },
   ];
 
-  const handleRowClick = (record: HolidayRequest) => {
-    setSelectedHoliday(record);
-    setIsHolidayDetailModalOpen(true);
-  };
-
-  const handleApprove = async () => {
-    if (!selectedHoliday) return;
-    try {
-      const res = await fetch(
-        `http://localhost:8000/api/superadmin/holidays/${selectedHoliday.id}/status/`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('access_token')}`,
-          },
-          body: JSON.stringify({ status: 'Approved' }),
-        }
-      );
-      if (!res.ok) throw new Error('Failed to approve');
-      fetchHolidayRequests();
-      setIsHolidayDetailModalOpen(false);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const handleDecline = async () => {
-    if (!selectedHoliday) return;
-    try {
-      const res = await fetch(
-        `http://localhost:8000/api/superadmin/holidays/${selectedHoliday.id}/status/`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('access_token')}`,
-          },
-          body: JSON.stringify({ status: 'Declined' }),
-        }
-      );
-      if (!res.ok) throw new Error('Failed to decline');
-      fetchHolidayRequests();
-      setIsDeclineModalOpen(false);
-      setIsHolidayDetailModalOpen(false);
-      setDeclineReason('');
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
   return (
     <Layout className="dashboard-layout">
       <Sidebar />
@@ -228,9 +258,12 @@ const Dashboard: React.FC = () => {
           <Row gutter={[16, 16]}>
             <Col xs={24} lg={16}>
               <div className="card analytics-card">
-                {chartOption && <Chart option={chartOption} style={{ height: chartHeight }} />}
+                {chartOption && (
+                  <Chart option={chartOption} style={{ height: chartHeight }} />
+                )}
               </div>
             </Col>
+
             <Col xs={24} lg={8}>
               <div
                 style={{
@@ -240,32 +273,39 @@ const Dashboard: React.FC = () => {
                   marginBottom: 16,
                 }}
               >
-                <h3 style={{ textAlign: 'center', marginBottom: 12 }}>Calendar</h3>
+                <h3 style={{ textAlign: 'center', marginBottom: 12 }}>
+                  Calendar
+                </h3>
                 <Calendar fullscreen={false} />
               </div>
+
               <Row gutter={[16, 16]} className="stats-row">
                 <Col span={12}>
-              <div
-                className="stat-card clickable"
-                onClick={() => {
-                  const pendingHolidays = holidayData.filter((h) => h.status === 'Pending');
-                  if (pendingHolidays.length === 1) {
-                    // Directly open detail modal
-                    setSelectedHoliday(pendingHolidays[0]);
-                    setIsHolidayDetailModalOpen(true);
-                  } else {
-                    // Open table modal
-                    setIsHolidayModalOpen(true);
-                  }
-                }}
-              >
-                <div className="stat-label">Holiday Request(s)</div>
-                <div className="stat-value danger">
-                  {holidayLoading ? <Spin size="small" /> : holidayData.filter(h => h.status === 'Pending').length}
-                </div>
-              </div>
-
+                  <div
+                    className="stat-card clickable"
+                    onClick={() => {
+                      const pendingHolidays = holidayData.filter(
+                        h => h.status === 'Pending'
+                      );
+                      if (pendingHolidays.length === 1) {
+                        setSelectedHoliday(pendingHolidays[0]);
+                        setIsHolidayDetailModalOpen(true);
+                      } else {
+                        setIsHolidayModalOpen(true);
+                      }
+                    }}
+                  >
+                    <div className="stat-label">Holiday Request(s)</div>
+                    <div className="stat-value danger">
+                      {holidayLoading ? (
+                        <Spin size="small" />
+                      ) : (
+                        holidayData.filter(h => h.status === 'Pending').length
+                      )}
+                    </div>
+                  </div>
                 </Col>
+
                 <Col span={12}>
                   <div
                     className="stat-card clickable"
@@ -287,11 +327,7 @@ const Dashboard: React.FC = () => {
             open={isHolidayModalOpen}
             onCancel={() => setIsHolidayModalOpen(false)}
             footer={[
-              <Button
-                key="see-all"
-                type="link"
-                onClick={() => navigate('/super-admin/requests')}
-              >
+              <Button key="see-all" type="link" onClick={() => navigate('/super-admin/requests')}>
                 See All
               </Button>,
               <Button key="close" onClick={() => setIsHolidayModalOpen(false)}>
@@ -300,25 +336,24 @@ const Dashboard: React.FC = () => {
             ]}
             width={800}
           >
-          <Table
-            columns={holidayColumns}
-            dataSource={holidayData.filter(h => h.status === 'Pending')}
-            loading={holidayLoading}
-            pagination={false}
-            rowKey="id"
-            onRow={(record) => ({
-              onClick: () => {
-                setSelectedHoliday(record);
-                setIsHolidayDetailModalOpen(true);
-                setIsHolidayModalOpen(false); // close table modal
-              },
-              style: { cursor: 'pointer' },
-            })}
-          />
-
+            <Table
+              columns={holidayColumns}
+              dataSource={holidayData.filter(h => h.status === 'Pending')}
+              loading={holidayLoading}
+              pagination={false}
+              rowKey="id"
+              onRow={record => ({
+                onClick: () => {
+                  setSelectedHoliday(record);
+                  setIsHolidayDetailModalOpen(true);
+                  setIsHolidayModalOpen(false);
+                },
+                style: { cursor: 'pointer' },
+              })}
+            />
           </Modal>
 
-          {/* Holiday Detail Modal */}
+          {/* ---------------- Holiday Detail Modal ---------------- */}
           <Modal
             title="Holiday Detail"
             open={isHolidayDetailModalOpen}
@@ -332,7 +367,7 @@ const Dashboard: React.FC = () => {
               </Button>,
             ]}
             width={600}
-            getContainer={false} // important for modal inside another modal
+            getContainer={false}
           >
             {selectedHoliday ? (
               <div className="holiday-detail">
@@ -362,7 +397,6 @@ const Dashboard: React.FC = () => {
             )}
           </Modal>
 
-
           {/* ---------------- Decline Reason Modal ---------------- */}
           <Modal
             title="Reason for Declining"
@@ -380,7 +414,7 @@ const Dashboard: React.FC = () => {
             <textarea
               placeholder="Enter reason for declining"
               value={declineReason}
-              onChange={(e) => setDeclineReason(e.target.value)}
+              onChange={e => setDeclineReason(e.target.value)}
               style={{ width: '100%', minHeight: 100 }}
             />
           </Modal>

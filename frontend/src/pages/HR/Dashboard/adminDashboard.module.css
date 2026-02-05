@@ -8,17 +8,40 @@
 
 /* Equal height smaller cards */
 .compactCard {
-  height: 240px;
   border-radius: 10px;
   overflow: hidden;
 }
 
-/* Calendar shrink */
+/* CALENDAR COMPACT SIZE */
 .calendarWrapper {
-  transform: scale(0.88);
-  transform-origin: top left;
-  height: 200px;
+  padding-top: 4px;
 }
+
+/* overall calendar height */
+:global(.ant-picker-calendar) {
+  height: auto;
+}
+
+/* week row height */
+:global(.ant-picker-content) tbody tr {
+  height: 34px;
+}
+
+/* shrink day cell spacing */
+:global(.ant-picker-cell) {
+  padding: 2px 0 !important;
+}
+
+/* smaller day numbers */
+:global(.ant-picker-cell-inner) {
+  font-size: 12px;
+}
+
+/* header dropdown spacing */
+:global(.ant-picker-calendar-header) {
+  padding-bottom: 6px;
+}
+
 
 /* CLOCK */
 .timeRow {
@@ -128,4 +151,51 @@
 .NOT_IN {
   background: #fff7e6;
   color: #d48806;
+}
+/* ===== ANT DESIGN REQUEST TABS ===== */
+
+.requestUnderAttendance {
+  margin-top: 12px;
+}
+
+.requestCard {
+  border-radius: 12px;
+}
+
+/* Compact Ant Tabs */
+.requestTabsAnt :global(.ant-tabs-nav) {
+  margin-bottom: 0;
+}
+
+.requestTabsAnt :global(.ant-tabs-tab) {
+  padding: 3px 6px !important;
+  font-size: 12px;
+}
+
+.requestTabsAnt :global(.ant-tabs-tab-active .ant-tabs-tab-btn) {
+  font-weight: 400;
+}
+
+.requestTabsAnt :global(.ant-tabs-ink-bar) {
+  height: 2px;
+}
+
+/* Request list */
+.requestList {
+  padding: 6px 3px;
+}
+
+.requestItem {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 4px;
+  font-size: 13px;
+}
+
+.requestItem + .requestItem {
+  border-top: 1px solid #f0f0f0;
+}
+
+.requestRow {
+  margin-top: 8px; /* 🔽 tighter spacing */
 }

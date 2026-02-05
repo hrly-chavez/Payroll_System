@@ -43,6 +43,10 @@ class HolidayAdmin(admin.ModelAdmin):
 admin.site.register(Attendance)
 admin.site.register(Attendance_Event)
 
+@admin.register(Employee_Salary)
+class Employee_Salary(admin.ModelAdmin):
+    list_display = ('pay_type', )
+
 @admin.register(Deduction_Type)
 class DeductionTypeAdmin(admin.ModelAdmin):
     list_display = ('code', 'calculation_type', 'amount', 'is_active', 'create_at')

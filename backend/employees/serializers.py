@@ -38,6 +38,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
         model = Department
         fields = ["id", "name", "shift", "shift_id", "is_active", "created_at"]
 
+#gamit pag load sa admin department nga mga employees
 class EmployeeSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
     department_name = serializers.CharField(source="department.name", read_only=True)
@@ -103,6 +104,7 @@ class AddressSerializer(serializers.ModelSerializer):
 
         return address
     
+#gamit if mag create employee
 class EmployeeCreateSerializer(serializers.ModelSerializer):
     address = AddressSerializer()
 
@@ -134,3 +136,17 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
             **validated_data
         )
         return employee
+    
+#para sa salary
+class EmployeeSalarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Employee_Salary
+        fields = ["id", "employee", "pay_type", "base_rate", "effective_from", "created_at"]
+
+    def validate(self, attrs):
+        # Ensure unique salary per employee per effective_from
+        employee = attrs.get("employee")
+        effective_from = attrs.get("effective_from")
+        if Employee_Salary.objects.filter(employee=employee, effective_from=effective_from).exists():
+            raise serializers.ValidationError("A salary for this employee starting from this date already exists.")
+        return attrs

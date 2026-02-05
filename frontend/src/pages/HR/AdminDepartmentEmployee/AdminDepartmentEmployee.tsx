@@ -6,7 +6,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 import styles from "./Admin_DepartmentEmployee.module.css";
-import AddAddDeptEmployee from "./AddAdDeptEmployee";
+// import AddAddDeptEmployee from "./AddAdDeptEmployee";
+import AddEmployeeFlow from "./AddEmployee/AddEmployeeFlow";
 import api from "api/axios";
 
 interface EmployeeType {
@@ -114,7 +115,7 @@ const AdminDepartmentEmployee: React.FC = () => {
             })}
           />
 
-          <AddAddDeptEmployee
+          <AddEmployeeFlow
             open={open}
             onClose={() => {
               setOpen(false);

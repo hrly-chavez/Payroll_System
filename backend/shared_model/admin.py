@@ -57,3 +57,16 @@ class DeductionTypeAdmin(admin.ModelAdmin):
 admin.site.register(Attendance)
 admin.site.register(Attendance_Event)
 admin.site.register(Payroll_Period)
+
+
+@admin.register(Pay_Rule)
+class PayRuleAdmin(admin.ModelAdmin):
+    # Display these columns in the admin list view
+    list_display = ('name', 'event_type', 'category', 'rate_type', 'rate_value', 'is_active', 'created_at' )
+    
+    list_filter = ('category', 'event_type', 'rate_type', 'is_active')
+    search_fields = ('name', 'event_type', 'category')
+    ordering = ('-created_at',)
+    date_hierarchy = 'created_at'
+    list_display_links = ('name', 'event_type')
+    raw_id_fields = ('applies_to', 'employee')

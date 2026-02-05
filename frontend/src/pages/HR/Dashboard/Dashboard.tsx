@@ -8,6 +8,7 @@ import styles from "./adminDashboard.module.css";
 import api from "../../../api/axios";
 import { formatTime, getAttendanceStatusLabel, formatBackendTime } from "../../helpers";
 import SharedCalendar from "./../../../components/SharedCalendar/SharedCalendar";
+import { Tabs } from "antd";
 
 
 
@@ -184,16 +185,16 @@ const Dashboard: React.FC = () => {
 
           {/* ATTENDANCE + CALENDAR */}
           <Row gutter={16} className={styles.mainSection}>
-            <Col xs={24} lg={16}>
+            <Col xs={24} lg={14}>
               {/* ATTENDANCE */}
               <Card title="Attendance" className={styles.compactCard}>
                 <div className={styles.timeRow}>
                   <div className={styles.timeBox}>
-                    <span>PH Time 🇵🇭</span>
+                    <span>PH Time</span>
                     <h2>{formatTime(phTime, "Asia/Manila")}</h2>
                   </div>
                   <div className={styles.timeBox}>
-                    <span>USA Time 🇺🇸</span>
+                    <span>USA Time</span>
                     <h2>{formatTime(usaTime, "America/New_York")}</h2>
                   </div>
                 </div>
@@ -221,9 +222,62 @@ const Dashboard: React.FC = () => {
                 </div>
               </Card>
 
+              <Card
+              title="Pending Requests"
+              className={`${styles.requestCard} ${styles.requestUnderAttendance}`}
+            >
+              <Tabs
+                defaultActiveKey="holiday"
+                size="small"
+                className={styles.requestTabsAnt}
+                items={[
+                  {
+                    key: "holiday",
+                    label: "Holiday",
+                    children: (
+                      <div className={styles.requestList}>
+                        <div className={styles.requestItem}>
+                          <span>ABC HOLIDAY</span>
+                          <span>12/25/2026</span>
+                        </div>
+                        <div className={styles.requestItem}>
+                          <span>ABC HOLIDAY</span>
+                          <span>01/01/2027</span>
+                        </div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "leave",
+                    label: "Leave",
+                    children: (
+                      <div className={styles.requestList}>
+                        <div className={styles.requestItem}>
+                          <span>John Doe</span>
+                          <span>02/10/2026</span>
+                        </div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "payroll",
+                    label: "Payroll",
+                    children: (
+                      <div className={styles.requestList}>
+                        <div className={styles.requestItem}>
+                          <span>January Payroll</span>
+                          <span>For Approval</span>
+                        </div>
+                      </div>
+                    ),
+                  },
+                ]}
+              />
+            </Card>
             </Col>
-      {/* CALENDAR */}
-            <Col xs={24} lg={8}>
+            
+            {/* CALENDAR */}
+            <Col xs={24} lg={10}>
               <Card title="Calendar" className={styles.compactCard}>
                 <div className={styles.calendarWrapper}>
                 <SharedCalendar events={calendarEvents} />
@@ -232,31 +286,13 @@ const Dashboard: React.FC = () => {
             </Col>
           </Row>
 
+
+
+
           {/* TODAY TABLE */}
           <Card title={today} extra={<DatePicker />} className={styles.sectionCard}>
             <Table columns={columns} dataSource={attendanceData} pagination={{ pageSize: 5 }} size="small" />
           </Card>
-
-          {/* BOTTOM CARDS */}
-          <Row gutter={16} className={styles.bottomRow}>
-            <Col xs={24} md={8}>
-              <Card title="Pending Holiday Request" className={styles.equalCard}>
-                <List size="small" dataSource={["Scrum Master","Software Tester","Software Developer","UI/UX Designer"]} renderItem={item => <List.Item>{item}</List.Item>} />
-              </Card>
-            </Col>
-
-            <Col xs={24} md={8}>
-              <Card title="Pending Leave Request" className={styles.equalCard}>
-                <List size="small" dataSource={["Scrum Master","Software Tester","Software Developer","UI/UX Designer"]} renderItem={item => <List.Item>{item}</List.Item>} />
-              </Card>
-            </Col>
-
-            <Col xs={24} md={8}>
-              <Card title="Payroll Pending Approval" className={styles.equalCard}>
-                <List size="small" dataSource={["Scrum Master","Software Tester","Software Developer","UI/UX Designer"]} renderItem={item => <List.Item>{item}</List.Item>} />
-              </Card>
-            </Col>
-          </Row>
 
         </Content>
       </Layout>

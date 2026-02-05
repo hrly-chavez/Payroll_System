@@ -7,6 +7,8 @@ import dayjs from "dayjs";
 import styles from "./adminDashboard.module.css";
 import api from "../../../api/axios";
 import { formatTime, getAttendanceStatusLabel, formatBackendTime } from "../../helpers";
+import SharedCalendar from "./../../../components/SharedCalendar/SharedCalendar";
+
 
 
 const { Content } = Layout;
@@ -41,6 +43,7 @@ const columns = [
 
 const Dashboard: React.FC = () => {
   const today = dayjs().format("MMMM D, YYYY");
+  const [calendarEvents, setCalendarEvents] = useState([]);
 
   const [phTime, setPhTime] = useState<Date | null>(null);
   const [usaTime, setUsaTime] = useState<Date | null>(null);
@@ -59,6 +62,23 @@ const Dashboard: React.FC = () => {
       console.error("Time API error", err);
     }
   };
+  const loadCalendarEvents = async () => {
+  try {
+    const res = await api.get("/approvals/holidays/");
+    const holidays = res.data;
+
+    const events = holidays.map((h: any) => ({
+      date: h.date,
+      type: "holiday",
+      color: h.base === "PH" ? "#2e7d32" : h.base === "US" ? "#c62828" : "#616161",
+    }));
+
+    setCalendarEvents(events);
+  } catch {
+    message.error("Failed to load holidays");
+  }
+};
+
 
   const fetchTodayAttendance = async () => {
     setLoadingStatus(true);
@@ -78,10 +98,12 @@ const Dashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchBaseTime("Asia/Manila", setPhTime);
-    fetchBaseTime("America/New_York", setUsaTime);
-    fetchTodayAttendance();
-  }, []);
+  fetchBaseTime("Asia/Manila", setPhTime);
+  fetchBaseTime("America/New_York", setUsaTime);
+  fetchTodayAttendance();
+  loadCalendarEvents();
+}, []);
+
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -204,7 +226,7 @@ const Dashboard: React.FC = () => {
             <Col xs={24} lg={8}>
               <Card title="Calendar" className={styles.compactCard}>
                 <div className={styles.calendarWrapper}>
-                  <Calendar fullscreen={false} />
+                <SharedCalendar events={calendarEvents} />
                 </div>
               </Card>
             </Col>

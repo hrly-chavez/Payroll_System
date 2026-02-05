@@ -1,22 +1,30 @@
 "use client";
-
+//frontend/src/pages/HR/Calendar/Calendar.tsx
 import React, { useState, useEffect } from "react";
-import { Layout, Button, Table, Input, Modal, DatePicker, Form, ColorPicker, message, Card } from "antd";
+import { Layout, Button, Table, Input, message, Card } from "antd";
+import PayrollPeriodTab from "./PayrollPeriodTab";
+import HolidayTab from "./HolidayTab";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 import dayjs from "dayjs";
 import styles from "./calendar.module.css";
 import AddHolidayModal from "./AddHolidayModal";
+import AddPayrollPeriodModal from "./AddPayrollPeriodModal";
 import api from "../../../api/axios";
 
 const { Content } = Layout;
-const { RangePicker } = DatePicker;
+
 
 const CalendarPage: React.FC = () => {
   const [periodModal, setPeriodModal] = useState(false);
   const [holidayModal, setHolidayModal] = useState(false);
   const [currentMonth] = useState(dayjs());
+
   const [holidays, setHolidays] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<"holiday" | "payroll">("payroll");
+  const [searchText, setSearchText] = useState("");
+  const [payrollRefreshKey, setPayrollRefreshKey] = useState(0);
+  const [holidayRefreshKey, setHolidayRefreshKey] = useState(0);
 
   const loadHolidays = async () => {
     try {
@@ -27,12 +35,17 @@ const CalendarPage: React.FC = () => {
     }
   };
 
+ 
 
+  
+  
   useEffect(() => {
     loadHolidays();
   }, []);
 
-  const [activeTab, setActiveTab] = useState<"holiday" | "payroll">("holiday");
+
+  
+  
   const daysInMonth = currentMonth.daysInMonth();
   const startDay = currentMonth.startOf("month").day();
 
@@ -113,62 +126,63 @@ const CalendarPage: React.FC = () => {
             </div>
           </Card>
 
+
           {/* REQUESTS CARD */}
-          <Card className={styles.card}>
-            
+          <Card className={styles.card}>  
             {/* HEADER ROW */}
             <div className={styles.requestHeader}>
               <div className={styles.tabSwitch}>
                 <Button
-                  type={activeTab === "holiday" ? "primary" : "default"}
-                  onClick={() => setActiveTab("holiday")}
-                >
-                  Holiday Request
-                </Button>
-
-                <Button
                   type={activeTab === "payroll" ? "primary" : "default"}
-                  onClick={() => setActiveTab("payroll")}
-                >
+                  onClick={() => setActiveTab("payroll")}>
                   Payroll Period
                 </Button>
+                <Button
+                  type={activeTab === "holiday" ? "primary" : "default"}
+                  onClick={() => setActiveTab("holiday")}>
+                  Holiday Request
+                </Button>    
               </div>
-
               <Input.Search
                 placeholder="Search"
                 className={styles.searchRight}
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                allowClear
               />
             </div>
 
             {/* TABLE */}
             {activeTab === "holiday" && (
-              <Table
-                columns={holidayColumns}
-                dataSource={holidays}
-                rowKey="id"
-                pagination={false}
-              />
-            )}
-
+            <HolidayTab
+              active={activeTab === "holiday"}
+              searchText={searchText}
+              refreshKey={holidayRefreshKey}
+            />
+          )}
             {activeTab === "payroll" && (
-              <div>Payroll Period Table Here</div>
-            )}
+            <PayrollPeriodTab
+              active={activeTab === "payroll"}
+              searchText={searchText}
+              refreshKey={payrollRefreshKey}
+            />
+          )}
           </Card>
+
+
         </Content>
       </Layout>
 
       {/* PAYROLL MODAL */}
-      <Modal open={periodModal} onCancel={() => setPeriodModal(false)} footer={null} title="Add Payroll Period">
-        <Form layout="vertical">
-          <Form.Item label="Select Period">
-            <RangePicker style={{ width: "100%" }} />
-          </Form.Item>
-          <Form.Item label="Color">
-            <ColorPicker />
-          </Form.Item>
-          <Button type="primary" block>Save</Button>
-        </Form>
-      </Modal>
+      <AddPayrollPeriodModal
+        open={periodModal}
+        onClose={() => setPeriodModal(false)}
+        onSuccess={() => {
+          message.success("Payroll period created");
+          setPeriodModal(false);
+          setPayrollRefreshKey((k) => k + 1);
+        }}
+      />
 
       {/* HOLIDAY MODAL */}
       <AddHolidayModal
@@ -176,7 +190,7 @@ const CalendarPage: React.FC = () => {
         onClose={() => setHolidayModal(false)}
         onSuccess={() => {
           message.success("Holiday request submitted");
-          loadHolidays();
+          setHolidayRefreshKey((k) => k + 1);
         }}
       />
     </Layout>

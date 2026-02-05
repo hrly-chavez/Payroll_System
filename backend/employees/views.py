@@ -57,7 +57,7 @@ class ShiftSerializer(serializers.ModelSerializer):
     def get_display_time(self, obj):
         return f"{obj.start_time.strftime('%H:%M')} - {obj.end_time.strftime('%H:%M')}"
 
-
+#employee details crud
 class EmployeeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsRole]
     allowed_roles = ["ADMIN", "SUPER_ADMIN"]
@@ -142,3 +142,18 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_201_CREATED
         )
+    
+#employee salary
+class EmployeeSalaryViewSet(viewsets.ModelViewSet):
+    queryset = Employee_Salary.objects.all().order_by("-effective_from")
+    serializer_class = EmployeeSalarySerializer
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["ADMIN"]  # only these roles can manage salaries
+
+    # Optionally, filter by employee if query param is provided
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        employee_id = self.request.query_params.get("employee")
+        if employee_id:
+            queryset = queryset.filter(employee_id=employee_id)
+        return queryset

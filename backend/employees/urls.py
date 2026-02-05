@@ -6,6 +6,7 @@ router = DefaultRouter()
 router.register(r"departments", DepartmentViewSet)
 router.register(r"shifts", ShiftViewSet)
 router.register(r"employees", EmployeeViewSet)
+router.register(r"salaries", EmployeeSalaryViewSet)
 
 urlpatterns = [
     path("", include(router.urls)),

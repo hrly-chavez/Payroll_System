@@ -28,6 +28,7 @@ import {
   StopOutlined,
   EditOutlined,
 } from "@ant-design/icons";
+import api from "api/axios";
 
 const { Content } = Layout;
 
@@ -122,20 +123,21 @@ const EmployeeDetailsPage: React.FC = () => {
   ========================== */
   useEffect(() => {
     const fetchEmployee = async () => {
-      try {
-        if (!employeeId) return;
+      if (!employeeId) return;
 
-        const res = await fetch(
-          `http://localhost:8000/api/employees/employees/${employeeId}/details/`
+      try {
+        setLoading(true);
+
+        const res = await api.get(
+          `/employees/employees/${employeeId}/details/`
         );
 
-        if (!res.ok) throw new Error("Failed to fetch employee details");
-
-        const data: EmployeeData = await res.json();
-        setEmployee(data);
-      } catch (error) {
+        setEmployee(res.data);
+      } catch (error: any) {
         console.error(error);
-        message.error("Error fetching employee details");
+        message.error(
+          error.response?.data?.message || "Error fetching employee details"
+        );
       } finally {
         setLoading(false);
       }

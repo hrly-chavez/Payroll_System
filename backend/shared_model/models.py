@@ -440,9 +440,10 @@ class Payroll_Period(models.Model):
     code = models.CharField(max_length=100,unique=True)
     start_date = models.DateField()
     end_date = models.DateField()
-    pay_date = models.DateField()
-    status = models.CharField(max_length=20,choices=period_status_choices)
-    created_at = models.DateField()
+    pay_date = models.DateField(null=True, blank=True)
+    color = models.CharField(max_length=20, default="#ff4d4f")
+    status = models.CharField(max_length=20, choices=period_status_choices, default="Open")
+    created_at = models.DateField(auto_now_add=True)
 
 class Pay_Rule(models.Model):
     event_type_choices = [
@@ -450,7 +451,7 @@ class Pay_Rule(models.Model):
         ("Late","Late"),
         ("Undertime","Undertime"),
         ("Overtime","Overtime"),
-        ("Regular Holiday","Regular Holiday"),
+        ("Regular Holiday","Regular Holiday"),  
         ("Special Holiday","Special Holiday"),
         ("Special Non Working Holiday","Special Non Working Holiday"),
         ("Company Holiday","Company Holiday"),

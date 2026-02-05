@@ -85,7 +85,6 @@ const EmployeeContributionsModal: React.FC<Props> = ({
         (item: any, idx: number) => ({
           employee: employeeId,
           deduction_type: mandatoryDeductions[idx].id,
-          manual_amount: item.amount, // use HR-entered amount
           frequency: "Monthly",
           effective_from: effectiveFrom,
           status: "Active",

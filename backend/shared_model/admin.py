@@ -46,6 +46,10 @@ class HolidayAdmin(admin.ModelAdmin):
 class Employee_Salary(admin.ModelAdmin):
     list_display = ('pay_type', )
 
+@admin.register(Employee_Deduction)
+class Employee_Deduction(admin.ModelAdmin):
+    list_display = ('id', )
+
 @admin.register(Deduction_Type)
 class DeductionTypeAdmin(admin.ModelAdmin):
     list_display = ('code', 'calculation_type', 'amount', 'is_active', 'create_at')
@@ -70,3 +74,4 @@ class PayRuleAdmin(admin.ModelAdmin):
     date_hierarchy = 'created_at'
     list_display_links = ('name', 'event_type')
     raw_id_fields = ('applies_to', 'employee')
+

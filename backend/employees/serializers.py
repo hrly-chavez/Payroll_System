@@ -165,7 +165,7 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
         model = Employee_Deduction
         fields = [
             "employee",
-            "deduction_type",
+            "deduction_type",   # nullable for optional
             "frequency",
             "effective_from",
             "status",
@@ -174,9 +174,10 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         employee = data["employee"]
-        deduction_type = data["deduction_type"]
+        input_deduction_type = data.get("deduction_type")
         manual_amount = data.get("manual_amount")
 
+        # Get latest salary
         salary = (
             Employee_Salary.objects
             .filter(employee=employee)
@@ -189,14 +190,31 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
 
         base_salary = salary.base_rate
 
-        # Salary range check
-        if not (
-            deduction_type.salary_range_from
-            <= base_salary
-            <= deduction_type.salary_range_to
-        ):
+        # ============================
+        # OPTIONAL DEDUCTION (manual)
+        # ============================
+        if input_deduction_type is None:
+            if manual_amount is None:
+                raise serializers.ValidationError(
+                    "manual_amount is required for optional deductions"
+                )
+
+            data["amount"] = round(manual_amount, 2)
+            return data
+
+        # ============================
+        # MANDATORY DEDUCTION
+        # ============================
+        deduction_type = Deduction_Type.objects.filter(
+            code=input_deduction_type.code,
+            is_active=True,
+            salary_range_from__lte=base_salary,
+            salary_range_to__gte=base_salary,
+        ).order_by("-salary_range_from").first()
+
+        if not deduction_type:
             raise serializers.ValidationError(
-                f"Salary not valid for {deduction_type.code}"
+                f"Salary not valid for {input_deduction_type.code}"
             )
 
         # --- COMPUTATION ---
@@ -204,25 +222,36 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
             amount = deduction_type.amount
 
         elif deduction_type.calculation_type == "Percent":
-            if manual_amount:
-                amount = manual_amount
-            else:
-                amount = base_salary * (deduction_type.amount / 100)
+            amount = base_salary * (deduction_type.amount / 100)
 
         else:
             raise serializers.ValidationError("Invalid calculation type")
 
-        data["computed_amount"] = round(amount, 2)
+        data["deduction_type"] = deduction_type
+        data["amount"] = round(amount, 2)
+        data["manual_code"] = data.get("manual_code")
+
         return data
 
     def create(self, validated_data):
-        amount = validated_data.pop("computed_amount")
-        validated_data.pop("manual_amount", None)
+        employee = validated_data["employee"]
+        deduction_type = validated_data.get("deduction_type")
+        effective_from = validated_data["effective_from"]
 
-        return Employee_Deduction.objects.create(
-            amount=amount,
-            **validated_data
+        # OPTIONAL → always create new row
+        if deduction_type is None:
+            validated_data.pop("manual_amount", None)
+            return Employee_Deduction.objects.create(**validated_data)
+
+        # MANDATORY → update per period
+        obj, _ = Employee_Deduction.objects.update_or_create(
+            employee=employee,
+            deduction_type=deduction_type,
+            effective_from=effective_from,
+            defaults=validated_data,
         )
+        return obj
+
 
 #deduction_type isulod rha sa 
 class DeductionTypeSerializer(serializers.ModelSerializer):

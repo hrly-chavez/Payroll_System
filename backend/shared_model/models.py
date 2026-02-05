@@ -83,12 +83,12 @@ class Employee(models.Model):
     #TODO: Optional: Add EMP_STATUS (Regular, Probationary, Resigned),EMP_TERMINATION_DATE
 
     id = models.AutoField(primary_key=True)
-    id_no = models.CharField(max_length=50,unique=True)
+    id_no = models.CharField(max_length=50,unique=True,null=True,blank=True)
     fname = models.CharField(max_length=50)
     lname = models.CharField(max_length=50)
-    initial = models.CharField(max_length=1)
-    suffix = models.CharField(max_length=20)
-    status = models.CharField(max_length=15, choices=EMP_STATUS)
+    initial = models.CharField(max_length=1,null=True,blank=True)
+    suffix = models.CharField(max_length=20,null=True,blank=True)
+    status = models.CharField(max_length=15, choices=EMP_STATUS,default="Single")
     address = models.ForeignKey(Address, on_delete=models.PROTECT, null=True, blank=True, related_name="residents")
     contact_no = models.CharField(max_length=12)
     hired_date = models.DateField()
@@ -444,6 +444,7 @@ class Payroll_Period(models.Model):
     color = models.CharField(max_length=20, default="#ff4d4f")
     status = models.CharField(max_length=20, choices=period_status_choices, default="Open")
     created_at = models.DateField(auto_now_add=True)
+    
 
 class Pay_Rule(models.Model):
     event_type_choices = [
@@ -476,7 +477,7 @@ class Pay_Rule(models.Model):
     effective_to = models.DateField(null=True,blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateField(auto_now=True)
-    applies_to = models.ForeignKey(Department,on_delete=models.PROTECT,null=True,blank=True,related_name="pay_rules")
+    applies_to = models.ForeignKey(Department,on_delete=models.CASCADE,null=True,blank=True,related_name="pay_rules")
     employee = models.ForeignKey("Employee",on_delete=models.SET_NULL,null=True,blank=True,related_name="pay_rules")
 
 class Payroll(models.Model):
@@ -499,7 +500,7 @@ class Payroll(models.Model):
     generated_at = models.DateField(auto_now_add=True)
     approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_payrolls")
     approved_at = models.DateField(null=True, blank=True)
-    payroll_period = models.ForeignKey(Payroll_Period,on_delete=models.PROTECT,related_name="payrolls")
+    payroll_period = models.ForeignKey(Payroll_Period,on_delete=models.CASCADE,related_name="payrolls")
     employee = models.ForeignKey(Employee,on_delete=models.PROTECT,related_name="payrolls")
 
     class Meta:

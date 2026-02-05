@@ -13,3 +13,4 @@ urlpatterns = [
     path("periods/", PayrollPeriodListCreateView.as_view(), name="payroll-periods"),
     path("periods/<int:period_id>/eligible-employees/", PayrollPeriodEligibleEmployeesView.as_view()),
 ]
+    

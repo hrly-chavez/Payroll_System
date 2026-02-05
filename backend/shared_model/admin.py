@@ -40,8 +40,7 @@ class HolidayAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at',)
     list_editable = ('is_active',)
 
-admin.site.register(Attendance)
-admin.site.register(Attendance_Event)
+
 
 @admin.register(Deduction_Type)
 class DeductionTypeAdmin(admin.ModelAdmin):
@@ -50,3 +49,7 @@ class DeductionTypeAdmin(admin.ModelAdmin):
     search_fields = ('code',)
     ordering = ('-create_at',)
     date_hierarchy = 'create_at'
+
+admin.site.register(Attendance)
+admin.site.register(Attendance_Event)
+admin.site.register(Payroll_Period)

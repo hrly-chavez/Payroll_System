@@ -37,16 +37,20 @@ class PayrollPeriodCreateSerializer(serializers.ModelSerializer):
 
         return attrs
 
-#for clicking the payroll period (shows modal)
+# for clicking the payroll period (shows modal)
 class EligibleEmployeeSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(source="employee_id", read_only=True)
     full_name = serializers.SerializerMethodField()
-    department_name = serializers.CharField(source="department.name", read_only=True)
-    class Meta:
-        model = Employee
-        fields = '__all__'
+    department_name = serializers.CharField(source="employee.department.name", read_only=True)
+    status = serializers.CharField(read_only=True) # status comes from PayrollPeriodEmployee
 
-    def get_full_name(self, obj):
-        return f"{obj.fname} {obj.lname}".strip()
+    class Meta:
+        model = PayrollPeriodEmployee
+        fields = ["id", "full_name", "department_name", "status"]
+
+    def get_full_name(self, obj: PayrollPeriodEmployee):
+        e = obj.employee
+        return f"{e.fname} {e.lname}".strip()
     
 
 #==========================================PAYRULE ========================================

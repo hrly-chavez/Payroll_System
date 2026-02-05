@@ -2,9 +2,11 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Modal, Table, Button, message } from "antd";
+import { Modal, Table, Button, message, Tag} from "antd";
 import api from "../../../../api/axios";
 import dayjs from "dayjs";
+import EachEmployeeModal from "./EachEmployeeModal";
+
 type PayrollPeriod = {
   id: number;
   code: string;
@@ -18,6 +20,7 @@ type EligibleEmployee = {
   id: number;
   full_name: string;
   department_name?: string;
+  status: "Pending" | "Verified" | "Processing" | "Approved" | "Declined";
 };
 
 type Props = {
@@ -30,6 +33,10 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
   const [loading, setLoading] = useState(false);
   const [period, setPeriod] = useState<PayrollPeriod | null>(null);
   const [employees, setEmployees] = useState<EligibleEmployee[]>([]);
+
+  
+  const [openEmployeeModal, setOpenEmployeeModal] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<EligibleEmployee | null>(null);
 
   const loadEligibleEmployees = async () => {
     if (!periodId) return;
@@ -57,14 +64,32 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, periodId]);
 
- const columns = [
-  { title: "Employee", dataIndex: "full_name" },
-  {
-    title: "Department",
-    dataIndex: "department_name",
-    render: (v: string) => v || "-",
+  const columns = [
+    { title: "Employee", dataIndex: "full_name" },
+    {
+      title: "Department",
+      dataIndex: "department_name",
+      render: (v: string) => v || "-",
+    },
+    {
+    title: "Status",
+    dataIndex: "status",
+    render: (v: EligibleEmployee["status"]) => {
+      const status = v || "Pending";
+
+      const map: Record<EligibleEmployee["status"], { text: string; color: string }> = {
+        Pending: { text: "Pending", color: "default" },
+        Verified: { text: "Verified", color: "blue" },
+        Processing: { text: "Processing", color: "gold" },
+        Approved: { text: "Approved", color: "green" },
+        Declined: { text: "Declined", color: "red" },
+      };
+
+      const meta = map[status];
+      return <Tag color={meta.color}>{meta.text}</Tag>;
+    },
   },
-];
+  ];
 
   return (
     <Modal
@@ -90,13 +115,29 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
         </Button>
       </div>
 
-      <Table
+        <Table
         columns={columns}
         dataSource={employees}
         rowKey="id"
         loading={loading}
         pagination={false}
         scroll={{ y: 360 }}
+        onRow={(record) => ({
+          onClick: () => {
+            setSelectedEmployee(record);
+            setOpenEmployeeModal(true);
+          },
+        })}
+        rowClassName={() => "clickable-row"}
+      />
+      <EachEmployeeModal
+        open={openEmployeeModal}
+        employee={selectedEmployee}
+        period={period}
+        onClose={() => {
+          setOpenEmployeeModal(false);
+          setSelectedEmployee(null);
+        }}
       />
     </Modal>
   );

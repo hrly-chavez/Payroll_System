@@ -195,17 +195,17 @@ const Dashboard: React.FC = () => {
           <Row gutter={16} className={styles.mainSection}>
 
             {/* LEFT COLUMN */}
-            <Col xs={24} md={12}>
+            <Col xs={24} md={14}>
 
               {/* ATTENDANCE */}
               <Card title="Attendance" className={styles.sectionCard}>
                 <div className={styles.timeRow}>
                   <div className={styles.timeBox}>
-                    <span>PH Time 🇵🇭</span>
+                    <span>PH Time</span>
                     <h2>{formatTime(phTime, "Asia/Manila")}</h2>
                   </div>
                   <div className={styles.timeBox}>
-                    <span>USA Time 🇺🇸</span>
+                    <span>USA Time</span>
                     <h2>{formatTime(usaTime, "America/New_York")}</h2>
                   </div>
                 </div>
@@ -234,30 +234,23 @@ const Dashboard: React.FC = () => {
                   </Button>
                 </div>
               </Card>
-            </Col>
-
-            {/* RIGHT COLUMN */}
-            <SharedCalendar events={calendarEvents} />
-
-          </Row>
-
-          {/* LOWER CARDS */}
-          <Row gutter={16}>
-            <Col xs={24} md={12}>
               <Card title="Payslip Status" className={styles.sectionCard}>
                 <Tag color="processing">PROCESSING</Tag>
                 <div>January 1, 2026</div>
               </Card>
 
-              {/* PAYSLIP CUT OFF */}
               <Card title="Payslip Cut Off" className={styles.sectionCard}>
                 <h3>08:00</h3>
                 <div>January 1, 2026</div>
               </Card>
-
             </Col>
 
-            <Col xs={24} md={12}>
+            {/* RIGHT COLUMN */}
+            <Col xs={24} md={10}>
+              <Card title="Calendar" className={styles.calendarCard}>
+                <SharedCalendar events={calendarEvents} />
+              </Card>
+
               <Card title="Legend & Holidays" className={styles.sectionCard}>
                 <div className={styles.legendSection}>
                   <div className={styles.legendItem}><span className={styles.legendGreen}></span> PH Holiday</div>
@@ -266,9 +259,9 @@ const Dashboard: React.FC = () => {
                   <div className={styles.legendItem}><span className={styles.legendGray}></span> Non-Work</div>
                 </div>
               </Card>
-            </Col>
-          </Row>
+              </Col>
 
+          </Row>
         </Content>
       </Layout>
     </Layout>

@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from shared_model.models import *
+from django.utils import timezone
 
 #---------------------address
 
@@ -150,3 +151,89 @@ class EmployeeSalarySerializer(serializers.ModelSerializer):
         if Employee_Salary.objects.filter(employee=employee, effective_from=effective_from).exists():
             raise serializers.ValidationError("A salary for this employee starting from this date already exists.")
         return attrs
+    
+#para sa deduction sa taxes like sss, pagibig, philhealth
+class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
+    manual_amount = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        write_only=True
+    )
+
+    class Meta:
+        model = Employee_Deduction
+        fields = [
+            "employee",
+            "deduction_type",
+            "frequency",
+            "effective_from",
+            "status",
+            "manual_amount",
+        ]
+
+    def validate(self, data):
+        employee = data["employee"]
+        deduction_type = data["deduction_type"]
+        manual_amount = data.get("manual_amount")
+
+        salary = (
+            Employee_Salary.objects
+            .filter(employee=employee)
+            .order_by("-effective_from")
+            .first()
+        )
+
+        if not salary:
+            raise serializers.ValidationError("Employee has no active salary")
+
+        base_salary = salary.base_rate
+
+        # Salary range check
+        if not (
+            deduction_type.salary_range_from
+            <= base_salary
+            <= deduction_type.salary_range_to
+        ):
+            raise serializers.ValidationError(
+                f"Salary not valid for {deduction_type.code}"
+            )
+
+        # --- COMPUTATION ---
+        if deduction_type.calculation_type == "Fixed":
+            amount = deduction_type.amount
+
+        elif deduction_type.calculation_type == "Percent":
+            if manual_amount:
+                amount = manual_amount
+            else:
+                amount = base_salary * (deduction_type.amount / 100)
+
+        else:
+            raise serializers.ValidationError("Invalid calculation type")
+
+        data["computed_amount"] = round(amount, 2)
+        return data
+
+    def create(self, validated_data):
+        amount = validated_data.pop("computed_amount")
+        validated_data.pop("manual_amount", None)
+
+        return Employee_Deduction.objects.create(
+            amount=amount,
+            **validated_data
+        )
+
+#deduction_type isulod rha sa 
+class DeductionTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Deduction_Type
+        fields = [
+            "id",
+            "code",
+            "salary_range_from",
+            "salary_range_to",
+            "calculation_type",
+            "amount",
+            "is_active",
+        ]

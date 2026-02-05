@@ -8,5 +8,5 @@ urlpatterns = [
 
     #PAYROLL PERIOD
     path("periods/", PayrollPeriodListCreateView.as_view(), name="payroll-periods"),
-    path("periods/<int:period_id>/eligible-employees/", PayrollPeriodEligibleEmployeesView.as_view()),
+    path("periods/<int:period_id>/eligible-employees/",PayrollPeriodEligibleEmployeesView.as_view(),name="payroll-period-eligible-employees"),
 ]

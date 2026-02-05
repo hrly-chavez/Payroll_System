@@ -62,19 +62,47 @@ class PayrollPeriodEligibleEmployeesView(APIView):
     def get(self, request, period_id):
         period = get_object_or_404(Payroll_Period, id=period_id)
 
-        employees = Employee.objects.filter(is_active=True).exclude(
-            payrolls__payroll_period=period
-        ).order_by("lname", "fname")
+        # 1) employees who already have payroll in this period
+        payroll_employee_ids = Payroll.objects.filter(
+            payroll_period=period
+        ).values_list("employee_id", flat=True)
 
-        data = EligibleEmployeeSerializer(employees, many=True).data
+        # 2) eligible employees = no payroll yet (your current behavior)
+        eligible_employees = Employee.objects.exclude(
+            id__in=payroll_employee_ids
+        ).select_related("department")
+
+        # 3) lazy-create PayrollPeriodEmployee rows for eligible employees
+        existing_employee_ids = set(
+            PayrollPeriodEmployee.objects.filter(period=period)
+            .values_list("employee_id", flat=True)
+        )
+
+        to_create = [
+            PayrollPeriodEmployee(period=period, employee=e)
+            for e in eligible_employees
+            if e.id not in existing_employee_ids
+        ]
+
+        if to_create:
+            PayrollPeriodEmployee.objects.bulk_create(
+                to_create,
+                ignore_conflicts=True
+            )
+
+        # 4) return PayrollPeriodEmployee rows (so we can include status)
+        ppe_qs = PayrollPeriodEmployee.objects.filter(
+            period=period
+        ).exclude(
+            employee_id__in=payroll_employee_ids
+        ).select_related(
+            "employee", "employee__department"
+        ).order_by(
+            "employee__lname", "employee__fname"
+        )
+
         return Response({
-            "period": {
-                "id": period.id,
-                "code": period.code,
-                "start_date": period.start_date,
-                "end_date": period.end_date,
-                "pay_date": period.pay_date,
-                "status": period.status,
-            },
-            "eligible_employees": data
+            "period": PayrollPeriodCreateSerializer(period).data,
+            "eligible_employees": EligibleEmployeeSerializer(ppe_qs, many=True).data
         })
+    

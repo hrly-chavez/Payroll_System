@@ -80,7 +80,7 @@ export default function AttendaceLogs({ year, month }: Props) {
   }, [year, month]);
 
   return (
-    <Card title="Attendance History / Logs" className={styles.historyCard}>
+    <Card title="Attendance Logs" className={styles.historyCard}>
       {loading ? (
         <div style={{ padding: 16 }}>
           <Spin />

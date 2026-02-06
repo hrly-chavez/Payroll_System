@@ -107,21 +107,6 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
         SUPER_ADMIN: '/super-admin/reports',
       },
     },
-
-    /* 🔥 UPDATED ICON */
-    {
-      key: 'Requests',
-      label: 'Requests',
-      icon: <FileTextOutlined />,
-      roles: ['ADMIN', 'SUPER_ADMIN', 'EMPLOYEE'],
-      hrefs: {
-        EMPLOYEE: '/employee/requests',
-        ADMIN: '/admin/requests',
-        SUPER_ADMIN: '/super-admin/requests',
-      },
-    },
-
-    /* 🔥 UPDATED ICON */
     {
       key: 'Payslip',
       label: 'Payslip',

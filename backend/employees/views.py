@@ -149,7 +149,7 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
     queryset = Employee_Salary.objects.all().order_by("-effective_from")
     serializer_class = EmployeeSalarySerializer
     permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["ADMIN"]
+    allowed_roles = ["ADMIN", "SUPER_ADMIN"]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -196,9 +196,8 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
 #employee deduction
 class EmployeeDeductionViewSet(viewsets.ModelViewSet):
     queryset = Employee_Deduction.objects.all()
-    serializer_class = EmployeeDeductionCreateSerializer
     permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["ADMIN"]
+    allowed_roles = ["ADMIN", "SUPER_ADMIN"]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -206,6 +205,12 @@ class EmployeeDeductionViewSet(viewsets.ModelViewSet):
         if employee_id:
             queryset = queryset.filter(employee_id=employee_id)
         return queryset
+
+    def get_serializer_class(self):
+        if self.action in ["list", "retrieve"]:
+            return EmployeeDeductionListSerializer
+        return EmployeeDeductionCreateSerializer
+
 
     # ----------------- NEW ENDPOINT -----------------
     @action(detail=False, methods=["get"], url_path="deduction-types")
@@ -228,12 +233,29 @@ class EmployeeDeductionViewSet(viewsets.ModelViewSet):
             for d in deduction_types
         ]
         return Response(data, status=status.HTTP_200_OK)
-    
+
+#--------------------- ALLOWANCE
 class EmployeeAllowanceViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["ADMIN", "SUPER_ADMIN"]
     queryset = Employee_Allowance.objects.all()
-    serializer_class = EmployeeAllowanceCreateSerializer
+
+    def get_serializer_class(self):
+        if self.action in ["list", "retrieve"]:
+            return EmployeeAllowanceSerializer  # read
+        return EmployeeAllowanceCreateSerializer  # create/update
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        employee_id = self.request.query_params.get("employee")
+        if employee_id:
+            queryset = queryset.filter(employee_id=employee_id)
+        return queryset
+
 
 class AllowanceTypeListAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["ADMIN", "SUPER_ADMIN"]
     """
     GET /employees/allowance-types/ → list all active allowance types
     """

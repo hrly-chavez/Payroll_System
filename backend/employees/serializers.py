@@ -153,6 +153,7 @@ class EmployeeSalarySerializer(serializers.ModelSerializer):
         return attrs
     
 #para sa deduction sa taxes like sss, pagibig, philhealth
+#para sad ni sya sa POST / PUT
 class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
     manual_amount = serializers.DecimalField(
         max_digits=12,
@@ -253,7 +254,34 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
         )
         return obj
 
+class EmployeeDeductionListSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
 
+    class Meta:
+        model = Employee_Deduction
+        fields = [
+            "id",
+            "name",
+            "amount",
+            "frequency",
+            "effective_from",
+            "status",
+        ]
+
+    def get_name(self, obj):
+        # 1️⃣ If manual deduction → use manual_code
+        if obj.manual_code:
+            return obj.manual_code
+
+        # 2️⃣ Else → use Deduction_Type.code
+        if obj.deduction_type:
+            return obj.deduction_type.code
+
+        return "-"
+
+
+#------------------- ALLOWANCE
+#PUT / POST
 class EmployeeAllowanceCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee_Allowance
@@ -277,8 +305,25 @@ class EmployeeAllowanceCreateSerializer(serializers.ModelSerializer):
         if existing.exists():
             raise serializers.ValidationError("Allowance already exists for this period")
         return data
-    
+
 class AllowanceTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Allowance_Type
         fields = ["id", "name", "code", "is_active"]
+
+#this is the read or get for allowance
+class EmployeeAllowanceSerializer(serializers.ModelSerializer):
+    allowance_type = AllowanceTypeSerializer(read_only=True)  # nested
+
+    class Meta:
+        model = Employee_Allowance
+        fields = [
+            "id",
+            "employee",
+            "allowance_type",
+            "amount",
+            "frequency",
+            "effective_from",
+            "effective_to",
+            "status",
+        ]

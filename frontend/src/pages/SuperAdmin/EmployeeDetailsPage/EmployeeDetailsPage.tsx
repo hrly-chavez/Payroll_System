@@ -46,6 +46,15 @@ interface EmployeeData {
   address: string;
 }
 
+interface DeductionRow {
+  key: string;
+  name: string;
+  amount: string;
+  frequency: string;
+  effective_from: string;
+  type: "Mandatory" | "Optional";
+}
+
 const EmployeeDetailsPage: React.FC = () => {
   const { employeeId } = useParams<{ employeeId: string }>();
 
@@ -80,12 +89,155 @@ const EmployeeDetailsPage: React.FC = () => {
     fetchEmployee();
   }, [employeeId]);
 
-  const salaryColumns = [
-    { title: "Salary", dataIndex: "salary", key: "salary" },
-    { title: "Salary Type", dataIndex: "type", key: "type" },
-  ];
+  /* =========================
+     SALARY RETRIEVE DATA
+  ========================== */
+  const [salaries, setSalaries] = useState<
+    { base_rate: number; pay_type: string; effective_from: string; id: number }[]
+  >([]);
+  const [loadingSalaries, setLoadingSalaries] = useState(false);
 
-  const salaryData = [{ key: "1", salary: "₱15,000", type: "Monthly" }];
+
+  const fetchSalaries = async (employeeId: number) => {
+    setLoadingSalaries(true);
+    try {
+      const response = await api.get("/employees/salaries/", {
+        params: { employee: employeeId },
+      });
+
+      // Map to table data
+      const tableData = response.data.map((item: any) => ({
+        key: item.id,
+        base_rate: item.base_rate,
+        pay_type: item.pay_type,
+        effective_from: item.effective_from,
+        id: item.id,
+      }));
+
+      setSalaries(tableData);
+    } catch (error: any) {
+      console.error(error);
+      message.error("Failed to fetch salary history");
+      setSalaries([]);
+    } finally {
+      setLoadingSalaries(false);
+    }
+  };
+
+
+  useEffect(() => {
+    if (!employeeId) return;
+
+    const empIdNum = Number(employeeId);
+
+    // Fetch allowances
+    fetchAllowances(empIdNum);
+
+    // Fetch salary history
+    fetchSalaries(empIdNum);
+  }, [employeeId]);
+
+
+  /* =========================
+       ALLOWANCE RETRIEVE DATA
+    ========================== */
+  
+    const [allowances, setAllowances] = useState<any[]>([]);
+    const [loadingAllowances, setLoadingAllowances] = useState(false);
+  
+    const fetchAllowances = async (employeeId: number) => {
+      setLoadingAllowances(true);
+      try {
+        const response = await api.get("/employees/allowances/", {
+          params: { employee: employeeId }, // backend filters by employee_id
+        });
+  
+        const tableData = response.data.map((item: any, index: number) => ({
+          key: index.toString(),
+          name: item.allowance_type.name, // linked allowance type name
+          amount: `₱${item.amount}`,
+          frequency: item.frequency,
+          status: item.status,
+        }));
+  
+        setAllowances(tableData);
+      } catch (error: any) {
+        message.error("Failed to fetch allowances");
+        console.error(error);
+      } finally {
+        setLoadingAllowances(false);
+      }
+    };
+  
+  
+    useEffect(() => {
+      if (!employeeId) return;
+      fetchAllowances(Number(employeeId)); // convert string param to number
+    }, [employeeId]);
+
+  /* =========================
+     TAX MODAL STATE
+  ========================== */
+  
+  const [deductions, setDeductions] = useState<DeductionRow[]>([]);
+  const [loadingDeductions, setLoadingDeductions] = useState(false);
+
+  const fetchDeductions = async (employeeId: number) => {
+    setLoadingDeductions(true);
+    try {
+      const response = await api.get("/employees/deductions/", {
+        params: { employee: employeeId },
+      });
+
+      const tableData = response.data.map((item: any) => ({
+        key: item.id,
+        name: item.name, // ✅ already resolved by backend
+        amount: `₱${Number(item.amount).toLocaleString()}`,
+        frequency: item.frequency,
+        effective_from: item.effective_from,
+      }));
+
+
+      setDeductions(tableData);
+    } catch (error) {
+      console.error(error);
+      message.error("Failed to fetch deductions");
+      setDeductions([]);
+    } finally {
+      setLoadingDeductions(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!employeeId) return;
+
+    const empIdNum = Number(employeeId);
+
+    fetchAllowances(empIdNum);
+    fetchSalaries(empIdNum);
+    fetchDeductions(empIdNum); // ✅ ADD THIS
+  }, [employeeId]);
+
+
+
+  const salaryColumns = [
+    {
+      title: "Salary Amount",
+      dataIndex: "base_rate",
+      key: "base_rate",
+      render: (val: number) => `₱${val.toLocaleString()}`, // format with commas
+    },
+    {
+      title: "Salary Type",
+      dataIndex: "pay_type",
+      key: "pay_type",
+    },
+    {
+      title: "Effective From",
+      dataIndex: "effective_from",
+      key: "effective_from",
+    },
+  ];
 
   if (loading) return <Spin tip="Loading..." style={{ marginTop: 100 }} />;
   if (!employee) return <p style={{ marginTop: 100 }}>Employee not found.</p>;
@@ -223,12 +375,12 @@ const EmployeeDetailsPage: React.FC = () => {
                 <Tabs.TabPane tab="Base Salary" key="1">
                   <div className={styles.salaryHeader}>
                     <h3>Base Salary</h3>
-                    
                   </div>
 
                   <Table
                     columns={salaryColumns}
-                    dataSource={salaryData}
+                    dataSource={salaries}
+                    loading={loadingSalaries}
                     pagination={false}
                   />
                 </Tabs.TabPane>
@@ -246,15 +398,8 @@ const EmployeeDetailsPage: React.FC = () => {
                       { title: "Frequency", dataIndex: "frequency", key: "frequency" },
                       { title: "Status", dataIndex: "status", key: "status" },
                     ]}
-                    dataSource={[
-                      {
-                        key: "1",
-                        name: "Allowance",
-                        amount: "₱500",
-                        frequency: "Per Pay Period",
-                        status: "Active",
-                      },
-                    ]}
+                    dataSource={allowances}
+                    loading={loadingAllowances}
                     pagination={false}
                   />
                 </Tabs.TabPane>
@@ -267,16 +412,17 @@ const EmployeeDetailsPage: React.FC = () => {
 
                   <Table
                     columns={[
-                      { title: "Contribution", dataIndex: "name", key: "name" },
+                      { title: "Deduction", dataIndex: "name", key: "name" },
+                      { title: "Type", dataIndex: "type", key: "type" },
+                      { title: "Frequency", dataIndex: "frequency", key: "frequency" },
+                      { title: "Effective From", dataIndex: "effective_from", key: "effective_from" },
                       { title: "Amount", dataIndex: "amount", key: "amount" },
                     ]}
-                    dataSource={[
-                      { key: "1", name: "SSS", amount: "₱1,000" },
-                      { key: "2", name: "Phil-Health", amount: "₱500" },
-                      { key: "3", name: "Pag-IBIG", amount: "₱300" },
-                    ]}
+                    dataSource={deductions}
+                    loading={loadingDeductions}
                     pagination={false}
                   />
+
                 </Tabs.TabPane>
 
                 {/* PAYSLIPS */}

@@ -1,0 +1,34 @@
+.content {
+  margin: 16px;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px 24px 24px;
+  min-height: 600px;
+}
+
+.tabs :global(.ant-tabs-nav) {
+  margin-bottom: 16px;
+}
+
+.tabs :global(.ant-tabs-tab) {
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.tabs :global(.ant-tabs-tab-active .ant-tabs-tab-btn) {
+  color: #386fa4;
+}
+
+.tabs :global(.ant-tabs-ink-bar) {
+  background: #386fa4;
+}
+
+.placeholder {
+  padding: 40px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 14px;
+}

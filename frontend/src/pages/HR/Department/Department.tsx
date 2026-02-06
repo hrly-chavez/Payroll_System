@@ -121,7 +121,9 @@ const Department: React.FC = () => {
             className={styles.table}
             onRow={(record) => ({
               onClick: () =>
-                navigate(`/admin/department-employee/${record.id}`),
+                navigate(`/admin/department-employee/${record.id}`, {
+                  state: { deptName: record.name }, // <-- pass department name here
+                }),
               style: { cursor: "pointer" },
             })}
           />

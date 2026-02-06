@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { Layout, Table, Input, Button, message } from "antd";
 import type { TableProps } from "antd";
 import { PlusOutlined, SearchOutlined, SlidersOutlined } from "@ant-design/icons";
@@ -26,6 +27,9 @@ const AdminDepartmentEmployee: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+
+  const location = useLocation();
+  const deptName = (location.state as { deptName?: string })?.deptName || "Employees";
 
   const fetchEmployees = async () => {
     if (!deptId) return;
@@ -61,8 +65,7 @@ const AdminDepartmentEmployee: React.FC = () => {
     },
     { title: "Position", dataIndex: "position", key: "position" },
     { title: "Status", dataIndex: "status", key: "status" },
-    { title: "Department", dataIndex: "department", key: "department" },
-    { title: "Shift", dataIndex: "shift", key: "shift" },
+    { title: "Shift", dataIndex: "shift_info", key: "shift" },
     { title: "Hired Date", dataIndex: "hired_date", key: "hired_date" },
   ];
 
@@ -70,7 +73,7 @@ const AdminDepartmentEmployee: React.FC = () => {
     <Layout className={styles.layout} style={{ minHeight: "100vh" }}>
       <Sidebar />
       <Layout>
-        <Topbar title="Employees" showBack />
+        <Topbar title={deptName} showBack />
 
         <Layout.Content className={styles.content}>
           <div className={styles.topBar}>

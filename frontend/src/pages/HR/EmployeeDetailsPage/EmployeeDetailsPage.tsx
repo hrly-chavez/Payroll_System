@@ -295,7 +295,7 @@ const EmployeeDetailsPage: React.FC = () => {
                   <div className={styles.salaryHeader}>
                     <h3>Base Salary</h3>
                     <Button type="primary" onClick={openSalaryModal}>
-                      Add New Base Salary
+                      Edit Base Salary
                     </Button>
                   </div>
 
@@ -311,7 +311,7 @@ const EmployeeDetailsPage: React.FC = () => {
                   <div className={styles.salaryHeader}>
                     <h3>Allowance</h3>
                     <Button type="primary" onClick={openAllowanceModal}>
-                      Add New Allowance
+                      Edit Allowance
                     </Button>
                   </div>
 
@@ -340,7 +340,7 @@ const EmployeeDetailsPage: React.FC = () => {
                   <div className={styles.salaryHeader}>
                     <h3>Mandatory Government Contribution</h3>
                     <Button type="primary" onClick={openTaxModal}>
-                      Add New Tax
+                      Edit Tax
                     </Button>
                   </div>
 
@@ -385,7 +385,16 @@ const EmployeeDetailsPage: React.FC = () => {
                   />
                 </Tabs.TabPane>
 
-                <Tabs.TabPane tab="Password" key="5" />
+                <Tabs.TabPane tab="Password" key="5">
+                  <div className={styles.salaryHeader}>
+                    <h3>Employee Account</h3>
+                    <Button type="primary">
+                      Change Pass
+                    </Button>
+                  </div>
+
+                </Tabs.TabPane>
+                    
               </Tabs>
             </Card>
           </div>

@@ -37,3 +37,18 @@
   gap: 12px;
   margin-left: auto; 
 }
+.innerTabs :global(.ant-tabs-nav) {
+  margin-bottom: 12px;
+}
+
+.innerTabs :global(.ant-tabs-tab) {
+  font-weight: 500;
+}
+
+.innerTabs :global(.ant-tabs-tab-active .ant-tabs-tab-btn) {
+  color: #386fa4;
+}
+
+.innerTabs :global(.ant-tabs-ink-bar) {
+  background: #386fa4;
+}

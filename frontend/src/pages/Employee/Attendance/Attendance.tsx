@@ -1,28 +1,18 @@
+//src/pages/Employee/Attendance/Attendace.tsx
 "use client";
 
 import React, { useState } from "react";
-import {
-  Layout,
-  Card,
-  Calendar,
-  Tooltip,
-  Button,
-  Row,
-  Select,
-  Table,
-} from "antd";
+import { Layout, Card, Calendar, Tooltip, Button, Row, Select, Tabs } from "antd";
 import type { Dayjs } from "dayjs";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 import styles from "./Attendance.module.css";
 import dayjs from "dayjs";
-import {
-  CalendarOutlined,
-  LeftOutlined,
-  RightOutlined,
-} from "@ant-design/icons";
+import { CalendarOutlined,LeftOutlined,RightOutlined,} from "@ant-design/icons";
 import AttendanceCorrection from "./AttendanceCorrection";
 import LeaveRequest from "./LeaveRequest";
+import AttendaceLogs from "./AttendanceLogs";
+import Requests from "./Requests/Requests";
 
 const { Content } = Layout;
 const { Option } = Select;
@@ -76,38 +66,7 @@ const Attendance: React.FC = () => {
     );
   };
 
-  /* =========================
-     Table
-  ========================== */
-  const columns = [
-    { title: "Date", dataIndex: "date" },
-    { title: "Punched In", dataIndex: "in" },
-    { title: "Punched Out", dataIndex: "out" },
-    { title: "WorkShift", dataIndex: "shift" },
-    { title: "Status", dataIndex: "status" },
-    { title: "Type", dataIndex: "type" },
-  ];
 
-  const tableData = [
-    {
-      key: 1,
-      date: "16/08/2013",
-      in: "8:02 AM",
-      out: "5:10 PM",
-      shift: "Vietnam",
-      status: "Late",
-      type: "Full Amount",
-    },
-    {
-      key: 2,
-      date: "12/06/2020",
-      in: "8:00 AM",
-      out: "4:59 PM",
-      shift: "Nepal",
-      status: "On Time",
-      type: "Offline",
-    },
-  ];
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -199,14 +158,20 @@ const Attendance: React.FC = () => {
             </div>
           </Card>
 
-          {/* ===== Attendance history ===== */}
-          <Card title="Attendance History / Logs" className={styles.historyCard}>
-            <Table
-              columns={columns}
-              dataSource={tableData}
-              pagination={false}
-            />
+          {/* ===== Logs & Requests Section ===== */}
+          <Card className={styles.historyCard}>
+            <Tabs defaultActiveKey="logs" className={styles.innerTabs}>
+              <Tabs.TabPane tab="Attendance Logs" key="logs">
+                <AttendaceLogs year={year} month={month + 1} />
+              </Tabs.TabPane>
+
+              <Tabs.TabPane tab="Requests" key="requests">
+                <Requests />
+              </Tabs.TabPane>
+            </Tabs>
           </Card>
+
+              
 
           {/* ===== Modals ===== */}
           <AttendanceCorrection

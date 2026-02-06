@@ -2,89 +2,75 @@ import React, { useEffect, useState } from "react";
 import { Layout, Table, Input, Button, message } from "antd";
 import type { TableProps } from "antd";
 import { PlusOutlined, SearchOutlined, SlidersOutlined } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
-import styles from "../../HR/Department/Department.module.css";
-import api from "../../../api/axios";
+import styles from "../../HR/AdminDepartmentEmployee/Admin_DepartmentEmployee.module.css";
+import api from "api/axios";
 
-interface ShiftType {
-  id: number;
-  start_time: string;
-  end_time: string;
-}
-
-interface DepartmentType {
+interface EmployeeType {
   id: number;
   name: string;
-  shift: ShiftType | number;
+  manager: string;
+  position: string;
+  status: string;
+  department: string;
+  shift: string;
+  hired_date: string;
 }
 
-const Department: React.FC = () => {
+const AdminDepartmentEmployee: React.FC = () => {
+  const { deptId } = useParams<{ deptId: string }>();
   const navigate = useNavigate();
-  const [departments, setDepartments] = useState<DepartmentType[]>([]);
+  const [employees, setEmployees] = useState<EmployeeType[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  const fetchDepartments = async () => {
+  const fetchEmployees = async () => {
+    if (!deptId) return;
+
     setLoading(true);
     try {
-      // use your axios instance that adds the token automatically
-      const res = await api.get("/employees/departments/");
-      setDepartments(res.data);
-    } catch (err) {
+      const res = await api.get(`/employees/employees/by-department/${deptId}/`);
+      setEmployees(res.data); // axios already parses JSON
+    } catch (err: any) {
       console.error(err);
-      message.error("Failed to load departments");
+      message.error(err.response?.data?.message || "Failed to load employees");
     } finally {
       setLoading(false);
     }
   };
 
-
   useEffect(() => {
-    fetchDepartments();
-  }, []);
+    fetchEmployees();
+  }, [deptId]);
 
-  const filteredDepartments = departments.filter((dept) =>
-    dept.name.toLowerCase().includes(search.toLowerCase())
+  const filteredEmployees = employees.filter((emp) =>
+    emp.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const columns: TableProps<DepartmentType>["columns"] = [
+  const columns: TableProps<EmployeeType>["columns"] = [
     {
-      title: "ID",
-      dataIndex: "id",
-      key: "id",
-      width: 80,
-    },
-    {
-      title: "Department",
+      title: "Employee Name",
       dataIndex: "name",
       key: "name",
       render: (text) => (
-        <span className={styles.rowLink}>{text}</span>
+        <span className={styles.empLink}>{text}</span>
       ),
     },
-    {
-      title: "Workshift",
-      dataIndex: "shift",
-      key: "shift",
-      render: (shift) => {
-        if (!shift) return "—";
-        if (typeof shift === "object") {
-          return `${shift.start_time} - ${shift.end_time}`;
-        }
-        return shift;
-      },
-    },
-
+    { title: "Position", dataIndex: "position", key: "position" },
+    { title: "Status", dataIndex: "status", key: "status" },
+    { title: "Department", dataIndex: "department", key: "department" },
+    { title: "Shift", dataIndex: "shift", key: "shift" },
+    { title: "Hired Date", dataIndex: "hired_date", key: "hired_date" },
   ];
 
   return (
     <Layout className={styles.layout} style={{ minHeight: "100vh" }}>
       <Sidebar />
       <Layout>
-        <Topbar title="Department" />
+        <Topbar title="Employees" showBack />
 
         <Layout.Content className={styles.content}>
           <div className={styles.topBar}>
@@ -103,23 +89,26 @@ const Department: React.FC = () => {
 
           </div>
 
-          <Table<DepartmentType>
+          <Table<EmployeeType>
             columns={columns}
-            dataSource={filteredDepartments}
+            dataSource={filteredEmployees}
             rowKey="id"
             loading={loading}
             pagination={false}
             className={styles.table}
             onRow={(record) => ({
               onClick: () =>
-                navigate(`/super-admin/department-employee/${record.id}`),
+                navigate(
+                  `/super-admin/employee/employee-details/${record.id}`
+                ),
               style: { cursor: "pointer" },
             })}
           />
+
         </Layout.Content>
       </Layout>
     </Layout>
   );
 };
 
-export default Department;
+export default AdminDepartmentEmployee;

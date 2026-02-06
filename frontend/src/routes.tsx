@@ -34,6 +34,8 @@ import SupCalendar from "./pages/SuperAdmin/Calendar/Calendar";
 import SupAttendance from "./pages/SuperAdmin/Attendance/Attendance";
 import SupReport from "./pages/SuperAdmin/Reports/Reports";
 import SupDepartment from "./pages/SuperAdmin/Department/Department";
+import SupDepartmentEmployee from "./pages/SuperAdmin/SuperAdminDepartmentEmployee/SuperAdminDepartmentEmployee";
+import SupEmployeeDetailsPage from "./pages/SuperAdmin/EmployeeDetailsPage/EmployeeDetailsPage";
 import SupSystemConfig from "./pages/SuperAdmin/System Configuration/SystemConfiguration";
 import SupRequest from "./pages/SuperAdmin/Request/Request";
 
@@ -80,6 +82,8 @@ const Router: React.FC = () => {
           <Route path="/super-admin/attendance" element={<SupAttendance />} />
           <Route path="/super-admin/reports" element={<SupReport />} />
           <Route path="/super-admin/department" element={<SupDepartment />} />
+          <Route path="/super-admin/department-employee/:deptId" element={<SupDepartmentEmployee />} />
+          <Route path="/super-admin/employee/employee-details/:employeeId" element={<SupEmployeeDetailsPage />} />
           <Route path="/super-admin/system" element={<SupSystemConfig />} />
           <Route path="/super-admin/requests" element={<SupRequest />} />
         </Route>

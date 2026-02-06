@@ -264,6 +264,9 @@ class Allowance_Type(models.Model):
             )
         ]
 
+    def __str__(self):
+        return self.name
+
 class Employee_Allowance(models.Model):
     frequency_choices = [
         ("Monthly","Monthly"),

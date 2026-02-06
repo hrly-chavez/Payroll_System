@@ -35,7 +35,7 @@ const EmployeeSalaryModal: React.FC<Props> = ({ open, employeeId, onNext, onClos
   };
 
   return (
-    <Modal open={open} title="Employee Salary" onCancel={onClose} footer={null}>
+    <Modal open={open} title="Employee Salary" onCancel={onClose} footer={null} closable={false}>
       <Form layout="vertical" form={form}>
         <Form.Item name="pay_type" label="Pay Type" rules={[{ required: true }]}>
           <Select

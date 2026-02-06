@@ -120,6 +120,7 @@ const EmployeeContributionsModal: React.FC<Props> = ({
       title="Employee Contributions"
       footer={null}
       onCancel={onClose}
+      closable={false}
     >
       <Form layout="vertical" form={form}>
         {/* ---------------- GOVERNMENT CONTRIBUTIONS ---------------- */}

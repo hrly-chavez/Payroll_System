@@ -164,6 +164,7 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee_Deduction
         fields = [
+            "manual_code",
             "employee",
             "deduction_type",   # nullable for optional
             "frequency",

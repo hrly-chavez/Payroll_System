@@ -1,20 +1,22 @@
-import { Modal, Form, Select, InputNumber, DatePicker, Button, message } from "antd";
+import { Modal, Form, Select, InputNumber, DatePicker, Button, message, Divider, List } from "antd";
 import { useEffect, useState } from "react";
 import api from "api/axios";
 
 interface Props {
   open: boolean;
   employeeId: number;
-  onNext: (creds: { username: string; password: string }) => void;
   onClose: () => void;
+  onNext: () => void; // NEW
 }
+
 
 const EmployeeAllowanceModal: React.FC<Props> = ({ open, employeeId, onNext, onClose }) => {
   const [form] = Form.useForm();
   const [allowances, setAllowances] = useState<any[]>([]);
+  const [submittedAllowances, setSubmittedAllowances] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!open) return; // only fetch when modal is opened
+    if (!open) return;
 
     const loadAllowances = async () => {
       try {
@@ -28,29 +30,50 @@ const EmployeeAllowanceModal: React.FC<Props> = ({ open, employeeId, onNext, onC
     loadAllowances();
   }, [open]);
 
-
-  const submit = async () => {
+  const addAllowance = async () => {
     try {
       const v = await form.validateFields();
 
-      await api.post("/employees/allowances/", {
+      const payload = {
         employee: employeeId,
         allowance_type: v.allowance_type,
         amount: v.amount,
         frequency: v.frequency,
         effective_from: v.effective_from.format("YYYY-MM-DD"),
         status: "Active",
-      });
+      };
 
-      message.success("Allowance saved");
-      onNext({ username: v.username, password: v.password });
-    } catch {
-      message.error("Failed to save allowance");
+      await api.post("/employees/allowances/", payload);
+
+      message.success("Allowance added");
+
+      // Add to local list
+      setSubmittedAllowances((prev) => [...prev, payload]);
+
+      // Reset form for next entry
+      form.resetFields();
+    } catch (err: any) {
+      message.error(err.response?.data?.message || "Failed to add allowance");
     }
   };
 
+  const submitAll = () => {
+    if (submittedAllowances.length === 0) {
+      message.warning("Please add at least one allowance");
+      return;
+    }
+    onClose();
+    onNext();
+  };
+
   return (
-    <Modal open={open} title="Employee Allowances" footer={null} onCancel={onClose}>
+    <Modal
+      open={open}
+      title="Employee Allowances"
+      footer={null}
+      onCancel={onClose}
+      closable={false}
+    >
       <Form layout="vertical" form={form}>
         <Form.Item
           name="allowance_type"
@@ -59,7 +82,10 @@ const EmployeeAllowanceModal: React.FC<Props> = ({ open, employeeId, onNext, onC
         >
           <Select
             placeholder="Select allowance type"
-            options={allowances.map(a => ({ label: a.name, value: a.id }))}
+            options={allowances
+              // Filter out already added allowance types
+              .filter(a => !submittedAllowances.some(sa => sa.allowance_type === a.id))
+              .map(a => ({ label: a.name, value: a.id }))}
           />
         </Form.Item>
 
@@ -80,9 +106,34 @@ const EmployeeAllowanceModal: React.FC<Props> = ({ open, employeeId, onNext, onC
           <DatePicker style={{ width: "100%" }} />
         </Form.Item>
 
-        <Button type="primary" block onClick={submit}>
+        <Button
+          type="default"
+          block
+          style={{ marginBottom: 8 }}
+          onClick={addAllowance}
+          disabled={submittedAllowances.length >= allowances.length}
+        >
+          Add Allowance
+        </Button>
+
+        <Button type="primary" block onClick={submitAll}>
           Next
         </Button>
+
+        {submittedAllowances.length > 0 && (
+          <>
+            <Divider>Added Allowances</Divider>
+            <List
+              size="small"
+              dataSource={submittedAllowances}
+              renderItem={(item, idx) => (
+                <List.Item key={idx}>
+                  {`${item.allowance_type} - ${item.amount} (${item.frequency}) from ${item.effective_from}`}
+                </List.Item>
+              )}
+            />
+          </>
+        )}
       </Form>
     </Modal>
   );

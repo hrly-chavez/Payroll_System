@@ -13,7 +13,10 @@ interface Props {
 const AddEmployeeFlow: React.FC<Props> = ({ open, onClose }) => {
   const [step, setStep] = useState(1);
   const [employeeId, setEmployeeId] = useState<number | null>(null);
-  const [credentials, setCredentials] = useState({ username: "", password: "" });
+  const [credentials, setCredentials] = useState({
+    username: "",
+    password: "",
+  });
 
   useEffect(() => {
     if (open) {
@@ -25,31 +28,33 @@ const AddEmployeeFlow: React.FC<Props> = ({ open, onClose }) => {
 
   return (
     <>
-      {/* Step 1: Employee Details (includes Address now) */}
+      {/* Step 1: Employee Details */}
       {step === 1 && (
         <EmployeeDetailsModal
           open={open}
-          onNext={(id) => {
+          onNext={(id, creds) => {
             setEmployeeId(id);
-            setStep(2);
+            setCredentials(creds); // <-- store credentials locally
+            setStep(2); // go to credentials modal
           }}
           onClose={onClose}
         />
       )}
 
-      {/* Step 2: Salary */}
+
+      {/* Step 2: Credentials (VIEW ONLY) */}
       {step === 2 && employeeId && (
-        <EmployeeSalaryModal
+        <EmployeeCredentialsModal
           open
-          employeeId={employeeId}
+          credentials={credentials} // <-- pass credentials here
           onNext={() => setStep(3)}
           onClose={onClose}
         />
       )}
 
-      {/* Step 3: Contributions */}
+      {/* Step 3: Salary */}
       {step === 3 && employeeId && (
-        <EmployeeContributionsModal
+        <EmployeeSalaryModal
           open
           employeeId={employeeId}
           onNext={() => setStep(4)}
@@ -57,29 +62,28 @@ const AddEmployeeFlow: React.FC<Props> = ({ open, onClose }) => {
         />
       )}
 
-      {/* Step 4: Allowances */}
+      {/* Step 4: Contributions */}
       {step === 4 && employeeId && (
-        <EmployeeAllowanceModal
+        <EmployeeContributionsModal
           open
           employeeId={employeeId}
-          onNext={(creds) => {
-            setCredentials(creds);
-            setStep(5);
-          }}
+          onNext={() => setStep(5)}
           onClose={onClose}
         />
       )}
 
-      {/* Step 5: Show credentials */}
-      {step === 5 && (
-        <EmployeeCredentialsModal
+      {/* Step 5: Allowances */}
+      {step === 5 && employeeId && (
+        <EmployeeAllowanceModal
           open
-          credentials={credentials}
+          employeeId={employeeId}
           onClose={onClose}
+          onNext={() => setStep(step + 1)} // close modal by moving to next step
         />
       )}
     </>
   );
 };
+
 
 export default AddEmployeeFlow;

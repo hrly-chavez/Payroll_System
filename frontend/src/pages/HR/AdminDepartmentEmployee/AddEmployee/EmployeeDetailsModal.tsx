@@ -7,9 +7,10 @@ const { Option } = Select;
 
 interface Props {
   open: boolean;
-  onNext: (employeeId: number) => void;
+  onNext: (employeeId: number, credentials: { username: string; password: string }) => void;
   onClose: () => void;
 }
+
 
 interface Shift {
   id: number;
@@ -85,7 +86,10 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, onNext, onClose }) => {
       const res = await api.post("/employees/employees/", payload);
 
       message.success("Employee created successfully!");
-      onNext(res.data.employee_id); // pass the new employee ID to next modal
+      onNext(res.data.employee_id, {
+        username: res.data.username,
+        password: res.data.password,
+      });
     } catch (err: any) {
       console.error(err);
       message.error(err.response?.data?.message || "Failed to create employee");
@@ -101,6 +105,7 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, onNext, onClose }) => {
       centered
       width={800}
       className={styles.modal}
+      closable={false}
     >
       <Form layout="vertical" form={form} className={styles.form}>
         <Row gutter={16}>

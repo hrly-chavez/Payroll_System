@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from accounts.permissions import IsRole;
 import random, string
+from rest_framework.views import APIView
 
 #--------------------------Address
 # List all provinces
@@ -148,12 +149,95 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
     queryset = Employee_Salary.objects.all().order_by("-effective_from")
     serializer_class = EmployeeSalarySerializer
     permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["ADMIN"]  # only these roles can manage salaries
+    allowed_roles = ["ADMIN"]
 
-    # Optionally, filter by employee if query param is provided
     def get_queryset(self):
         queryset = super().get_queryset()
         employee_id = self.request.query_params.get("employee")
         if employee_id:
             queryset = queryset.filter(employee_id=employee_id)
         return queryset
+
+    @action(detail=False, methods=["get"], url_path="latest")
+    def latest_salary(self, request):
+        employee_id = request.query_params.get("employee")
+        if not employee_id:
+            return Response(
+                {"detail": "employee query param is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            employee_id = int(employee_id)
+        except ValueError:
+            return Response(
+                {"detail": "Invalid employee ID"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get the latest salary regardless of the effective_from filter
+        salary = (
+            Employee_Salary.objects
+            .filter(employee_id=employee_id)
+            .order_by("-effective_from")
+            .first()
+        )
+
+        if not salary:
+            return Response(
+                {"detail": "No salary found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = self.get_serializer(salary)
+        return Response(serializer.data)
+
+    
+#employee deduction
+class EmployeeDeductionViewSet(viewsets.ModelViewSet):
+    queryset = Employee_Deduction.objects.all()
+    serializer_class = EmployeeDeductionCreateSerializer
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["ADMIN"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        employee_id = self.request.query_params.get("employee")
+        if employee_id:
+            queryset = queryset.filter(employee_id=employee_id)
+        return queryset
+
+    # ----------------- NEW ENDPOINT -----------------
+    @action(detail=False, methods=["get"], url_path="deduction-types")
+    def deduction_types(self, request):
+        """
+        GET /employees/deductions/deduction-types/
+        Returns all deduction types (SSS, PhilHealth, Pag-IBIG, etc.)
+        """
+        deduction_types = Deduction_Type.objects.filter(is_active=True)
+        # Simplest serializer: return id, code, amount, calculation_type, salary ranges
+        data = [
+            {
+                "id": d.id,
+                "code": d.code,
+                "calculation_type": d.calculation_type,
+                "amount": float(d.amount),
+                "salary_range_from": float(d.salary_range_from),
+                "salary_range_to": float(d.salary_range_to),
+            }
+            for d in deduction_types
+        ]
+        return Response(data, status=status.HTTP_200_OK)
+    
+class EmployeeAllowanceViewSet(viewsets.ModelViewSet):
+    queryset = Employee_Allowance.objects.all()
+    serializer_class = EmployeeAllowanceCreateSerializer
+
+class AllowanceTypeListAPIView(APIView):
+    """
+    GET /employees/allowance-types/ → list all active allowance types
+    """
+    def get(self, request):
+        allowance_types = Allowance_Type.objects.filter(is_active=True)
+        serializer = AllowanceTypeSerializer(allowance_types, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

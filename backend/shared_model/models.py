@@ -210,6 +210,9 @@ class Deduction_Type(models.Model):
             )
         ]
 
+    def __str__(self):
+        return self.code   # 👈 THIS is the magic
+
 class Employee_Deduction(models.Model):
     frequency_choices = [
         ("Monthly","Monthly"),
@@ -222,6 +225,8 @@ class Employee_Deduction(models.Model):
     ]
     id = models.AutoField(primary_key=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    manual_code = models.CharField(max_length=100, null=True, blank=True)
+    manual_calculation_type = models.CharField(max_length=20, choices=[("Fixed","Fixed"),("Percent","Percent")], null=True, blank=True)
     frequency = models.CharField(max_length=20, choices=frequency_choices)
     effective_from = models.DateField()
     effective_to = models.DateField(null=True,blank=True)
@@ -234,7 +239,7 @@ class Employee_Deduction(models.Model):
     amortization_per_period = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
 
     employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="deductions")
-    deduction_type = models.ForeignKey(Deduction_Type,on_delete=models.PROTECT,related_name="employee_deductions") 
+    deduction_type = models.ForeignKey(Deduction_Type,on_delete=models.PROTECT,related_name="employee_deductions", null=True, blank=True) 
 
     class Meta:
         constraints = [

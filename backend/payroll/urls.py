@@ -11,6 +11,6 @@ urlpatterns = [
     path('superadmin/deductions/<int:pk>/', DeductionDetailView.as_view(), name='deduction-detail'),
     path('superadmin/deductions/<int:pk>/status/', DeductionUpdateStatusView.as_view(), name='deduction-update-status'),
     path("periods/", PayrollPeriodListCreateView.as_view(), name="payroll-periods"),
-    path("periods/<int:period_id>/eligible-employees/", PayrollPeriodEligibleEmployeesView.as_view()),
+    path("periods/<int:period_id>/eligible-employees/",PayrollPeriodEligibleEmployeesView.as_view(),name="payroll-period-eligible-employees"),
 ]
     

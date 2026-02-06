@@ -2,7 +2,8 @@ from datetime import datetime, date, timedelta
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
-
+from calendar import monthrange
+from datetime import date
 from shared_model.models import *
 
 #======================================HELPERS====================================
@@ -19,6 +20,12 @@ def _get_today_local_date():
 
 def _get_now_local_time():
     return timezone.localtime().time()
+
+def _month_date_range(year: int, month: int):
+    last_day = monthrange(year, month)[1]
+    start = date(year, month, 1)
+    end = date(year, month, last_day)
+    return start, end
 
 def _is_workday_for_shift(shift, target_date: date) -> bool:
     """

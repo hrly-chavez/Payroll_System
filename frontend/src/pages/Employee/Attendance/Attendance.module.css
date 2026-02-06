@@ -31,3 +31,9 @@
 .historyCard {
   margin-top: 20px;
 }
+
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-left: auto; 
+}

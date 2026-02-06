@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, Table, message } from "antd";
+import { Table, message, Tag } from "antd";
 import dayjs from "dayjs";
 import api from "../../../api/axios";
 
@@ -43,6 +43,18 @@ export default function HolidayTab({ active, searchText, refreshKey }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, refreshKey]);
 
+  const getStatusTag = (status?: string) => {
+    switch ((status || "").toLowerCase()) {
+      case "approved":
+        return <Tag color="green">Approved</Tag>;
+      case "declined":
+      case "rejected":
+        return <Tag color="red">Declined</Tag>;
+      default:
+        return <Tag color="gold">Pending</Tag>;
+    }
+  };
+
   const holidayColumns = [
     { title: "Holiday Name", dataIndex: "name" },
     {
@@ -53,26 +65,33 @@ export default function HolidayTab({ active, searchText, refreshKey }: Props) {
     { title: "Holiday Type", dataIndex: "type" },
     { title: "Holiday Base", dataIndex: "base" },
     {
-      title: "Action",
+      title: "Status",
       dataIndex: "status",
-      render: (status: string) => <Button>{status || "View"} ▼</Button>,
+      render: (status: string) => getStatusTag(status),
     },
   ];
 
-  const filtered = useMemo(() => {
-    const q = (searchText || "").trim().toLowerCase();
-    if (!q) return holidays;
+  const sortedHolidays = useMemo(() => {
+  return [...holidays].sort((a, b) => {
+    return dayjs(b.date).valueOf() - dayjs(a.date).valueOf();
+  });
+}, [holidays]);
 
-    return holidays.filter((h) => {
-      return (
-        h.name?.toLowerCase().includes(q) ||
-        h.type?.toLowerCase().includes(q) ||
-        h.base?.toLowerCase().includes(q) ||
-        h.date?.toLowerCase().includes(q) ||
-        (h.status || "").toLowerCase().includes(q)
-      );
-    });
-  }, [holidays, searchText]);
+  const filtered = useMemo(() => {
+  const q = (searchText || "").trim().toLowerCase();
+  if (!q) return sortedHolidays;
+
+  return sortedHolidays.filter((h) => {
+    return (
+      h.name?.toLowerCase().includes(q) ||
+      h.type?.toLowerCase().includes(q) ||
+      h.base?.toLowerCase().includes(q) ||
+      h.date?.toLowerCase().includes(q) ||
+      (h.status || "").toLowerCase().includes(q)
+    );
+  });
+}, [sortedHolidays, searchText]);
+
 
   return (
     <Table

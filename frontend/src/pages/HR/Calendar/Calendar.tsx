@@ -228,25 +228,28 @@ const CalendarPage: React.FC = () => {
             {/* HEADER ROW */}
             <div className={styles.requestHeader}>
               <div className={styles.tabSwitch}>
-                <Button
-                  type={activeTab === "payroll" ? "primary" : "default"}
-                  onClick={() => setActiveTab("payroll")}>
+                <button
+                  className={`${styles.pillTab} ${
+                    activeTab === "payroll" ? styles.pillActive : ""
+                  }`}
+                  onClick={() => setActiveTab("payroll")}
+                  type="button"
+                >
                   Payroll Period
-                </Button>
-                <Button
-                  type={activeTab === "holiday" ? "primary" : "default"}
-                  onClick={() => setActiveTab("holiday")}>
+                </button>
+
+                <button
+                  className={`${styles.pillTab} ${
+                    activeTab === "holiday" ? styles.pillActive : ""
+                  }`}
+                  onClick={() => setActiveTab("holiday")}
+                  type="button"
+                >
                   Holiday Request
-                </Button>    
+                </button>
               </div>
-              <Input.Search
-                placeholder="Search"
-                className={styles.searchRight}
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                allowClear
-              />
-            </div>
+              </div>
+
 
             {/* TABLE */}
             {activeTab === "holiday" && (

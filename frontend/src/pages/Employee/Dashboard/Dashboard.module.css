@@ -25,11 +25,25 @@
 
 /* Shrink calendar height */
 .equalTopCard :global(.ant-picker-calendar) {
-  height: 200px;
+  height: 165px;
 }
 
 .equalTopCard :global(.ant-picker-content) {
-  height: 150px;
+  height: 120px;
+}
+
+.equalTopCard :global(.ant-picker-cell) {
+  padding: 2px 0;
+}
+
+.equalTopCard :global(.ant-picker-cell-inner) {
+  min-height: 22px;
+  line-height: 22px;
+}
+
+.equalTopCard :global(.ant-picker-content th) {
+  padding: 4px 0;
+  font-size: 12px;
 }
 
 /* Calendar dropdown header */

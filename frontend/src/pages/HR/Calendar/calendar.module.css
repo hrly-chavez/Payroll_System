@@ -9,6 +9,7 @@
 .actions {
   display: flex;
   gap: 12px;
+  justify-content: flex-end;
 }
 
 /* Primary action */
@@ -27,14 +28,15 @@
 /* Secondary action */
 .holidayBtn {
   border-radius: 6px;
+  background-color: #386FA4 !important;
   border: 1px solid #386FA4 !important;
-  color: #386FA4 !important;
+  color: #fff !important;
 }
 
 .holidayBtn:hover {
-  background-color: #eaf2f9 !important;
+  background-color: #2f5f8d !important;
   border-color: #2f5f8d !important;
-  color: #2f5f8d !important;
+  color: #eaf2f9 !important;
 }
 
 /* CARD */
@@ -55,9 +57,45 @@
   margin-bottom: 16px;
 }
 
-.tabSwitch button {
-  margin-right: 8px;
+/* Pill container */
+.tabSwitch {
+  display: inline-flex;
+  background: #f0f2f5;
+  padding: 4px;
+  border-radius: 999px; /* full pill */
+  gap: 4px;
 }
+
+/* Individual pill */
+.pillTab {
+  border: none;
+  background: transparent;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #595959;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* Hover (inactive only) */
+.pillTab:hover {
+  color: #2f5f8d;
+}
+
+/* Active pill */
+.pillActive {
+  background: #2f5f8d;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(22, 119, 255, 0.35);
+}
+
+/* Active hover (keep solid) */
+.pillActive:hover {
+  color: #ffffff;
+}
+
 
 .searchRight {
   width: 240px;

@@ -15,7 +15,6 @@ import Unauthorized from "./pages/Login/Unauthorized";
 /* ================= EMPLOYEE ================= */
 import EmpDashboard from "./pages/Employee/Dashboard/Dashboard";
 import EmpAttendance from "./pages/Employee/Attendance/Attendance";
-import EmpRequests from "./pages/Employee/Requests/Requests";
 import EmpPayslips from "./pages/Employee/Payslips/Payslips";
 
 /* ================= ADMIN / HR ================= */
@@ -53,7 +52,6 @@ const Router: React.FC = () => {
         <Route element={<ProtectedRoute allowedRoles={["EMPLOYEE"]} />}>
           <Route path="/employee_dashboard" element={<EmpDashboard />} />
           <Route path="/employee/attendance" element={<EmpAttendance />} />
-          <Route path="/employee/requests" element={<EmpRequests />} />
           <Route path="/employee/payslips" element={<EmpPayslips />} />
         </Route>
 

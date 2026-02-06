@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Layout, Card, Calendar, Tooltip, Button, Row, Select } from "antd";
+import { Layout, Card, Calendar, Tooltip, Button, Row, Select, Tabs } from "antd";
 import type { Dayjs } from "dayjs";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
@@ -12,6 +12,7 @@ import { CalendarOutlined,LeftOutlined,RightOutlined,} from "@ant-design/icons";
 import AttendanceCorrection from "./AttendanceCorrection";
 import LeaveRequest from "./LeaveRequest";
 import AttendaceLogs from "./AttendanceLogs";
+import Requests from "./Requests/Requests";
 
 const { Content } = Layout;
 const { Option } = Select;
@@ -157,8 +158,19 @@ const Attendance: React.FC = () => {
             </div>
           </Card>
 
-          {/* ===== Attendance history ===== */}
-          <AttendaceLogs year={year} month={month + 1} />
+          {/* ===== Logs & Requests Section ===== */}
+          <Card className={styles.historyCard}>
+            <Tabs defaultActiveKey="logs" className={styles.innerTabs}>
+              <Tabs.TabPane tab="Attendance Logs" key="logs">
+                <AttendaceLogs year={year} month={month + 1} />
+              </Tabs.TabPane>
+
+              <Tabs.TabPane tab="Requests" key="requests">
+                <Requests />
+              </Tabs.TabPane>
+            </Tabs>
+          </Card>
+
               
 
           {/* ===== Modals ===== */}

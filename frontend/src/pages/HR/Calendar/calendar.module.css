@@ -5,77 +5,7 @@
   border-radius: 12px;
 }
 
-/* Header */
-.headerRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.monthTitle {
-  font-size: 22px;
-  font-weight: 600;
-}
-
-.actions {
-  display: flex;
-  gap: 12px;
-}
-
-/* Calendar Grid */
-.calendarGrid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  border: 1px solid #eee;
-}
-
-.dayHeader {
-  padding: 8px;
-  text-align: center;
-  font-weight: 600;
-  background: #f8f9fb;
-}
-
-.dayCell {
-  height: 80px;
-  border: 1px solid #f0f0f0;
-  padding: 6px;
-}
-
-/* Legend */
-.legendRow {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin: 12px 0;
-}
-
-.box {
-  width: 14px;
-  height: 14px;
-  display: inline-block;
-  margin-right: 6px;
-  border-radius: 3px;
-}
-
-.ph { background: #2e7d32; }
-.us { background: #c62828; }
-.work { background: #fbc02d; }
-.nonWork { background: #616161; }
-.open { background: #b2dfdb; }
-.close { background: #bbdefb; }
-.lock { background: #d7ccc8; }
-
-/* Table */
-.tableSection {
-  margin-top: 16px;
-}
-
-.search {
-  margin-bottom: 10px;
-}
-
+/* ACTION BUTTONS */
 .actions {
   display: flex;
   gap: 12px;
@@ -107,11 +37,17 @@
   color: #2f5f8d !important;
 }
 
+/* CARD */
 .card {
   margin-top: 20px;
   border-radius: 12px;
 }
 
+.card :global(.ant-card-body) {
+  padding: 14px 16px;
+}
+
+/* REQUESTS HEADER */
 .requestHeader {
   display: flex;
   justify-content: space-between;
@@ -127,3 +63,175 @@
   width: 240px;
 }
 
+/* =========================
+   CALENDAR STYLES
+========================= */
+
+.calendarWrap {
+  width: 100%;
+}
+
+/* Remove AntD borders/background */
+.calendarWrap :global(.ant-picker-calendar),
+.calendarWrap :global(.ant-picker-calendar-mini),
+.calendarWrap :global(.ant-picker-panel) {
+  background: transparent;
+  border: none;
+}
+
+/* Weekday header (Sun–Sat) */
+.calendarWrap :global(.ant-picker-content th) {
+  padding: 8px 0;
+  font-weight: 600;
+  font-size: 12px;
+  background: #f8f9fb;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* Calendar cells */
+.calendarWrap :global(.ant-picker-calendar-date) {
+  margin: 0 !important;
+  padding: 6px 8px !important;
+  height: 76px !important;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* Day number */
+.calendarWrap :global(.ant-picker-calendar-date-value) {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Today highlight */
+.calendarWrap :global(.ant-picker-calendar-date-today) {
+  border-color: #386FA4 !important;
+}
+
+/* Reduce inner spacing */
+.calendarWrap :global(.ant-picker-calendar-date-content) {
+  margin-top: 6px;
+  height: auto;
+}
+
+/* =========================
+   CUSTOM CALENDAR HEADER
+========================= */
+
+.calHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0f0f0;
+  gap: 12px;
+}
+
+.calLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calTitle {
+  font-weight: 700;
+  font-size: 14px;
+  min-width: 120px;
+  text-align: center;
+}
+
+.calRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calRight :global(.ant-select-selector) {
+  border-radius: 8px !important;
+}
+
+/* =========================
+   HOLIDAY CELL MARKERS
+========================= */
+
+.cellNote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.cellText {
+  font-size: 11px;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+}
+
+.cellMore {
+  font-size: 11px;
+  opacity: 0.65;
+  flex-shrink: 0;
+}
+
+/* =========================
+   TABLE
+========================= */
+
+.tableSection {
+  margin-top: 16px;
+}
+
+.search {
+  margin-bottom: 10px;
+}
+/* Stack items inside the date cell neatly */
+.cellStack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* Payroll period range bar */
+
+.ppBar {
+  width: 100%;
+  height: 10px;
+  border-radius: 4px;
+  background: rgba(56, 111, 164, 0.18);
+  border: 1px solid rgba(56, 111, 164, 0.28);
+}
+
+/* range shapes */
+.ppStart {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.ppMid {
+  border-radius: 0;
+}
+
+.ppEnd {
+  border-top-left-radius:  0;
+  border-bottom-left-radius:  0;
+}
+
+.ppSingle {
+  border-radius: 4px;
+}
+
+.ppText {
+  font-weight: 600;
+  color: #2f5f8d;
+}
+
+.ppMore {
+  margin-left: 6px;
+  font-size: 11px;
+  opacity: 0.65;
+}

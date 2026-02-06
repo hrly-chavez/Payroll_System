@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from accounts.permissions import IsRole;
 import random, string
+from rest_framework.views import APIView
 
 #--------------------------Address
 # List all provinces
@@ -227,3 +228,16 @@ class EmployeeDeductionViewSet(viewsets.ModelViewSet):
             for d in deduction_types
         ]
         return Response(data, status=status.HTTP_200_OK)
+    
+class EmployeeAllowanceViewSet(viewsets.ModelViewSet):
+    queryset = Employee_Allowance.objects.all()
+    serializer_class = EmployeeAllowanceCreateSerializer
+
+class AllowanceTypeListAPIView(APIView):
+    """
+    GET /employees/allowance-types/ → list all active allowance types
+    """
+    def get(self, request):
+        allowance_types = Allowance_Type.objects.filter(is_active=True)
+        serializer = AllowanceTypeSerializer(allowance_types, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

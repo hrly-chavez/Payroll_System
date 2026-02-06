@@ -14,8 +14,20 @@ const EmployeeAllowanceModal: React.FC<Props> = ({ open, employeeId, onNext, onC
   const [allowances, setAllowances] = useState<any[]>([]);
 
   useEffect(() => {
-    api.get("/employees/allowance-types/").then(res => setAllowances(res.data));
-  }, []);
+    if (!open) return; // only fetch when modal is opened
+
+    const loadAllowances = async () => {
+      try {
+        const res = await api.get("/employees/allowance-types/");
+        setAllowances(res.data);
+      } catch {
+        message.error("Failed to load allowance types");
+      }
+    };
+
+    loadAllowances();
+  }, [open]);
+
 
   const submit = async () => {
     try {
@@ -40,9 +52,17 @@ const EmployeeAllowanceModal: React.FC<Props> = ({ open, employeeId, onNext, onC
   return (
     <Modal open={open} title="Employee Allowances" footer={null} onCancel={onClose}>
       <Form layout="vertical" form={form}>
-        <Form.Item name="allowance_type" label="Allowance Type" rules={[{ required: true }]}>
-          <Select options={allowances.map(a => ({ label: a.name, value: a.id }))} />
+        <Form.Item
+          name="allowance_type"
+          label="Allowance Type"
+          rules={[{ required: true, message: "Please select an allowance type" }]}
+        >
+          <Select
+            placeholder="Select allowance type"
+            options={allowances.map(a => ({ label: a.name, value: a.id }))}
+          />
         </Form.Item>
+
 
         <Form.Item name="amount" label="Amount" rules={[{ required: true }]}>
           <InputNumber style={{ width: "100%" }} />

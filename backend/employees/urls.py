@@ -10,6 +10,8 @@ router.register(r"shifts", ShiftViewSet)
 router.register(r"employees", EmployeeViewSet)
 router.register(r"salaries", EmployeeSalaryViewSet)
 router.register(r"deductions", EmployeeDeductionViewSet) 
+router.register(r"allowances", EmployeeAllowanceViewSet)
+
 
 urlpatterns = [
     path("", include(router.urls)),
@@ -17,4 +19,5 @@ urlpatterns = [
     path("provinces/", ProvinceListAPIView.as_view(), name="provinces-list"),
     path("provinces/<int:province_id>/cities/", CityListByProvinceAPIView.as_view(), name="cities-by-province"),
     path("cities/<int:city_id>/barangays/", BarangayListByCityAPIView.as_view(), name="barangays-by-city"),
+    path("allowance-types/", AllowanceTypeListAPIView.as_view(), name="allowance-types-list"),
 ]

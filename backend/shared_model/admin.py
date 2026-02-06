@@ -58,6 +58,14 @@ class DeductionTypeAdmin(admin.ModelAdmin):
     ordering = ('-create_at',)
     date_hierarchy = 'create_at'
 
+@admin.register(Allowance_Type)
+class Allowance_Type(admin.ModelAdmin):
+    list_display = ('name', )
+
+@admin.register(Employee_Allowance)
+class Employee_Allowance(admin.ModelAdmin):
+    list_display = ('id', )
+
 admin.site.register(Attendance)
 admin.site.register(Attendance_Event)
 admin.site.register(Payroll_Period)

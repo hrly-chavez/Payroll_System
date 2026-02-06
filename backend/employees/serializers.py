@@ -253,16 +253,31 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
         return obj
 
 
-#deduction_type isulod rha sa 
-class DeductionTypeSerializer(serializers.ModelSerializer):
+class EmployeeAllowanceCreateSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Deduction_Type
+        model = Employee_Allowance
         fields = [
-            "id",
-            "code",
-            "salary_range_from",
-            "salary_range_to",
-            "calculation_type",
+            "employee",
+            "allowance_type",
             "amount",
-            "is_active",
+            "frequency",
+            "effective_from",
+            "effective_to",
+            "status",
         ]
+
+    def validate(self, data):
+        # Optional: check overlapping allowances for same employee + type
+        existing = Employee_Allowance.objects.filter(
+            employee=data["employee"],
+            allowance_type=data["allowance_type"],
+            effective_from=data["effective_from"],
+        )
+        if existing.exists():
+            raise serializers.ValidationError("Allowance already exists for this period")
+        return data
+    
+class AllowanceTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Allowance_Type
+        fields = ["id", "name", "code", "is_active"]

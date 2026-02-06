@@ -2,8 +2,8 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from shared_model.models import Holiday
-from .serializers import HolidaySerializer
+from shared_model.models import *
+from .serializers import *
 from accounts.permissions import IsRole;
 
 class HolidayListView(generics.ListAPIView):
@@ -47,3 +47,21 @@ class HolidayUpdateStatusView(APIView):
             'detail': 'Status updated',
             'holiday': serializer.data
         }, status=status.HTTP_200_OK)
+    
+class LeaveTypeListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    queryset = Leave_Type.objects.all().order_by('-created_at')
+    serializer_class = LeaveTypeSerializer
+
+class LeaveTypeCreateView(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated]
+    queryset = Leave_Type.objects.all()
+    serializer_class = LeaveTypeSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(is_active=True)
+
+class LeaveTypeUpdateView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    queryset = Leave_Type.objects.all()
+    serializer_class = LeaveTypeSerializer

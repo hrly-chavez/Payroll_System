@@ -70,3 +70,11 @@ class PayRuleAdmin(admin.ModelAdmin):
     date_hierarchy = 'created_at'
     list_display_links = ('name', 'event_type')
     raw_id_fields = ('applies_to', 'employee')
+
+@admin.register(Leave_Type)
+class LeaveTypeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'is_paid', 'pay_rate', 'requires_approval', 'is_active', 'created_at')
+    list_filter = ('is_paid', 'requires_approval', 'is_active')
+    search_fields = ['name']  # <-- must be a list
+    ordering = ['-created_at']  # <-- must be a list
+    readonly_fields = ('created_at',)

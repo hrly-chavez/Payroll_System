@@ -10,6 +10,8 @@ import {
   Spin,
   DatePicker,
   Checkbox,
+  Row,
+  Col,
 } from 'antd';
 import { EditOutlined } from '@ant-design/icons';
 import Sidebar from '../../../components/Sidebar/Sidebar';
@@ -23,7 +25,7 @@ const { Option } = Select;
 const { RangePicker } = DatePicker;
 
 const SystemConfiguration: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'contribution' | 'payroll'>('contribution');
+  const [activeTab, setActiveTab] = useState<'contribution' | 'payroll' | 'leave'>('contribution');
 
   // ================= DEDUCTIONS / CONTRIBUTIONS =================
   const [contributions, setContributions] = useState<any[]>([]);
@@ -59,7 +61,15 @@ const SystemConfiguration: React.FC = () => {
 
   const [payrollForm] = Form.useForm();
 
-  // Fetch Departments & Employees
+  // ================= LEAVE TYPES =================
+  const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
+  const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+  const [leaveEditMode, setLeaveEditMode] = useState(false);
+  const [editingLeaveId, setEditingLeaveId] = useState<number | null>(null);
+
+  const [leaveForm] = Form.useForm();
+
+  // ================= Fetch Functions =================
   const fetchDepartments = async () => {
     try {
       const res = await API.get('/employees/departments/');
@@ -92,6 +102,18 @@ const SystemConfiguration: React.FC = () => {
     setLoading(false);
   };
 
+  const fetchLeaveTypes = async () => {
+    setLoading(true);
+    try {
+      const res = await API.get('/approvals/superadmin/leave-types/');
+      setLeaveTypes([...res.data].reverse());
+    } catch (error) {
+      console.error(error);
+      message.error('Failed to fetch leave types.');
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
     if (activeTab === 'contribution') fetchContributions();
     if (activeTab === 'payroll') {
@@ -99,6 +121,7 @@ const SystemConfiguration: React.FC = () => {
       fetchDepartments();
       fetchEmployees();
     }
+    if (activeTab === 'leave') fetchLeaveTypes();
   }, [activeTab]);
 
   // ================= CONTRIBUTION HANDLERS =================
@@ -231,6 +254,62 @@ const SystemConfiguration: React.FC = () => {
     }
   };
 
+  // ================= LEAVE TYPE HANDLERS =================
+  const openLeaveModal = () => {
+    leaveForm.resetFields();
+    setLeaveEditMode(false);
+    setLeaveModalOpen(true);
+  };
+
+  const closeLeaveModal = () => {
+    leaveForm.resetFields();
+    setLeaveEditMode(false);
+    setEditingLeaveId(null);
+    setLeaveModalOpen(false);
+  };
+
+  const handleEditLeave = (leave: any) => {
+    setLeaveEditMode(true);
+    setEditingLeaveId(leave.id);
+    leaveForm.setFieldsValue({
+      name: leave.name,
+      is_paid: leave.is_paid,
+      pay_rate: leave.pay_rate,
+      requires_approval: leave.requires_approval,
+      is_active: leave.is_active,
+    });
+    setLeaveModalOpen(true);
+  };
+
+  const handleSaveLeave = async () => {
+    try {
+      const values = await leaveForm.validateFields();
+      const payload = {
+        name: values.name,
+        is_paid: values.is_paid,
+        pay_rate: parseFloat(values.pay_rate),
+        requires_approval: values.requires_approval,
+        is_active: values.is_active,
+      };
+
+      if (leaveEditMode && editingLeaveId) {
+        await API.put(`/approvals/superadmin/leave-types/${editingLeaveId}/`, payload);
+        setLeaveTypes((prev) =>
+          prev.map((item) => (item.id === editingLeaveId ? { ...item, ...payload } : item))
+        );
+        message.success('Leave type updated successfully');
+      } else {
+        const res = await API.post('/approvals/superadmin/leave-types/create/', payload);
+        setLeaveTypes((prev) => [res.data, ...prev]);
+        message.success('Leave type added successfully');
+      }
+      closeLeaveModal();
+    } catch (error) {
+      console.error(error);
+      message.error('Failed to save leave type.');
+    }
+  };
+
   return (
     <Layout className="system-layout">
       <Sidebar />
@@ -252,11 +331,23 @@ const SystemConfiguration: React.FC = () => {
               >
                 Payroll Rules
               </button>
+              <button
+                className={activeTab === 'leave' ? 'active' : ''}
+                onClick={() => setActiveTab('leave')}
+              >
+                Leave Types
+              </button>
             </div>
 
             {/* Section Header */}
             <div className="section-header">
-              <h3>{activeTab === 'contribution' ? 'Contribution Table' : 'Payroll Rules'}</h3>
+              <h3>
+                {activeTab === 'contribution'
+                  ? 'Contribution Table'
+                  : activeTab === 'payroll'
+                  ? 'Payroll Rules'
+                  : 'Leave Types'}
+              </h3>
 
               {activeTab === 'contribution' && (
                 <Button type="primary" onClick={openContributionModal}>
@@ -266,6 +357,11 @@ const SystemConfiguration: React.FC = () => {
               {activeTab === 'payroll' && (
                 <Button type="primary" onClick={openPayrollModal}>
                   Add New Payroll Rule
+                </Button>
+              )}
+              {activeTab === 'leave' && (
+                <Button type="primary" onClick={openLeaveModal}>
+                  Add New Leave Type
                 </Button>
               )}
             </div>
@@ -350,6 +446,42 @@ const SystemConfiguration: React.FC = () => {
               </div>
             )}
 
+            {/* ================= Leave Types Table ================= */}
+            {activeTab === 'leave' && (
+              <div className="table-wrapper">
+                {loading ? (
+                  <Spin />
+                ) : (
+                  <table className="config-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Paid?</th>
+                        <th>Pay Rate</th>
+                        <th>Requires Approval</th>
+                        <th>Active</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {leaveTypes.map((leave) => (
+                        <tr key={leave.id}>
+                          <td>{leave.name}</td>
+                          <td>{leave.is_paid ? 'Yes' : 'No'}</td>
+                          <td>{leave.pay_rate}</td>
+                          <td>{leave.requires_approval ? 'Yes' : 'No'}</td>
+                          <td>{leave.is_active ? 'Yes' : 'No'}</td>
+                          <td className="actions">
+                            <EditOutlined onClick={() => handleEditLeave(leave)} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+
             {/* ================= Contribution Modal ================= */}
             <Modal
               title={isEditMode ? 'Edit Contribution' : 'Add Contribution'}
@@ -393,93 +525,73 @@ const SystemConfiguration: React.FC = () => {
             </Modal>
 
             {/* ================= Payroll Rule Modal ================= */}
-            {activeTab === 'payroll' && (
+            {activeTab === 'leave' && (
               <Modal
-                title={payRuleEditMode ? 'Edit Payroll Rule' : 'Add Payroll Rule'}
-                open={payrollModalOpen}
-                onCancel={closePayrollModal}
-                onOk={handleSavePayRule}
+                title={leaveEditMode ? 'Edit Leave Type' : 'Add Leave Type'}
+                open={leaveModalOpen}
+                onCancel={closeLeaveModal}
+                onOk={handleSaveLeave}
                 okText="Save"
                 centered
+                width={500}
+                bodyStyle={{ padding: '20px 20px' }}
+                okButtonProps={{ style: { backgroundColor: '#1890ff', borderColor: '#1890ff' } }}
               >
-                <Form form={payrollForm} layout="vertical">
-                  <Form.Item label="Rule Name" name="name" rules={[{ required: true }]}>
-                    <Input />
+                <Form
+                  form={leaveForm}
+                  layout="vertical"
+                  colon={false}
+                  labelAlign="left"
+                  wrapperCol={{ span: 24 }}
+                  style={{ maxWidth: '100%' }}
+                >
+                  {/* Leave Name */}
+                  <Form.Item
+                    label="Leave Name"
+                    name="name"
+                    rules={[{ required: true, message: 'Please enter leave name' }]}
+                  >
+                    <Input placeholder="Enter leave name" />
                   </Form.Item>
 
-                  <Form.Item label="Event Type" name="event_type" rules={[{ required: true }]}>
-                    <Select>
-                      <Option value="Night Differential">Night Differential</Option>
-                      <Option value="Late">Late</Option>
-                      <Option value="Undertime">Undertime</Option>
-                      <Option value="Overtime">Overtime</Option>
-                      <Option value="Regular Holiday">Regular Holiday</Option>
-                      <Option value="Special Holiday">Special Holiday</Option>
-                      <Option value="Special Non Working Holiday">Special Non Working Holiday</Option>
-                      <Option value="Company Holiday">Company Holiday</Option>
-                    </Select>
-                  </Form.Item>
-
-                  <Form.Item label="Category" name="category" rules={[{ required: true }]}>
-                    <Select>
-                      <Option value="Earning">Earning</Option>
-                      <Option value="Deduction">Deduction</Option>
-                    </Select>
-                  </Form.Item>
-
-                  <Form.Item label="Rate Type" name="rate_type" rules={[{ required: true }]}>
-                    <Select>
-                      <Option value="PER_MINUTE">Per Minute</Option>
-                      <Option value="MULTIPLIER">Multiplier</Option>
-                      <Option value="FIXED">Fixed</Option>
-                      <Option value="PER_DAY">Per Day</Option>
-                    </Select>
-                  </Form.Item>
-
-                  <Form.Item label="Rate Value" name="rate_value" rules={[{ required: true }]}>
-                    <Input type="number" step="0.01" />
-                  </Form.Item>
-
-                  <Form.Item label="Applies To (Department)" name="applies_to">
-                    <Select allowClear placeholder="Select Department">
-                      <Option value="">All Departments</Option>
-                      {departments.map((dept) => (
-                        <Option key={dept.id} value={dept.id}>
-                          {dept.name}
-                        </Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-
-                  <Form.Item label="Employee" name="employee">
-                    <Select allowClear placeholder="Select Employee">
-                      <Option value="">All Employees</Option>
-                      {employees.map((emp) => (
-                        <Option key={emp.id} value={emp.id}>
-                          {emp.name} ({emp.department_name})
-                        </Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-
-                  <Form.Item label="Effective From / To" name="effective_dates">
-                    <RangePicker
-                      format="YYYY-MM-DD"
-                      value={payrollForm.getFieldValue('effective_dates')}
-                      onChange={(dates) =>
-                        payrollForm.setFieldsValue({
-                          effective_dates: dates,
-                        })
-                      }
+                  {/* Pay Rate */}
+                  <Form.Item
+                    label="Pay Rate"
+                    name="pay_rate"
+                    rules={[{ required: true, message: 'Please enter pay rate' }]}
+                  >
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="Enter pay rate"
+                      style={{ width: '100%' }}
                     />
                   </Form.Item>
 
-                  <Form.Item name="is_active" valuePropName="checked">
-                    <Checkbox>Is Active</Checkbox>
+                  {/* Options */}
+                  <Form.Item label="Options">
+                    <Row gutter={16}>
+                      <Col>
+                        <Form.Item name="is_paid" valuePropName="checked" noStyle>
+                          <Checkbox>Paid Leave</Checkbox>
+                        </Form.Item>
+                      </Col>
+                      <Col>
+                        <Form.Item name="requires_approval" valuePropName="checked" noStyle>
+                          <Checkbox>Requires Approval</Checkbox>
+                        </Form.Item>
+                      </Col>
+                      <Col>
+                        <Form.Item name="is_active" valuePropName="checked" noStyle>
+                          <Checkbox>Active</Checkbox>
+                        </Form.Item>
+                      </Col>
+                    </Row>
                   </Form.Item>
                 </Form>
               </Modal>
             )}
+
           </div>
         </Content>
       </Layout>

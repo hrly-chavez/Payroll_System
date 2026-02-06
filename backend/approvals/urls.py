@@ -1,11 +1,14 @@
 from django.urls import path
-from .views import HolidayListView, HolidayUpdateStatusView, HolidayCreateView
+from .views import HolidayListView, HolidayCreateView, HolidayUpdateStatusView, LeaveTypeListView, LeaveTypeCreateView, LeaveTypeUpdateView
 urlpatterns = [
     path('superadmin/holidays/<int:pk>/status/', HolidayUpdateStatusView.as_view(), name='holiday-update-status'),
     path('holidays/', HolidayListView.as_view()),
     path('superadmin/holidays/', HolidayListView.as_view()),
     path('holidays/create/', HolidayCreateView.as_view()),
-
-
+ 
+    # Leave Types
+    path('superadmin/leave-types/', LeaveTypeListView.as_view(), name='leave-list'),
+    path('superadmin/leave-types/create/', LeaveTypeCreateView.as_view(), name='leave-create'),
+    path('superadmin/leave-types/<int:pk>/', LeaveTypeUpdateView.as_view(), name='leave-update'),
 
 ]

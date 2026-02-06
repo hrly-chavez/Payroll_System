@@ -342,11 +342,10 @@ class Attendance_Event(models.Model):
 class Leave_Type(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=20)
-    code = models.CharField(max_length=20)
     is_paid = models.BooleanField(default=False)
     pay_rate = models.DecimalField(max_digits=4, decimal_places=2,default=1.00)
     requires_approval = models.BooleanField(default=True)
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True) 
     created_at = models.DateField(auto_now=True)
 
 class Leave_Request(models.Model):

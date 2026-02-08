@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Layout, Row, Col, Calendar, Spin, message } from 'antd';
+import { Layout, Row, Col, Calendar, Spin, message, DatePicker, Segmented } from "antd";
 import Chart from '../../../components/Chart';
 import Sidebar from '../../../components/Sidebar/Sidebar';
 import Topbar from '../../../components/Topbar/Topbar';
-import Greeting from '../../../components/Greeting/Greeting';
+
 import * as echarts from 'echarts';
 import dayjs from 'dayjs';
+import type { Dayjs } from "dayjs";
 import { useNavigate } from 'react-router-dom';
 import api from '../../../api/axios';
 import './Dashboard.css';
 
-// ✅ Import the modularized modals
+
 import HolidayModal from './HolidayModal';
 import HolidayDetailModal from './HolidayDetailModal';
 import DeclineReasonModal from './DeclineReasonModal';
@@ -43,6 +44,8 @@ interface AttendanceRecord {
 }
 
 type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'OVERTIME' | 'UNDERTIME';
+type RangeMode = "Day" | "Week" | "Month" | "Year";
+
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -68,6 +71,9 @@ const Dashboard: React.FC = () => {
     OVERTIME: 0,
     UNDERTIME: 0,
   });
+  const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs()); // default today
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [rangeMode, setRangeMode] = useState<RangeMode>("Day");
 
   /* ------------------ Modal state ------------------ */
   const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
@@ -102,30 +108,110 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const fetchAttendanceRecords = async () => {
-    try {
-      const res = await api.get<AttendanceRecord[]>('/employee/attendance/');
-      const counts: Record<AttendanceStatus, number> = {
-        PRESENT: 0,
-        ABSENT: 0,
-        LATE: 0,
-        OVERTIME: 0,
-        UNDERTIME: 0,
-      };
-      res.data.forEach(item => {
-        if (item.status in counts) counts[item.status as AttendanceStatus]++;
+    const countFromRows = (list: any[]) => {
+    let present = 0;
+    let absent = 0;
+    let late = 0;
+    let overtime = 0;
+    let undertime = 0;
+
+    list.forEach((r: any) => {
+      if (r.status === "PRESENT") present++;
+      if (r.status === "ABSENT") absent++;
+
+      const types = (r.event_types || "")
+        .split(",")
+        .map((x: string) => x.trim())
+        .filter(Boolean);
+
+      if (types.includes("Late")) late++;
+      if (types.includes("OverTime")) overtime++;
+      if (types.includes("UnderTime")) undertime++;
+    });
+
+    return { PRESENT: present, ABSENT: absent, LATE: late, OVERTIME: overtime, UNDERTIME: undertime };
+  };
+
+  const fetchMonthRows = async (y: number, m: number) => {
+    const params = { year: y, month: m };
+    const res = await api.get("/attendance/admin/logs/", { params });
+    return res.data.results || [];
+  };
+
+  const filterRowsByRange = (rows: any[], mode: RangeMode, anchor: Dayjs) => {
+    if (mode === "Month") {
+      const start = anchor.startOf("month");
+      const end = anchor.endOf("month");
+      return rows.filter((r) => {
+        const d = dayjs(r.date);
+        return (d.isAfter(start, "day") || d.isSame(start, "day")) &&
+              (d.isBefore(end, "day") || d.isSame(end, "day"));
       });
-      setAttendanceData(counts);
-    } catch (error) {
-      console.error('Failed to fetch attendance data', error);
+    }
+
+    if (mode === "Day") {
+      const target = anchor.format("YYYY-MM-DD");
+      return rows.filter((r) => r.date === target);
+    }
+
+    if (mode === "Week") {
+      const start = anchor.startOf("week");
+      const end = anchor.endOf("week");
+      return rows.filter((r) => {
+        const d = dayjs(r.date);
+        return (d.isAfter(start, "day") || d.isSame(start, "day")) &&
+              (d.isBefore(end, "day") || d.isSame(end, "day"));
+      });
+    }
+
+    // Year (handled elsewhere)
+    return rows;
+  };
+
+  const fetchAttendanceAnalytics = async (d?: Dayjs, mode?: RangeMode) => {
+    setAttendanceLoading(true);
+    try {
+      const anchor = d ?? selectedDate;
+      const m = (mode ?? rangeMode);
+
+      if (m === "Year") {
+        const y = anchor.year();
+
+        // fetch all 12 months then aggregate
+        const all: any[] = [];
+        for (let mm = 1; mm <= 12; mm++) {
+          const rows = await fetchMonthRows(y, mm);
+          all.push(...rows);
+        }
+
+        setAttendanceData(countFromRows(all));
+        return;
+      }
+
+      // Day / Week / Month
+      const y = anchor.year();
+      const month = anchor.month() + 1;
+
+      const monthRows = await fetchMonthRows(y, month);
+      const filtered = filterRowsByRange(monthRows, m, anchor);
+
+      setAttendanceData(countFromRows(filtered));
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to load attendance analytics");
+    } finally {
+      setAttendanceLoading(false);
     }
   };
+
+
 
   useEffect(() => {
     fetchHolidayRequests();
     fetchPendingPayrolls();
-    fetchAttendanceRecords();
+    fetchAttendanceAnalytics(selectedDate, rangeMode);
   }, []);
+
 
   /* ------------------ Chart ------------------ */
   const computeSettings = (width: number) => {
@@ -199,14 +285,46 @@ const Dashboard: React.FC = () => {
       <Layout>
         <Topbar title="Dashboard" />
         <Content className="dashboard-content">
-          <Greeting />
+          
 
           <Row gutter={[16, 16]}>
             <Col xs={24} lg={16}>
               <div className="card analytics-card">
-                {chartOption && <Chart option={chartOption} style={{ height: chartHeight }} />}
+
+                {/* DATE FILTER FOR BAR GRAPH */}
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+                <Segmented
+                  value={rangeMode}
+                  options={["Day", "Week", "Month", "Year"]}
+                  onChange={(v) => {
+                    const mode = v as RangeMode;
+                    setRangeMode(mode);
+                    fetchAttendanceAnalytics(selectedDate, mode);
+                  }}
+                />
+
+                <DatePicker
+                  picker={rangeMode === "Month" ? "month" : rangeMode === "Year" ? "year" : "date"}
+                  value={selectedDate}
+                  onChange={(d: Dayjs | null) => {
+                    if (!d) return;
+                    setSelectedDate(d);
+                    fetchAttendanceAnalytics(d);
+                  }}
+                />
+              </div>
+
+
+                {/* BAR GRAPH */}
+                <Spin spinning={attendanceLoading}>
+                  {chartOption && (
+                    <Chart option={chartOption} style={{ height: chartHeight }} />
+                  )}
+                </Spin>
+
               </div>
             </Col>
+
 
             <Col xs={24} lg={8}>
               <div

@@ -27,6 +27,22 @@ type TodayAttendanceResponse = {
     created_at: string;
   };
 };
+  type AttendanceLogRow = {
+    id: number;
+    date: string;
+    status: string;
+    time_in: string | null;
+    time_out: string | null;
+    shift_name: string | null;
+    event_types: string; // e.g. "Late, UnderTime" or ""
+  };
+
+  type AttendanceLogsResponse = {
+    year: number;
+    month: number;
+    count: number;
+    results: AttendanceLogRow[];
+  };
 
 const Dashboard: React.FC = () => {
   const [phTime, setPhTime] = useState<Date | null>(null);
@@ -37,27 +53,23 @@ const Dashboard: React.FC = () => {
   const [loadingPunchIn, setLoadingPunchIn] = useState(false);
   const [loadingPunchOut, setLoadingPunchOut] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(false);
-
+  const [stats, setStats] = useState({ present: 0, lates: 0, absent: 0 });
+  const [loadingStats, setLoadingStats] = useState(false);
     
     
 
     const fetchTodayAttendance = async () => {
       setLoadingStatus(true);
       try {
-       try {
           const res = await api.get<TodayAttendanceResponse>("/attendance/today/");
           setAttendance(res.data.attendance);
         } catch (err: any) {
           console.error(err);
           const msg = err?.response?.data?.detail || "Failed to fetch attendance status.";
           message.error(msg);
+        } finally {
+          setLoadingStatus(false);
         }
-      } catch (err: any) {
-        console.error(err);
-        message.error(err?.message || "Failed to load attendance status.");
-      } finally {
-        setLoadingStatus(false);
-      }
     };
 
     const handlePunchIn = async () => {
@@ -66,6 +78,7 @@ const Dashboard: React.FC = () => {
         const res = await api.post("/attendance/punch-in/", {});
         message.success(res.data?.message || "Punch in successful.");
         setAttendance(res.data.attendance);
+        fetchAttendanceStats();
       } catch (err: any) {
         console.error(err);
         const msg =
@@ -84,6 +97,7 @@ const Dashboard: React.FC = () => {
         const res = await api.post("/attendance/punch-out/", {});
         message.success(res.data?.message || "Punch out successful.");
         setAttendance(res.data.attendance);
+        fetchAttendanceStats();
       } catch (err: any) {
         console.error(err);
         const msg =
@@ -95,7 +109,39 @@ const Dashboard: React.FC = () => {
         setLoadingPunchOut(false);
       }
     };
-    
+    const fetchAttendanceStats = async () => {
+      setLoadingStats(true);
+      try {
+        const now = dayjs();
+        const params = { year: now.year(), month: now.month() + 1 };
+
+        const res = await api.get<AttendanceLogsResponse>("/attendance/logs/", { params });
+
+        const rows = res.data.results || [];
+
+        const present = rows.filter((r) => r.status === "PRESENT").length;
+        const absent = rows.filter((r) => r.status === "ABSENT").length;
+
+        const lates = rows.filter((r) => {
+          const types = (r.event_types || "")
+            .split(",")
+            .map((x) => x.trim())
+            .filter(Boolean);
+          return types.includes("Late");
+        }).length;
+
+        setStats({ present, lates, absent });
+      } catch (err: any) {
+        const backendMsg =
+          err?.response?.data?.detail ||
+          err?.response?.data?.message ||
+          "Failed to load attendance stats.";
+        message.error(backendMsg);
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+
     const loadCalendarEvents = async () => {
   try {
     const res = await api.get("/approvals/holidays/");
@@ -136,6 +182,7 @@ const Dashboard: React.FC = () => {
       fetchBaseTime("Asia/Manila", setPhTime);
       fetchBaseTime("America/New_York", setUsaTime);
       fetchTodayAttendance();
+      fetchAttendanceStats();
       loadCalendarEvents();
     }, []);
 
@@ -186,9 +233,21 @@ const Dashboard: React.FC = () => {
 
           {/* Stats */}
           <Row gutter={16}>
-            <Col span={6}><Card><Statistic title="Total Present" value={0} /></Card></Col>
-            <Col span={6}><Card><Statistic title="Total Lates" value={0} /></Card></Col>
-            <Col span={6}><Card><Statistic title="Total Absences" value={0} /></Card></Col>
+            <Col span={6}>
+              <Card>
+                <Statistic title="Total Present" value={stats.present} loading={loadingStats} />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card>
+                <Statistic title="Total Lates" value={stats.lates} loading={loadingStats} />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card>
+                <Statistic title="Total Absences" value={stats.absent} loading={loadingStats} />
+              </Card>
+            </Col>
             <Col span={6}><Card><Statistic title="Leave request pending" value={0} /></Card></Col>
           </Row>
 

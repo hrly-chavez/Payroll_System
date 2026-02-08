@@ -1,11 +1,12 @@
 // src/pages/SuperAdmin/Attendance/Attendance.tsx
 import React, { useEffect, useState } from "react";
-import { Layout, Card, Table, Input, Avatar, Row, Col, Statistic, Tag, message } from "antd";
+import { Layout, Card, Table, Input, Avatar, Row, Col, Statistic, Tag, message, DatePicker, Segmented } from "antd";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 import "./Attendance.css";
 import api from "../../../api/axios";
 import dayjs from "dayjs";
+import type { Dayjs } from "dayjs";
 
 const { Content } = Layout;
 const { Search } = Input;
@@ -49,35 +50,81 @@ const Attendance: React.FC = () => {
   const [rows, setRows] = useState<LogRow[]>([]);
   const [stats, setStats] = useState({ present: 0, lates: 0, absent: 0 });
   const [search, setSearch] = useState("");
+  type RangeMode = "Month" | "Week" | "Day";
+  const [rangeMode, setRangeMode] = useState<RangeMode>("Month");
+  const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs()); // used for Day/Week anchor
+  const [selectedMonth, setSelectedMonth] = useState<Dayjs>(dayjs()); // used for Month filter
 
-  // current month by default (same as HR version)
-  const year = dayjs().year();
-  const month = dayjs().month() + 1;
+  const [allRows, setAllRows] = useState<LogRow[]>([]); // raw rows from API (month)
 
-  const fetchLogs = async (keyword?: string) => {
-    try {
-      setLoading(true);
+  
+  const computeStatsFromRows = (list: LogRow[]) => {
+    const present = list.filter((r) => r.status === "PRESENT").length;
+    const absent = list.filter((r) => r.status === "ABSENT").length;
 
-      const params: any = { year, month };
-      if (keyword && keyword.trim()) params.search = keyword.trim();
+    const lates = list.filter((r) => {
+      const types = (r.event_types || "")
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean);
+      return types.includes("Late");
+    }).length;
 
-      const res = await api.get<ApiResponse>("/attendance/super_admin/logs/", { params });
-
-      setRows(res.data.results);
-      setStats(res.data.stats);
-    } catch (err: any) {
-      const backendMsg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        "Failed to load attendance logs.";
-      message.error(backendMsg);
-    } finally {
-      setLoading(false);
-    }
+    return { present, lates, absent };
   };
 
+  const applyClientFilter = (list: LogRow[], mode: RangeMode, anchor: Dayjs) => {
+    if (mode === "Month") return list;
+
+    if (mode === "Day") {
+      const target = anchor.format("YYYY-MM-DD");
+      return list.filter((r) => r.date === target);
+    }
+
+    // Week (Mon-Sun)
+    const start = anchor.startOf("week"); // if you want Monday as start, see note below
+    const end = anchor.endOf("week");
+    return list.filter((r) => {
+      const d = dayjs(r.date);
+      return d.isSame(start, "day") || (d.isAfter(start, "day") && d.isBefore(end, "day")) || d.isSame(end, "day");
+    });
+  };
+
+  const fetchLogs = async (opts?: { keyword?: string; y?: number; m?: number }) => {
+      try {
+        setLoading(true);
+
+        const y = opts?.y ?? selectedMonth.year();
+        const m = opts?.m ?? (selectedMonth.month() + 1);
+
+        const params: any = { year: y, month: m };
+        if (opts?.keyword && opts.keyword.trim()) params.search = opts.keyword.trim();
+
+        const res = await api.get<ApiResponse>("/attendance/super_admin/logs/", { params });
+
+        // store raw month rows
+        setAllRows(res.data.results);
+
+        // apply Day/Week/Month filter on the month rows
+        const anchor = selectedDate;
+        const filtered = applyClientFilter(res.data.results, rangeMode, anchor);
+
+        setRows(filtered);
+        setStats(computeStatsFromRows(filtered));
+      } catch (err: any) {
+        const backendMsg =
+          err?.response?.data?.detail ||
+          err?.response?.data?.message ||
+          "Failed to load attendance logs.";
+        message.error(backendMsg);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+
   useEffect(() => {
-    fetchLogs("");
+    fetchLogs({ keyword: "" });
   }, []);
 
   const columns = [
@@ -151,12 +198,67 @@ const Attendance: React.FC = () => {
 
           <Card className="table-card">
             <div className="table-header">
+              <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+              <Segmented
+                value={rangeMode}
+                onChange={(v) => {
+                  const mode = v as RangeMode;
+                  setRangeMode(mode);
+
+                  // re-apply filter immediately on existing month data
+                  const filtered = applyClientFilter(allRows, mode, selectedDate);
+                  setRows(filtered);
+                  setStats(computeStatsFromRows(filtered));
+                }}
+                options={["Month", "Week", "Day"]}
+              />
+
+              {rangeMode === "Month" && (
+                <DatePicker
+                  picker="month"
+                  value={selectedMonth}
+                  onChange={(d) => {
+                    if (!d) return;
+                    setSelectedMonth(d);
+
+                    // fetch server data for new month
+                    fetchLogs({ keyword: search, y: d.year(), m: d.month() + 1 });
+                  }}
+                />
+              )}
+
+              {rangeMode !== "Month" && (
+                <DatePicker
+                  value={selectedDate}
+                  onChange={(d) => {
+                    if (!d) return;
+                    setSelectedDate(d);
+
+                    // ensure the month data loaded matches the anchor date's month
+                    const ymChanged =
+                      d.year() !== selectedMonth.year() || d.month() !== selectedMonth.month();
+
+                    if (ymChanged) {
+                      setSelectedMonth(d);
+                      fetchLogs({ keyword: search, y: d.year(), m: d.month() + 1 });
+                      return;
+                    }
+
+                    // same month: just re-filter client-side
+                    const filtered = applyClientFilter(allRows, rangeMode, d);
+                    setRows(filtered);
+                    setStats(computeStatsFromRows(filtered));
+                  }}
+                />
+              )}
+            </div>
+
               <Search
                 placeholder="Search name / department"
                 className="search-input"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                onSearch={(v) => fetchLogs(v)}
+                onSearch={(v) => fetchLogs({ keyword: v })}
                 allowClear
               />
             </div>

@@ -1,3 +1,4 @@
+//src/pages/HR/Dashboard/Dashboard.tsx
 import React, { useEffect, useState } from "react";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
@@ -27,13 +28,50 @@ type TodayAttendanceResponse = {
   };
 };
 
-const attendanceData = [
-  { key: 1, name: "Jeremy Neigh", in: "9:42 P.M.", out: "7:26 A.M.", status: "Present" },
-  { key: 2, name: "Annette Black", in: "12:18 A.M.", out: "9:28 A.M.", status: "Late" },
-  { key: 3, name: "Theresa Webb", in: "11:58 P.M.", out: "9:20 A.M.", status: "Present" },
-  { key: 4, name: "Kathryn Murphy", in: "12:00 A.M.", out: "9:00 A.M.", status: "Present" },
-  { key: 5, name: "Jane Cooper", in: "11:50 P.M.", out: "10:00 A.M.", status: "Present" },
-];
+type AttendanceLogRow = {
+  id: number;
+  date: string;
+  status: string;
+  time_in: string | null;
+  time_out: string | null;
+  shift_name: string | null;
+  event_types: string;
+};
+
+type AttendanceLogsResponse = {
+  year: number;
+  month: number;
+  count: number;
+  results: AttendanceLogRow[];
+};
+
+
+type TodayRow = {
+  key: number;
+  name: string;
+  in: string;
+  out: string;
+  status: string;
+};
+type AdminLogsResponse = {
+  year: number;
+  month: number;
+  count: number;
+  results: Array<{
+    id: number;
+    date: string;
+    status: string;
+    time_in: string | null;
+    time_out: string | null;
+    employee_id: number;
+    full_name: string;
+    department_name: string | null;
+    shift_name: string | null;
+    event_types: string;
+  }>;
+};
+
+
 
 const columns = [
   { title: "Name", dataIndex: "name" },
@@ -41,6 +79,7 @@ const columns = [
   { title: "Time-out", dataIndex: "out" },
   { title: "Status", dataIndex: "status" },
 ];
+
 
 const Dashboard: React.FC = () => {
   const today = dayjs().format("MMMM D, YYYY");
@@ -53,6 +92,58 @@ const Dashboard: React.FC = () => {
   const [loadingPunchIn, setLoadingPunchIn] = useState(false);
   const [loadingPunchOut, setLoadingPunchOut] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(false);
+  const [myStats, setMyStats] = useState({ present: 0, lates: 0, absent: 0 });
+  const [loadingMyStats, setLoadingMyStats] = useState(false);
+
+  const [todayRows, setTodayRows] = useState<TodayRow[]>([]);
+  const [loadingTodayRows, setLoadingTodayRows] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(dayjs()); // default = today
+
+
+
+  const fetchTodayEmployeesAttendance = async (d?: dayjs.Dayjs) => {
+    setLoadingTodayRows(true);
+    try {
+      const target = d ?? dayjs();
+      const params = { year: target.year(), month: target.month() + 1 };
+
+      const res = await api.get<AdminLogsResponse>("/attendance/admin/logs/", { params });
+
+      const targetStr = target.format("YYYY-MM-DD");
+
+      const filtered = (res.data.results || [])
+        .filter((r) => r.date === targetStr)
+        .filter((r) => !!r.time_in)
+        .map((r) => {
+          const types = (r.event_types || "")
+            .split(",")
+            .map((x) => x.trim())
+            .filter(Boolean);
+
+          const isLate = types.includes("Late");
+
+          return {
+            key: r.id,
+            name: r.full_name,
+            in: r.time_in ? dayjs(`2000-01-01 ${r.time_in}`).format("h:mm A") : "-",
+            out: r.time_out ? dayjs(`2000-01-01 ${r.time_out}`).format("h:mm A") : "-",
+            status: isLate ? "Late" : "Present",
+          };
+        });
+
+      setTodayRows(filtered);
+    } catch (err: any) {
+      const backendMsg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to load attendance.";
+      message.error(backendMsg);
+    } finally {
+      setLoadingTodayRows(false);
+    }
+  };
+
+
 
   const fetchBaseTime = async (timezone: string, setter: (d: Date) => void) => {
     try {
@@ -80,6 +171,39 @@ const Dashboard: React.FC = () => {
   }
 };
 
+  const fetchMyDashboardStats = async () => {
+    setLoadingMyStats(true);
+    try {
+      const now = dayjs();
+      const params = { year: now.year(), month: now.month() + 1 };
+
+      const res = await api.get<AttendanceLogsResponse>("/attendance/logs/", { params });
+
+      const rows = res.data.results || [];
+
+      const present = rows.filter((r) => r.status === "PRESENT").length;
+      const absent = rows.filter((r) => r.status === "ABSENT").length;
+
+      const lates = rows.filter((r) => {
+        const types = (r.event_types || "")
+          .split(",")
+          .map((x) => x.trim())
+          .filter(Boolean);
+        return types.includes("Late");
+      }).length;
+
+      setMyStats({ present, lates, absent });
+    } catch (err: any) {
+      const backendMsg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to load attendance stats.";
+      message.error(backendMsg);
+    } finally {
+      setLoadingMyStats(false);
+    }
+  };
+
 
   const fetchTodayAttendance = async () => {
     setLoadingStatus(true);
@@ -103,6 +227,10 @@ const Dashboard: React.FC = () => {
   fetchBaseTime("America/New_York", setUsaTime);
   fetchTodayAttendance();
   loadCalendarEvents();
+  fetchMyDashboardStats();
+  fetchTodayEmployeesAttendance(selectedDate);
+
+
 }, []);
 
 
@@ -121,6 +249,9 @@ const Dashboard: React.FC = () => {
       const res = await api.post("/attendance/punch-in/", {});
       message.success(res.data?.message || "Punch in successful.");
       setAttendance(res.data.attendance);
+      fetchMyDashboardStats();
+      fetchTodayEmployeesAttendance(selectedDate);
+
     } catch (err: any) {
       console.error(err);
       const msg =
@@ -139,6 +270,10 @@ const Dashboard: React.FC = () => {
       const res = await api.post("/attendance/punch-out/", {});
       message.success(res.data?.message || "Punch out successful.");
       setAttendance(res.data.attendance);
+      fetchMyDashboardStats();
+      fetchTodayEmployeesAttendance(selectedDate);
+
+
     } catch (err: any) {
       console.error(err);
       const msg =
@@ -177,11 +312,24 @@ const Dashboard: React.FC = () => {
 
           {/* STATS */}
           <Row gutter={16}>
+            <Col span={6}>
+              <Card>
+                <Statistic title="Total Present" value={myStats.present} loading={loadingMyStats} />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card>
+                <Statistic title="Total Lates" value={myStats.lates} loading={loadingMyStats} />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card>
+                <Statistic title="Total Absences" value={myStats.absent} loading={loadingMyStats} />
+              </Card>
+            </Col>
             <Col span={6}><Card><Statistic title="Pending Correction Request" value={0} /></Card></Col>
-            <Col span={6}><Card><Statistic title="Total Lates" value={0} /></Card></Col>
-            <Col span={6}><Card><Statistic title="Total Absences" value={0} /></Card></Col>
-            <Col span={6}><Card><Statistic title="Attendance Summary" value={0} /></Card></Col>
           </Row>
+
 
           {/* ATTENDANCE + CALENDAR */}
           <Row gutter={16} className={styles.mainSection}>
@@ -290,8 +438,21 @@ const Dashboard: React.FC = () => {
 
 
           {/* TODAY TABLE */}
-          <Card title={today} extra={<DatePicker />} className={styles.sectionCard}>
-            <Table columns={columns} dataSource={attendanceData} pagination={{ pageSize: 5 }} size="small" />
+          <Card title={selectedDate.format("MMMM D, YYYY")}
+            extra={<DatePicker value={selectedDate}
+                onChange={(d) => {
+                  if (!d) return;
+                  setSelectedDate(d);
+                  fetchTodayEmployeesAttendance(d);
+                }}/>}className={styles.sectionCard}>
+
+            <Table
+            columns={columns}
+            dataSource={todayRows}
+            loading={loadingTodayRows}
+            pagination={{ pageSize: 5 }}
+            size="small"
+              />
           </Card>
 
         </Content>

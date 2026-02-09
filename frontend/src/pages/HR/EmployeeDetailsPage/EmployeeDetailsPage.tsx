@@ -29,6 +29,8 @@ import {
   EditOutlined,
 } from "@ant-design/icons";
 import api from "api/axios";
+import EmployeeSalaryModal from "../EmployeeDetailsPage/Modals/EditEmployeeDetails";
+
 
 const { Content } = Layout;
 
@@ -65,23 +67,21 @@ const EmployeeDetailsPage: React.FC = () => {
      BASE SALARY MODAL STATE
   ========================== */
   const [isSalaryModalOpen, setIsSalaryModalOpen] = useState(false);
-  const [salaryForm] = Form.useForm();
+  const [selectedSalary, setSelectedSalary] = useState<any>(null);
 
   const openSalaryModal = () => {
+    if (!salaries.length) {
+      message.warning("No salary record found");
+      return;
+    }
+
+    setSelectedSalary(salaries[0]); // latest salary
     setIsSalaryModalOpen(true);
   };
 
-  const closeSalaryModal = () => {
-    salaryForm.resetFields();
-    setIsSalaryModalOpen(false);
-  };
 
-  const handleAddSalary = (values: any) => {
-    console.log("Base Salary Data:", values);
-    message.success("Base salary added successfully");
-    closeSalaryModal();
-    // TODO: POST to backend using employeeId
-  };
+
+  
 
   /* =========================
      SALARY RETRIEVE DATA
@@ -550,39 +550,6 @@ const EmployeeDetailsPage: React.FC = () => {
       </Layout>
 
       {/* =========================
-          BASE SALARY MODAL
-      ========================== */}
-      <Modal
-        title="Add Base Salary"
-        open={isSalaryModalOpen}
-        onCancel={closeSalaryModal}
-        onOk={() => salaryForm.submit()}
-        okText="Save"
-      >
-        <Form form={salaryForm} layout="vertical" onFinish={handleAddSalary}>
-          <Form.Item
-            label="Salary Amount"
-            name="amount"
-            rules={[{ required: true, message: "Please enter salary amount" }]}
-          >
-            <Input placeholder="e.g. 15000" />
-          </Form.Item>
-
-          <Form.Item
-            label="Salary Type"
-            name="type"
-            rules={[{ required: true, message: "Please select salary type" }]}
-          >
-            <Select placeholder="Select type">
-              <Select.Option value="Monthly">Monthly</Select.Option>
-              <Select.Option value="Daily">Daily</Select.Option>
-              <Select.Option value="Hourly">Hourly</Select.Option>
-            </Select>
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* =========================
           ALLOWANCE MODAL
       ========================== */}
       <Modal
@@ -659,6 +626,19 @@ const EmployeeDetailsPage: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      <EmployeeSalaryModal
+        open={isSalaryModalOpen}
+        employeeId={Number(employeeId)}
+        salary={selectedSalary}
+        onSuccess={() => {
+          fetchSalaries(Number(employeeId));
+          fetchDeductions(Number(employeeId)); // 🔥 important
+          setIsSalaryModalOpen(false);
+        }}
+        onClose={() => setIsSalaryModalOpen(false)}
+      />
+
     </Layout>
   );
 };

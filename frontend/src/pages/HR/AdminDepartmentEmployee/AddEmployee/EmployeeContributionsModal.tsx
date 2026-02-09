@@ -19,7 +19,6 @@ interface Props {
   onClose: () => void;
 }
 
-const MANDATORY_CODES = ["SSS", "PHILHEALTH", "PAGIBIG"];
 
 const EmployeeContributionsModal: React.FC<Props> = ({
   open,
@@ -30,8 +29,12 @@ const EmployeeContributionsModal: React.FC<Props> = ({
   const [form] = Form.useForm();
 
   const [salary, setSalary] = useState<number>(0);
-  const [mandatoryDeductions, setMandatoryDeductions] = useState<any[]>([]);
-  const [optionalDeductions, setOptionalDeductions] = useState<any[]>([]);
+  const [deductionTypes, setDeductionTypes] = useState<any[]>([]);
+
+  //checkbox
+  const [enabledDeductions, setEnabledDeductions] = useState<number[]>([]);
+
+
 
   /* -------------------- LOAD SALARY + DEDUCTIONS -------------------- */
   useEffect(() => {
@@ -47,31 +50,33 @@ const EmployeeContributionsModal: React.FC<Props> = ({
         const baseSalary = Number(salaryRes.data.base_rate);
         setSalary(baseSalary);
 
-        const mandatory = deductionRes.data.filter((d: any) =>
-          MANDATORY_CODES.includes(d.code.toUpperCase())
-        );
-        const optional = deductionRes.data.filter(
-          (d: any) => !MANDATORY_CODES.includes(d.code)
-        );
+        const computed = deductionRes.data.map((d: any) => {
+          let computed_amount = 0;
 
-        setMandatoryDeductions(
-          mandatory.map((d: any) => ({
+          if (d.calculation_type === "Fixed") {
+            computed_amount = Number(d.amount);
+          } else if (d.calculation_type === "Percent") {
+            computed_amount = baseSalary * (Number(d.amount) / 100);
+          }
+
+          return {
             ...d,
-            computed_amount:
-              d.calculation_type === "Fixed"
-                ? Number(d.amount)
-                : baseSalary * (Number(d.amount) / 100),
-          }))
-        );
+            computed_amount: Number(computed_amount.toFixed(2)),
+          };
+        });
 
-        setOptionalDeductions(optional);
-      } catch (err) {
+        setDeductionTypes(computed);
+
+        setEnabledDeductions(computed.map((d: any) => d.id));
+
+      } catch {
         message.error("Failed to load salary or deductions");
       }
     };
 
     load();
   }, [open, employeeId]);
+
 
   /* -------------------- SUBMIT -------------------- */
   const submit = async () => {
@@ -81,31 +86,33 @@ const EmployeeContributionsModal: React.FC<Props> = ({
       const effectiveFrom = values.effective_from.format("YYYY-MM-DD");
 
       // Payload for mandatory deductions with editable amounts
-      const mandatoryPayloads = (values.mandatory_deductions || []).map(
-        (item: any, idx: number) => ({
+      const systemPayloads = deductionTypes
+        .filter(d => enabledDeductions.includes(d.id))
+        .map(d => ({
           employee: employeeId,
-          deduction_type: mandatoryDeductions[idx].id,
+          deduction_type: d.id,
           frequency: "Monthly",
           effective_from: effectiveFrom,
           status: "Active",
-        })
-      );
+        }));
+
+
 
       // Optional deductions payload
       const optionalPayloads = (values.optional_deductions || []).map((d: any) => ({
         employee: employeeId,
         manual_code: d.manual_code,
-        manual_calculation_type: d.manual_calculation_type,
-        manual_amount: d.manual_calculation_type === "Percent"
-          ? (salary * d.manual_amount) / 100 // compute percentage from base salary
-          : d.manual_amount,
+        manual_calculation_type: d.manual_calculation_type || "Fixed",
+        manual_amount: d.manual_amount,  // 👈 send this field so serializer sees it
         frequency: "Monthly",
         effective_from: effectiveFrom,
         status: "Active",
       }));
 
+
+
       // Submit all together
-      await Promise.all([...mandatoryPayloads, ...optionalPayloads].map(p => api.post("/employees/deductions/", p)));
+      await Promise.all([...systemPayloads, ...optionalPayloads].map(p => api.post("/employees/deductions/", p)));
 
       message.success("Employee contributions saved");
       onNext();
@@ -126,21 +133,54 @@ const EmployeeContributionsModal: React.FC<Props> = ({
         {/* ---------------- GOVERNMENT CONTRIBUTIONS ---------------- */}
         <Divider>Government Contributions</Divider>
 
-        {mandatoryDeductions.map((d, index) => (
-          <Form.Item
-            key={d.id}
-            name={["mandatory_deductions", index, "amount"]}
-            label={d.code}
-            initialValue={Number(d.computed_amount.toFixed(2))}
-            rules={[{ required: true, message: "Please enter amount" }]}
-          >
-            <InputNumber
-              style={{ width: "100%" }}
-              min={0}
-              step={0.01}
-            />
-          </Form.Item>
-        ))}
+        {deductionTypes.map((d, index) => {
+          const isEnabled = enabledDeductions.includes(d.id);
+
+          return (
+            <div
+              key={d.id}
+              style={{
+                border: "1px solid #f0f0f0",
+                padding: 12,
+                marginBottom: 12,
+                borderRadius: 6,
+                opacity: isEnabled ? 1 : 0.5,
+              }}
+            >
+              <Form.Item
+                name={["system_deductions", index, "amount"]}
+                label={`${d.code} (${d.calculation_type})`}
+                initialValue={d.computed_amount}
+                rules={
+                  isEnabled
+                    ? [{ required: true, message: "Please enter amount" }]
+                    : []
+                }
+              >
+                <InputNumber
+                  style={{ width: "100%" }}
+                  min={0}
+                  step={0.01}
+                  disabled={!isEnabled}
+                />
+              </Form.Item>
+
+              <Button
+                danger={isEnabled}
+                type="link"
+                onClick={() =>
+                  setEnabledDeductions(prev =>
+                    isEnabled
+                      ? prev.filter(id => id !== d.id)
+                      : [...prev, d.id]
+                  )
+                }
+              >
+                {isEnabled ? "Remove" : "Add"}
+              </Button>
+            </div>
+          );
+        })}
 
         {/* ---------------- OPTIONAL DEDUCTIONS ---------------- */}
         <Divider>Other Deductions</Divider>

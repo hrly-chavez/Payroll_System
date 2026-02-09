@@ -7,6 +7,9 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from accounts.permissions import IsRole;
 import random, string
 from rest_framework.views import APIView
+from decimal import Decimal
+from django.db import transaction
+from django.utils.timezone import now
 
 #--------------------------Address
 # List all provinces
@@ -191,8 +194,62 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(salary)
         return Response(serializer.data)
-
     
+    # 🔥 NEW ACTION
+    @action(detail=False, methods=["post"], url_path="edit")
+    @transaction.atomic
+    def edit_salary(self, request):
+        """
+        Create a NEW salary row for the employee (for audit) and recompute percent deductions
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Create new salary row
+        new_salary = serializer.save()
+
+        # Recompute percent-based deductions linked to this employee and effective_from
+        self._recompute_percentage_deductions(
+            employee_id=new_salary.employee_id,
+            salary_amount=new_salary.base_rate,
+            effective_from=new_salary.effective_from
+        )
+
+        return Response(self.get_serializer(new_salary).data, status=status.HTTP_201_CREATED)
+
+    def _recompute_percentage_deductions(self, employee_id: int, salary_amount: Decimal, effective_from):
+        """
+        Update existing Employee_Deduction rows for this employee if their calculation_type (linked or manual) is Percent.
+        Includes:
+        - deductions linked to Deduction_Type with calculation_type='Percent'
+        - deductions without Deduction_Type but with manual_calculation_type='Percent'
+        """
+        from django.db.models import Q
+
+        deductions = Employee_Deduction.objects.filter(
+            employee_id=employee_id
+        ).filter(
+            Q(deduction_type__calculation_type="Percent") |
+            Q(manual_calculation_type="Percent")
+        )
+
+        for ded in deductions:
+            # Case 1: Linked Deduction_Type with Percent
+            if ded.deduction_type and ded.deduction_type.calculation_type == "Percent":
+                percent_value = ded.deduction_type.amount
+
+            # Case 2: Manual percent deduction (no linked Deduction_Type)
+            elif ded.manual_calculation_type == "Percent":
+                percent_value = ded.amount  # assuming you store the % in 'amount' for manual deductions
+            else:
+                continue  # skip if not percent
+
+            # Update the amount based on the new salary
+            ded.amount = round(salary_amount * (percent_value / 100), 2)
+            ded.save(update_fields=["amount"])
+
+
+            
 #employee deduction
 class EmployeeDeductionViewSet(viewsets.ModelViewSet):
     queryset = Employee_Deduction.objects.all()

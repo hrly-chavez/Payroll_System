@@ -43,8 +43,17 @@ class HolidayAdmin(admin.ModelAdmin):
 
 
 @admin.register(Employee_Salary)
-class Employee_Salary(admin.ModelAdmin):
-    list_display = ('pay_type', )
+class Employee_SalaryAdmin(admin.ModelAdmin):
+    list_display = ('pay_type', 'employee_fname')
+
+    # This method fetches the first name from the related Employee
+    def employee_fname(self, obj):
+        return obj.employee.fname
+
+    # Optional: allow sorting by employee's first name
+    employee_fname.admin_order_field = 'employee__fname'
+    employee_fname.short_description = 'Employee First Name'
+
 
 @admin.register(Employee_Deduction)
 class Employee_Deduction(admin.ModelAdmin):

@@ -179,13 +179,13 @@ class Employee_Salary(models.Model):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="salaries")
 
     
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["employee", "effective_from"],
-                name="unique_salary_start_per_employee"
-            )
-        ]
+    # class Meta:
+    #     constraints = [
+    #         models.UniqueConstraint(
+    #             fields=["employee", "effective_from"],
+    #             name="unique_salary_start_per_employee"
+    #         )
+    #     ]
        
 class Deduction_Type(models.Model):
     calculation_choices = [

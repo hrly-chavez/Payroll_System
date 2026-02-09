@@ -69,7 +69,7 @@ class Employee_Allowance(admin.ModelAdmin):
 admin.site.register(Attendance)
 admin.site.register(Attendance_Event)
 admin.site.register(Payroll_Period)
-
+admin.site.register(Commission_Type)
 
 @admin.register(Pay_Rule)
 class PayRuleAdmin(admin.ModelAdmin):

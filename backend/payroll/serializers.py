@@ -107,6 +107,28 @@ class EmployeeDeductionMiniSerializer(serializers.ModelSerializer):
             "amortization_per_period",
         ]
 
+# Minimal allowance type details for verification preview
+class AllowanceTypeMiniSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Allowance_Type
+        fields = ["id", "code", "name"]
+
+# Returns employee allowances active during the payroll period (verification preview only)
+class EmployeeAllowanceMiniSerializer(serializers.ModelSerializer):
+    allowance_type = AllowanceTypeMiniSerializer(read_only=True)
+
+    class Meta:
+        model = Employee_Allowance
+        fields = [
+            "id",
+            "amount",
+            "frequency",
+            "effective_from",
+            "effective_to",
+            "status",
+            "allowance_type",
+        ]
+
 # Aggregated snapshot shown in Verify Employee modal before payroll generation
 class PayrollVerifySnapshotSerializer(serializers.Serializer):
     # Aggregated snapshot shown in Verify Employee modal
@@ -121,9 +143,36 @@ class PayrollVerifySnapshotSerializer(serializers.Serializer):
 
     taxes = EmployeeDeductionMiniSerializer(many=True)   # SSS/PAGIBIG/PHILHEALTH...
     loans = EmployeeDeductionMiniSerializer(many=True)   # loan deductions only
+    allowances = EmployeeAllowanceMiniSerializer(many=True)
 
     warnings = serializers.ListField(child=serializers.CharField(), required=False)
- 
+
+
+#==================================COMMISION================================
+# Commission type dropdown
+class CommissionTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Commission_Type
+        fields = ["id", "name", "code", "is_taxable", "is_active"]
+
+# List commissions in the modal
+class PayrollPeriodEmployeeCommissionListSerializer(serializers.ModelSerializer):
+    commission_type = CommissionTypeSerializer(read_only=True)
+
+    class Meta:
+        model = PayrollPeriodEmployeeCommission
+        fields = ["id", "commission_type", "amount", "remarks", "created_at"]
+
+# Create commission from modal
+class PayrollPeriodEmployeeCommissionCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PayrollPeriodEmployeeCommission
+        fields = ["commission_type", "amount", "remarks"]
+
+    def validate_amount(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Amount must be greater than 0.")
+        return value
 
 #==========================================PAYRULE ========================================
 

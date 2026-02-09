@@ -327,6 +327,20 @@ class Employee_Allowance(models.Model):
             )
         ]
 
+class Commission_Type(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=50)
+    code = models.CharField(max_length=50, unique=True)
+    is_taxable = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+
+
+
 class Attendance(models.Model):
     STATUS_CHOICES = [
         ("PRESENT", "Present"),
@@ -454,7 +468,7 @@ class Holiday(models.Model):
         ("US", "United States"),
         ("COMPANY", "Company"),
     ]
-    #TODO: HOLIDAY_RATE_MULTIPLIER,IS_NATIONAL / IS_LOCAL
+    
     id = models.AutoField(primary_key=True)
     date = models.DateField()
     name = models.CharField(max_length=50)
@@ -572,6 +586,7 @@ class Payroll(models.Model):
         ]
     
 
+
 class PayrollPeriodEmployee(models.Model):
     STATUS_CHOICES = [
         ("Pending", "Pending"),        # default – HR has not verified
@@ -605,5 +620,28 @@ class PayrollPeriodEmployee(models.Model):
     def __str__(self):
         return f"{self.employee} - {self.period} ({self.status})"
 
+class PayrollPeriodEmployeeCommission(models.Model):
+    id = models.AutoField(primary_key=True)
 
-#TODO: PAYROLL_RUN_LOG
+    period = models.ForeignKey(Payroll_Period,on_delete=models.CASCADE,related_name="commissions")
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="period_commissions")
+    commission_type = models.ForeignKey(Commission_Type,on_delete=models.PROTECT,related_name="period_employee_commissions")
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    remarks = models.TextField(null=True, blank=True)
+    created_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="created_period_commissions")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            # Prevent duplicate commission type for same employee in same payroll period
+            models.UniqueConstraint(
+                fields=["period", "employee", "commission_type"],
+                name="unique_commission_type_per_employee_per_period"
+            )
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.employee} - {self.commission_type.code} ({self.amount}) [{self.period.code}]"
+
+#TODO: PAYROLL_RUN_LOG ,AND THE PAYSLIP TABLE

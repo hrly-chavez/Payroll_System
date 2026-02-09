@@ -63,6 +63,21 @@ type Deduction = {
   amortization_per_period?: string | null;
 };
 
+type AllowanceType = {
+  id: number;
+  code: string;
+  name: string;
+};
+
+type Allowance = {
+  id: number;
+  amount: string;
+  frequency: "Monthly" | "Per Period" | "One Time";
+  effective_from: string;
+  effective_to?: string | null;
+  status: "Active" | "Inactive";
+  allowance_type: AllowanceType;
+};
 type Snapshot = {
   period_id: number;
   employee_id: number;
@@ -73,6 +88,7 @@ type Snapshot = {
   salary: Salary | null;
   taxes: Deduction[];
   loans: Deduction[];
+  allowances: Allowance[];
   warnings?: string[];
 };
 
@@ -150,8 +166,27 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
     } else {
       setSnapshot(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [open, employee?.id, period?.id]);
+
+  const allowanceColumns = [
+    {
+      title: "Allowance",
+      dataIndex: ["allowance_type", "name"],
+      render: (v: string) => v || "-",
+    },
+    
+    {
+      title: "Amount",
+      dataIndex: "amount",
+      render: (v: string) => v || "0.00",
+    },
+    {
+      title: "Frequency",
+      dataIndex: "frequency",
+      render: (v: string) => v || "-",
+    },
+  ];
 
   const taxColumns = [
     {
@@ -285,7 +320,7 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: 12 }}>
+              <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, marginBottom: 6 }}>Taxes</div>
                   <Table
@@ -310,6 +345,19 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
                   />
                 </div>
               </div>
+
+              <div>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>Allowances</div>
+                <Table
+                  columns={allowanceColumns}
+                  dataSource={snapshot?.allowances || []}
+                  rowKey="id"
+                  pagination={false}
+                  size="small"
+                  locale={{ emptyText: "No allowances found" }}
+                />
+              </div>
+
             </>
           )}
         </>

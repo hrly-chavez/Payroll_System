@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
+from django.db import transaction
 
 #helpers
 def _overlaps_period(eff_from, eff_to, period_start, period_end):
@@ -116,7 +117,7 @@ class PayrollPeriodEligibleEmployeesView(APIView):
 
 #=========================VERIFY EMPLOYEE==========================
 
-# Returns salary, shift, tax, and loans for employee verification preview
+# Returns salary, shift, taxes, loans, and allowances for employee verification preview
 class PayrollVerifyEmployeeSnapshotView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -160,7 +161,7 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
             if (d.amortization_per_period is not None) or (d.total_loan_amount is not None)
         ]
 
-        # Taxes: use category instead of codes
+        # Taxes: category=TAX and not a loan row
         taxes = [
             d for d in in_period_deductions
             if d.deduction_type
@@ -170,6 +171,18 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
 
         if not taxes:
             warnings.append("No mandatory tax deductions found for this period (category=TAX).")
+
+        # Allowances active during the payroll period
+        allowances_qs = (
+            Employee_Allowance.objects
+            .select_related("allowance_type")
+            .filter(employee=employee, status="Active")
+        )
+
+        in_period_allowances = [
+            a for a in allowances_qs
+            if _overlaps_period(a.effective_from, a.effective_to, period.start_date, period.end_date)
+        ]
 
         payload = {
             "period_id": period.id,
@@ -181,6 +194,7 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
             "salary": salary,
             "taxes": taxes,
             "loans": loans,
+            "allowances": in_period_allowances,
             "warnings": warnings,
         }
 
@@ -232,6 +246,85 @@ class PayrollVerifyEmployeeView(APIView):
         return Response(
             {"detail": "Employee verified successfully.", "status": ppe.status},
             status=http_status.HTTP_200_OK
+        )
+
+#===========================ADD COMMISSION========================
+class CommissionTypeListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CommissionTypeSerializer
+
+    def get_queryset(self):
+        # only active types
+        return Commission_Type.objects.filter(is_active=True).order_by("name")
+
+
+class PayrollPeriodEmployeeCommissionListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _guard_locked(self, period, employee):
+        # block when payroll already exists
+        if Payroll.objects.filter(payroll_period=period, employee=employee).exists():
+            return Response(
+                {"detail": "Payroll already generated. Commissions are locked for this employee in this period."},
+                status=http_status.HTTP_400_BAD_REQUEST
+            )
+
+        ppe = get_object_or_404(PayrollPeriodEmployee, period=period, employee=employee)
+
+        if ppe.status not in ["Pending", "Verified"]:
+            return Response(
+                {"detail": f"Cannot modify commissions when status is {ppe.status}."},
+                status=http_status.HTTP_400_BAD_REQUEST
+            )
+
+        return None  # OK
+
+    def get(self, request, period_id, employee_id):
+        period = get_object_or_404(Payroll_Period, id=period_id)
+        employee = get_object_or_404(Employee, id=employee_id)
+
+        qs = PayrollPeriodEmployeeCommission.objects.filter(
+            period=period,
+            employee=employee
+        ).select_related("commission_type").order_by("-created_at")
+
+        return Response(
+            PayrollPeriodEmployeeCommissionListSerializer(qs, many=True).data,
+            status=http_status.HTTP_200_OK
+        )
+
+    @transaction.atomic
+    def post(self, request, period_id, employee_id):
+        period = get_object_or_404(Payroll_Period, id=period_id)
+        employee = get_object_or_404(Employee, id=employee_id)
+
+        locked = self._guard_locked(period, employee)
+        if locked:
+            return locked
+
+        serializer = PayrollPeriodEmployeeCommissionCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        commission_type = serializer.validated_data["commission_type"]
+
+        # enforce unique per type per period per employee
+        obj, created = PayrollPeriodEmployeeCommission.objects.update_or_create(
+            period=period,
+            employee=employee,
+            commission_type=commission_type,
+            defaults={
+                "amount": serializer.validated_data["amount"],
+                "remarks": serializer.validated_data.get("remarks", ""),
+                "created_by": request.user,
+            },
+        )
+
+        return Response(
+            {
+                "detail": "Commission saved successfully.",
+                "commission": PayrollPeriodEmployeeCommissionListSerializer(obj).data,
+            },
+            status=http_status.HTTP_201_CREATED if created else http_status.HTTP_200_OK
         )
 
 

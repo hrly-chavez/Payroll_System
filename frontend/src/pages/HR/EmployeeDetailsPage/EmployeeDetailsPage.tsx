@@ -29,6 +29,10 @@ import {
   EditOutlined,
 } from "@ant-design/icons";
 import api from "api/axios";
+import EmployeeSalaryModal from "../EmployeeDetailsPage/Modals/EditEmployeeDetails";
+import EditEmployeeAllowanceModal from "../EmployeeDetailsPage/Modals/EditEmployeeAllowanceModal";
+
+
 
 const { Content } = Layout;
 
@@ -65,23 +69,21 @@ const EmployeeDetailsPage: React.FC = () => {
      BASE SALARY MODAL STATE
   ========================== */
   const [isSalaryModalOpen, setIsSalaryModalOpen] = useState(false);
-  const [salaryForm] = Form.useForm();
+  const [selectedSalary, setSelectedSalary] = useState<any>(null);
 
   const openSalaryModal = () => {
+    if (!salaries.length) {
+      message.warning("No salary record found");
+      return;
+    }
+
+    setSelectedSalary(salaries[0]); // latest salary
     setIsSalaryModalOpen(true);
   };
 
-  const closeSalaryModal = () => {
-    salaryForm.resetFields();
-    setIsSalaryModalOpen(false);
-  };
 
-  const handleAddSalary = (values: any) => {
-    console.log("Base Salary Data:", values);
-    message.success("Base salary added successfully");
-    closeSalaryModal();
-    // TODO: POST to backend using employeeId
-  };
+
+  
 
   /* =========================
      SALARY RETRIEVE DATA
@@ -149,10 +151,13 @@ const EmployeeDetailsPage: React.FC = () => {
 
       const tableData = response.data.map((item: any, index: number) => ({
         key: index.toString(),
+        id: item.id,
+        allowance_type_id: item.allowance_type.id,
         name: item.allowance_type.name, // linked allowance type name
         amount: `₱${item.amount}`,
         frequency: item.frequency,
         status: item.status,
+        effective_from: item.effective_from,
       }));
 
       setAllowances(tableData);
@@ -217,46 +222,19 @@ const EmployeeDetailsPage: React.FC = () => {
   /* =========================
      ALLOWANCE MODAL STATE
   ========================== */
-  const [isAllowanceModalOpen, setIsAllowanceModalOpen] = useState(false);
-  const [allowanceForm] = Form.useForm();
+  const [isEditAllowanceModalOpen, setIsEditAllowanceModalOpen] = useState(false);
+  const [editingAllowance, setEditingAllowance] = useState<any | null>(null);
 
-  const openAllowanceModal = () => {
-    setIsAllowanceModalOpen(true);
+  const openEditAllowanceModal = (allowance: any) => {
+    setEditingAllowance(allowance);
+    setIsEditAllowanceModalOpen(true);
   };
 
-  const closeAllowanceModal = () => {
-    allowanceForm.resetFields();
-    setIsAllowanceModalOpen(false);
+  const closeEditAllowanceModal = () => {
+    setEditingAllowance(null);
+    setIsEditAllowanceModalOpen(false);
   };
 
-  const handleAddAllowance = (values: any) => {
-    console.log("Allowance Data:", values);
-    message.success("Allowance added successfully");
-    closeAllowanceModal();
-    // TODO: POST to backend using employeeId
-  };
-
-  /* =========================
-     TAX MODAL STATE
-  ========================== */
-  const [isTaxModalOpen, setIsTaxModalOpen] = useState(false);
-  const [taxForm] = Form.useForm();
-
-  const openTaxModal = () => {
-    setIsTaxModalOpen(true);
-  };
-
-  const closeTaxModal = () => {
-    taxForm.resetFields();
-    setIsTaxModalOpen(false);
-  };
-
-  const handleAddTax = (values: any) => {
-    console.log("Tax Data:", values);
-    message.success("Tax/contributions added successfully");
-    closeTaxModal();
-    // TODO: POST to backend using employeeId
-  };
 
   /* =========================
      FETCH EMPLOYEE DETAILS
@@ -464,9 +442,6 @@ const EmployeeDetailsPage: React.FC = () => {
                 <Tabs.TabPane tab="Allowance" key="2">
                   <div className={styles.salaryHeader}>
                     <h3>Allowance</h3>
-                    <Button type="primary" onClick={openAllowanceModal}>
-                      Edit Allowance
-                    </Button>
                   </div>
 
                   <Table
@@ -475,6 +450,16 @@ const EmployeeDetailsPage: React.FC = () => {
                       { title: "Amount", dataIndex: "amount", key: "amount" },
                       { title: "Frequency", dataIndex: "frequency", key: "frequency" },
                       { title: "Status", dataIndex: "status", key: "status" },
+                      { title: "Effective from", dataIndex: "effective_from", key: "effective_from" },
+                      {
+                        title: "Action",
+                        key: "action",
+                        render: (_text, record) => (
+                          <Button type="link" onClick={() => openEditAllowanceModal(record)}>
+                            Edit
+                          </Button>
+                        ),
+                      }
                     ]}
                     dataSource={allowances}
                     loading={loadingAllowances}
@@ -486,9 +471,6 @@ const EmployeeDetailsPage: React.FC = () => {
                 <Tabs.TabPane tab="Tax" key="3">
                   <div className={styles.salaryHeader}>
                     <h3>Mandatory Government Contribution</h3>
-                    <Button type="primary" onClick={openTaxModal}>
-                      Edit Tax
-                    </Button>
                   </div>
 
                   <Table
@@ -549,116 +531,29 @@ const EmployeeDetailsPage: React.FC = () => {
         </Content>
       </Layout>
 
-      {/* =========================
-          BASE SALARY MODAL
-      ========================== */}
-      <Modal
-        title="Add Base Salary"
+      <EditEmployeeAllowanceModal
+        open={isEditAllowanceModalOpen}
+        allowance={editingAllowance}
+        employeeId={Number(employeeId)}
+        onClose={closeEditAllowanceModal}
+        onSuccess={() => {
+          fetchAllowances(Number(employeeId));
+          closeEditAllowanceModal();
+        }}
+      />
+
+      <EmployeeSalaryModal
         open={isSalaryModalOpen}
-        onCancel={closeSalaryModal}
-        onOk={() => salaryForm.submit()}
-        okText="Save"
-      >
-        <Form form={salaryForm} layout="vertical" onFinish={handleAddSalary}>
-          <Form.Item
-            label="Salary Amount"
-            name="amount"
-            rules={[{ required: true, message: "Please enter salary amount" }]}
-          >
-            <Input placeholder="e.g. 15000" />
-          </Form.Item>
+        employeeId={Number(employeeId)}
+        salary={selectedSalary}
+        onSuccess={() => {
+          fetchSalaries(Number(employeeId));
+          fetchDeductions(Number(employeeId)); //  important
+          setIsSalaryModalOpen(false);
+        }}
+        onClose={() => setIsSalaryModalOpen(false)}
+      />
 
-          <Form.Item
-            label="Salary Type"
-            name="type"
-            rules={[{ required: true, message: "Please select salary type" }]}
-          >
-            <Select placeholder="Select type">
-              <Select.Option value="Monthly">Monthly</Select.Option>
-              <Select.Option value="Daily">Daily</Select.Option>
-              <Select.Option value="Hourly">Hourly</Select.Option>
-            </Select>
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* =========================
-          ALLOWANCE MODAL
-      ========================== */}
-      <Modal
-        title="Add Employee Allowance"
-        open={isAllowanceModalOpen}
-        onCancel={closeAllowanceModal}
-        onOk={() => allowanceForm.submit()}
-        okText="Save"
-      >
-        <Form form={allowanceForm} layout="vertical" onFinish={handleAddAllowance}>
-          <Form.Item
-            label="Allowance Name"
-            name="name"
-            rules={[{ required: true, message: "Please enter allowance name" }]}
-          >
-            <Input placeholder="e.g. Transportation Allowance" />
-          </Form.Item>
-
-          <Form.Item
-            label="Frequency"
-            name="frequency"
-            rules={[{ required: true, message: "Please select frequency" }]}
-          >
-            <Select placeholder="Select frequency">
-              <Select.Option value="Per Pay Period">Per Pay Period</Select.Option>
-              <Select.Option value="Monthly">Monthly</Select.Option>
-              <Select.Option value="One-time">One-time</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            label="Amount"
-            name="amount"
-            rules={[{ required: true, message: "Please enter amount" }]}
-          >
-            <Input placeholder="e.g. 500" />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* =========================
-          TAX MODAL
-      ========================== */}
-      <Modal
-        title="Add Mandatory Government Contributions"
-        open={isTaxModalOpen}
-        onCancel={closeTaxModal}
-        onOk={() => taxForm.submit()}
-        okText="Save"
-      >
-        <Form form={taxForm} layout="vertical" onFinish={handleAddTax}>
-          <Form.Item
-            label="SSS"
-            name="sss"
-            rules={[{ required: true, message: "Please enter SSS amount" }]}
-          >
-            <Input placeholder="e.g. 1000" />
-          </Form.Item>
-
-          <Form.Item
-            label="Phil-Health"
-            name="philhealth"
-            rules={[{ required: true, message: "Please enter Phil-Health amount" }]}
-          >
-            <Input placeholder="e.g. 500" />
-          </Form.Item>
-
-          <Form.Item
-            label="Pag-IBIG"
-            name="pagibig"
-            rules={[{ required: true, message: "Please enter Pag-IBIG amount" }]}
-          >
-            <Input placeholder="e.g. 300" />
-          </Form.Item>
-        </Form>
-      </Modal>
     </Layout>
   );
 };

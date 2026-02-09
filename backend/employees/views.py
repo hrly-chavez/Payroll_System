@@ -7,6 +7,9 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from accounts.permissions import IsRole;
 import random, string
 from rest_framework.views import APIView
+from decimal import Decimal
+from django.db import transaction
+from django.utils.timezone import now
 
 #--------------------------Address
 # List all provinces
@@ -191,7 +194,42 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(salary)
         return Response(serializer.data)
+    
+    # 🔥 NEW ACTION
+    @action(detail=False, methods=["post"], url_path="edit")
+    @transaction.atomic
+    def edit_salary(self, request):
+        """
+        Create a NEW salary row for the employee (for audit) and recompute percent deductions
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
+        # Create new salary row
+        new_salary = serializer.save()
+
+        # Recompute percent-based deductions linked to this employee and effective_from
+        self._recompute_percentage_deductions(
+            employee_id=new_salary.employee_id,
+            salary_amount=new_salary.base_rate,
+            effective_from=new_salary.effective_from
+        )
+
+        return Response(self.get_serializer(new_salary).data, status=status.HTTP_201_CREATED)
+
+    def _recompute_percentage_deductions(self, employee_id: int, salary_amount: Decimal, effective_from):
+        deductions = Employee_Deduction.objects.filter(
+            employee_id=employee_id,
+            deduction_type__calculation_type="Percent"
+        )
+
+        for ded in deductions:
+            percent_value = ded.deduction_type.amount
+            ded.amount = round(salary_amount * (percent_value / 100), 2)
+            ded.save(update_fields=["amount"])
+
+
+            
 #employee deduction
 class EmployeeDeductionViewSet(viewsets.ModelViewSet):
     queryset = Employee_Deduction.objects.all()
@@ -215,15 +253,18 @@ class EmployeeDeductionViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"], url_path="deduction-types")
     def deduction_types(self, request):
         """
-        GET /employees/deductions/deduction-types/
-        Returns all deduction types (SSS, PhilHealth, Pag-IBIG, etc.)
+        Returns ONLY TAX / Government deductions
         """
-        deduction_types = Deduction_Type.objects.filter(is_active=True)
-        # Simplest serializer: return id, code, amount, calculation_type, salary ranges
+        deduction_types = Deduction_Type.objects.filter(
+            is_active=True,
+            category="TAX"   # 👈 FILTER HERE
+        )
+
         data = [
             {
                 "id": d.id,
                 "code": d.code,
+                "category": d.category,
                 "calculation_type": d.calculation_type,
                 "amount": float(d.amount),
                 "salary_range_from": float(d.salary_range_from),
@@ -250,6 +291,30 @@ class EmployeeAllowanceViewSet(viewsets.ModelViewSet):
         if employee_id:
             queryset = queryset.filter(employee_id=employee_id)
         return queryset
+    
+    @action(detail=True, methods=["post"])
+    def edit_allowance(self, request, pk=None):
+        """
+        Custom action to "edit" an allowance:
+        - Create a new Employee_Allowance record
+        - Keep the old one for history
+        """
+        original = self.get_object()  # the current allowance
+        data = request.data.copy()
+        
+        # Ensure we use the same employee and allowance_type
+        data["employee"] = original.employee.id
+        data["allowance_type"] = original.allowance_type.id
+        data["status"] = data.get("status", "Active")
+
+        serializer = EmployeeAllowanceCreateSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(
+            {"message": "Allowance updated successfully"},
+            status=status.HTTP_201_CREATED
+        )
 
 
 class AllowanceTypeListAPIView(APIView):

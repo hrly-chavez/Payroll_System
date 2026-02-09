@@ -1,27 +1,53 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Modal, Form, Select, DatePicker, Input, Button, message } from "antd";
-import styles from "./LeaveRequest.module.css";
-
-interface LeaveRequestProps {
-  open: boolean;
-  onClose: () => void;
-}
+import api from "../../../api/axios";
 
 const { RangePicker } = DatePicker;
 
-const LeaveRequest: React.FC<LeaveRequestProps> = ({ open, onClose }) => {
+const LeaveRequest = ({ open, onClose }: any) => {
   const [form] = Form.useForm();
+  const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const onFinish = (values: any) => {
-    console.log("Leave Request:", values);
+  /* 🔹 Fetch leave types from backend */
+  useEffect(() => {
+    if (open) {
+      api.get("/approvals/superadmin/leave-types/")
+        .then((res) => setLeaveTypes(res.data))
+        .catch(() => message.error("Failed to load leave types"));
+    }
+  }, [open]);
 
-    // TEMP: simulate success
-    message.success("Leave request submitted successfully");
-    form.resetFields();
-    onClose();
+  const onFinish = async (values: any) => {
+    if (!values.date_range) return;
 
-    // LATER:
-    // api.post("/leaves/", values)
+    setLoading(true);
+
+    try {
+    const payload = {
+      leave_type: values.leave_type,
+      date_range: [
+        values.date_range[0].format("YYYY-MM-DD"),
+        values.date_range[1].format("YYYY-MM-DD"),
+      ],
+      reason: values.reason || "",
+    };
+
+
+      await api.post("/approvals/leaves/", payload);
+
+      message.success("Leave request submitted successfully");
+      form.resetFields();
+      onClose();
+    } catch (error: any) {
+      message.error(
+        error.response?.data?.detail ||
+        error.response?.data?.non_field_errors?.[0] ||
+        "Failed to submit leave request"
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -30,22 +56,26 @@ const LeaveRequest: React.FC<LeaveRequestProps> = ({ open, onClose }) => {
       open={open}
       onCancel={onClose}
       footer={null}
-      className={styles.modal}
       destroyOnClose
     >
       <Form layout="vertical" form={form} onFinish={onFinish}>
+        
+        {/* Leave Type */}
         <Form.Item
           label="Leave Type"
-          name="type"
+          name="leave_type"
           rules={[{ required: true, message: "Please select leave type" }]}
         >
-          <Select placeholder="Select leave type">
-            <Select.Option value="SICK">Sick Leave</Select.Option>
-            <Select.Option value="VACATION">Vacation Leave</Select.Option>
-            <Select.Option value="EMERGENCY">Emergency Leave</Select.Option>
+          <Select placeholder="Select leave type" loading={!leaveTypes.length}>
+            {leaveTypes.map((type) => (
+              <Select.Option key={type.id} value={type.id}>
+                {type.name}
+              </Select.Option>
+            ))}
           </Select>
         </Form.Item>
 
+        {/* Date Range */}
         <Form.Item
           label="Date Range"
           name="date_range"
@@ -54,11 +84,17 @@ const LeaveRequest: React.FC<LeaveRequestProps> = ({ open, onClose }) => {
           <RangePicker style={{ width: "100%" }} />
         </Form.Item>
 
+        {/* Reason */}
         <Form.Item label="Reason" name="reason">
-          <Input.TextArea rows={4} placeholder="Optional reason" />
+          <Input.TextArea rows={4} />
         </Form.Item>
 
-        <Button type="primary" block htmlType="submit">
+        <Button
+          type="primary"
+          block
+          htmlType="submit"
+          loading={loading}
+        >
           Submit Request
         </Button>
       </Form>

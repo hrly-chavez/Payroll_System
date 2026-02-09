@@ -1,4 +1,5 @@
 from rest_framework import generics, status
+from rest_framework.generics import ListCreateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -65,3 +66,26 @@ class LeaveTypeUpdateView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Leave_Type.objects.all()
     serializer_class = LeaveTypeSerializer
+
+class LeaveRequestListCreateView(ListCreateAPIView):
+    serializer_class = LeaveRequestSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Leave_Request.objects.filter(
+            employee__user=self.request.user
+        ).order_by("-requested_at")
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        employee = Employee.objects.get(user=user)
+
+        date_from, date_to = serializer.validated_data.pop("date_range")
+
+        serializer.save(
+            employee=employee,
+            date_from=date_from,
+            date_to=date_to,
+            status="Pending"
+        )
+

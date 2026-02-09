@@ -218,33 +218,13 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(new_salary).data, status=status.HTTP_201_CREATED)
 
     def _recompute_percentage_deductions(self, employee_id: int, salary_amount: Decimal, effective_from):
-        """
-        Update existing Employee_Deduction rows for this employee if their calculation_type (linked or manual) is Percent.
-        Includes:
-        - deductions linked to Deduction_Type with calculation_type='Percent'
-        - deductions without Deduction_Type but with manual_calculation_type='Percent'
-        """
-        from django.db.models import Q
-
         deductions = Employee_Deduction.objects.filter(
-            employee_id=employee_id
-        ).filter(
-            Q(deduction_type__calculation_type="Percent") |
-            Q(manual_calculation_type="Percent")
+            employee_id=employee_id,
+            deduction_type__calculation_type="Percent"
         )
 
         for ded in deductions:
-            # Case 1: Linked Deduction_Type with Percent
-            if ded.deduction_type and ded.deduction_type.calculation_type == "Percent":
-                percent_value = ded.deduction_type.amount
-
-            # Case 2: Manual percent deduction (no linked Deduction_Type)
-            elif ded.manual_calculation_type == "Percent":
-                percent_value = ded.amount  # assuming you store the % in 'amount' for manual deductions
-            else:
-                continue  # skip if not percent
-
-            # Update the amount based on the new salary
+            percent_value = ded.deduction_type.amount
             ded.amount = round(salary_amount * (percent_value / 100), 2)
             ded.save(update_fields=["amount"])
 
@@ -273,15 +253,18 @@ class EmployeeDeductionViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"], url_path="deduction-types")
     def deduction_types(self, request):
         """
-        GET /employees/deductions/deduction-types/
-        Returns all deduction types (SSS, PhilHealth, Pag-IBIG, etc.)
+        Returns ONLY TAX / Government deductions
         """
-        deduction_types = Deduction_Type.objects.filter(is_active=True)
-        # Simplest serializer: return id, code, amount, calculation_type, salary ranges
+        deduction_types = Deduction_Type.objects.filter(
+            is_active=True,
+            category="TAX"   # 👈 FILTER HERE
+        )
+
         data = [
             {
                 "id": d.id,
                 "code": d.code,
+                "category": d.category,
                 "calculation_type": d.calculation_type,
                 "amount": float(d.amount),
                 "salary_range_from": float(d.salary_range_from),
@@ -308,6 +291,30 @@ class EmployeeAllowanceViewSet(viewsets.ModelViewSet):
         if employee_id:
             queryset = queryset.filter(employee_id=employee_id)
         return queryset
+    
+    @action(detail=True, methods=["post"])
+    def edit_allowance(self, request, pk=None):
+        """
+        Custom action to "edit" an allowance:
+        - Create a new Employee_Allowance record
+        - Keep the old one for history
+        """
+        original = self.get_object()  # the current allowance
+        data = request.data.copy()
+        
+        # Ensure we use the same employee and allowance_type
+        data["employee"] = original.employee.id
+        data["allowance_type"] = original.allowance_type.id
+        data["status"] = data.get("status", "Active")
+
+        serializer = EmployeeAllowanceCreateSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(
+            {"message": "Allowance updated successfully"},
+            status=status.HTTP_201_CREATED
+        )
 
 
 class AllowanceTypeListAPIView(APIView):

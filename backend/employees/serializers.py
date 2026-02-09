@@ -155,29 +155,24 @@ class EmployeeSalarySerializer(serializers.ModelSerializer):
 #para sa deduction sa taxes like sss, pagibig, philhealth
 #para sad ni sya sa POST / PUT
 class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
-    manual_amount = serializers.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        required=False,
-        write_only=True
-    )
-
     class Meta:
         model = Employee_Deduction
         fields = [
-            "manual_code",
             "employee",
-            "deduction_type",   # nullable for optional
+            "deduction_type",
             "frequency",
             "effective_from",
             "status",
-            "manual_amount",
         ]
 
     def validate(self, data):
         employee = data["employee"]
-        input_deduction_type = data.get("deduction_type")
-        manual_amount = data.get("manual_amount")
+        deduction_type = data.get("deduction_type")
+
+        if not deduction_type:
+            raise serializers.ValidationError(
+                "deduction_type is required"
+            )
 
         # Get latest salary
         salary = (
@@ -192,23 +187,9 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
 
         base_salary = salary.base_rate
 
-        # ============================
-        # OPTIONAL DEDUCTION (manual)
-        # ============================
-        if input_deduction_type is None:
-            if manual_amount is None:
-                raise serializers.ValidationError(
-                    "manual_amount is required for optional deductions"
-                )
-
-            data["amount"] = round(manual_amount, 2)
-            return data
-
-        # ============================
-        # MANDATORY DEDUCTION
-        # ============================
+        # Validate salary range
         deduction_type = Deduction_Type.objects.filter(
-            code=input_deduction_type.code,
+            id=deduction_type.id,
             is_active=True,
             salary_range_from__lte=base_salary,
             salary_range_to__gte=base_salary,
@@ -216,43 +197,31 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
 
         if not deduction_type:
             raise serializers.ValidationError(
-                f"Salary not valid for {input_deduction_type.code}"
+                f"Salary not valid for {data['deduction_type'].code}"
             )
 
-        # --- COMPUTATION ---
+        # Compute amount
         if deduction_type.calculation_type == "Fixed":
             amount = deduction_type.amount
-
         elif deduction_type.calculation_type == "Percent":
             amount = base_salary * (deduction_type.amount / 100)
-
         else:
             raise serializers.ValidationError("Invalid calculation type")
 
         data["deduction_type"] = deduction_type
         data["amount"] = round(amount, 2)
-        data["manual_code"] = data.get("manual_code")
 
         return data
 
     def create(self, validated_data):
-        employee = validated_data["employee"]
-        deduction_type = validated_data.get("deduction_type")
-        effective_from = validated_data["effective_from"]
-
-        # OPTIONAL → always create new row
-        if deduction_type is None:
-            validated_data.pop("manual_amount", None)
-            return Employee_Deduction.objects.create(**validated_data)
-
-        # MANDATORY → update per period
         obj, _ = Employee_Deduction.objects.update_or_create(
-            employee=employee,
-            deduction_type=deduction_type,
-            effective_from=effective_from,
+            employee=validated_data["employee"],
+            deduction_type=validated_data["deduction_type"],
+            effective_from=validated_data["effective_from"],
             defaults=validated_data,
         )
         return obj
+
 
 class EmployeeDeductionListSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
@@ -269,11 +238,6 @@ class EmployeeDeductionListSerializer(serializers.ModelSerializer):
         ]
 
     def get_name(self, obj):
-        # 1️⃣ If manual deduction → use manual_code
-        if obj.manual_code:
-            return obj.manual_code
-
-        # 2️⃣ Else → use Deduction_Type.code
         if obj.deduction_type:
             return obj.deduction_type.code
 

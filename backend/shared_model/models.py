@@ -250,8 +250,6 @@ class Employee_Deduction(models.Model):
     ]
     id = models.AutoField(primary_key=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    manual_code = models.CharField(max_length=100, null=True, blank=True)
-    manual_calculation_type = models.CharField(max_length=20, choices=[("Fixed","Fixed"),("Percent","Percent")], null=True, blank=True)
     frequency = models.CharField(max_length=20, choices=frequency_choices)
     effective_from = models.DateField()
     effective_to = models.DateField(null=True,blank=True)

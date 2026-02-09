@@ -1,9 +1,7 @@
 import {
   Modal,
   Form,
-  Select,
   InputNumber,
-  Input,
   DatePicker,
   Button,
   message,
@@ -97,22 +95,11 @@ const EmployeeContributionsModal: React.FC<Props> = ({
         }));
 
 
-
-      // Optional deductions payload
-      const optionalPayloads = (values.optional_deductions || []).map((d: any) => ({
-        employee: employeeId,
-        manual_code: d.manual_code,
-        manual_calculation_type: d.manual_calculation_type || "Fixed",
-        manual_amount: d.manual_amount,  // 👈 send this field so serializer sees it
-        frequency: "Monthly",
-        effective_from: effectiveFrom,
-        status: "Active",
-      }));
-
-
-
       // Submit all together
-      await Promise.all([...systemPayloads, ...optionalPayloads].map(p => api.post("/employees/deductions/", p)));
+      await Promise.all(
+        systemPayloads.map(p => api.post("/employees/deductions/", p))
+      );
+
 
       message.success("Employee contributions saved");
       onNext();
@@ -181,58 +168,6 @@ const EmployeeContributionsModal: React.FC<Props> = ({
             </div>
           );
         })}
-
-        {/* ---------------- OPTIONAL DEDUCTIONS ---------------- */}
-        <Divider>Other Deductions</Divider>
-
-        <Form.List name="optional_deductions">
-          {(fields, { add, remove }) => (
-            <>
-              {fields.map(({ key, name }) => (
-                <div key={key} style={{ marginBottom: 16 }}>
-                  {/* Deduction Code / Name */}
-                  <Form.Item
-                    name={[name, "manual_code"]}
-                    label="Code / Name"
-                    rules={[{ required: true, message: "Please enter code or name" }]}
-                  >
-                    <Input style={{ width: "100%" }} />
-                  </Form.Item>
-
-
-                  {/* Calculation Type */}
-                  <Form.Item
-                    name={[name, "manual_calculation_type"]}
-                    label="Type"
-                    rules={[{ required: true, message: "Please select type" }]}
-                  >
-                    <Select
-                      options={[
-                        { label: "Fixed", value: "Fixed" },
-                        { label: "Percent", value: "Percent" },
-                      ]}
-                    />
-                  </Form.Item>
-
-                  {/* Amount */}
-                  <Form.Item
-                    name={[name, "manual_amount"]}
-                    label="Amount"
-                    rules={[{ required: true, message: "Please enter amount" }]}
-                  >
-                    <InputNumber style={{ width: "100%" }} min={0} step={0.01} />
-                  </Form.Item>
-
-                  <Button danger onClick={() => remove(name)}>Remove</Button>
-                </div>
-              ))}
-
-              <Button type="dashed" onClick={() => add()} block>
-                + Add Other Deduction
-              </Button>
-            </>
-          )}
-        </Form.List>
 
         {/* ---------------- EFFECTIVE DATE ---------------- */}
         <Form.Item

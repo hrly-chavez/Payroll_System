@@ -77,6 +77,7 @@ export default function ContributionTab({ active }: Props) {
 
       const payload = {
         code: values.name,
+         category: values.category,
         salary_range_from: parseFloat(values.salaryFrom),
         salary_range_to: parseFloat(values.salaryTo),
         calculation_type: values.amountType === "manual" ? "Fixed" : "Percent",
@@ -115,6 +116,7 @@ export default function ContributionTab({ active }: Props) {
           <thead>
             <tr>
               <th>Code</th>
+              <th>Category</th>
               <th>Salary From</th>
               <th>Salary To</th>
               <th>Type</th>
@@ -126,6 +128,7 @@ export default function ContributionTab({ active }: Props) {
             {contributions.map((c) => (
               <tr key={c.id}>
                 <td>{c.code}</td>
+                <td>{c.category || "-"}</td>
                 <td>₱{c.salary_range_from}</td>
                 <td>₱{c.salary_range_to}</td>
                 <td>{c.calculation_type}</td>

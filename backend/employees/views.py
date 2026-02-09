@@ -192,7 +192,6 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(salary)
         return Response(serializer.data)
 
-    
 #employee deduction
 class EmployeeDeductionViewSet(viewsets.ModelViewSet):
     queryset = Employee_Deduction.objects.all()

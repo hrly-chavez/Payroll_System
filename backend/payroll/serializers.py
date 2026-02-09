@@ -11,6 +11,7 @@ class DeductionTypeSerializer(serializers.ModelSerializer):
 
 
 #==================================PAYROLL PERIOD=================================
+# Used to create and return payroll period data (date range, code, status)
 class PayrollPeriodCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payroll_Period
@@ -37,7 +38,7 @@ class PayrollPeriodCreateSerializer(serializers.ModelSerializer):
 
         return attrs
 
-# for clicking the payroll period (shows modal)
+# Used to list employees inside a payroll period modal (name, department, status)
 class EligibleEmployeeSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source="employee_id", read_only=True)
     full_name = serializers.SerializerMethodField()
@@ -51,20 +52,101 @@ class EligibleEmployeeSerializer(serializers.ModelSerializer):
     def get_full_name(self, obj: PayrollPeriodEmployee):
         e = obj.employee
         return f"{e.fname} {e.lname}".strip()
-    
-    
+
+
+#=========================VERIFY EMPLOYEE==========================
+# Serializes workdays of a shift (used for verification preview only)
+class ShiftWorkdaySerializer(serializers.ModelSerializer):
+    day = serializers.CharField(source="get_day_of_week_display", read_only=True)
+
+    class Meta:
+        model = Shift_Workday
+        fields = ["day_of_week", "day", "is_workday"]
+
+# Minimal shift details for Verify Employee modal (not for payroll computation)
+class ShiftMiniSerializer(serializers.ModelSerializer):
+    workdays = ShiftWorkdaySerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Shift
+        fields = [
+            "id", "name", "start_time", "end_time",
+            "break_minutes", "grace_minutes", "is_overnight",
+            "workdays"
+        ]
+
+# Returns the employee's latest effective salary for verification preview
+class EmployeeSalaryMiniSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Employee_Salary
+        fields = ["id", "pay_type", "base_rate", "effective_from"]
+
+# Minimal deduction type data (used to identify tax)
+class DeductionTypeMiniSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Deduction_Type
+        fields = ["id", "code", "category", "calculation_type", "amount", "salary_range_from", "salary_range_to"]
+
+# Returns tax or loan deductions active during the payroll period
+class EmployeeDeductionMiniSerializer(serializers.ModelSerializer):
+    deduction_type = DeductionTypeMiniSerializer(read_only=True)
+
+    class Meta:
+        model = Employee_Deduction
+        fields = [
+            "id",
+            "amount",
+            "frequency",
+            "effective_from",
+            "effective_to",
+            "status",
+            "deduction_type",
+            # loan fields
+            "total_loan_amount",
+            "balance",
+            "amortization_per_period",
+        ]
+
+# Aggregated snapshot shown in Verify Employee modal before payroll generation
+class PayrollVerifySnapshotSerializer(serializers.Serializer):
+    # Aggregated snapshot shown in Verify Employee modal
+    period_id = serializers.IntegerField()
+    employee_id = serializers.IntegerField()
+    full_name = serializers.CharField()
+    department_name = serializers.CharField(allow_null=True)
+    status = serializers.CharField()
+
+    shift = ShiftMiniSerializer(allow_null=True)
+    salary = EmployeeSalaryMiniSerializer(allow_null=True)
+
+    taxes = EmployeeDeductionMiniSerializer(many=True)   # SSS/PAGIBIG/PHILHEALTH...
+    loans = EmployeeDeductionMiniSerializer(many=True)   # loan deductions only
+
+    warnings = serializers.ListField(child=serializers.CharField(), required=False)
+ 
 
 #==========================================PAYRULE ========================================
 
 class PayRuleSerializer(serializers.ModelSerializer):
     applies_to_name = serializers.CharField(source="applies_to.name", read_only=True)
-    employee_name = serializers.SerializerMethodField()
+    employee_name = serializers.CharField(source="employee.full_name", read_only=True)
 
     class Meta:
         model = Pay_Rule
-        fields = '__all__'  # Send all fields to frontend
+        fields = '__all__'
 
-    def get_employee_name(self, obj):
-        if obj.employee:
-            return f"{obj.employee.fname} {obj.employee.lname}"
-        return None
+    def validate(self, attrs):
+        """
+        Enforce scope rules:
+        - Either applies_to OR employee OR none (global)
+        - Not both applies_to and employee at the same time
+        """
+        applies_to = attrs.get("applies_to", getattr(self.instance, "applies_to", None))
+        employee = attrs.get("employee", getattr(self.instance, "employee", None))
+
+        if applies_to and employee:
+            raise serializers.ValidationError(
+                {"detail": "Choose only one scope: either Department (applies_to) or Employee, not both."}
+            )
+
+        return attrs

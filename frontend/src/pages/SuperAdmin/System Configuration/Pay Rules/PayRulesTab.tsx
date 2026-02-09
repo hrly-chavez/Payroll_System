@@ -2,8 +2,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Button, Form, Spin, message } from "antd";
-import { EditOutlined } from "@ant-design/icons";
+import { Button, Form, Spin, message, Tag } from "antd";import { EditOutlined } from "@ant-design/icons";
 import API from "../../../../api/axios";
 import "../SystemConfiguration.css";
 
@@ -95,7 +94,6 @@ export default function PayRulesTab({ active }: Props) {
   const handleSavePayRule = async () => {
     try {
       const values = await payrollForm.validateFields();
-      const [effective_from, effective_to] = values.effective_dates || [];
 
       const payload = {
         name: values.name,
@@ -105,14 +103,16 @@ export default function PayRulesTab({ active }: Props) {
         rate_value: parseFloat(values.rate_value),
         applies_to: values.applies_to || null,
         employee: values.employee || null,
-        effective_from: effective_from ? effective_from.format("YYYY-MM-DD") : null,
-        effective_to: effective_to ? effective_to.format("YYYY-MM-DD") : null,
+        effective_from: values.effective_from ? values.effective_from.format("YYYY-MM-DD") : null,
+        effective_to: values.effective_to ? values.effective_to.format("YYYY-MM-DD") : null,
         is_active: values.is_active ?? true,
       };
 
       if (payRuleEditMode && editingPayRuleId) {
         await API.put(`/payroll/superadmin/pay-rules/${editingPayRuleId}/`, payload);
-        setPayRules((prev) => prev.map((item) => (item.id === editingPayRuleId ? { ...item, ...payload } : item)));
+        setPayRules((prev) =>
+          prev.map((item) => (item.id === editingPayRuleId ? { ...item, ...payload } : item))
+        );
         message.success("Payroll rule updated successfully");
       } else {
         const res = await API.post("/payroll/superadmin/pay-rules/", payload);
@@ -126,6 +126,7 @@ export default function PayRulesTab({ active }: Props) {
       message.error("Failed to save payroll rule.");
     }
   };
+
 
   return (
     <div className="table-wrapper">
@@ -148,6 +149,7 @@ export default function PayRulesTab({ active }: Props) {
               <th>Rate Value</th>
               <th>Scope</th>
               <th>Effective From</th>
+              <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -161,9 +163,15 @@ export default function PayRulesTab({ active }: Props) {
                 <td>₱{rule.rate_value}</td>
                 <td>{rule.applies_to_name || "All"}</td>
                 <td>{rule.effective_from}</td>
+                <td>
+                  <Tag color={rule.is_active ? "green" : "red"}>
+                    {rule.is_active ? "Active" : "Inactive"}
+                  </Tag>
+                </td>
                 <td className="actions">
                   <EditOutlined onClick={() => handleEditPayRule(rule)} />
                 </td>
+
               </tr>
             ))}
           </tbody>

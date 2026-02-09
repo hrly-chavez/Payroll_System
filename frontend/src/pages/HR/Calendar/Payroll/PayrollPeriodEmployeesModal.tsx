@@ -5,7 +5,7 @@ import React, { useEffect, useState } from "react";
 import { Modal, Table, Button, message, Tag} from "antd";
 import api from "../../../../api/axios";
 import dayjs from "dayjs";
-import EachEmployeeModal from "./EachEmployeeModal";
+import VerifyEmployeeModal from "./VerifyEmployeeModal";
 
 type PayrollPeriod = {
   id: number;
@@ -130,7 +130,7 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
         })}
         rowClassName={() => "clickable-row"}
       />
-      <EachEmployeeModal
+      <VerifyEmployeeModal
         open={openEmployeeModal}
         employee={selectedEmployee}
         period={period}
@@ -138,7 +138,11 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
           setOpenEmployeeModal(false);
           setSelectedEmployee(null);
         }}
+        onVerified={() => {
+          loadEligibleEmployees(); // refresh table status after verify
+        }}
       />
+
     </Modal>
   );
 }

@@ -73,7 +73,6 @@ admin.site.register(Payroll_Period)
 
 @admin.register(Pay_Rule)
 class PayRuleAdmin(admin.ModelAdmin):
-    # Display these columns in the admin list view
     list_display = ('name', 'event_type', 'category', 'rate_type', 'rate_value', 'is_active', 'created_at' )
     
     list_filter = ('category', 'event_type', 'rate_type', 'is_active')
@@ -87,6 +86,22 @@ class PayRuleAdmin(admin.ModelAdmin):
 class LeaveTypeAdmin(admin.ModelAdmin):
     list_display = ('name', 'is_paid', 'pay_rate', 'requires_approval', 'is_active', 'created_at')
     list_filter = ('is_paid', 'requires_approval', 'is_active')
-    search_fields = ['name']  # <-- must be a list
-    ordering = ['-created_at']  # <-- must be a list
+    search_fields = ['name'] 
+    ordering = ['-created_at']  
     readonly_fields = ('created_at',)
+
+@admin.register(Leave_Request)
+class LeaveRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "employee",
+        "leave_type",
+        "date_from",
+        "date_to",
+        "status",
+        "requested_at",
+    )
+    list_filter = ("status", "leave_type", "requested_at")
+    search_fields = ("employee__user__username", "reason")
+    ordering = ("-requested_at",)
+    readonly_fields = ("requested_at", "approved_at")

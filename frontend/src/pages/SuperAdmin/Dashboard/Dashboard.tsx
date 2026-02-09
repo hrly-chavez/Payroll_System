@@ -3,7 +3,6 @@ import { Layout, Row, Col, Calendar, Spin, message } from 'antd';
 import Chart from '../../../components/Chart';
 import Sidebar from '../../../components/Sidebar/Sidebar';
 import Topbar from '../../../components/Topbar/Topbar';
-import Greeting from '../../../components/Greeting/Greeting';
 import * as echarts from 'echarts';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
@@ -199,7 +198,6 @@ const Dashboard: React.FC = () => {
       <Layout>
         <Topbar title="Dashboard" />
         <Content className="dashboard-content">
-          <Greeting />
 
           <Row gutter={[16, 16]}>
             <Col xs={24} lg={16}>

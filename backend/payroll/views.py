@@ -1,4 +1,5 @@
 from rest_framework import generics, status
+from rest_framework import status as http_status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from shared_model.models import *
@@ -6,8 +7,15 @@ from .serializers import *
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
+from rest_framework.exceptions import ValidationError
 
-
+#helpers
+def _overlaps_period(eff_from, eff_to, period_start, period_end):
+    if eff_from and eff_from > period_end:
+        return False
+    if eff_to and eff_to < period_start:
+        return False
+    return True
 
 
 # List and Create
@@ -55,7 +63,7 @@ class PayrollPeriodListCreateView(generics.ListCreateAPIView):
             status="Open",
         )
 
-#for clicking the payroll period (shows modal)
+#for clicking the payroll period (shows modal with employees)
 class PayrollPeriodEligibleEmployeesView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -105,28 +113,159 @@ class PayrollPeriodEligibleEmployeesView(APIView):
             "period": PayrollPeriodCreateSerializer(period).data,
             "eligible_employees": EligibleEmployeeSerializer(ppe_qs, many=True).data
         })
-    
-#==========================================PAYRULE========================================
 
-# List and Create
-class PayRuleListCreateView(generics.ListCreateAPIView):
+#=========================VERIFY EMPLOYEE==========================
+
+# Returns salary, shift, tax, and loans for employee verification preview
+class PayrollVerifyEmployeeSnapshotView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, period_id, employee_id):
+        period = get_object_or_404(Payroll_Period, id=period_id)
+        employee = get_object_or_404(
+            Employee.objects.select_related("department", "shift", "department__shift_id"),
+            id=employee_id
+        )
+        ppe = get_object_or_404(PayrollPeriodEmployee, period=period, employee=employee)
+
+        warnings = []
+
+        shift = employee.shift or getattr(employee.department, "shift_id", None)
+        if not shift:
+            warnings.append("No shift assigned (employee.shift and department.shift_id are empty).")
+
+        salary = (
+            Employee_Salary.objects
+            .filter(employee=employee, effective_from__lte=period.end_date)
+            .order_by("-effective_from")
+            .first()
+        )
+        if not salary:
+            warnings.append("No salary found with effective_from <= payroll period end date.")
+
+        deductions_qs = (
+            Employee_Deduction.objects
+            .select_related("deduction_type")
+            .filter(employee=employee, status="Active")
+        )
+
+        in_period_deductions = [
+            d for d in deductions_qs
+            if _overlaps_period(d.effective_from, d.effective_to, period.start_date, period.end_date)
+        ]
+
+        # Loans first (so we can exclude them from taxes)
+        loans = [
+            d for d in in_period_deductions
+            if (d.amortization_per_period is not None) or (d.total_loan_amount is not None)
+        ]
+
+        # Taxes: use category instead of codes
+        taxes = [
+            d for d in in_period_deductions
+            if d.deduction_type
+            and d.deduction_type.category == "TAX"
+            and d not in loans
+        ]
+
+        if not taxes:
+            warnings.append("No mandatory tax deductions found for this period (category=TAX).")
+
+        payload = {
+            "period_id": period.id,
+            "employee_id": employee.id,
+            "full_name": f"{employee.fname} {employee.lname}".strip(),
+            "department_name": employee.department.name if employee.department else None,
+            "status": ppe.status,
+            "shift": shift,
+            "salary": salary,
+            "taxes": taxes,
+            "loans": loans,
+            "warnings": warnings,
+        }
+
+        return Response(
+            PayrollVerifySnapshotSerializer(payload).data,
+            status=http_status.HTTP_200_OK
+        )
+
+# Marks an employee as verified for a payroll period
+class PayrollVerifyEmployeeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, period_id, employee_id):
+        period = get_object_or_404(Payroll_Period, id=period_id)
+        employee = get_object_or_404(Employee, id=employee_id)
+
+        ppe = get_object_or_404(PayrollPeriodEmployee, period=period, employee=employee)
+
+        # Already verified (or beyond) — do not re-verify
+        if ppe.status != "Pending":
+            return Response(
+                {"detail": f"Employee is already {ppe.status}."},
+                status=http_status.HTTP_400_BAD_REQUEST
+            )
+
+        # Optional: enforce prerequisites before verification
+        salary = (
+            Employee_Salary.objects
+            .filter(employee=employee, effective_from__lte=period.end_date)
+            .order_by("-effective_from")
+            .first()
+        )
+        if not salary:
+            return Response(
+                {"detail": "Cannot verify: employee has no active salary for this payroll period."},
+                status=http_status.HTTP_400_BAD_REQUEST
+            )
+
+        # Shift is optional; if  want to enforce it, uncomment:
+        shift = employee.shift or getattr(employee.department, "shift_id", None)
+        if not shift:
+            return Response({"detail": "Cannot verify: employee has no shift assigned."}, status=http_status.HTTP_400_BAD_REQUEST)
+
+        ppe.status = "Verified"
+        ppe.verified_by = request.user
+        ppe.verified_at = timezone.now()
+        ppe.save(update_fields=["status", "verified_by", "verified_at", "updated_at"])
+
+        return Response(
+            {"detail": "Employee verified successfully.", "status": ppe.status},
+            status=http_status.HTTP_200_OK
+        )
+
+
+#==========================================PAYRULE========================================
+class SuperAdminPayRuleListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = PayRuleSerializer
-    queryset = Pay_Rule.objects.all().order_by('-created_at')
 
-# Retrieve, Update, Delete
-class PayRuleDetailView(generics.RetrieveUpdateDestroyAPIView):
+    def get_queryset(self):
+        # If you want only active rules by default, uncomment:
+        # return Pay_Rule.objects.filter(is_active=True).order_by("-id")
+        return Pay_Rule.objects.all().order_by("-id")
+
+    def perform_create(self, serializer):
+        # Optional: enforce effective_from <= effective_to
+        effective_from = serializer.validated_data.get("effective_from")
+        effective_to = serializer.validated_data.get("effective_to")
+        if effective_to and effective_from and effective_to < effective_from:
+            raise ValidationError({"detail": "effective_to cannot be earlier than effective_from."})
+
+        serializer.save()
+
+
+class SuperAdminPayRuleRetrieveUpdateView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = PayRuleSerializer
     queryset = Pay_Rule.objects.all()
 
-# Optional: Update only 'is_active' status
-class PayRuleUpdateStatusView(APIView):
-    permission_classes = [IsAuthenticated]
+    def perform_update(self, serializer):
+        effective_from = serializer.validated_data.get("effective_from", serializer.instance.effective_from)
+        effective_to = serializer.validated_data.get("effective_to", serializer.instance.effective_to)
 
-    def patch(self, request, pk):
-        rule = get_object_or_404(Pay_Rule, pk=pk)
-        rule.is_active = request.data.get('is_active', rule.is_active)
-        rule.save()
-        serializer = PayRuleSerializer(rule)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        if effective_to and effective_from and effective_to < effective_from:
+            raise ValidationError({"detail": "effective_to cannot be earlier than effective_from."})
+
+        serializer.save()
+    

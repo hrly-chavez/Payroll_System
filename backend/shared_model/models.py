@@ -6,14 +6,20 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseU
 class Province(models.Model):
     name = models.CharField(max_length=100)
 
+    def __str__(self):
+        return self.name
 class City(models.Model):
     name = models.CharField(max_length=100)
     province = models.ForeignKey(Province, on_delete=models.PROTECT, related_name="cities")
+    def __str__(self):
+        return f"{self.name} {self.province}"
 
 class Barangay(models.Model):
     name = models.CharField(max_length=100)
     city = models.ForeignKey(City, on_delete=models.PROTECT, related_name="barangays")
 
+    def __str__(self):
+        return f"{self.name} {self.city}"
 class Address(models.Model):
     province = models.ForeignKey(Province, on_delete=models.PROTECT, related_name="addresses")
     city = models.ForeignKey(City, on_delete=models.PROTECT, related_name="addresses")
@@ -22,6 +28,8 @@ class Address(models.Model):
     sitio = models.CharField(max_length=255, blank=True, null=True)
     zip_code = models.CharField(max_length=10, blank=True, null=True)
 
+    def __str__(self):
+        return f"{self.province} - {self.city} - {self.barangay} - {self.street}"
 class Department(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=50)
@@ -178,6 +186,8 @@ class Employee_Salary(models.Model):
     blank=True)
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="salaries")
 
+    def __str__(self):
+        return f"{self.pay_type} {self.base_rate}"
     
     # class Meta:
     #     constraints = [
@@ -188,13 +198,28 @@ class Employee_Salary(models.Model):
     #     ]
        
 class Deduction_Type(models.Model):
-    calculation_choices = [
-        ("Fixed","Fixed"),
-        ("Percent","Percent"),
-    ]
+   
+#     DEDUCTIONS
+#   Government Deductions
+#     - SSS
+#     - Pag-IBIG
+#     - PhilHealth
 
+#   Other Deductions
+#     - Company Loan
+#     - Cash Advance
+    calculation_choices = [
+            ("Fixed","Fixed"),
+            ("Percent","Percent"),
+        ]
+
+    CATEGORY_CHOICES = [
+        ("TAX", "Tax / Government Mandatory"),
+        ("OTHER", "Other Deduction"),
+    ]
     id = models.AutoField(primary_key=True)
     code = models.CharField(max_length=100,unique=True)
+    category = models.CharField(max_length=10,choices=CATEGORY_CHOICES,default="TAX",help_text="Used to classify deductions (e.g., TAX vs OTHER)")
     salary_range_from = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     salary_range_to = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     calculation_type = models.CharField(max_length=20, choices=calculation_choices)
@@ -211,7 +236,7 @@ class Deduction_Type(models.Model):
         ]
 
     def __str__(self):
-        return self.code   # 👈 THIS is the magic
+        return self.code   
 
 class Employee_Deduction(models.Model):
     frequency_choices = [
@@ -240,6 +265,9 @@ class Employee_Deduction(models.Model):
 
     employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="deductions")
     deduction_type = models.ForeignKey(Deduction_Type,on_delete=models.PROTECT,related_name="employee_deductions", null=True, blank=True) 
+
+    def __str__(self):
+        return f"{self.amount} {self.deduction_type}"
 
     class Meta:
         constraints = [
@@ -288,6 +316,9 @@ class Employee_Allowance(models.Model):
     allowance_type = models.ForeignKey(Allowance_Type,on_delete=models.PROTECT,related_name="employee_allowances")
     employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="allowances")
 
+    def __str__(self):
+        return f"{self.amount} {self.allowance_type}"
+    
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -312,6 +343,9 @@ class Attendance(models.Model):
     time_out = models.TimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="attendances")
+
+    def __str__(self):
+        return f"{self.date} - {self.employee}"
 
     class Meta:
         constraints = [
@@ -356,12 +390,15 @@ class Leave_Type(models.Model):
     is_active = models.BooleanField(default=True) 
     created_at = models.DateField(auto_now=True)
 
+    def __str__(self):
+        return f"{self.name} {self.is_paid}"
+
 class Leave_Request(models.Model):
     half_day_choices = [
         ("AM","AM"),
         ("PM","PM"),
     ]
-    STATUS_CHOICES = [
+    STATUS_CHOICES = [ 
         ("Pending","Pending"),
         ("Approved","Approved"),
         ("Declined","Declined"),
@@ -381,6 +418,9 @@ class Leave_Request(models.Model):
     employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="leave_requests")
     leave_type = models.ForeignKey(Leave_Type,on_delete=models.PROTECT,related_name="leave_requests")
 
+    def __str__(self):
+        return f"{self.date_from} to {self.date_to}" 
+
 class Leave_Day(models.Model):
     id = models.AutoField(primary_key=True)
     date = models.DateField()
@@ -390,6 +430,9 @@ class Leave_Day(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     leave_request = models.ForeignKey(Leave_Request,on_delete=models.CASCADE, related_name="days")
     employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="leave_days")
+
+    def __str__(self):
+        return f"{self.date} is {self.is_paid}"
 
     class Meta:
         constraints = [
@@ -422,6 +465,9 @@ class Holiday(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return f"{self.date} - {self.name} type {self.type}"
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -436,6 +482,8 @@ class Company_Note(models.Model):
     created_at = models.DateField(auto_now_add=True)
     user = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="company_notes")
 
+    def __str__(self):
+        return self.note
 class Payroll_Period(models.Model):
     period_status_choices = [
         ("Open","Open"),
@@ -451,7 +499,6 @@ class Payroll_Period(models.Model):
     color = models.CharField(max_length=20, default="#ff4d4f")
     status = models.CharField(max_length=20, choices=period_status_choices, default="Open")
     created_at = models.DateField(auto_now_add=True)
-    
 
 class Pay_Rule(models.Model):
     event_type_choices = [
@@ -487,6 +534,9 @@ class Pay_Rule(models.Model):
     applies_to = models.ForeignKey(Department,on_delete=models.CASCADE,null=True,blank=True,related_name="pay_rules")
     employee = models.ForeignKey("Employee",on_delete=models.SET_NULL,null=True,blank=True,related_name="pay_rules")
 
+    def __str__(self):
+        return f"{self.name} - {self.event_type}"
+
 class Payroll(models.Model):
     status_choices = [
         ("Draft","Draft"),
@@ -510,6 +560,9 @@ class Payroll(models.Model):
     payroll_period = models.ForeignKey(Payroll_Period,on_delete=models.CASCADE,related_name="payrolls")
     employee = models.ForeignKey(Employee,on_delete=models.PROTECT,related_name="payrolls")
 
+    def __str__(self):
+        return f"{self.status} - {self.generated_at} to {self.payroll_period}"
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -517,6 +570,7 @@ class Payroll(models.Model):
                 name="unique_payroll_per_period_per_employee"
             )
         ]
+    
 
 class PayrollPeriodEmployee(models.Model):
     STATUS_CHOICES = [

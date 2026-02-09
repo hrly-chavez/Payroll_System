@@ -27,10 +27,8 @@ export function editPayRule({
     rate_value: rule.rate_value,
     applies_to: rule.applies_to || null,
     employee: rule.employee || null,
-    effective_dates: [
-      rule.effective_from ? dayjs(rule.effective_from) : null,
-      rule.effective_to ? dayjs(rule.effective_to) : null,
-    ],
+    effective_from: rule.effective_from ? dayjs(rule.effective_from) : null,
+    effective_to: rule.effective_to ? dayjs(rule.effective_to) : null,
     is_active: rule.is_active,
   });
 

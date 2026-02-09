@@ -23,12 +23,13 @@ export function editContribution({
   setAmountType(type);
 
   form.setFieldsValue({
-    name: record.code,
-    salaryFrom: record.salary_range_from,
-    salaryTo: record.salary_range_to,
-    amountType: type,
-    amount: record.amount,
-  });
+  name: record.code,
+  category: record.category || "OTHER",
+  salaryFrom: record.salary_range_from,
+  salaryTo: record.salary_range_to,
+  amountType: record.calculation_type === "Percent" ? "percent" : "manual",
+  amount: record.amount,
+});
 
   setIsModalOpen(true);
 }

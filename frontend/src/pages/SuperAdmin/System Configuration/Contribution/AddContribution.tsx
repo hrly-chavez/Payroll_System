@@ -33,6 +33,17 @@ export default function AddContribution({
           <Input disabled={isEditMode} />
         </Form.Item>
 
+          <Form.Item
+            label="Category"
+            name="category"
+            rules={[{ required: true, message: "Please select a category." }]}
+          >
+            <Select placeholder="Select category">
+              <Select.Option value="TAX">Tax / Government Mandatory</Select.Option>
+              <Select.Option value="OTHER">Other Deduction</Select.Option>
+            </Select>
+          </Form.Item>
+
         <Form.Item label="Salary Range (From)" name="salaryFrom" rules={[{ required: true }]}>
           <Input />
         </Form.Item>

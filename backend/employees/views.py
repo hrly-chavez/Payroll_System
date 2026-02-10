@@ -136,15 +136,44 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             role=requested_role,
             employee=employee
         )
+        # Serialize the newly created employee using READ serializer
+        employee_data = EmployeeSerializer(employee).data
 
         return Response(
             {
                 "message": "Employee and user created successfully",
-                "employee_id": employee.id,
+                "employee_id": employee_data,
                 "username": username,
                 "password": password  # send this so it can be communicated to the employee
             },
             status=status.HTTP_201_CREATED
+        )
+    # ---------------------------------
+    # UPDATE EMPLOYEE DETAILS
+    # /employees/employees/<id>/update/
+    # ---------------------------------
+    @action(
+        detail=True,
+        methods=["put", "patch"],
+        url_path="update",
+    )
+    def update_employee(self, request, pk=None):
+        employee = self.get_object()
+
+        serializer = EmployeeUpdateSerializer(
+            employee,
+            data=request.data,
+            partial=True,
+        )
+
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(
+            {
+                "message": "Employee updated successfully",
+                "employee": EmployeeSerializer(employee).data,
+            }
         )
     
 #employee salary
@@ -195,7 +224,7 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(salary)
         return Response(serializer.data)
     
-    # 🔥 NEW ACTION
+    #  NEW ACTION
     @action(detail=False, methods=["post"], url_path="edit")
     @transaction.atomic
     def edit_salary(self, request):

@@ -44,12 +44,16 @@ class EmployeeSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
     department_name = serializers.CharField(source="department.name", read_only=True)
     shift_info = serializers.SerializerMethodField()
-
+    address = serializers.SerializerMethodField()
     class Meta:
         model = Employee
         fields = [
             "id",
+            "fname",
+            "lname",
             "name",
+            "suffix",
+            "initial",
             "department_name",
             "position",
             "status",
@@ -69,43 +73,47 @@ class EmployeeSerializer(serializers.ModelSerializer):
             return f"{obj.shift.start_time} - {obj.shift.end_time}"
         return None
     
+    # <-- method name matches the field name
+    def get_address(self, obj):
+        if not obj.address:
+            return None
+        addr = obj.address
+        return {
+            "street": addr.street or "",
+            "sitio": addr.sitio or "",
+            "barangay_name": addr.barangay.name if addr.barangay else "",
+            "city_name": addr.city.name if addr.city else "",
+            "province_name": addr.province.name if addr.province else "",
+            "zip_code": addr.zip_code or "",
+        }
+
+    
+# =========================
+# Address Serializer
+# =========================
 class AddressSerializer(serializers.ModelSerializer):
+    province_name = serializers.CharField(source="province.name", read_only=True)
+    city_name = serializers.CharField(source="city.name", read_only=True)
+    barangay_name = serializers.CharField(source="barangay.name", read_only=True)
+
     class Meta:
         model = Address
         fields = [
-            "province",
+            "id",
+            "province",        # expects ID
+            "province_name",   # output only
             "city",
+            "city_name",
             "barangay",
-            "street",
+            "barangay_name",
             "sitio",
+            "street",
             "zip_code",
         ]
 
-    def create(self, validated_data):
-        province_name = validated_data.pop("province")
-        city_name = validated_data.pop("city")
-        barangay_name = validated_data.pop("barangay")
-
-        province, _ = Province.objects.get_or_create(name=province_name)
-        city, _ = City.objects.get_or_create(
-            name=city_name,
-            province=province
-        )
-        barangay, _ = Barangay.objects.get_or_create(
-            name=barangay_name,
-            city=city
-        )
-
-        address = Address.objects.create(
-            province=province,
-            city=city,
-            barangay=barangay,
-            **validated_data
-        )
-
-        return address
-    
-#gamit if mag create employee
+# =========================
+# Employee Create Serializer
+# =========================
 class EmployeeCreateSerializer(serializers.ModelSerializer):
     address = AddressSerializer()
 
@@ -130,13 +138,89 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         address_data = validated_data.pop("address")
-        address = AddressSerializer().create(address_data)
+
+        address = Address.objects.create(**address_data)
 
         employee = Employee.objects.create(
             address=address,
             **validated_data
         )
         return employee
+
+    
+class EmployeeUpdateSerializer(serializers.ModelSerializer):
+    address = AddressSerializer(required=False)
+
+    class Meta:
+        model = Employee
+        fields = [
+            "fname",
+            "initial",
+            "lname",
+            "suffix",
+            "status",
+            "contact_no",
+            "email",
+            "hired_date",
+            "position",
+            "bank_info",
+            "shift",
+            "department",
+            "address",
+            "is_active",
+        ]
+
+    def update(self, instance, validated_data):
+        address_data = validated_data.pop("address", None)
+
+        # -------------------
+        # Update Employee
+        # -------------------
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.save()
+
+        # -------------------
+        # Update Address
+        # -------------------
+        if address_data:
+            address = instance.address
+
+            province_name = address_data.get("province")
+            city_name = address_data.get("city")
+            barangay_name = address_data.get("barangay")
+
+            if province_name:
+                province, _ = Province.objects.get_or_create(
+                    name=province_name
+                )
+                address.province = province
+
+            if city_name:
+                city, _ = City.objects.get_or_create(
+                    name=city_name,
+                    province=province
+                )
+                address.city = city
+
+            if barangay_name:
+                barangay, _ = Barangay.objects.get_or_create(
+                    name=barangay_name,
+                    city=city
+                )
+                address.barangay = barangay
+
+            address.street = address_data.get("street", address.street)
+            address.sitio = address_data.get("sitio", address.sitio)
+            address.zip_code = address_data.get(
+                "zip_code", address.zip_code
+            )
+
+            address.save()
+
+        return instance
+
     
 #para sa salary
 class EmployeeSalarySerializer(serializers.ModelSerializer):

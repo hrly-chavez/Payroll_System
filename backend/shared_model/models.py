@@ -12,14 +12,14 @@ class City(models.Model):
     name = models.CharField(max_length=100)
     province = models.ForeignKey(Province, on_delete=models.PROTECT, related_name="cities")
     def __str__(self):
-        return f"{self.name} {self.province}"
+        return f"{self.name} {self.province.name}"
 
 class Barangay(models.Model):
     name = models.CharField(max_length=100)
     city = models.ForeignKey(City, on_delete=models.PROTECT, related_name="barangays")
 
     def __str__(self):
-        return f"{self.name} {self.city}"
+        return f"{self.name} {self.city.name}"
 class Address(models.Model):
     province = models.ForeignKey(Province, on_delete=models.PROTECT, related_name="addresses")
     city = models.ForeignKey(City, on_delete=models.PROTECT, related_name="addresses")
@@ -29,7 +29,7 @@ class Address(models.Model):
     zip_code = models.CharField(max_length=10, blank=True, null=True)
 
     def __str__(self):
-        return f"{self.province} - {self.city} - {self.barangay} - {self.street}"
+        return f"{self.province.name} - {self.city.name} - {self.barangay.name}"
 class Department(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=50)

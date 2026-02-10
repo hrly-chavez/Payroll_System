@@ -33,18 +33,70 @@ interface MenuItemConfig {
 const Sidebar: React.FC<SidebarProps> = ({ role }) => {
   const location = useLocation();
   const [currentRole, setCurrentRole] = useState<UserRole>('SUPER_ADMIN');
+  const [isMobile, setIsMobile] = useState<boolean>(
+    typeof window !== 'undefined' && window.innerWidth < 768
+  );
+  const [collapsed, setCollapsed] = useState<boolean>(isMobile);
 
+  // Touch positions for swipe
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchEndX, setTouchEndX] = useState<number | null>(null);
+
+  // Set current role
   useEffect(() => {
     if (role) {
       setCurrentRole(role);
     } else {
       const storedRole = localStorage.getItem('role') as UserRole | null;
-      if (storedRole) {
-        setCurrentRole(storedRole);
-      }
+      if (storedRole) setCurrentRole(storedRole);
     }
   }, [role]);
 
+  // Handle window resize
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) setCollapsed(true);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Swipe handlers for mobile (only from left edge)
+  const handleTouchStart = (e: TouchEvent) => {
+    const x = e.touches[0].clientX;
+    if (x < 30) setTouchStartX(x); // only detect touches from very left edge
+  };
+
+  const handleTouchMove = (e: TouchEvent) => {
+    if (touchStartX !== null) {
+      setTouchEndX(e.touches[0].clientX);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartX !== null && touchEndX !== null) {
+      const distance = touchEndX - touchStartX;
+      if (distance > 50) setCollapsed(false); // open sidebar
+    }
+    setTouchStartX(null);
+    setTouchEndX(null);
+  };
+
+  useEffect(() => {
+    if (!isMobile) return;
+    document.addEventListener('touchstart', handleTouchStart);
+    document.addEventListener('touchmove', handleTouchMove);
+    document.addEventListener('touchend', handleTouchEnd);
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [touchStartX, touchEndX, isMobile]);
+
+  // Menu configuration
   const menuConfig: MenuItemConfig[] = [
     {
       key: 'dashboard',
@@ -107,7 +159,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
         SUPER_ADMIN: '/super-admin/reports',
       },
     },
-        {
+    {
       key: 'Requests',
       label: 'Requests',
       icon: <FileTextOutlined />,
@@ -138,39 +190,27 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
       Object.values(item.hrefs).includes(location.pathname)
     )?.key ?? 'dashboard';
 
-  const [isMobile, setIsMobile] = useState<boolean>(
-    typeof window !== 'undefined' && window.innerWidth < 768
-  );
-  const [collapsed, setCollapsed] = useState<boolean>(isMobile);
-
-  useEffect(() => {
-    const onResize = () => {
-      const mobile = window.innerWidth < 768;
-      setIsMobile(mobile);
-      if (mobile) setCollapsed(true);
-    };
-
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
   const showOverlay = isMobile && !collapsed;
 
+  // Add/remove body class for mobile overlay
   useEffect(() => {
     const body = document.body;
     body.classList.remove('sidebar-open-mobile');
-
-    if (isMobile && !collapsed) {
-      body.classList.add('sidebar-open-mobile');
-    }
-
-    return () => {
-      body.classList.remove('sidebar-open-mobile');
-    };
+    if (isMobile && !collapsed) body.classList.add('sidebar-open-mobile');
+    return () => body.classList.remove('sidebar-open-mobile');
   }, [collapsed, isMobile]);
+
+  // Auto-collapse / expand on hover (desktop only)
+  const handleMouseEnter = () => {
+    if (!isMobile) setCollapsed(false);
+  };
+  const handleMouseLeave = () => {
+    if (!isMobile) setCollapsed(true);
+  };
 
   return (
     <>
+      {/* Mobile overlay */}
       {showOverlay && (
         <div
           className="sider-overlay"
@@ -192,6 +232,9 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
           setIsMobile(broken);
           if (broken) setCollapsed(true);
         }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        trigger={null}
       >
         <div className="logo-container">
           <img src={logo} alt="AttiTech" />
@@ -210,7 +253,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
             if (!href) return null;
 
             return (
-              <Menu.Item key={item.key} icon={item.icon}>
+              <Menu.Item key={item.key} icon={item.icon} onClick={() => isMobile && setCollapsed(true)}>
                 <Link to={href}>{item.label}</Link>
               </Menu.Item>
             );

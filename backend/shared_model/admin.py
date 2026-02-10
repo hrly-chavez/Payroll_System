@@ -13,7 +13,21 @@ class DepartmentAdmin(admin.ModelAdmin):
     list_filter = ('shift_id',)
     search_fields = ('name',)
 
-admin.site.register(Shift)
+@admin.register(Shift)
+class ShiftAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "start_time",
+        "end_time",
+        "break_minutes",
+        "grace_minutes",
+        "is_overnight",
+        "is_active",
+    )
+    list_filter = ("is_active", "is_overnight")
+    search_fields = ("name",)
+    ordering = ("start_time",)
+    list_editable = ("is_active",)
 admin.site.register(Shift_Workday)
 admin.site.register(Employee)
 admin.site.register(Address)

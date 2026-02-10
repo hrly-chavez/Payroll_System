@@ -164,3 +164,24 @@
     margin-left: 80px;
   }
 }
+
+/* Floating mobile burger button */
+.mobile-burger {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1200;
+  border-radius: 8px;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: 3f78a3;
+}
+
+/* Optional: hide the button on desktop */
+@media (min-width: 768px) {
+  .mobile-burger {
+    display: none;
+  }
+}

@@ -8,4 +8,6 @@ urlpatterns = [
     path("logs/", AttendanceLogsView.as_view(), name="attendance-logs"),
     path("admin/logs/", CEOandHRAttendanceLogsView.as_view(), name="attendance-admin-logs"),
     path("super_admin/logs/", CEOandHRAttendanceLogsView.as_view(), name="attendance-super_admin-logs"),
+    path("shifts/", ShiftListCreateView.as_view(), name="shift-list-create"),
+    path("shifts/<int:pk>/", ShiftRetrieveUpdateDestroyView.as_view(), name="shift-detail"),
 ]

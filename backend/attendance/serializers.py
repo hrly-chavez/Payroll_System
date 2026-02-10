@@ -88,3 +88,17 @@ class PunchOutSerializer(serializers.Serializer):
     """
     def validate(self, attrs):
         return attrs
+    
+class ShiftSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Shift
+        fields = [
+            "id",
+            "name",
+            "start_time",
+            "end_time",
+            "break_minutes",
+            "grace_minutes",
+            "is_overnight",
+            "is_active",
+        ]

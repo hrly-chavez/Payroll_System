@@ -271,9 +271,9 @@ class PayrollPeriodEmployeeCommissionListCreateView(APIView):
 
         ppe = get_object_or_404(PayrollPeriodEmployee, period=period, employee=employee)
 
-        if ppe.status not in ["Pending", "Verified"]:
+        if ppe.status != "Pending":
             return Response(
-                {"detail": f"Cannot modify commissions when status is {ppe.status}."},
+                {"detail": f"Cannot modify commissions when status is {ppe.status}. Commissions are only allowed while Pending."},
                 status=http_status.HTTP_400_BAD_REQUEST
             )
 

@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from "react";
 import { Modal, Descriptions, Tag, Table, Button, Alert, Spin, message } from "antd";
 import api from "../../../../api/axios";
+import AddCommission from "./AddCommission";
 
 type EligibleEmployee = {
   id: number;
@@ -78,6 +79,22 @@ type Allowance = {
   status: "Active" | "Inactive";
   allowance_type: AllowanceType;
 };
+type CommissionType = {
+  id: number;
+  name: string;
+  code: string;
+  is_taxable: boolean;
+  is_active: boolean;
+};
+
+type Commission = {
+  id: number;
+  commission_type: CommissionType;
+  amount: string;
+  remarks?: string | null;
+  created_at: string;
+};
+
 type Snapshot = {
   period_id: number;
   employee_id: number;
@@ -91,6 +108,7 @@ type Snapshot = {
   allowances: Allowance[];
   warnings?: string[];
 };
+
 
 type Props = {
   open: boolean;
@@ -115,7 +133,14 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
   const [verifying, setVerifying] = useState(false);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
 
+    // commissions
+  const [commissionLoading, setCommissionLoading] = useState(false);
+  const [commissions, setCommissions] = useState<Commission[]>([]);
+  const [openCommissionModal, setOpenCommissionModal] = useState(false);
+
   const canVerify = status === "Pending";
+  const canAddCommission = status === "Pending";
+
 
   const loadSnapshot = async () => {
     if (!open || !employee || !period) return;
@@ -136,6 +161,26 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
       setLoading(false);
     }
   };
+
+  const loadCommissions = async () => {
+    if (!open || !employee || !period) return;
+    setCommissionLoading(true);
+    try {
+      const res = await api.get(
+        `/payroll/periods/${period.id}/employees/${employee.id}/commissions/`
+      );
+      setCommissions(res.data || []);
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to load commissions";
+      message.error(msg);
+    } finally {
+      setCommissionLoading(false);
+    }
+  };
+
 
   const handleVerify = async () => {
     if (!employee || !period) return;
@@ -163,10 +208,11 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
   useEffect(() => {
     if (open) {
       loadSnapshot();
+      loadCommissions();
     } else {
       setSnapshot(null);
+      setCommissions([]);
     }
-
   }, [open, employee?.id, period?.id]);
 
   const allowanceColumns = [
@@ -223,7 +269,28 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
       render: (v: string) => v || "-",
     },
   ];
-
+  const commissionColumns = [
+    {
+      title: "Type",
+      dataIndex: ["commission_type", "name"],
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Code",
+      dataIndex: ["commission_type", "code"],
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Amount",
+      dataIndex: "amount",
+      render: (v: string) => v || "0.00",
+    },
+    {
+      title: "Remarks",
+      dataIndex: "remarks",
+      render: (v: string) => v || "-",
+    },
+  ];
   return (
     <Modal
       open={open}
@@ -260,9 +327,28 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
               >
                 Verify Employee
               </Button>
+
+              <Button
+                style={{ marginTop: 8 }}
+                block
+                onClick={() => setOpenCommissionModal(true)}
+                disabled={!canAddCommission || !period}
+              >
+                Add Commission
+              </Button>
+
+              {status !== "Pending" ? (
+                <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>
+                  Commissions are locked once the employee is Verified.
+                </div>
+              ) : null}
+
+
+
               <div style={{ fontSize: 12, opacity: 0.75, marginTop: 8 }}>
                 {canVerify ? "This will mark the employee as Verified for this payroll period." : "Employee is not in Pending status."}
               </div>
+
             </div>
           </div>
 
@@ -346,7 +432,7 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
                 </div>
               </div>
 
-              <div>
+              <div style={{ marginBottom: 12 }}>
                 <div style={{ fontWeight: 600, marginBottom: 6 }}>Allowances</div>
                 <Table
                   columns={allowanceColumns}
@@ -357,6 +443,30 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
                   locale={{ emptyText: "No allowances found" }}
                 />
               </div>
+
+              <div>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>Commissions</div>
+                <Table
+                  columns={commissionColumns}
+                  dataSource={commissions}
+                  rowKey="id"
+                  pagination={false}
+                  size="small"
+                  loading={commissionLoading}
+                  locale={{ emptyText: "No commissions added" }}
+                />
+              </div>
+
+              <AddCommission
+                open={openCommissionModal}
+                period={period}
+                employee={employee}
+                onClose={() => setOpenCommissionModal(false)}
+                onSaved={() => {
+                  loadCommissions();
+                }}
+              />
+
 
             </>
           )}

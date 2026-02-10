@@ -89,3 +89,35 @@ class LeaveRequestListCreateView(ListCreateAPIView):
             status="Pending"
         )
 
+# ----------------------------
+# LIST
+# /superadmin/commission-types/
+# ----------------------------
+class CommissionTypeListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN"]
+
+    queryset = Commission_Type.objects.all().order_by("-created_at")
+    serializer_class = CommissionTypeSerializer
+
+# ----------------------------
+# CREATE
+# /superadmin/commission-types/create/
+# ----------------------------
+class CommissionTypeCreateView(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN"]
+
+    queryset = Commission_Type.objects.all()
+    serializer_class = CommissionTypeSerializer
+
+# ----------------------------
+# UPDATE
+# /superadmin/commission-types/<id>/
+# ----------------------------
+class CommissionTypeUpdateView(generics.UpdateAPIView):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN"]
+
+    queryset = Commission_Type.objects.all()
+    serializer_class = CommissionTypeSerializer

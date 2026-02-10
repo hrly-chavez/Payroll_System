@@ -8,13 +8,15 @@ import "./SystemConfiguration.css";
 import PayRulesTab from "./Pay Rules/PayRulesTab";
 import ContributionTab from "./Contribution/ContributionTab";
 import LeaveTab from "./Leave/LeaveTab";
+import CommissionTypeTab from "./CommissionType/CommissionTypeTab";
+
 
 const { Content } = Layout;
 
 
 
 const SystemConfiguration: React.FC = () => {
-   const [activeTab, setActiveTab] = useState<"contribution" | "payroll" | "leave">("contribution");
+   const [activeTab, setActiveTab] = useState<"contribution" | "payroll" | "leave" | "commission">("contribution");
 
   return (
     <Layout className="system-layout">
@@ -34,6 +36,10 @@ const SystemConfiguration: React.FC = () => {
               <button className={activeTab === "leave" ? "active" : ""} onClick={() => setActiveTab("leave")}>
                 Leave Types
               </button>
+              <button className={activeTab === "commission" ? "active" : ""} onClick={() => setActiveTab("commission")}>
+                Commission Types
+              </button>
+
             </div>
 
             {/* Section Header */}
@@ -43,7 +49,9 @@ const SystemConfiguration: React.FC = () => {
                   ? "Contribution Table"
                   : activeTab === "payroll"
                   ? "Payroll Rules"
-                  : "Leave Types"}
+                  : activeTab === "leave"
+                  ? "Leave Types"
+                  : "Commission Types"}
               </h3>
             </div>
 
@@ -51,6 +59,8 @@ const SystemConfiguration: React.FC = () => {
             {activeTab === "contribution" && <ContributionTab active />}
             {activeTab === "payroll" && <PayRulesTab active />}
             {activeTab === "leave" && <LeaveTab active />}
+            {activeTab === "commission" && <CommissionTypeTab active />}
+
           </div>
         </Content>
       </Layout>

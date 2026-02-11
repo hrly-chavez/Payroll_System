@@ -1,0 +1,27 @@
+.noteCard {
+  background: #aecdde; /* soft blue like your screenshot */
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+  color: #ffffff;
+}
+
+.title {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.content {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-line; /* preserves line breaks from backend */
+}
+
+.author {
+  margin-top: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.9;
+}

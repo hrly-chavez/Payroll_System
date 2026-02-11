@@ -142,7 +142,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         return Response(
             {
                 "message": "Employee and user created successfully",
-                "employee_id": employee_data,
+                "employee_id": employee.id,
                 "username": username,
                 "password": password  # send this so it can be communicated to the employee
             },

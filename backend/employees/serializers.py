@@ -39,6 +39,12 @@ class DepartmentSerializer(serializers.ModelSerializer):
         model = Department
         fields = ["id", "name", "shift", "shift_id", "is_active", "created_at"]
 
+#User model (user account)
+class UserAccountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["user_id", "user_name", "role", "is_active"]
+
 #gamit pag load sa admin department nga mga employees
 class EmployeeSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()

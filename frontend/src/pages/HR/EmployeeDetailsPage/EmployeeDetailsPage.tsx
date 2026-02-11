@@ -29,6 +29,7 @@ import EditEmployeeSalaryModal from "./Modals/EditEmployeeSalaryModal";
 import EditEmployeeAllowanceModal from "../EmployeeDetailsPage/Modals/EditEmployeeAllowanceModal";
 import EditEmployeeDetailsModal from "./Modals/EditEmployeeDetailsModal";
 import EditEmployeeAddressModal from "./Modals/EditEmployeeAddressModal";
+import ForgotPasswordModal from "./Modals/ForgotPasswordModal";
 
 
 const { Content } = Layout;
@@ -275,7 +276,45 @@ const EmployeeDetailsPage: React.FC = () => {
   //employee address details
   const [isEditAddressOpen, setIsEditAddressOpen] = useState(false);
 
+  /* =========================
+     EMPLOYEE ACCOUNT RETRIEVE STATE
+  ========================== */
+  // inside EmployeeDetailsPage component, near your other useState declarations
+  const [userAccount, setUserAccount] = useState<{
+    user_id: number;
+    user_name: string;
+    role: string;
+    is_active: boolean;
+  } | null>(null);
 
+  const [loadingUser, setLoadingUser] = useState(false);
+
+  const fetchUserAccount = async () => {
+    if (!employeeId) return;
+
+    setLoadingUser(true);
+    try {
+      const res = await api.get(`/employees/users/employee/${employeeId}/`);
+      setUserAccount(res.data);
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to fetch user account");
+      setUserAccount(null);
+    } finally {
+      setLoadingUser(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserAccount();
+  }, [employeeId]);
+
+  /* =========================
+     EMPLOYEE ACCOUNT MODAL STATE
+  ========================== */
+  // Modal state
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+  
 
   const salaryColumns = [
     {
@@ -553,16 +592,38 @@ const EmployeeDetailsPage: React.FC = () => {
                   />
                 </Tabs.TabPane>
 
-                <Tabs.TabPane tab="Password" key="5">
+                <Tabs.TabPane tab="Employee Account" key="5">
                   <div className={styles.salaryHeader}>
                     <h3>Employee Account</h3>
-                    <Button type="primary">
-                      Change Pass
+                    <Button
+                      type="primary"
+                      onClick={() => setIsForgotPasswordOpen(true)}
+                      disabled={!userAccount}
+                    >
+                      Reset Password
                     </Button>
                   </div>
 
+                  {userAccount ? (
+                    <Table
+                      columns={[
+                        { title: "Username", dataIndex: "user_name", key: "user_name" },
+                        { title: "Role", dataIndex: "role", key: "role" },
+                        {
+                          title: "Status",
+                          dataIndex: "is_active",
+                          key: "is_active",
+                          render: (val: boolean) => (val ? "Active" : "Inactive"),
+                        },
+                      ]}
+                      dataSource={[userAccount]} // just one row
+                      pagination={false}
+                    />
+                  ) : (
+                    <p>No user account linked to this employee.</p>
+                  )}
                 </Tabs.TabPane>
-                    
+
               </Tabs>
             </Card>
           </div>
@@ -636,6 +697,16 @@ const EmployeeDetailsPage: React.FC = () => {
         }}
       />
 
+      <ForgotPasswordModal
+        open={isForgotPasswordOpen}
+        username={userAccount?.user_name || ""}
+        userId={userAccount?.user_id} // pass the PK
+        onClose={() => setIsForgotPasswordOpen(false)}
+        onSuccess={() => {
+          setIsForgotPasswordOpen(false);
+          fetchUserAccount();
+        }}
+      />
     </Layout>
   );
 };

@@ -10,6 +10,13 @@ import api from "../../../api/axios";
 import { formatTime, getAttendanceStatusLabel, formatBackendTime } from "../../helpers";
 import SharedCalendar from "./../../../components/SharedCalendar/SharedCalendar";
 import { Tabs } from "antd";
+import {
+  HOLIDAY_LEGEND,
+  HolidayBase,
+  HolidayType,
+} from "../../../components/SharedCalendar/CalendarLegend";
+
+
 
 
 
@@ -80,10 +87,18 @@ const columns = [
   { title: "Status", dataIndex: "status" },
 ];
 
+type CalendarEvent = {
+  type: "holiday" | "payroll";
+  start_date: string;
+  end_date?: string;
+  title: string;
+  color: string;
+};
+
 
 const Dashboard: React.FC = () => {
   const today = dayjs().format("MMMM D, YYYY");
-  const [calendarEvents, setCalendarEvents] = useState([]);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
 
   const [phTime, setPhTime] = useState<Date | null>(null);
   const [usaTime, setUsaTime] = useState<Date | null>(null);
@@ -156,20 +171,44 @@ const Dashboard: React.FC = () => {
   };
   const loadCalendarEvents = async () => {
   try {
-    const res = await api.get("/approvals/holidays/");
-    const holidays = res.data;
+    const [holidayRes, payrollRes] = await Promise.all([
+      api.get("/approvals/holidays/"),
+      api.get("/payroll/periods/"),
+    ]);
 
-    const events = holidays.map((h: any) => ({
-      date: h.date,
-      type: "holiday",
-      color: h.base === "PH" ? "#2e7d32" : h.base === "US" ? "#c62828" : "#616161",
-    }));
+    const holidays = holidayRes.data;
+    const payrolls = payrollRes.data;
+
+    const events: CalendarEvent[] = [
+      ...holidays.map((h: any) => {
+        const base = h.base as HolidayBase;
+        const type = h.type as HolidayType;
+
+        const legend = HOLIDAY_LEGEND[base]?.[type];
+
+        return {
+          type: "holiday",
+          start_date: h.date,
+          title: `${h.base} Holiday – ${h.name}`,
+          color: legend?.bgColor || "#999999",
+        };
+      }),
+
+      ...payrolls.map((p: any) => ({
+        type: "payroll",
+        start_date: p.start_date,
+        end_date: p.end_date,
+        title: "Payroll",
+        color: p.color || "#1890ff",
+      })),
+    ];
 
     setCalendarEvents(events);
   } catch {
-    message.error("Failed to load holidays");
+    message.error("Failed to load calendar events");
   }
 };
+
 
   const fetchMyDashboardStats = async () => {
     setLoadingMyStats(true);
@@ -232,6 +271,11 @@ const Dashboard: React.FC = () => {
 
 
 }, []);
+
+  useEffect(() => {
+    console.log("Calendar Events:", calendarEvents);
+  }, [calendarEvents]);
+
 
 
   useEffect(() => {
@@ -427,14 +471,31 @@ const Dashboard: React.FC = () => {
             {/* CALENDAR */}
             <Col xs={24} lg={10}>
               <Card title="Calendar" className={styles.compactCard}>
-                <div className={styles.calendarWrapper}>
+                <div className={styles.fullCellWrapper}>
                 <SharedCalendar events={calendarEvents} />
                 </div>
               </Card>
+              <Card title="Legend">
+                {calendarEvents
+                  .filter((v, i, arr) =>
+                    arr.findIndex(x => x.color === v.color) === i
+                  )
+                  .map((event, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div
+                        style={{
+                          width: 12,
+                          height: 12,
+                          backgroundColor: event.color,
+                          borderRadius: 4,
+                        }}
+                      />
+                      {event.type === "holiday" ? "Holiday" : "Payroll Period"}
+                    </div>
+                  ))}
+              </Card>
             </Col>
           </Row>
-
-
 
 
           {/* TODAY TABLE */}

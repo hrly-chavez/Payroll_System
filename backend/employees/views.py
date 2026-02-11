@@ -136,8 +136,6 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             role=requested_role,
             employee=employee
         )
-        # Serialize the newly created employee using READ serializer
-        employee_data = EmployeeSerializer(employee).data
 
         return Response(
             {

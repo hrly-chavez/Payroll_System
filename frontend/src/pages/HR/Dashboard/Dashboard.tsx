@@ -9,13 +9,14 @@ import styles from "./adminDashboard.module.css";
 import api from "../../../api/axios";
 import { formatTime, getAttendanceStatusLabel, formatBackendTime } from "../../helpers";
 import SharedCalendar from "./../../../components/SharedCalendar/SharedCalendar";
-import { Tabs } from "antd";
+import { Tabs,Modal, Input } from "antd";
 import {
   HOLIDAY_LEGEND,
   HolidayBase,
   HolidayType,
 } from "../../../components/SharedCalendar/CalendarLegend";
-
+import CompanyNote from "../../../components/CompanyNote/companyNote";
+import { Pie } from "@ant-design/plots";
 
 
 
@@ -78,15 +79,6 @@ type AdminLogsResponse = {
   }>;
 };
 
-
-
-const columns = [
-  { title: "Name", dataIndex: "name" },
-  { title: "Time-in", dataIndex: "in" },
-  { title: "Time-out", dataIndex: "out" },
-  { title: "Status", dataIndex: "status" },
-];
-
 type CalendarEvent = {
   type: "holiday" | "payroll";
   start_date: string;
@@ -95,13 +87,73 @@ type CalendarEvent = {
   color: string;
 };
 
+const columns = [
+  { title: "Name", dataIndex: "name" },
+  { title: "Time-in", dataIndex: "in" },
+  { title: "Time-out", dataIndex: "out" },
+  { title: "Status", dataIndex: "status" },
+];
+
 
 const Dashboard: React.FC = () => {
   const today = dayjs().format("MMMM D, YYYY");
+
+/* =========================================================
+     🟢 COMPANY NOTE MODAL STATE (for Add Note button)
+     ========================================================= */
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [noteContent, setNoteContent] = useState("");
+
+  const handleAddNote = async () => {
+    try {
+      console.log("New Note:", noteContent);
+
+      message.success("Note added successfully");
+      setIsNoteModalOpen(false);
+      setNoteContent("");
+    } catch {
+      message.error("Failed to add note");
+    }
+  };
+
+  /* =========================================================
+     🟢 CALENDAR EVENTS STATE (holidays + payroll periods)
+     ========================================================= */
+  
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+
+    /* =========================================================
+     🟢 DAILY SUMMARY STATE (FOR THE DATE PIE CHART)
+     👉 This fixes your setDailySummary error
+     ========================================================= */
+
+  const [dailySummary, setDailySummary] = useState({
+    present: 0,
+    notReported: 0,
+  });
+
+  // ================= DAILY PIE DATA =================
+  const dailyChartData = [
+    {
+      type: "Reported",
+      value: dailySummary.present,
+    },
+    {
+      type: "Not Reported",
+      value: dailySummary.notReported,
+    },
+  ];
+
+ /* =========================================================
+     🟢 TIME STATES
+     ========================================================= */
 
   const [phTime, setPhTime] = useState<Date | null>(null);
   const [usaTime, setUsaTime] = useState<Date | null>(null);
+
+  /* =========================================================
+     🟢 ATTENDANCE STATES
+     ========================================================= */
 
   const [attendance, setAttendance] = useState<TodayAttendanceResponse["attendance"]>(null);
   const [loadingPunchIn, setLoadingPunchIn] = useState(false);
@@ -110,11 +162,18 @@ const Dashboard: React.FC = () => {
   const [myStats, setMyStats] = useState({ present: 0, lates: 0, absent: 0 });
   const [loadingMyStats, setLoadingMyStats] = useState(false);
 
+  /* =========================================================
+     🟢 TODAY EMPLOYEE TABLE STATES
+     ========================================================= */
+
   const [todayRows, setTodayRows] = useState<TodayRow[]>([]);
   const [loadingTodayRows, setLoadingTodayRows] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(dayjs()); // default = today
+  const [selectedDate, setSelectedDate] = useState(dayjs()); 
 
-
+  /* =========================================================
+     🟢 FETCH TODAY EMPLOYEE ATTENDANCE
+     👉 ALSO UPDATES THE DAILY PIE CHART
+     ========================================================= */
 
   const fetchTodayEmployeesAttendance = async (d?: dayjs.Dayjs) => {
     setLoadingTodayRows(true);
@@ -147,18 +206,82 @@ const Dashboard: React.FC = () => {
         });
 
       setTodayRows(filtered);
+
+/* =========================================================
+         🟢 DAILY SUMMARY CALCULATION (FOR DATE PIE)
+         ========================================================= */
+
+      const totalEmployees = res.data.results.length;
+      const presentCount = filtered.length;
+
+      setDailySummary({
+        present: presentCount,
+        notReported: totalEmployees - presentCount,
+      });
+
     } catch (err: any) {
-      const backendMsg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        "Failed to load attendance.";
-      message.error(backendMsg);
+      message.error("Failed to load attendance.");
     } finally {
       setLoadingTodayRows(false);
     }
   };
 
+/* =========================================================
+     🟢 PIE CONFIG FOR DATE CARD
+     ========================================================= */
 
+  const dailyPieConfig = {
+    data: dailyChartData,
+    angleField: "value",
+    colorField: "type",
+    radius: 1,
+    innerRadius: 0.75, 
+    legend: false,
+    label: false,
+    tooltip: false,
+    animation: {
+      appear: {
+        animation: "wave-in",
+        duration: 800,
+      },
+    },
+    color: ({ type }: { type: string }) => {
+  switch (type) {
+    case "Reported":
+      return "#2e7d32"; // green
+    case "Not Reported":
+      return "#c62828"; // red
+    default:
+      return "#e0e0e0";
+  }
+},
+ // ================= CENTER PERCENTAGE =================
+  statistic: {
+    title: false,
+    content: {
+      style: {
+        fontSize: "18px",
+        fontWeight: 600,
+      },
+      formatter: () => {
+        const total = dailyChartData.reduce((a, b) => a + b.value, 0);
+        const reported =
+          dailyChartData.find(d => d.type === "Reported")?.value || 0;
+
+        if (total === 0) return "0%";
+
+        return `${Math.round((reported / total) * 100)}%`;
+      },
+    },
+  },
+  };
+
+/* =========================================================
+   🟢 FETCH BASE TIME (PH & US CLOCK)
+   - Calls WorldTimeAPI
+   - Updates time every second via interval
+   - Used for real-time clock display
+   ========================================================= */
 
   const fetchBaseTime = async (timezone: string, setter: (d: Date) => void) => {
     try {
@@ -169,6 +292,15 @@ const Dashboard: React.FC = () => {
       console.error("Time API error", err);
     }
   };
+
+/* =========================================================
+   🟢 LOAD CALENDAR EVENTS (HOLIDAYS + PAYROLL PERIODS)
+   - Fetches holidays from backend
+   - Fetches payroll periods
+   - Converts them into calendar event format
+   - Applies legend color mapping
+   ========================================================= */
+
   const loadCalendarEvents = async () => {
   try {
     const [holidayRes, payrollRes] = await Promise.all([
@@ -209,6 +341,11 @@ const Dashboard: React.FC = () => {
   }
 };
 
+/* =========================================================
+   🟢 FETCH MONTHLY DASHBOARD STATS
+   - Gets PRESENT / LATE / ABSENT count
+   - Used for summary statistics cards
+   ========================================================= */ 
 
   const fetchMyDashboardStats = async () => {
     setLoadingMyStats(true);
@@ -243,6 +380,11 @@ const Dashboard: React.FC = () => {
     }
   };
 
+ /* =========================================================
+   🟢 FETCH TODAY ATTENDANCE (FOR ADMIN USER)
+   - Gets today's punch-in / punch-out status
+   - Updates status badge on dashboard
+   ========================================================= */ 
 
   const fetchTodayAttendance = async () => {
     setLoadingStatus(true);
@@ -261,6 +403,12 @@ const Dashboard: React.FC = () => {
     }
   };
 
+/* =========================================================
+   🟢 INITIAL DASHBOARD LOAD
+   - Runs only once on component mount
+   - Loads everything needed for dashboard
+   ========================================================= */
+
   useEffect(() => {
   fetchBaseTime("Asia/Manila", setPhTime);
   fetchBaseTime("America/New_York", setUsaTime);
@@ -268,15 +416,22 @@ const Dashboard: React.FC = () => {
   loadCalendarEvents();
   fetchMyDashboardStats();
   fetchTodayEmployeesAttendance(selectedDate);
-
-
 }, []);
+
+/* =========================================================
+   🟢 DEBUG CALENDAR EVENTS
+   - Logs calendar events whenever they change
+   ========================================================= */
 
   useEffect(() => {
     console.log("Calendar Events:", calendarEvents);
   }, [calendarEvents]);
 
-
+/* =========================================================
+   🟢 REAL-TIME CLOCK UPDATE
+   - Adds 1 second every second
+   - Keeps PH and US time live
+   ========================================================= */
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -286,6 +441,12 @@ const Dashboard: React.FC = () => {
 
     return () => clearInterval(interval);
   }, []);
+
+  /* =========================================================
+   🟢 HANDLE PUNCH IN
+   - Calls backend punch-in API
+   - Refreshes stats + employee list
+   ========================================================= */
 
   const handlePunchIn = async () => {
     setLoadingPunchIn(true);
@@ -308,6 +469,12 @@ const Dashboard: React.FC = () => {
     }
   };
 
+/* =========================================================
+   🟢 HANDLE PUNCH OUT
+   - Calls backend punch-out API
+   - Refreshes stats + employee list
+   ========================================================= */
+
   const handlePunchOut = async () => {
     setLoadingPunchOut(true);
     try {
@@ -329,12 +496,23 @@ const Dashboard: React.FC = () => {
       setLoadingPunchOut(false);
     }
   };
+
+/* =========================================================
+   🟢 CURRENT USER NAME
+   - Retrieved from localStorage
+   ========================================================= */
+
   const name = localStorage.getItem("user_name") || "User";
 
-    const { key: statusKey, label: statusLabel } = getAttendanceStatusLabel(
-      attendance,
-      formatBackendTime
-    );
+ /* =========================================================
+   🟢 STATUS LABEL HELPER
+   - Determines badge color and text
+   ========================================================= */ 
+
+  const { key: statusKey, label: statusLabel } = getAttendanceStatusLabel(
+    attendance,
+    formatBackendTime
+  );
       
 
   return (
@@ -355,167 +533,157 @@ const Dashboard: React.FC = () => {
           </div>
 
           {/* STATS */}
-          <Row gutter={16}>
-            <Col span={6}>
-              <Card>
-                <Statistic title="Total Present" value={myStats.present} loading={loadingMyStats} />
-              </Card>
-            </Col>
-            <Col span={6}>
-              <Card>
-                <Statistic title="Total Lates" value={myStats.lates} loading={loadingMyStats} />
-              </Card>
-            </Col>
-            <Col span={6}>
-              <Card>
-                <Statistic title="Total Absences" value={myStats.absent} loading={loadingMyStats} />
-              </Card>
-            </Col>
-            <Col span={6}><Card><Statistic title="Pending Correction Request" value={0} /></Card></Col>
-          </Row>
-
-
-          {/* ATTENDANCE + CALENDAR */}
+          {/* ROW 1: DATE + ATTENDANCE + COMPANY NOTE */}
           <Row gutter={16} className={styles.mainSection}>
-            <Col xs={24} lg={14}>
-              {/* ATTENDANCE */}
-              <Card title="Attendance" className={styles.compactCard}>
-                <div className={styles.timeRow}>
-                  <div className={styles.timeBox}>
-                    <span>PH Time</span>
-                    <h2>{formatTime(phTime, "Asia/Manila")}</h2>
-                  </div>
-                  <div className={styles.timeBox}>
-                    <span>USA Time</span>
-                    <h2>{formatTime(usaTime, "America/New_York")}</h2>
-                  </div>
-                </div>
 
-                <div className={styles.buttonRow}>
-                  <Button
-                    icon={<LoginOutlined />}
-                    className={styles.punchInBtn}
-                    onClick={handlePunchIn}
-                    loading={loadingPunchIn}
-                    disabled={loadingStatus || !!attendance?.time_in}
-                  >
-                    Punch in
-                  </Button>
-
-                  <Button
-                    icon={<LogoutOutlined />}
-                    className={styles.punchOutBtn}
-                    onClick={handlePunchOut}
-                    loading={loadingPunchOut}
-                    disabled={loadingStatus || !attendance?.time_in || !!attendance?.time_out}
-                  >
-                    Punch out
-                  </Button>
-                </div>
-              </Card>
-
-              <Card
-              title="Pending Requests"
-              className={`${styles.requestCard} ${styles.requestUnderAttendance}`}
+        {/* DATE CARD */}
+        <Col xs={24} md={8}>
+          <Card
+              title={selectedDate.format("MMMM D, YYYY")}
+              className={`${styles.compactCard} ${styles.dateCard}`}
             >
-              <Tabs
-                defaultActiveKey="holiday"
-                size="small"
-                className={styles.requestTabsAnt}
-                items={[
-                  {
-                    key: "holiday",
-                    label: "Holiday",
-                    children: (
-                      <div className={styles.requestList}>
-                        <div className={styles.requestItem}>
-                          <span>ABC HOLIDAY</span>
-                          <span>12/25/2026</span>
-                        </div>
-                        <div className={styles.requestItem}>
-                          <span>ABC HOLIDAY</span>
-                          <span>01/01/2027</span>
-                        </div>
-                      </div>
-                    ),
-                  },
-                  {
-                    key: "leave",
-                    label: "Leave",
-                    children: (
-                      <div className={styles.requestList}>
-                        <div className={styles.requestItem}>
-                          <span>John Doe</span>
-                          <span>02/10/2026</span>
-                        </div>
-                      </div>
-                    ),
-                  },
-                  {
-                    key: "payroll",
-                    label: "Payroll",
-                    children: (
-                      <div className={styles.requestList}>
-                        <div className={styles.requestItem}>
-                          <span>January Payroll</span>
-                          <span>For Approval</span>
-                        </div>
-                      </div>
-                    ),
-                  },
-                ]}
-              />
-            </Card>
-            </Col>
-            
-            {/* CALENDAR */}
-            <Col xs={24} lg={10}>
-              <Card title="Calendar" className={styles.compactCard}>
-                <div className={styles.fullCellWrapper}>
-                <SharedCalendar events={calendarEvents} />
-                </div>
-              </Card>
-              <Card title="Legend">
-                {calendarEvents
-                  .filter((v, i, arr) =>
-                    arr.findIndex(x => x.color === v.color) === i
-                  )
-                  .map((event, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div
-                        style={{
-                          width: 12,
-                          height: 12,
-                          backgroundColor: event.color,
-                          borderRadius: 4,
-                        }}
-                      />
-                      {event.type === "holiday" ? "Holiday" : "Payroll Period"}
-                    </div>
-                  ))}
-              </Card>
-            </Col>
-          </Row>
+            <div style={{ padding: 20 }}>
+              {/* 🟢 DAILY DONUT CHART */}
+              <Pie {...dailyPieConfig} height={150} />
 
+              {/* 🟢 LEGEND */}
+              <div style={{ textAlign: "center", marginTop: 10 }}>
+                <span style={{ marginRight: 15 }}>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: 10,
+                      height: 10,
+                      background: "#d9d9d9",
+                      borderRadius: "50%",
+                      marginRight: 6,
+                    }}
+                  />
+                  Not Reported
+                </span>
 
-          {/* TODAY TABLE */}
-          <Card title={selectedDate.format("MMMM D, YYYY")}
-            extra={<DatePicker value={selectedDate}
-                onChange={(d) => {
-                  if (!d) return;
-                  setSelectedDate(d);
-                  fetchTodayEmployeesAttendance(d);
-                }}/>}className={styles.sectionCard}>
-
-            <Table
-            columns={columns}
-            dataSource={todayRows}
-            loading={loadingTodayRows}
-            pagination={{ pageSize: 5 }}
-            size="small"
-              />
+                <span>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: 10,
+                      height: 10,
+                      background: "#2f5e8e",
+                      borderRadius: "50%",
+                      marginRight: 6,
+                    }}
+                  />
+                  Reported
+                </span>
+              </div>
+            </div>
           </Card>
+        </Col>
 
+        {/* ATTENDANCE */}
+        <Col xs={24} md={8}>
+          <Card
+            title="Attendance"
+            className={`${styles.compactCard} ${styles.attendanceCard}`}
+          >            
+              <div className={styles.timeRow}>
+              <div className={styles.timeBox}>
+                <span>PH Time</span>
+                <h2>{formatTime(phTime, "Asia/Manila")}</h2>
+              </div>
+              <div className={styles.timeBox}>
+                <span>USA Time</span>
+                <h2>{formatTime(usaTime, "America/New_York")}</h2>
+              </div>
+            </div>
+
+            <div className={styles.buttonRow}>
+              <Button
+                icon={<LoginOutlined />}
+                className={styles.punchInBtn}
+                onClick={handlePunchIn}
+                loading={loadingPunchIn}
+                disabled={loadingStatus || !!attendance?.time_in}
+              >
+                Punch in
+              </Button>
+
+              <Button
+                icon={<LogoutOutlined />}
+                className={styles.punchOutBtn}
+                onClick={handlePunchOut}
+                loading={loadingPunchOut}
+                disabled={loadingStatus || !attendance?.time_in || !!attendance?.time_out}
+              >
+                Punch out
+              </Button>
+            </div>
+          </Card>
+        </Col>
+
+        {/* COMPANY NOTE */}
+      <Col xs={24} md={8}>
+            <CompanyNote role="ADMIN" />
+      </Col>
+      </Row>
+
+      {/* ROW 2: PENDING + CALENDAR */}
+      <Row gutter={16} className={styles.mainSection}>
+
+        {/* PENDING REQUESTS */}
+        <Col xs={24} md={16}>
+          <Card title="Pending Requests" className={styles.pendingCard}>
+            <Tabs
+              defaultActiveKey="holiday"
+              size="small"
+              className={styles.pendingTabs}
+              items={[
+                {
+                  key: "holiday",
+                  label: "Holiday",
+                  children: <div>Holiday requests here</div>,
+                },
+                {
+                  key: "leave",
+                  label: "Leave",
+                  children: <div>Leave requests here</div>,
+                },
+                {
+                  key: "payroll",
+                  label: "Payroll",
+                  children: <div>Payroll requests here</div>,
+                },
+                {
+                key: "attendance correction",
+                  label: "Attendance Correction",
+                  children: <div>Attendance question requests here</div>,
+                },
+              ]}
+            />
+              </Card>
+      </Col>
+
+      {/* CALENDAR */}
+      <Col xs={24} md={8}>
+        <Card title="Calendar" className={styles.compactCard}>
+          <SharedCalendar events={calendarEvents} />
+        </Card>
+      </Col>
+      <Modal
+        title="Add Company Note"
+        open={isNoteModalOpen}
+        onCancel={() => setIsNoteModalOpen(false)}
+        onOk={handleAddNote}
+        okText="Submit"
+      >
+        <Input.TextArea
+          rows={4}
+          value={noteContent}
+          onChange={(e) => setNoteContent(e.target.value)}
+          placeholder="Write company note here..."
+        />
+      </Modal>
+    </Row>
         </Content>
       </Layout>
     </Layout>

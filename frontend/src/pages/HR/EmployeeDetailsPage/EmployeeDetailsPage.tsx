@@ -7,10 +7,6 @@ import {
   Table,
   message,
   Spin,
-  Modal,
-  Form,
-  Input,
-  Select,
 } from "antd";
 import { useParams } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
@@ -29,12 +25,27 @@ import {
   EditOutlined,
 } from "@ant-design/icons";
 import api from "api/axios";
-import EmployeeSalaryModal from "../EmployeeDetailsPage/Modals/EditEmployeeDetails";
+import EditEmployeeSalaryModal from "./Modals/EditEmployeeSalaryModal";
 import EditEmployeeAllowanceModal from "../EmployeeDetailsPage/Modals/EditEmployeeAllowanceModal";
-
+import EditEmployeeDetailsModal from "./Modals/EditEmployeeDetailsModal";
+import EditEmployeeAddressModal from "./Modals/EditEmployeeAddressModal";
+import ForgotPasswordModal from "./Modals/ForgotPasswordModal";
 
 
 const { Content } = Layout;
+
+interface AddressData {
+  id: number;
+  province: number;       // FK ID
+  province_name: string;  // the name we want to display
+  city: number;
+  city_name: string;
+  barangay: number;
+  barangay_name: string;
+  sitio?: string;
+  street?: string;
+  zip_code?: string;
+}
 
 interface EmployeeData {
   id: number;
@@ -47,7 +58,7 @@ interface EmployeeData {
   bank_info: string;
   email: string;
   contact_no: string;
-  address: string;
+  address: AddressData;
 }
 
 interface DeductionRow {
@@ -80,10 +91,6 @@ const EmployeeDetailsPage: React.FC = () => {
     setSelectedSalary(salaries[0]); // latest salary
     setIsSalaryModalOpen(true);
   };
-
-
-
-  
 
   /* =========================
      SALARY RETRIEVE DATA
@@ -120,7 +127,6 @@ const EmployeeDetailsPage: React.FC = () => {
     }
   };
 
-
   useEffect(() => {
     if (!employeeId) return;
 
@@ -132,8 +138,6 @@ const EmployeeDetailsPage: React.FC = () => {
     // Fetch salary history
     fetchSalaries(empIdNum);
   }, [employeeId]);
-
-
 
   /* =========================
      ALLOWANCE RETRIEVE DATA
@@ -169,14 +173,13 @@ const EmployeeDetailsPage: React.FC = () => {
     }
   };
 
-
   useEffect(() => {
     if (!employeeId) return;
     fetchAllowances(Number(employeeId)); // convert string param to number
   }, [employeeId]);
 
   /* =========================
-     TAX MODAL STATE
+     TAX RETRIEVE STATE
   ========================== */
   
   const [deductions, setDeductions] = useState<DeductionRow[]>([]);
@@ -264,6 +267,55 @@ const EmployeeDetailsPage: React.FC = () => {
     fetchEmployee();
   }, [employeeId]);
 
+  /* =========================
+     EMPLOYEE MODAL STATE
+  ========================== */
+  //employee details
+  const [isEditEmployeeOpen, setIsEditEmployeeOpen] = useState(false);
+
+  //employee address details
+  const [isEditAddressOpen, setIsEditAddressOpen] = useState(false);
+
+  /* =========================
+     EMPLOYEE ACCOUNT RETRIEVE STATE
+  ========================== */
+  // inside EmployeeDetailsPage component, near your other useState declarations
+  const [userAccount, setUserAccount] = useState<{
+    user_id: number;
+    user_name: string;
+    role: string;
+    is_active: boolean;
+  } | null>(null);
+
+  const [loadingUser, setLoadingUser] = useState(false);
+
+  const fetchUserAccount = async () => {
+    if (!employeeId) return;
+
+    setLoadingUser(true);
+    try {
+      const res = await api.get(`/employees/users/employee/${employeeId}/`);
+      setUserAccount(res.data);
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to fetch user account");
+      setUserAccount(null);
+    } finally {
+      setLoadingUser(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserAccount();
+  }, [employeeId]);
+
+  /* =========================
+     EMPLOYEE ACCOUNT MODAL STATE
+  ========================== */
+  // Modal state
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+  
+
   const salaryColumns = [
     {
       title: "Salary Amount",
@@ -310,7 +362,9 @@ const EmployeeDetailsPage: React.FC = () => {
                       type="text"
                       icon={<EditOutlined />}
                       className={styles.editBtn}
+                      onClick={() => setIsEditEmployeeOpen(true)}
                     />
+
                   </div>
                   <span className={styles.empId}>ID : {employee.id}</span>
                 </div>
@@ -387,11 +441,34 @@ const EmployeeDetailsPage: React.FC = () => {
                   <div className={styles.iconBox}>
                     <HomeOutlined />
                   </div>
-                  <div>
-                    <span className={styles.label}>Address</span>
-                    <p>{employee.address}</p>
+                  <div className={styles.nameSection}>
+                    <div className={styles.nameTop}>
+                      <span className={styles.label}>Address</span>
+
+                      <Button
+                        type="text"
+                        icon={<EditOutlined />}
+                        className={styles.editBtn}
+                        onClick={() => setIsEditAddressOpen(true)}
+                      />
+
+                    </div>
+
+                    <p>
+                      {[
+                        employee.address?.street,
+                        employee.address?.sitio,
+                        employee.address?.barangay_name,
+                        employee.address?.city_name,
+                        employee.address?.province_name,
+                        employee.address?.zip_code,
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </p>
                   </div>
                 </div>
+
 
                 <div className={styles.statusRow}>
                   <div className={styles.iconBox}>
@@ -515,16 +592,38 @@ const EmployeeDetailsPage: React.FC = () => {
                   />
                 </Tabs.TabPane>
 
-                <Tabs.TabPane tab="Password" key="5">
+                <Tabs.TabPane tab="Employee Account" key="5">
                   <div className={styles.salaryHeader}>
                     <h3>Employee Account</h3>
-                    <Button type="primary">
-                      Change Pass
+                    <Button
+                      type="primary"
+                      onClick={() => setIsForgotPasswordOpen(true)}
+                      disabled={!userAccount}
+                    >
+                      Reset Password
                     </Button>
                   </div>
 
+                  {userAccount ? (
+                    <Table
+                      columns={[
+                        { title: "Username", dataIndex: "user_name", key: "user_name" },
+                        { title: "Role", dataIndex: "role", key: "role" },
+                        {
+                          title: "Status",
+                          dataIndex: "is_active",
+                          key: "is_active",
+                          render: (val: boolean) => (val ? "Active" : "Inactive"),
+                        },
+                      ]}
+                      dataSource={[userAccount]} // just one row
+                      pagination={false}
+                    />
+                  ) : (
+                    <p>No user account linked to this employee.</p>
+                  )}
                 </Tabs.TabPane>
-                    
+
               </Tabs>
             </Card>
           </div>
@@ -542,7 +641,7 @@ const EmployeeDetailsPage: React.FC = () => {
         }}
       />
 
-      <EmployeeSalaryModal
+      <EditEmployeeSalaryModal
         open={isSalaryModalOpen}
         employeeId={Number(employeeId)}
         salary={selectedSalary}
@@ -554,6 +653,60 @@ const EmployeeDetailsPage: React.FC = () => {
         onClose={() => setIsSalaryModalOpen(false)}
       />
 
+      <EditEmployeeDetailsModal
+        open={isEditEmployeeOpen}
+        employee={employee}
+        onClose={() => setIsEditEmployeeOpen(false)}
+        onSuccess={() => {
+          setIsEditEmployeeOpen(false); // close the modal immediately
+          message.success("Employee updated successfully");
+
+          // Refresh employee details after 5 seconds
+          setTimeout(async () => {
+            if (!employeeId) return;
+            try {
+              setLoading(true);
+              const res = await api.get(`/employees/employees/${employeeId}/details/`);
+              setEmployee(res.data);
+              message.success("Employee data refreshed");
+            } catch (error: any) {
+              console.error(error);
+              message.error(
+                error.response?.data?.message || "Error refreshing employee details"
+              );
+            } finally {
+              setLoading(false);
+            }
+          }, 3000); // 3 seconds
+        }}
+      />
+
+      <EditEmployeeAddressModal
+        open={isEditAddressOpen}
+        employeeId={Number(employeeId)}
+        address={employee.address}
+        onClose={() => setIsEditAddressOpen(false)}
+        onSuccess={async () => {
+          setIsEditAddressOpen(false);
+
+          // Refresh employee data
+          const res = await api.get(
+            `/employees/employees/${employeeId}/details/`
+          );
+          setEmployee(res.data);
+        }}
+      />
+
+      <ForgotPasswordModal
+        open={isForgotPasswordOpen}
+        username={userAccount?.user_name || ""}
+        userId={userAccount?.user_id} // pass the PK
+        onClose={() => setIsForgotPasswordOpen(false)}
+        onSuccess={() => {
+          setIsForgotPasswordOpen(false);
+          fetchUserAccount();
+        }}
+      />
     </Layout>
   );
 };

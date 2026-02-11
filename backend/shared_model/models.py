@@ -97,7 +97,7 @@ class Employee(models.Model):
     initial = models.CharField(max_length=1,null=True,blank=True)
     suffix = models.CharField(max_length=20,null=True,blank=True)
     status = models.CharField(max_length=15, choices=EMP_STATUS,default="Single")
-    address = models.ForeignKey(Address, on_delete=models.PROTECT, null=True, blank=True, related_name="residents")
+    address = models.ForeignKey(Address, on_delete=models.CASCADE, null=True, blank=True, related_name="residents")
     contact_no = models.CharField(max_length=12)
     hired_date = models.DateField()
     position = models.CharField(max_length=20)

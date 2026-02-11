@@ -28,6 +28,8 @@ import api from "api/axios";
 import EditEmployeeSalaryModal from "./Modals/EditEmployeeSalaryModal";
 import EditEmployeeAllowanceModal from "../EmployeeDetailsPage/Modals/EditEmployeeAllowanceModal";
 import EditEmployeeDetailsModal from "./Modals/EditEmployeeDetailsModal";
+import EditEmployeeAddressModal from "./Modals/EditEmployeeAddressModal";
+
 
 const { Content } = Layout;
 
@@ -267,7 +269,12 @@ const EmployeeDetailsPage: React.FC = () => {
   /* =========================
      EMPLOYEE MODAL STATE
   ========================== */
+  //employee details
   const [isEditEmployeeOpen, setIsEditEmployeeOpen] = useState(false);
+
+  //employee address details
+  const [isEditAddressOpen, setIsEditAddressOpen] = useState(false);
+
 
 
   const salaryColumns = [
@@ -395,8 +402,19 @@ const EmployeeDetailsPage: React.FC = () => {
                   <div className={styles.iconBox}>
                     <HomeOutlined />
                   </div>
-                  <div>
-                    <span className={styles.label}>Address</span>
+                  <div className={styles.nameSection}>
+                    <div className={styles.nameTop}>
+                      <span className={styles.label}>Address</span>
+
+                      <Button
+                        type="text"
+                        icon={<EditOutlined />}
+                        className={styles.editBtn}
+                        onClick={() => setIsEditAddressOpen(true)}
+                      />
+
+                    </div>
+
                     <p>
                       {[
                         employee.address?.street,
@@ -404,9 +422,9 @@ const EmployeeDetailsPage: React.FC = () => {
                         employee.address?.barangay_name,
                         employee.address?.city_name,
                         employee.address?.province_name,
-                        employee.address?.zip_code
+                        employee.address?.zip_code,
                       ]
-                        .filter(Boolean) // remove undefined/null/empty strings
+                        .filter(Boolean)
                         .join(", ")}
                     </p>
                   </div>
@@ -601,6 +619,23 @@ const EmployeeDetailsPage: React.FC = () => {
           }, 3000); // 3 seconds
         }}
       />
+
+      <EditEmployeeAddressModal
+        open={isEditAddressOpen}
+        employeeId={Number(employeeId)}
+        address={employee.address}
+        onClose={() => setIsEditAddressOpen(false)}
+        onSuccess={async () => {
+          setIsEditAddressOpen(false);
+
+          // Refresh employee data
+          const res = await api.get(
+            `/employees/employees/${employeeId}/details/`
+          );
+          setEmployee(res.data);
+        }}
+      />
+
     </Layout>
   );
 };

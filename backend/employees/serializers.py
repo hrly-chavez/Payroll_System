@@ -92,24 +92,41 @@ class EmployeeSerializer(serializers.ModelSerializer):
 # Address Serializer
 # =========================
 class AddressSerializer(serializers.ModelSerializer):
-    province_name = serializers.CharField(source="province.name", read_only=True)
-    city_name = serializers.CharField(source="city.name", read_only=True)
-    barangay_name = serializers.CharField(source="barangay.name", read_only=True)
+    province = serializers.PrimaryKeyRelatedField(
+        queryset=Province.objects.all()
+    )
+    city = serializers.PrimaryKeyRelatedField(
+        queryset=City.objects.all()
+    )
+    barangay = serializers.PrimaryKeyRelatedField(
+        queryset=Barangay.objects.all()
+    )
+
+    # READ-ONLY display fields
+    province_name = serializers.CharField(
+        source="province.name", read_only=True
+    )
+    city_name = serializers.CharField(
+        source="city.name", read_only=True
+    )
+    barangay_name = serializers.CharField(
+        source="barangay.name", read_only=True
+    )
 
     class Meta:
         model = Address
         fields = [
-            "id",
-            "province",        # expects ID
-            "province_name",   # output only
-            "city",
-            "city_name",
+            "street",
+            "sitio",
             "barangay",
             "barangay_name",
-            "sitio",
-            "street",
+            "city",
+            "city_name",
+            "province",
+            "province_name",
             "zip_code",
         ]
+
 
 # =========================
 # Employee Create Serializer
@@ -174,7 +191,7 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
         address_data = validated_data.pop("address", None)
 
         # -------------------
-        # Update Employee
+        # Update Employee fields
         # -------------------
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -182,44 +199,18 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
         instance.save()
 
         # -------------------
-        # Update Address
+        # Update Address (CORRECT WAY)
         # -------------------
         if address_data:
             address = instance.address
 
-            province_name = address_data.get("province")
-            city_name = address_data.get("city")
-            barangay_name = address_data.get("barangay")
-
-            if province_name:
-                province, _ = Province.objects.get_or_create(
-                    name=province_name
-                )
-                address.province = province
-
-            if city_name:
-                city, _ = City.objects.get_or_create(
-                    name=city_name,
-                    province=province
-                )
-                address.city = city
-
-            if barangay_name:
-                barangay, _ = Barangay.objects.get_or_create(
-                    name=barangay_name,
-                    city=city
-                )
-                address.barangay = barangay
-
-            address.street = address_data.get("street", address.street)
-            address.sitio = address_data.get("sitio", address.sitio)
-            address.zip_code = address_data.get(
-                "zip_code", address.zip_code
-            )
+            for attr, value in address_data.items():
+                setattr(address, attr, value)
 
             address.save()
 
         return instance
+
 
     
 #para sa salary

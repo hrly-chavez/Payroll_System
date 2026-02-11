@@ -39,7 +39,7 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
     )
 
     leave_type_id = serializers.PrimaryKeyRelatedField(
-        queryset=Leave_Type.objects.all(),
+        queryset=Leave_Type.objects.all().order_by('-created_at'),
         source="leave_type",
         write_only=True
     )

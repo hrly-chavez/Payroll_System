@@ -25,13 +25,14 @@ const LeaveRequest = ({ open, onClose }: any) => {
 
     try {
     const payload = {
-      leave_type: values.leave_type,
+      leave_type_id: values.leave_type,   // ✅ must be leave_type_id
       date_range: [
         values.date_range[0].format("YYYY-MM-DD"),
         values.date_range[1].format("YYYY-MM-DD"),
       ],
       reason: values.reason || "",
     };
+
 
 
       await api.post("/approvals/leaves/", payload);

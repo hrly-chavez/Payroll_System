@@ -10,6 +10,11 @@ import api from "../../../api/axios";
 import dayjs, { Dayjs } from "dayjs";
 import { formatBackendTime,formatTime, getAttendanceStatusLabel } from "../../helpers";
 import SharedCalendar from "./../../../components/SharedCalendar/SharedCalendar";
+import { Pie } from "@ant-design/plots";
+import { Tabs } from "antd";
+import CompanyNote from "./../../../components/CompanyNote/companyNote";
+
+
 
 
 const { Content } = Layout;
@@ -44,10 +49,17 @@ type TodayAttendanceResponse = {
     results: AttendanceLogRow[];
   };
 
+  type CalendarEvent = {
+  date: string;
+  type: "holiday" | "payroll";
+  title: string;
+  color: string;
+};
+
 const Dashboard: React.FC = () => {
   const [phTime, setPhTime] = useState<Date | null>(null);
   const [usaTime, setUsaTime] = useState<Date | null>(null);
-  const [calendarEvents, setCalendarEvents] = useState([]);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
 
   const [attendance, setAttendance] = useState<TodayAttendanceResponse["attendance"]>(null);
   const [loadingPunchIn, setLoadingPunchIn] = useState(false);
@@ -55,7 +67,50 @@ const Dashboard: React.FC = () => {
   const [loadingStatus, setLoadingStatus] = useState(false);
   const [stats, setStats] = useState({ present: 0, lates: 0, absent: 0 });
   const [loadingStats, setLoadingStats] = useState(false);
-    
+
+  const [selectedMonth, setSelectedMonth] = useState(dayjs().month() + 1); // 1–12
+  const [selectedFilter, setSelectedFilter] = useState<
+    "ALL" | "PRESENT" | "LATE" | "LEAVE" | "ABSENT"
+  >("ALL");
+  // pie for the attendance stats
+  const baseChartData = [
+  { type: "none", value: 1 },
+  { type: "Present", value: stats.present },
+  { type: "Late", value: stats.lates },
+  { type: "Leave", value: 0 },
+  { type: "Absent", value: stats.absent },
+  { type: "Undertime", value: 0 },
+];
+
+const attendanceChartData =
+  selectedFilter === "ALL"
+    ? baseChartData
+    : baseChartData.filter(
+        (item) =>
+          item.type.toUpperCase() === selectedFilter ||
+          item.type === "none"
+      );
+
+  const attendanceConfig = {
+  data: attendanceChartData,
+  angleField: "value",
+  colorField: "type",
+  radius: 1,
+  innerRadius: 0.7,
+  legend: false,
+  label: false,
+  padding: 0,
+  color: ({ type }: { type: string }) => {
+    switch (type) {
+      case "Present": return "#2e7d32";   // green
+      case "Late": return "#f0ad4e";      // yellow
+      case "Leave": return "#1890ff";     // blue
+      case "Absent": return "#c62828";    // red
+      case "Undertime": return "#7b1fa2"; // purple
+      default: return "#e0e0e0";          // gray (none)
+    }
+  },
+};  
     
 
     const fetchTodayAttendance = async () => {
@@ -109,6 +164,7 @@ const Dashboard: React.FC = () => {
         setLoadingPunchOut(false);
       }
     };
+
     const fetchAttendanceStats = async () => {
       setLoadingStats(true);
       try {
@@ -144,20 +200,57 @@ const Dashboard: React.FC = () => {
 
     const loadCalendarEvents = async () => {
   try {
-    const res = await api.get("/approvals/holidays/");
-    const holidays = res.data;
+    const [holidayRes, payrollRes] = await Promise.all([
+      api.get("/approvals/holidays/"),
+      api.get("/payroll/periods/"),
+    ]);
 
-    const events = holidays.map((h: any) => ({
-      date: h.date,
-      type: "holiday",
-      color: h.base === "PH" ? "#2e7d32" : h.base === "US" ? "#c62828" : "#616161",
-    }));
+    const holidays = holidayRes.data;
+    const payrolls = payrollRes.data;
 
-      setCalendarEvents(events);
-    } catch {
-      message.error("Failed to load holidays");
-    }
-  };
+    const events: CalendarEvent[] = [];
+
+
+    // ===== HOLIDAYS =====
+    holidays.forEach((h: any) => {
+      events.push({
+        date: dayjs(h.date).format("YYYY-MM-DD"),
+        type: "holiday",
+        title: `${h.base} Holiday – ${h.name}`,
+        color:
+          h.base === "PH"
+            ? "#2e7d32"
+            : h.base === "US"
+            ? "#c62828"
+            : "#616161",
+      });
+    });
+
+    // ===== PAYROLL PERIODS =====
+    payrolls.forEach((p: any) => {
+      let cur = dayjs(p.start_date);
+      const end = dayjs(p.end_date);
+
+      while (cur.isSame(end) || cur.isBefore(end)) {
+        events.push({
+          date: cur.format("YYYY-MM-DD"),
+          type: "payroll",
+          title: `Payroll Period (${dayjs(p.start_date).format(
+            "MMM D"
+          )} – ${dayjs(p.end_date).format("MMM D")})`,
+          color: "#1890ff",
+        });
+
+        cur = cur.add(1, "day");
+      }
+    });
+
+    setCalendarEvents(events);
+  } catch (err) {
+    message.error("Failed to load calendar events");
+  }
+};
+
 
     const fetchBaseTime = async (timezone: string, setter: (d: Date) => void) => {
       try {
@@ -211,6 +304,10 @@ const Dashboard: React.FC = () => {
       formatBackendTime
     );
     
+    const monthOptions = Array.from({ length: 12 }, (_, i) => ({
+    value: i + 1,
+    label: dayjs().month(i).format("MMMM"),
+  }));
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -229,88 +326,171 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
+         {/* ROW: ATTENDANCE + COMPANY NOTE */}
+        <Row gutter={16} className={styles.mainSection}>
 
-
-          {/* Stats */}
-          <Row gutter={16}>
-            <Col span={6}>
-              <Card>
-                <Statistic title="Total Present" value={stats.present} loading={loadingStats} />
-              </Card>
-            </Col>
-            <Col span={6}>
-              <Card>
-                <Statistic title="Total Lates" value={stats.lates} loading={loadingStats} />
-              </Card>
-            </Col>
-            <Col span={6}>
-              <Card>
-                <Statistic title="Total Absences" value={stats.absent} loading={loadingStats} />
-              </Card>
-            </Col>
-            <Col span={6}><Card><Statistic title="Leave request pending" value={0} /></Card></Col>
-          </Row>
-
-          <Row gutter={16} className={styles.mainSection}>
-
-            {/* LEFT COLUMN */}
-            <Col xs={24} md={14}>
-
-              {/* ATTENDANCE */}
-              <Card title="Attendance" className={styles.sectionCard}>
-                <div className={styles.timeRow}>
-                  <div className={styles.timeBox}>
-                    <span>PH Time</span>
-                    <h2>{formatTime(phTime, "Asia/Manila")}</h2>
-                  </div>
-                  <div className={styles.timeBox}>
-                    <span>USA Time</span>
-                    <h2>{formatTime(usaTime, "America/New_York")}</h2>
-                  </div>
+          {/* LEFT: ATTENDANCE */}
+          <Col xs={24} md={13}>
+          <Card title="Attendance" className={styles.attendanceCard}>
+              <div className={styles.timeRow}>
+                <div className={styles.timeBox}>
+                  <span>PH Time</span>
+                  <h2>{formatTime(phTime, "Asia/Manila")}</h2>
                 </div>
 
-                <div className={styles.buttonRow}>
-                  <Button
-                    icon={<LoginOutlined />}
-                    className={styles.punchInBtn}
-                    size="large"
-                    onClick={handlePunchIn}
-                    loading={loadingPunchIn}
-                    disabled={loadingStatus || !!attendance?.time_in}
-                  >
-                    Punch in
-                  </Button>
-
-                  <Button
-                    icon={<LogoutOutlined />}
-                    className={styles.punchOutBtn}
-                    size="large"
-                    onClick={handlePunchOut}
-                    loading={loadingPunchOut}
-                    disabled={loadingStatus || !attendance?.time_in || !!attendance?.time_out}
-                  >
-                    Punch out
-                  </Button>
+                <div className={styles.timeBox}>
+                  <span>USA Time</span>
+                  <h2>{formatTime(usaTime, "America/New_York")}</h2>
                 </div>
-              </Card>
-              <Card title="Payslip Status" className={styles.sectionCard}>
-                <Tag color="processing">PROCESSING</Tag>
-                <div>January 1, 2026</div>
-              </Card>
+              </div>
 
-              <Card title="Payslip Cut Off" className={styles.sectionCard}>
-                <h3>08:00</h3>
-                <div>January 1, 2026</div>
-              </Card>
-            </Col>
+              <div className={styles.buttonRow}>
+                <Button
+                  icon={<LoginOutlined />}
+                  className={styles.punchInBtn}
+                  size="large"
+                  onClick={handlePunchIn}
+                  loading={loadingPunchIn}
+                  disabled={loadingStatus || !!attendance?.time_in}
+                >
+                  Punch in
+                </Button>
 
-            {/* RIGHT COLUMN */}
-            <Col xs={24} md={10}>
-              <Card title="Calendar" className={styles.calendarCard}>
-                <SharedCalendar events={calendarEvents} />
-              </Card>
+                <Button
+                  icon={<LogoutOutlined />}
+                  className={styles.punchOutBtn}
+                  size="large"
+                  onClick={handlePunchOut}
+                  loading={loadingPunchOut}
+                  disabled={loadingStatus || !attendance?.time_in || !!attendance?.time_out}
+                >
+                  Punch out
+                </Button>
+              </div>
+            </Card>
+          </Col>
 
-              <Card title="Legend & Holidays" className={styles.sectionCard}>
+          {/* RIGHT: COMPANY NOTE */}
+          <Col xs={24} md={11}>
+            <CompanyNote
+              content={`Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+        Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+        Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.`}
+              author="Super Admin"
+            />
+          </Col>
+
+        </Row>
+
+        {/* ROW: STATUS + ATTENDANCE PIE + CALENDAR */}
+        <Row gutter={16} className={styles.mainSection}>
+
+          {/* STATUS */}
+          <Col xs={24} md={8}>
+          <Card title="Status" className={styles.statusCard}>
+              <Tabs
+                defaultActiveKey="payslip"
+                items={[
+                  {
+                    key: "payslip",
+                    label: "Payslip",
+                    children: (
+                      <div className={styles.payslipList}>
+                        <div className={styles.payslipRow}>
+                          <span className={styles.payslipStatus}>Pending</span>
+                          <span className={styles.payslipDate}>
+                            March 20, 2025 10:21
+                          </span>
+                        </div>
+
+                        <div className={styles.payslipRow}>
+                          <span className={styles.payslipStatus}>Pending</span>
+                          <span className={styles.payslipDate}>
+                            January 1, 2026 08:00
+                          </span>
+                        </div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "attendance correction",
+                    label: "Attendance Correction",
+                    children: (
+                      <div className={styles.payslipList}>
+                        <div className={styles.payslipRow}>
+                          <span className={styles.payslipStatus}>Pending</span>
+                          <span className={styles.payslipDate}>
+                            March 20, 2025 10:21
+                          </span>
+                        </div>
+                      </div>
+                    ),
+                  },
+                ]}
+              />
+            </Card>
+          </Col>
+
+          {/* ATTENDANCE PIE */}
+          <Col xs={24} md={8}>
+            <Card
+              title={
+                <div className={styles.attendanceHeader}>
+                  <span>Attendance</span>
+                  <Select
+                    size="small"
+                    value={selectedMonth}
+                    onChange={(value) => setSelectedMonth(value)}
+                    style={{ width: 110 }}
+                  >
+                    {monthOptions.map((m) => (
+                      <Option key={m.value} value={m.value}>
+                        {m.label}
+                      </Option>
+                    ))}
+                  </Select>
+
+                  <Select
+                    size="small"
+                    value={selectedFilter}
+                    onChange={(value) => setSelectedFilter(value)}
+                    style={{ width: 120 }}
+                  >
+                    <Option value="ALL">All</Option>
+                    <Option value="PRESENT">Present</Option>
+                    <Option value="LATE">Late</Option>
+                    <Option value="LEAVE">Leave</Option>
+                    <Option value="ABSENT">Absent</Option>
+                  </Select>
+                </div>
+              }
+              className={styles.sectionCard}
+            >
+              <div className={styles.chartWrapper}>
+                <Pie {...attendanceConfig} />
+              </div>
+
+              <div className={styles.chartLegend}>
+                <span><i className={styles.grayDot} /> none</span>
+                <span><i className={styles.greenDot} /> Present</span>
+                <span><i className={styles.yellowDot} /> Late</span>
+                <span><i className={styles.blueDot} /> Leave</span>
+                <span><i className={styles.redDot} /> Absent</span>
+                <span><i className={styles.purpleDot} /> Undertime</span>
+              </div>
+            </Card>
+          </Col>
+
+          {/* CALENDAR */}
+          <Col xs={24} md={8}>
+          <Card title="Calendar" className={styles.calendarCard}>
+              <SharedCalendar events={calendarEvents} />
+            </Card>
+          </Col>
+
+        </Row>
+
+              <Card title="Legend & Holidays" className={styles.legendCard}>
                 <div className={styles.legendSection}>
                   <div className={styles.legendItem}><span className={styles.legendGreen}></span> PH Holiday</div>
                   <div className={styles.legendItem}><span className={styles.legendRed}></span> US Holiday</div>
@@ -318,9 +498,6 @@ const Dashboard: React.FC = () => {
                   <div className={styles.legendItem}><span className={styles.legendGray}></span> Non-Work</div>
                 </div>
               </Card>
-              </Col>
-
-          </Row>
         </Content>
       </Layout>
     </Layout>

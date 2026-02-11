@@ -1,141 +1,26 @@
+/* ================= Layout ================= */
+
+:root {
+  --card-shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --card-shadow-medium: 0 6px 18px rgba(0, 0, 0, 0.12);
+  --card-shadow-hover: 0 10px 28px rgba(0, 0, 0, 0.16);
+}
+
 .content {
-  margin: 16px;
+  margin: 12px;
 }
 
 .mainSection {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
-.sectionCard {
-  margin-bottom: 20px;
-}
-
-/* Make top row columns equal height */
-.flexCol {
-  display: flex;
-}
-
-/* Equal Attendance & Calendar */
-.equalTopCard {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-/* Shrink calendar height */
-.equalTopCard :global(.ant-picker-calendar) {
-  height: 165px;
-}
-
-.equalTopCard :global(.ant-picker-content) {
-  height: 120px;
-}
-
-.equalTopCard :global(.ant-picker-cell) {
-  padding: 2px 0;
-}
-
-.equalTopCard :global(.ant-picker-cell-inner) {
-  min-height: 22px;
-  line-height: 22px;
-}
-
-.equalTopCard :global(.ant-picker-content th) {
-  padding: 4px 0;
-  font-size: 12px;
-}
-
-/* Calendar dropdown header */
-.calendarHeader {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  padding: 4px 0;
-}
-
-/* Time layout */
-.timeRow {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-
-.timeBox {
-  text-align: center;
-  border: 1px solid #cdcdcd;
-  padding: 16px 24px;
-  border-radius: 10px;
-  min-width: 140px;
-}
-
-.timeBox span {
-  font-size: 14px;
-  color: #888;
-}
-
-.timeBox h2 {
-  margin-top: 8px;
-  font-size: 28px;
-}
-
-/* Buttons */
-.buttonRow {
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-}
-
-.punchInBtn {
-  background-color: #386fa4 !important;
-  border-color: #386fa4 !important;
-  color: white !important;
-}
-
-.punchOutBtn {
-  background-color: #a9a9a9 !important;
-  border-color: #868686 !important;
-  color: white !important;
-}
-
-/* Legend */
-.legendSection {
-  margin-bottom: 8px;
-}
-
-.legendItem {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.legendGreen,
-.legendRed,
-.legendYellow,
-.legendGray {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-}
-
-.legendGreen { background: #3fa34d; }
-.legendRed { background: #d9534f; }
-.legendYellow { background: #f0ad4e; }
-.legendGray { background: #aaa; }
-
-
-/* ================== GREETING (from Greeting.module.css) ================== */
+/* ================= Greeting ================= */
 
 .greetingCard {
-  padding: 16px 20px;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.05);
-  margin-bottom: 16px;
-
+  padding: 10px 14px;
+  background: #ffffff;
+  border-radius: 8px;
+  margin-bottom: 10px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -143,26 +28,20 @@
 
 .greetingLeft {
   font-weight: 600;
-  font-size: 16px;
-  color: #222;
+  font-size: 14px;
 }
 
 .greetingName {
   color: #1890ff;
 }
 
-/* STATUS BADGE */
 .greetingStatus {
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 11px;
   font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
-/* Color Variants */
 .IN {
   background: #e6f7ee;
   color: #1f9d55;
@@ -178,3 +57,314 @@
   color: #d48806;
 }
 
+/* ================= Company Note ================= */
+
+:global(.companyNote) {
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  margin-bottom: 12px;
+  height: 460px;
+  background: #ffffff;
+  box-shadow: var(--card-shadow-soft);
+  transition: box-shadow 0.2s ease;
+}
+
+/* ================= Attendance Card ================= */
+
+.attendanceCard {
+  margin-bottom: 12px;
+  border-radius: 8px;
+  overflow: hidden;
+  height: 238px;
+  box-shadow: var(--card-shadow-soft);
+  transition: box-shadow 0.2s ease;
+}
+
+/* Attendance header = WHITE */
+.attendanceCard :global(.ant-card-head) {
+  background: #ffffff;
+}
+
+.attendanceCard :global(.ant-card-head-title) {
+  color: #000000;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Attendance header controls */
+.attendanceHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.legendCard {
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--card-shadow-soft);
+  transition: box-shadow 0.2s ease;
+}
+/* ================= Attendance Pie ================= */
+.attendancePieCard,
+.statusCard,
+.calendarCard {
+  height: 300px;
+}
+
+.chartWrapper {
+  height: 150px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.chartLegend {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 10px;
+  flex-wrap: wrap;
+}
+
+.chartLegend span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.grayDot,
+.greenDot,
+.yellowDot,
+.blueDot,
+.redDot,
+.purpleDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.grayDot {
+  background: #e0e0e0;
+}
+
+.greenDot {
+  background: #2e7d32;
+}
+
+.yellowDot {
+  background: #f0ad4e;
+}
+
+.blueDot {
+  background: #1890ff;
+}
+
+.redDot {
+  background: #c62828;
+}
+
+.purpleDot {
+  background: #7b1fa2;
+}
+
+/* ================= Attendance Time ================= */
+
+.timeRow {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.timeBox {
+  padding: 10px 14px;
+  min-width: 120px;
+  border-radius: 8px;
+  border: 1px solid #d9d9d9;
+  text-align: center;
+}
+
+.timeBox span {
+  font-size: 11px;
+  color: #888;
+}
+
+.timeBox h2 {
+  margin-top: 4px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* ================= Punch Buttons ================= */
+
+.buttonRow {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.punchInBtn,
+.punchOutBtn {
+  height: 32px;
+  font-size: 13px;
+}
+
+.punchInBtn {
+  background-color: #386fa4 !important;
+  border-color: #386fa4 !important;
+  color: #ffffff !important;
+}
+
+.punchOutBtn {
+  background-color: #a9a9a9 !important;
+  border-color: #868686 !important;
+  color: #ffffff !important;
+}
+
+/* ================= Status Card ================= */
+
+.statusCard {
+  margin-bottom: 12px;
+  border-radius: 10px;
+  overflow: hidden;
+  height: 300px;
+  border: 1px solid #3b73a8;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  transition: box-shadow 0.2s ease;
+}
+
+/* BLUE HEADER ONLY */
+.statusCard :global(.ant-card-head),
+.statusCard :global(.ant-card-head-wrapper) {
+  background: #3b73a8;
+  min-height: 44px;
+  padding: 0 16px;
+}
+
+.statusCard :global(.ant-card-head-title) {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* BODY */
+.statusCard :global(.ant-card-body) {
+  background: #ffffff;
+  padding: 12px 16px;
+}
+
+/* ================= Status Tabs ================= */
+
+.statusCard :global(.ant-tabs-nav) {
+  margin: 0 0 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.statusCard :global(.ant-tabs-tab) {
+  font-size: 13px;
+  padding: 6px 12px;
+  color: #595959;
+}
+
+.statusCard
+  :global(.ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn) {
+  color: #1677ff;
+  font-weight: 600;
+}
+
+.statusCard :global(.ant-tabs-ink-bar) {
+  background-color: #1677ff;
+  height: 2px;
+}
+
+/* ================= Payslip Rows ================= */
+
+.payslipList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 6px;
+}
+
+.payslipRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.payslipStatus {
+  font-size: 13px;
+  color: #262626;
+}
+
+.payslipDate {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+/* ================= Calendar ================= */
+
+.calendarCard {
+  height: 300px;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--card-shadow-soft);
+  transition: box-shadow 0.2s ease;
+}
+
+.calendarCard :global(.ant-card-body) {
+  padding: 8px 10px;
+}
+
+/* ================= Legend ================= */
+
+.legendSection {
+  padding-top: 4px;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.legendGreen,
+.legendRed,
+.legendYellow,
+.legendGray {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.legendGreen {
+  background: #3fa34d;
+}
+
+.legendRed {
+  background: #d9534f;
+}
+
+.legendYellow {
+  background: #f0ad4e;
+}
+
+.legendGray {
+  background: #aaaaaa;
+}
+
+@media (max-width: 768px) {
+  .attendanceCard,
+  .statusCard,
+  .attendancePieCard,
+  .calendarCard,
+  .legendCard {
+    height: auto;
+  }
+}

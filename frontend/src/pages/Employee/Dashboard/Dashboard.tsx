@@ -18,10 +18,7 @@ import {
   HolidayBase,
   HolidayType,
 } from "../../../components/SharedCalendar/CalendarLegend";
-
-
-
-
+import { PAYROLL_COLOR } from "../../../components/SharedCalendar/CalendarLegend";
 
 const { Content } = Layout;
 const { Option } = Select;
@@ -238,7 +235,7 @@ const attendanceChartData =
         title: `Payroll (${dayjs(p.start_date).format("MMM D")} - ${dayjs(
           p.end_date
         ).format("MMM D")})`,
-        color: p.color || "#1890ff",
+        color: PAYROLL_COLOR.bgColor,
       })),
     ];
 

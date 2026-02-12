@@ -9,14 +9,21 @@ interface Props {
   role?: string;
 }
 
+interface CompanyNoteType {
+  id: number;
+  note: string;
+  created_at: string;
+  created_by: string;
+}
+
 export default function CompanyNote({ role }: Props) {
-  const [notes, setNotes] = useState<any[]>([]);
+  const [notes, setNotes] = useState<CompanyNoteType[]>([]);
   const [open, setOpen] = useState(false);
   const [content, setContent] = useState("");
 
   const fetchNotes = async () => {
     try {
-      const res = await api.get("/company-notes/");
+      const res = await api.get("/employees/company-notes/")
       setNotes(res.data);
     } catch {
       message.error("Failed to load notes");
@@ -25,7 +32,9 @@ export default function CompanyNote({ role }: Props) {
 
   const handleSubmit = async () => {
     try {
-      await api.post("/company-notes/", { content });
+      await api.post("/employees/company-notes/", {
+      note: content,
+      })
       message.success("Note added");
       setOpen(false);
       setContent("");
@@ -60,7 +69,7 @@ export default function CompanyNote({ role }: Props) {
       >
         {latestNote ? (
           <>
-            <div className={styles.content}>{latestNote.content}</div>
+            <div className={styles.content}>{latestNote.note}</div> {/* ✅ FIXED */}
             <div className={styles.author}>
               — {latestNote.created_by}
             </div>

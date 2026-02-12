@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status, generics
+from rest_framework import viewsets, status, generics, permissions
 from shared_model.models import *
 from .serializers import *
 from rest_framework.decorators import action
@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from decimal import Decimal
 from django.db import transaction
 from django.utils.timezone import now
+from .serializers import CompanyNoteSerializer
 
 #--------------------------Address
 # List all provinces
@@ -356,3 +357,12 @@ class AllowanceTypeListAPIView(APIView):
         allowance_types = Allowance_Type.objects.filter(is_active=True)
         serializer = AllowanceTypeSerializer(allowance_types, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+#COMPANY NOTE
+class CompanyNoteListCreateView(generics.ListCreateAPIView):
+    queryset = Company_Note.objects.all().order_by("-created_at")
+    serializer_class = CompanyNoteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)

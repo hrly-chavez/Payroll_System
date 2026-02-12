@@ -655,18 +655,18 @@ const EmployeeDetailsPage: React.FC = () => {
                   <Table
                     columns={[
                       { title: "Action", dataIndex: "action", key: "action" },
-                      { title: "User ID", dataIndex: "user_id", key: "user_id" },
+                      { title: "User", dataIndex: "user", key: "user" },
                       { title: "Model", dataIndex: "model_name", key: "model_name" },
-                      { title: "Old Data", dataIndex: "old_data", key: "old_data", render: (val) => JSON.stringify(val) },
-                      { title: "New Data", dataIndex: "new_data", key: "new_data", render: (val) => JSON.stringify(val) },
+                      { title: "Old Data", dataIndex: "old_data", key: "old_data" },
+                      { title: "New Data", dataIndex: "new_data", key: "new_data" },
                       { title: "Timestamp", dataIndex: "timestamp", key: "timestamp" },
                     ]}
                     dataSource={auditLogs}
                     loading={loadingLogs}
                     rowKey="id"
                   />
-                </Tabs.TabPane>
 
+                </Tabs.TabPane>
 
               </Tabs>
             </Card>

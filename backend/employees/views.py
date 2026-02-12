@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status, generics
+from rest_framework import viewsets, status, generics, permissions
 from shared_model.models import *
 from .serializers import *
 from rest_framework.decorators import action, api_view
@@ -15,6 +15,7 @@ from django.contrib.auth.hashers import make_password
 
 import logging
 import secrets
+from .serializers import CompanyNoteSerializer
 
 #--------------------------Address
 # List all provinces
@@ -451,13 +452,13 @@ def employee_audit_logs(request, employee_id):
     # Related tables
     related_models = ["Employee_Salary", "Employee_Deduction", "Employee_Allowance", "User"]
 
-    # 1️⃣ Employee logs (all actions)
+    #  Employee logs (all actions)
     employee_logs = AuditLog.objects.filter(
         model_name="Employee",
         object_id=str(employee.id)
     )
 
-    # 2️⃣ CREATE logs for related models linked to this employee
+    #  CREATE logs for related models linked to this employee
     related_logs = AuditLog.objects.filter(
         model_name__in=related_models,
         action="CREATE"
@@ -487,3 +488,12 @@ def employee_audit_logs(request, employee_id):
 
     serializer = AuditLogSerializer(all_logs, many=True)
     return Response(serializer.data)
+
+#COMPANY NOTE
+class CompanyNoteListCreateView(generics.ListCreateAPIView):
+    queryset = Company_Note.objects.all().order_by("-created_at")
+    serializer_class = CompanyNoteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)

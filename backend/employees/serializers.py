@@ -37,7 +37,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Department
-        fields = ["id", "name", "shift", "shift_id", "is_active", "created_at"]
+        fields = "__all__"
 
 #User model (user account)
 class UserAccountSerializer(serializers.ModelSerializer):
@@ -388,3 +388,16 @@ class AuditLogSerializer(serializers.ModelSerializer):
             "new_data",
             "timestamp",
         ]
+
+#------------ COMPANY NOTE SERIALIZER-----------
+class CompanyNoteSerializer(serializers.ModelSerializer):
+    created_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Company_Note
+        fields = ["id", "note", "created_at", "created_by"]
+
+    def get_created_by(self, obj):
+        if obj.user:
+            return obj.user.user_name
+        return "System"

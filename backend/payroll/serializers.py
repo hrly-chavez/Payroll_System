@@ -129,6 +129,27 @@ class EmployeeAllowanceMiniSerializer(serializers.ModelSerializer):
             "allowance_type",
         ]
 
+#Retruns employee Attendance
+class AttendanceEventMiniSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Attendance_Event
+        fields = '__all__'
+
+#Returns employee Attendance Event
+class AttendanceMiniSerializer(serializers.ModelSerializer):
+    events = AttendanceEventMiniSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Attendance
+        fields = [
+            "id",
+            "date",
+            "status",
+            "time_in",
+            "time_out",
+            "events",
+        ]
+
 # Aggregated snapshot shown in Verify Employee modal before payroll generation
 class PayrollVerifySnapshotSerializer(serializers.Serializer):
     # Aggregated snapshot shown in Verify Employee modal
@@ -144,7 +165,7 @@ class PayrollVerifySnapshotSerializer(serializers.Serializer):
     taxes = EmployeeDeductionMiniSerializer(many=True)   # SSS/PAGIBIG/PHILHEALTH...
     loans = EmployeeDeductionMiniSerializer(many=True)   # loan deductions only
     allowances = EmployeeAllowanceMiniSerializer(many=True)
-
+    attendances = AttendanceMiniSerializer(many=True)  
     warnings = serializers.ListField(child=serializers.CharField(), required=False)
 
 
@@ -199,3 +220,5 @@ class PayRuleSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+    
+    

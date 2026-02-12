@@ -9,6 +9,8 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Exists, OuterRef, Q
+
 
 #helpers
 def _overlaps_period(eff_from, eff_to, period_start, period_end):
@@ -76,10 +78,24 @@ class PayrollPeriodEligibleEmployeesView(APIView):
             payroll_period=period
         ).values_list("employee_id", flat=True)
 
-        # 2) eligible employees = no payroll yet (your current behavior)
-        eligible_employees = Employee.objects.exclude(
-            id__in=payroll_employee_ids
-        ).select_related("department")
+        # attendance must exist within the payroll period date range
+        attendance_in_period = Attendance.objects.filter(
+            employee_id=OuterRef("pk"),
+            date__gte=period.start_date,
+            date__lte=period.end_date,
+        )
+
+        eligible_employees = (
+            Employee.objects
+            .filter(is_active=True)
+            .exclude(id__in=payroll_employee_ids)
+            # "No CEO" filter (best-practice: exclude by position and/or linked user role)
+            .exclude(Q(position__iexact="CEO") | Q(user__role="SUPERADMIN"))
+            # must have at least 1 attendance within the period
+            .annotate(has_attendance=Exists(attendance_in_period))
+            .filter(has_attendance=True)
+            .select_related("department", "user")
+        )
 
         # 3) lazy-create PayrollPeriodEmployee rows for eligible employees
         existing_employee_ids = set(
@@ -100,14 +116,12 @@ class PayrollPeriodEligibleEmployeesView(APIView):
             )
 
         # 4) return PayrollPeriodEmployee rows (so we can include status)
-        ppe_qs = PayrollPeriodEmployee.objects.filter(
-            period=period
-        ).exclude(
-            employee_id__in=payroll_employee_ids
-        ).select_related(
-            "employee", "employee__department"
-        ).order_by(
-            "employee__lname", "employee__fname"
+        ppe_qs = (
+            PayrollPeriodEmployee.objects
+            .filter(period=period, employee__in=eligible_employees)
+            .exclude(employee_id__in=payroll_employee_ids)
+            .select_related("employee", "employee__department")
+            .order_by("employee__lname", "employee__fname")
         )
 
         return Response({
@@ -184,6 +198,20 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
             if _overlaps_period(a.effective_from, a.effective_to, period.start_date, period.end_date)
         ]
 
+        attendances = (
+            Attendance.objects
+            .filter(
+                employee=employee,
+                date__gte=period.start_date,
+                date__lte=period.end_date
+            )
+            .prefetch_related("events")
+            .order_by("date")
+        )
+
+        if not attendances.exists():
+            warnings.append("No attendance records found within this payroll period.")
+
         payload = {
             "period_id": period.id,
             "employee_id": employee.id,
@@ -195,6 +223,7 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
             "taxes": taxes,
             "loans": loans,
             "allowances": in_period_allowances,
+            "attendances": attendances,  # NEW
             "warnings": warnings,
         }
 
@@ -347,7 +376,6 @@ class SuperAdminPayRuleListCreateView(generics.ListCreateAPIView):
 
         serializer.save()
 
-
 class SuperAdminPayRuleRetrieveUpdateView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = PayRuleSerializer
@@ -361,4 +389,29 @@ class SuperAdminPayRuleRetrieveUpdateView(generics.RetrieveUpdateAPIView):
             raise ValidationError({"detail": "effective_to cannot be earlier than effective_from."})
 
         serializer.save()
+    
+class PayRuleChoicesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        event_type_choices = [
+            {"value": value, "label": label}
+            for value, label in Pay_Rule.event_type_choices
+        ]
+
+        category_choices = [
+            {"value": value, "label": label}
+            for value, label in Pay_Rule.categories
+        ]
+
+        rate_type_choices = [
+            {"value": value, "label": label}
+            for value, label in Pay_Rule.RATE_TYPE_CHOICES
+        ]
+
+        return Response({
+            "event_type_choices": event_type_choices,
+            "category_choices": category_choices,
+            "rate_type_choices": rate_type_choices,
+        })
     

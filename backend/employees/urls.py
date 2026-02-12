@@ -24,4 +24,7 @@ urlpatterns = [
     path("allowance-types/", AllowanceTypeListAPIView.as_view(), name="allowance-types-list"),
 
     path("auditlogs/employee/<int:employee_id>/", employee_audit_logs, name="employee-audit-logs"),
+    #company note
+    path("company-notes/", CompanyNoteListCreateView.as_view(), name="company-notes"),
+
 ]

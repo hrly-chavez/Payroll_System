@@ -1,10 +1,10 @@
-// src/pages/SuperAdmin/System Configuration/Pay Rules/AddPayRules.tsx
+//src/pages/SuperAdmin/System Configuration/Pay Rules/AddPayRules.tsx
+
 "use client";
 
-import React from "react";
-import { Modal, Form, Input, Select, DatePicker, Checkbox, Row, Col } from "antd";
-
-const { Option } = Select;
+import React, { useEffect, useState } from "react";
+import { Modal, Form, Input, Select, DatePicker, Checkbox, Row, Col, Spin, InputNumber } from "antd";
+import api from "../../../../api/axios";
 
 type Props = {
   open: boolean;
@@ -18,16 +18,43 @@ type Props = {
   employees: any[];
 };
 
-export default function AddPayRules({
-  open,
-  title,
-  onCancel,
-  onOk,
-  okText = "Save",
-  form,
-  departments,
-  employees,
-}: Props) {
+type Choice = { value: string; label: string };
+
+export default function AddPayRules({open,title,onCancel,onOk,okText = "Save",form,departments,employees,}: Props) {
+
+  const [eventTypes, setEventTypes] = useState<Choice[]>([]);
+  const [categories, setCategories] = useState<Choice[]>([]);
+  const [rateTypes, setRateTypes] = useState<Choice[]>([]);
+  const [loadingChoices, setLoadingChoices] = useState(false);
+
+  const rateType = Form.useWatch("rate_type", form);
+  const isMultiplier = rateType === "MULTIPLIER";
+
+  const rateLabel = isMultiplier ? "Multiplier" : "Rate Value";
+  const rateHelp = isMultiplier
+    ? "Example: 1 = 100% of base (daily_rate/hourly_rate), 1.5 = 150%"
+    : "Enter exact peso amount based on rate type (e.g., ₱10 per minute).";
+
+
+  useEffect(() => {
+    const fetchChoices = async () => {
+      try {
+        setLoadingChoices(true);
+        const res = await api.get("/payroll/superadmin/pay-rules/choices/");
+
+        setEventTypes(res.data?.event_type_choices || []);
+        setCategories(res.data?.category_choices || []);
+        setRateTypes(res.data?.rate_type_choices || []);
+      } finally {
+        setLoadingChoices(false);
+      }
+    };
+
+    if (open) fetchChoices();
+  }, [open]);
+
+ 
+
   return (
     <Modal
       title={title}
@@ -50,56 +77,54 @@ export default function AddPayRules({
               name="event_type"
               rules={[{ required: true, message: "Event type is required" }]}
             >
-              <Select placeholder="Select event type">
-                <Option value="Late">Late</Option>
-                <Option value="Undertime">Undertime</Option>
-                <Option value="Overtime">Overtime</Option>
-                <Option value="Night Differential">Night Differential</Option>
-                <Option value="Regular Holiday">Regular Holiday</Option>
-                <Option value="Special Holiday">Special Holiday</Option>
-                <Option value="Special Non Working Holiday">Special Non Working Holiday</Option>
-                <Option value="Company Holiday">Company Holiday</Option>
-              </Select>
+              <Select
+                placeholder="Select event type"
+                loading={loadingChoices}
+                options={eventTypes}
+                notFoundContent={loadingChoices ? <Spin size="small" /> : null}
+              />
             </Form.Item>
           </Col>
 
           <Col span={12}>
-            <Form.Item
-              label="Category"
-              name="category"
-              rules={[{ required: true, message: "Category is required" }]}
-            >
-              <Select placeholder="Select category">
-                <Option value="Earning">Earning</Option>
-                <Option value="Deduction">Deduction</Option>
-              </Select>
+            <Form.Item label="Category" name="category" rules={[{ required: true, message: "Category is required" }]}>
+              <Select
+                placeholder="Select category"
+                loading={loadingChoices}
+                options={categories}
+                notFoundContent={loadingChoices ? <Spin size="small" /> : null}
+              />
             </Form.Item>
           </Col>
         </Row>
 
         <Row gutter={12}>
           <Col span={12}>
-            <Form.Item
-              label="Rate Type"
-              name="rate_type"
-              rules={[{ required: true, message: "Rate type is required" }]}
-            >
-              <Select placeholder="Select rate type">
-                <Option value="FIXED">Fixed</Option>
-                <Option value="PER_MINUTE">Per Minute</Option>
-                <Option value="PER_DAY">Per Day</Option>
-                <Option value="MULTIPLIER">Multiplier</Option>
-              </Select>
+            <Form.Item label="Rate Type" name="rate_type" rules={[{ required: true, message: "Rate type is required" }]}>
+              <Select
+                placeholder="Select rate type"
+                loading={loadingChoices}
+                options={rateTypes}
+                notFoundContent={loadingChoices ? <Spin size="small" /> : null}
+              />
             </Form.Item>
           </Col>
 
           <Col span={12}>
             <Form.Item
-              label="Rate Value"
+              label={rateLabel}
               name="rate_value"
-              rules={[{ required: true, message: "Rate value is required" }]}
+              help={rateHelp}
+              rules={[{ required: true, message: isMultiplier ? "Multiplier is required" : "Rate value is required" }]}
             >
-              <Input type="number" step="0.01" placeholder="Enter value" />
+              <InputNumber
+                style={{ width: "100%" }}
+                min={0}
+                step={isMultiplier ? 0.0001 : 0.01}
+                stringMode
+                addonBefore={isMultiplier ? "x" : "₱"}
+                placeholder={isMultiplier ? "e.g. 1, 1.5, 2" : "Enter amount"}
+              />
             </Form.Item>
           </Col>
         </Row>
@@ -113,13 +138,8 @@ export default function AddPayRules({
                 onChange={(value) => {
                   if (value) form.setFieldsValue({ employee: null });
                 }}
-              >
-                {departments.map((d) => (
-                  <Option key={d.id} value={d.id}>
-                    {d.name}
-                  </Option>
-                ))}
-              </Select>
+                options={departments.map((d) => ({ value: d.id, label: d.name }))}
+              />
             </Form.Item>
           </Col>
 
@@ -131,13 +151,8 @@ export default function AddPayRules({
                 onChange={(value) => {
                   if (value) form.setFieldsValue({ applies_to: null });
                 }}
-              >
-                {employees.map((e) => (
-                  <Option key={e.id} value={e.id}>
-                    {e.full_name}
-                  </Option>
-                ))}
-              </Select>
+                options={employees.map((e) => ({ value: e.id, label: e.full_name }))}
+              />
             </Form.Item>
           </Col>
         </Row>

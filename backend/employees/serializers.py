@@ -143,76 +143,56 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee
         fields = [
-            "id_no",
-            "fname",
-            "initial",
-            "lname",
-            "suffix",
-            "status",
-            "contact_no",
-            "email",
-            "hired_date",
-            "position",
-            "bank_info",
-            "shift",
-            "department",
-            "address",
+            "id_no", "fname", "initial", "lname", "suffix", "status",
+            "contact_no", "email", "hired_date", "position", "bank_info",
+            "shift", "department", "address",
         ]
 
     def create(self, validated_data):
+        # extract _current_user if passed from view
+        user = validated_data.pop("_current_user", None)
         address_data = validated_data.pop("address")
-
         address = Address.objects.create(**address_data)
 
-        employee = Employee.objects.create(
-            address=address,
-            **validated_data
-        )
+        # Instantiate Employee manually
+        employee = Employee(**validated_data)
+        employee.address = address
+
+        # Attach _current_user BEFORE saving
+        if user:
+            employee._current_user = user
+
+        employee.save()  # triggers post_save, now signal sees _current_user
+
         return employee
 
-    
 class EmployeeUpdateSerializer(serializers.ModelSerializer):
     address = AddressSerializer(required=False)
 
     class Meta:
         model = Employee
         fields = [
-            "fname",
-            "initial",
-            "lname",
-            "suffix",
-            "status",
-            "contact_no",
-            "email",
-            "hired_date",
-            "position",
-            "bank_info",
-            "shift",
-            "department",
-            "address",
-            "is_active",
+            "fname", "initial", "lname", "suffix", "status", "contact_no",
+            "email", "hired_date", "position", "bank_info", "shift",
+            "department", "address", "is_active",
         ]
 
     def update(self, instance, validated_data):
+        user = validated_data.pop("_current_user", None)
         address_data = validated_data.pop("address", None)
 
-        # -------------------
-        # Update Employee fields
-        # -------------------
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
+        if user:
+            instance._current_user = user
+
         instance.save()
 
-        # -------------------
-        # Update Address (CORRECT WAY)
-        # -------------------
         if address_data:
             address = instance.address
-
             for attr, value in address_data.items():
                 setattr(address, attr, value)
-
             address.save()
 
         return instance
@@ -375,12 +355,16 @@ class EmployeeAllowanceSerializer(serializers.ModelSerializer):
 
 #audit logs
 class AuditLogSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(source="user.id", read_only=True)
+    username = serializers.CharField(source="user.user_name", read_only=True)
     timestamp = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S")  # 24-hour format
+    
     class Meta:
         model = AuditLog
         fields = [
             "id",
             "user_id",
+            "username",
             "action",
             "model_name",
             "object_id",

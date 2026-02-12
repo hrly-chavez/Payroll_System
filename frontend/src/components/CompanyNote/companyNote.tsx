@@ -53,7 +53,7 @@ export default function CompanyNote({ role }: Props) {
   return (
     <>
       <Card
-        title="Company Note"
+        title="Announcement"
         extra={
           role === "ADMIN" || role === "SUPERADMIN" ? (
             <Button

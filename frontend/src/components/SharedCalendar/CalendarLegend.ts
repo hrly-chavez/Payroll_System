@@ -1,5 +1,3 @@
-// components/SharedCalendar/CalendarLegend.ts
-
 export type HolidayBase = "PH" | "US" | "COMPANY";
 
 export type HolidayType =
@@ -17,6 +15,11 @@ interface LegendConfig {
  * Central Holiday Legend Configuration
  * All holiday colors are controlled here
  */
+export const PAYROLL_COLOR = {
+  bgColor: "#D6F2EA",
+  textColor: "#000000",
+};
+
 export const HOLIDAY_LEGEND: Record<
   HolidayBase,
   Record<HolidayType, LegendConfig>
@@ -27,53 +30,53 @@ export const HOLIDAY_LEGEND: Record<
       textColor: "#ffffff",
     },
     "Special Non-Working": {
-      bgColor: "#388e3c",
+      bgColor: "linear-gradient(135deg, #ab0202, #2e7d32)",
       textColor: "#ffffff",
     },
     "Special Working": {
-      bgColor: "#66bb6a",
+      bgColor: "linear-gradient(135deg, #2e7d32, #ffde3b)",
       textColor: "#000000",
     },
     "Company Holiday": {
-      bgColor: "#1b5e20",
+      bgColor: "#386FA4",
       textColor: "#ffffff",
     },
   },
 
   US: {
     Regular: {
-      bgColor: "#c62828",
+      bgColor: "#ab0202",
       textColor: "#ffffff",
     },
     "Special Non-Working": {
-      bgColor: "#d32f2f",
+      bgColor: "linear-gradient(135deg, #ab0202, #2e7d32)",
       textColor: "#ffffff",
     },
     "Special Working": {
-      bgColor: "#ef5350",
+      bgColor: "linear-gradient(135deg, #ab0202, #ffde3b)",
       textColor: "#ffffff",
     },
     "Company Holiday": {
-      bgColor: "#8e0000",
+      bgColor: "#386FA4",
       textColor: "#ffffff",
     },
   },
 
   COMPANY: {
     Regular: {
-      bgColor: "#1565c0",
+      bgColor: "#386FA4",
       textColor: "#ffffff",
     },
     "Special Non-Working": {
-      bgColor: "#1976d2",
+      bgColor: "linear-gradient(135deg, #ab0202, #2e7d32)",
       textColor: "#ffffff",
     },
     "Special Working": {
-      bgColor: "#64b5f6",
+      bgColor: "linear-gradient(135deg, #2e7d32, #ffde3b)",
       textColor: "#000000",
     },
     "Company Holiday": {
-      bgColor: "#0d47a1",
+      bgColor: "#386FA4",
       textColor: "#ffffff",
     },
   },

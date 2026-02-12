@@ -14,6 +14,7 @@ import {
   HOLIDAY_LEGEND,
   HolidayBase,
   HolidayType,
+  PAYROLL_COLOR,
 } from "../../../components/SharedCalendar/CalendarLegend";
 import CompanyNote from "../../../components/CompanyNote/companyNote";
 import { Pie } from "@ant-design/plots";
@@ -331,7 +332,7 @@ const Dashboard: React.FC = () => {
         start_date: p.start_date,
         end_date: p.end_date,
         title: "Payroll",
-        color: p.color || "#1890ff",
+        color: PAYROLL_COLOR.bgColor,
       })),
     ];
 

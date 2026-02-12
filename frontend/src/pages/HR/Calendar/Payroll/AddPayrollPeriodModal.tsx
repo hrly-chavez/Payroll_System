@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Modal, Form, DatePicker, ColorPicker, Button, message } from "antd";
+import { Modal, Form, DatePicker, Button, message } from "antd";
 import api from "../../../../api/axios";
 
 const { RangePicker } = DatePicker;
@@ -22,7 +22,6 @@ export default function AddPayrollPeriodModal({ open, onClose, onSuccess }: Prop
       await api.post("/payroll/periods/", {
         start_date: start.format("YYYY-MM-DD"),
         end_date: end.format("YYYY-MM-DD"),
-        color: values.color?.toHexString?.() || "#ff4d4f",
       });
 
       message.success("Payroll period created");
@@ -41,23 +40,19 @@ export default function AddPayrollPeriodModal({ open, onClose, onSuccess }: Prop
 
   return (
     <Modal open={open} onCancel={onClose} footer={null} title="Add Payroll Period">
-      <Form form={form} layout="vertical" onFinish={handleSubmit}>
-        <Form.Item
-          name="period"
-          label="Select Period"
-          rules={[{ required: true, message: "Please select a payroll period" }]}
-        >
-          <RangePicker style={{ width: "100%" }} />
-        </Form.Item>
+         <Form form={form} layout="vertical" onFinish={handleSubmit}>
+          <Form.Item
+            name="period"
+            label="Select Period"
+            rules={[{ required: true, message: "Please select a payroll period" }]}
+          >
+            <RangePicker style={{ width: "100%" }} />
+          </Form.Item>
 
-        <Form.Item name="color" label="Color">
-          <ColorPicker />
-        </Form.Item>
-
-        <Button type="primary" htmlType="submit" block>
-          Save
-        </Button>
-      </Form>
-    </Modal>
-  );
-}
+          <Button type="primary" htmlType="submit" block>
+            Save
+          </Button>
+        </Form>
+      </Modal>
+    );
+  }

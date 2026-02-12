@@ -1,64 +1,43 @@
-/* ===== Tooltip Styling ===== */
-
-.tooltipContainer {
-  min-width: 160px;
+/* Remove default padding */
+:global(.ant-picker-calendar-date) {
+  padding: 0 !important;
+  margin: 0 !important;
+  height: 110px !important;
 }
 
-.tooltipItem {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+:global(.ant-picker-calendar-date-content) {
+  margin: 0 !important;
+  height: 100% !important;
 }
 
-.tooltipItem:last-child {
-  margin-bottom: 0;
+:global(.ant-picker-cell-inner) {
+  padding: 0 !important;
+  height: 100% !important;
+  background: transparent !important;
 }
 
-.tooltipColor {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
+:global(.ant-picker-cell-selected .ant-picker-cell-inner) {
+  background: transparent !important;
 }
 
-.tooltipText {
-  font-size: 13px;
+:global(.ant-picker-calendar-date-today) {
+  border: none !important;
 }
 
-/* ===== Full Cell Wrapper ===== */
+:global(.ant-picker-content td) {
+  border: 1px solid #d9d9d9;
+}
 
 .fullCellWrapper {
-  position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 6px;
-  overflow: hidden;
+  position: relative;
+  transition: 0.2s ease;
 }
-
-/* Holiday Full Background */
-
-.holidayBackground {
-  position: absolute;
-  inset: 0;
-  border-radius: 6px;
-}
-
-/* Payroll Smooth Bar */
-
-.payrollBar {
-  position: absolute;
-  bottom: 4px;
-  left: 4px;
-  right: 4px;
-  height: 6px;
-  border-radius: 4px;
-  opacity: 0.9;
-}
-
-/* Date Number */
 
 .dateNumber {
-  position: relative;
-  z-index: 2;
-  text-align: center;
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  font-weight: 600;
 }

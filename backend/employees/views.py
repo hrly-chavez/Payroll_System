@@ -10,6 +10,11 @@ from rest_framework.views import APIView
 from decimal import Decimal
 from django.db import transaction
 from django.utils.timezone import now
+from django.core.mail import send_mail
+from django.contrib.auth.hashers import make_password
+
+import logging
+import secrets
 
 #--------------------------Address
 # List all provinces
@@ -60,7 +65,83 @@ class ShiftSerializer(serializers.ModelSerializer):
 
     def get_display_time(self, obj):
         return f"{obj.start_time.strftime('%H:%M')} - {obj.end_time.strftime('%H:%M')}"
+    
+#user account
+logger = logging.getLogger(__name__)  # Use Django logging
 
+class UserViewSet(viewsets.ModelViewSet):
+    """
+    User CRUD + custom actions like get_by_employee and reset password
+    """
+    queryset = User.objects.all()
+    serializer_class = UserAccountSerializer
+    allowed_roles = ["ADMIN"]
+    display_time = serializers.SerializerMethodField()
+
+    @action(detail=False, methods=["get"], url_path="employee/(?P<employee_id>[^/.]+)")
+    def get_by_employee(self, request, employee_id=None):
+        """Retrieve user account linked to a specific employee"""
+        from shared_model.models import Employee  # adjust import if needed
+
+        try:
+            employee = Employee.objects.get(id=employee_id)
+        except Employee.DoesNotExist:
+            return Response({"detail": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Use the related_name "user"
+        user = getattr(employee, "user", None)
+        if not user:
+            return Response({"detail": "User account not found for this employee."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(user)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=["post"], url_path="reset-password")
+    def reset_password(self, request, pk=None):
+        """
+        Admin resets a user's password.
+        - Generates a strong random password
+        - Hashes and saves it
+        - Sends it via email to the employee
+        """
+        user = self.get_object()
+
+        # Generate strong random password (12 characters, mix of letters, digits, punctuation)
+        new_password = ''.join(
+            secrets.choice(string.ascii_letters + string.digits + string.punctuation)
+            for _ in range(12)
+        )
+
+        # Hash the password before saving
+        user.password = make_password(new_password)
+        user.save()
+        logger.info(f"Password for user '{user.user_name}' has been reset by admin '{request.user.user_name}'.")
+
+        # Attempt to send email
+        email_sent = False
+        try:
+            send_mail(
+                subject="Your New Account Password",
+                message=f"Hello {user.employee.fname} {user.employee.lname},\n\nYour password has been reset by HR.\n\n"
+                        f"New password: {new_password}\n\nPlease log in and change it immediately.",
+                from_email=None,  # will use DEFAULT_FROM_EMAIL from settings.py
+                recipient_list=[user.employee.email],
+                fail_silently=False,
+            )
+            email_sent = True
+            logger.info(f"Reset password email sent to '{user.employee.email}'.")
+        except Exception as e:
+            logger.error(f"Failed to send reset password email to '{user.employee.email}': {str(e)}")
+
+        # Return response
+        if email_sent:
+            return Response({"detail": "Password reset successfully and emailed to the user."}, status=status.HTTP_200_OK)
+        else:
+            return Response(
+                {"detail": "Password reset successfully, but failed to send email. Check logs for details."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
 #employee details crud
 class EmployeeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsRole]
@@ -146,6 +227,33 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_201_CREATED
         )
+    # ---------------------------------
+    # UPDATE EMPLOYEE DETAILS
+    # /employees/employees/<id>/update/
+    # ---------------------------------
+    @action(
+        detail=True,
+        methods=["put", "patch"],
+        url_path="update",
+    )
+    def update_employee(self, request, pk=None):
+        employee = self.get_object()
+
+        serializer = EmployeeUpdateSerializer(
+            employee,
+            data=request.data,
+            partial=True,
+        )
+
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(
+            {
+                "message": "Employee updated successfully",
+                "employee": EmployeeSerializer(employee).data,
+            }
+        )
     
 #employee salary
 class EmployeeSalaryViewSet(viewsets.ModelViewSet):
@@ -195,7 +303,7 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(salary)
         return Response(serializer.data)
     
-    # 🔥 NEW ACTION
+    #  NEW ACTION
     @action(detail=False, methods=["post"], url_path="edit")
     @transaction.atomic
     def edit_salary(self, request):

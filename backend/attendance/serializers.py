@@ -88,3 +88,18 @@ class CEOandHRAttendanceLogSerializer(serializers.ModelSerializer):
     def get_event_types(self, obj):
         types = list(obj.events.values_list("type", flat=True))
         return ", ".join(types) if types else ""
+
+    
+class ShiftSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Shift
+        fields = [
+            "id",
+            "name",
+            "start_time",
+            "end_time",
+            "break_minutes",
+            "grace_minutes",
+            "is_overnight",
+            "is_active",
+        ]

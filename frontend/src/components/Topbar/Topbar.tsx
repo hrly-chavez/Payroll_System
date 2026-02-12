@@ -24,7 +24,6 @@ const Topbar: React.FC<TopbarProps> = ({ title = 'Dashboard', showBack, onLogout
     navigate('/', { replace: true });
   };
 
-  // 🔔 Fetch unread notification count from backend
   useEffect(() => {
     const fetchNotifCount = async () => {
       try {

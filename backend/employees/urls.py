@@ -11,6 +11,7 @@ router.register(r"employees", EmployeeViewSet)
 router.register(r"salaries", EmployeeSalaryViewSet)
 router.register(r"deductions", EmployeeDeductionViewSet) 
 router.register(r"allowances", EmployeeAllowanceViewSet)
+router.register(r"users", UserViewSet, basename="users")
 
 
 urlpatterns = [

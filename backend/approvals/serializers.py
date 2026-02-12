@@ -59,3 +59,14 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
             "requested_at",
         ]
 
+class CommissionTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Commission_Type
+        fields = [
+            "id",
+            "name",
+            "code",
+            "is_taxable",
+            "is_active",
+            "created_at",
+        ]

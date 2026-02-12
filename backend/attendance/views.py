@@ -1,4 +1,5 @@
 from rest_framework.views import APIView
+from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.utils import timezone
@@ -143,3 +144,14 @@ class CEOandHRAttendanceLogsView(APIView):
             "count": qs.count(),
             "results": CEOandHRAttendanceLogSerializer(qs, many=True).data
         })  
+
+class ShiftListCreateView(generics.ListCreateAPIView):
+    queryset = Shift.objects.all().order_by("start_time")
+    serializer_class = ShiftSerializer
+    permission_classes = [IsAuthenticated]
+
+
+class ShiftRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Shift.objects.all()
+    serializer_class = ShiftSerializer
+    permission_classes = [IsAuthenticated]

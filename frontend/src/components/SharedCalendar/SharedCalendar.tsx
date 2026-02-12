@@ -17,10 +17,16 @@ export interface EventItem {
 
 interface Props {
   events: EventItem[];
+  value?: Dayjs;
+  onSelect?: (date: Dayjs) => void;
 }
 
-export default function SharedCalendar({ events }: Props) {
-  const cellRender = (value: Dayjs) => {
+export default function SharedCalendar({
+  events,
+  value,
+  onSelect,
+}: Props)  
+  { const cellRender = (value: Dayjs) => {
     const dateStr = value.format("YYYY-MM-DD");
 
     const dayEvents = events.filter((e) => {
@@ -83,13 +89,15 @@ export default function SharedCalendar({ events }: Props) {
 
   return (
     <Calendar
-      fullscreen={false}
-      cellRender={(current, info) => {
-        if (info.type === "date") {
-          return cellRender(current);
-        }
-        return info.originNode;
-      }}
-    />
+    value={value}
+    onSelect={onSelect}
+    fullscreen={false}
+    cellRender={(current, info) => {
+      if (info.type === "date") {
+        return cellRender(current);
+      }
+      return info.originNode;
+    }}
+/>
   );
 }

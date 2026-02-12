@@ -41,3 +41,7 @@
   left: 10px;
   font-weight: 600;
 }
+/* Hide default AntD date number */
+:global(.ant-picker-calendar-date-value) {
+  display: none !important;
+}

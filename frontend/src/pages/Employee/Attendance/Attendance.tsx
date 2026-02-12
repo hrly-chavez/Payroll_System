@@ -1,7 +1,7 @@
 // src/pages/Employee/Attendance/Attendance.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo} from "react";
 import {
   Layout,
   Card,
@@ -30,6 +30,15 @@ import LeaveRequest from "./LeaveRequest";
 import AttendaceLogs from "./AttendanceLogs";
 import api from "../../../api/axios";
 import styles from "./Attendance.module.css";
+import SharedCalendar, {
+  EventItem,
+} from "../../../components/SharedCalendar/SharedCalendar";
+import {
+  HOLIDAY_LEGEND,
+  PAYROLL_COLOR,
+} from "../../../components/SharedCalendar/CalendarLegend";
+
+
 
 const { Content } = Layout;
 
@@ -43,6 +52,43 @@ const attendanceData: Record<string, { in: string; out: string }> = {
 };
 
 const Attendance: React.FC = () => {
+
+  type PayrollPeriod = {
+  id: number;
+  start_date: string;
+  end_date: string;
+  };
+
+  type Holiday = {
+    id: number;
+    date: string;
+    name: string;
+    type: "Regular" | "Special Non-Working" | "Special Working" | "Company Holiday";
+    base: "PH" | "US" | "COMPANY";
+  };
+
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [payrollPeriods, setPayrollPeriods] = useState<PayrollPeriod[]>([]);
+
+  const loadHolidays = async () => {
+    try {
+      const res = await api.get("/approvals/holidays/");
+      setHolidays(res.data);
+    } catch {
+      console.error("Failed to load holidays");
+    }
+  };
+
+  const loadPayrollPeriods = async () => {
+    try {
+      const res = await api.get("/payroll/periods/");
+      setPayrollPeriods(res.data);
+    } catch {
+      console.error("Failed to load payroll periods");
+    }
+  };
+
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLeaveOpen, setIsLeaveOpen] = useState(false);
   const [calendarValue, setCalendarValue] = useState<Dayjs>(dayjs());
@@ -68,6 +114,37 @@ const Attendance: React.FC = () => {
   useEffect(() => {
     fetchLeaveRequests();
   }, []);
+
+  useEffect(() => {
+  fetchLeaveRequests();
+  loadHolidays();
+  loadPayrollPeriods();
+}, []);
+
+
+    /* =========================
+     Shared Calendar
+  ========================== */
+
+  const events = useMemo<EventItem[]>(() => {
+    return [
+      ...holidays.map<EventItem>((h) => ({
+        type: "holiday",
+        start_date: h.date,
+        title: `${h.base} Holiday – ${h.name}`,
+        color: HOLIDAY_LEGEND[h.base][h.type].bgColor,
+      })),
+      ...payrollPeriods.map<EventItem>((p) => ({
+        type: "payroll",
+        start_date: p.start_date,
+        end_date: p.end_date,
+        title: "Payroll Period",
+        color: PAYROLL_COLOR.bgColor,
+      })),
+    ];
+  }, [holidays, payrollPeriods]);
+
+
 
   /* =========================
      Calendar controls
@@ -187,7 +264,7 @@ const Attendance: React.FC = () => {
 
               <div className={styles.actions}>
                 <Button
-                  type="primary"
+                  className={styles.requestBtn}
                   icon={<CalendarOutlined />}
                   onClick={() => setIsModalOpen(true)}
                 >
@@ -195,7 +272,7 @@ const Attendance: React.FC = () => {
                 </Button>
 
                 <Button
-                  type="primary"
+                  className={styles.requestBtn}
                   icon={<CalendarOutlined />}
                   onClick={() => setIsLeaveOpen(true)}
                 >
@@ -205,29 +282,26 @@ const Attendance: React.FC = () => {
             </Row>
 
             {/* ===== Calendar ===== */}
-            <div style={{ marginTop: 12 }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 12,
-                }}
-              >
-                <div style={{ display: "flex", gap: 12 }}>
-                  <Button size="small" icon={<LeftOutlined />} onClick={goPrevMonth} />
-                  <strong>{calendarValue.format("MMMM YYYY")}</strong>
-                  <Button size="small" icon={<RightOutlined />} onClick={goNextMonth} />
+            <div className={styles.calendarSection}>
+              <div className={styles.calendarHeader}>
+                <div className={styles.calendarNav}>
+                  <Button
+                    size="small"
+                    icon={<LeftOutlined />}
+                    onClick={goPrevMonth}
+                  />
+                  <span className={styles.calendarTitle}>
+                    {calendarValue.format("MMMM YYYY")}
+                  </span>
+                  <Button
+                    size="small"
+                    icon={<RightOutlined />}
+                    onClick={goNextMonth}
+                  />
                 </div>
               </div>
 
-              <Calendar
-                value={calendarValue}
-                onSelect={setCalendarValue}
-                headerRender={() => null}
-                fullscreen={false}
-                dateCellRender={dateCellRender}
-              />
+              <SharedCalendar events={events} />
             </div>
           </Card>
 

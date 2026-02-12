@@ -372,3 +372,19 @@ class EmployeeAllowanceSerializer(serializers.ModelSerializer):
             "effective_to",
             "status",
         ]
+
+#audit logs
+class AuditLogSerializer(serializers.ModelSerializer):
+    timestamp = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S")  # 24-hour format
+    class Meta:
+        model = AuditLog
+        fields = [
+            "id",
+            "user_id",
+            "action",
+            "model_name",
+            "object_id",
+            "old_data",
+            "new_data",
+            "timestamp",
+        ]

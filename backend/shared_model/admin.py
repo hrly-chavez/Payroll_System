@@ -128,3 +128,5 @@ class LeaveRequestAdmin(admin.ModelAdmin):
     search_fields = ("employee__user__username", "reason")
     ordering = ("-requested_at",)
     readonly_fields = ("requested_at", "approved_at")
+
+admin.site.register(AuditLog)

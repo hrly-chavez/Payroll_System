@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status, generics
 from shared_model.models import *
 from .serializers import *
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from accounts.permissions import IsRole;
@@ -435,3 +435,55 @@ class AllowanceTypeListAPIView(APIView):
         allowance_types = Allowance_Type.objects.filter(is_active=True)
         serializer = AllowanceTypeSerializer(allowance_types, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+#--------------------- audit logs
+@api_view(["GET"])
+def employee_audit_logs(request, employee_id):
+    """
+    Return all audit logs related to a specific employee and related tables.
+    Only CREATE logs for related tables, full logs for Employee.
+    """
+    try:
+        employee = Employee.objects.get(pk=employee_id)
+    except Employee.DoesNotExist:
+        return Response({"detail": "Employee not found"}, status=404)
+
+    # Related tables
+    related_models = ["Employee_Salary", "Employee_Deduction", "Employee_Allowance", "User"]
+
+    # 1️⃣ Employee logs (all actions)
+    employee_logs = AuditLog.objects.filter(
+        model_name="Employee",
+        object_id=str(employee.id)
+    )
+
+    # 2️⃣ CREATE logs for related models linked to this employee
+    related_logs = AuditLog.objects.filter(
+        model_name__in=related_models,
+        action="CREATE"
+    )
+
+    # Filter the related logs to only include those linked to this employee
+    filtered_related_logs = []
+    for log in related_logs:
+        try:
+            if log.model_name == "User":
+                # User model has employee field
+                user_instance = User.objects.get(pk=log.object_id)
+                if user_instance.employee and user_instance.employee.id == employee.id:
+                    filtered_related_logs.append(log)
+            else:
+                # Other models have employee field
+                model_class = globals()[log.model_name]  # Get model class dynamically
+                instance = model_class.objects.get(pk=log.object_id)
+                if instance.employee.id == employee.id:
+                    filtered_related_logs.append(log)
+        except Exception:
+            continue
+
+    # Combine logs
+    all_logs = employee_logs | AuditLog.objects.filter(pk__in=[log.pk for log in filtered_related_logs])
+    all_logs = all_logs.order_by("-timestamp")
+
+    serializer = AuditLogSerializer(all_logs, many=True)
+    return Response(serializer.data)

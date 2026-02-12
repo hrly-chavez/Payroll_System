@@ -2,8 +2,21 @@
   margin: 16px;
 }
 
+.ant-card-body {
+  overflow: auto;
+}
+
 .mainSection {
-  margin-top: 16px;
+  margin-top: 20px;
+  align-items: stretch; 
+}
+
+.mainSection .ant-col {
+  display: flex;
+}
+
+.mainSection .ant-card {
+  flex: 1;
 }
 
 /* Equal height smaller cards */
@@ -197,5 +210,110 @@
 }
 
 .requestRow {
-  margin-top: 8px; /* 🔽 tighter spacing */
+  margin-top: 8px; 
+}
+.companyNoteCard {
+  background: #e3f2fd;
+  border-radius: 12px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+}
+
+.noteContent {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #1fff1f1f;
+}
+
+.noteAuthor {
+  margin-top: 12px;
+  font-weight: 500;
+  font-style: italic;
+  color: #1565c0;
+}
+
+.mainSection {
+  margin-top: 20px;
+}
+
+.compactCard {
+  border-radius: 12px;
+  height: 360px;   
+  display: flex;
+  flex-direction: column;
+}
+
+.dateCard {
+  height: 360px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.attendanceCard {
+  height: 360px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.companyNoteCard {
+  height: 360px;
+}
+.pieWrapper {
+  display: flex;
+  justify-content: center;   /* horizontal center */
+  align-items: center;       /* vertical center */
+  height: 100%;              /* take full card body height */
+}
+.cardSmall {
+  height: 280px;
+}
+
+.cardMedium {
+  height: 340px;
+}
+
+.cardLarge {
+  height: 420px;
+}
+
+/* ================= PENDING REQUEST CARD ================= */
+
+.pendingCard {
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+/* Make card header blue */
+.pendingCard :global(.ant-card-head) {
+  background: #3f6f9c;
+  border-bottom: none;
+}
+
+.pendingCard :global(.ant-card-head-title) {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* Remove extra spacing */
+.pendingCard :global(.ant-card-body) {
+  padding: 16px 20px;
+  border: 1px solid #3b73a8;
+}
+
+/* Tabs inside */
+.pendingTabs :global(.ant-tabs-nav) {
+  margin-bottom: 12px;
+}
+
+.pendingTabs :global(.ant-tabs-tab) {
+  font-size: 13px;
+  padding: 6px 10px !important;
+}
+
+.pendingTabs :global(.ant-tabs-tab-active .ant-tabs-tab-btn) {
+  font-weight: 600;
+  color: #3f6f9c;
+}
+
+.pendingTabs :global(.ant-tabs-ink-bar) {
+  background: #3f6f9c;
+  height: 2px;
 }

@@ -21,4 +21,7 @@ urlpatterns = [
     path("provinces/<int:province_id>/cities/", CityListByProvinceAPIView.as_view(), name="cities-by-province"),
     path("cities/<int:city_id>/barangays/", BarangayListByCityAPIView.as_view(), name="barangays-by-city"),
     path("allowance-types/", AllowanceTypeListAPIView.as_view(), name="allowance-types-list"),
+    #company note
+    path("company-notes/", CompanyNoteListCreateView.as_view(), name="company-notes"),
+
 ]

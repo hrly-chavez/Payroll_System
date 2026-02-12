@@ -372,3 +372,16 @@ class EmployeeAllowanceSerializer(serializers.ModelSerializer):
             "effective_to",
             "status",
         ]
+
+#------------ COMPANY NOTE SERIALIZER-----------
+class CompanyNoteSerializer(serializers.ModelSerializer):
+    created_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Company_Note
+        fields = ["id", "note", "created_at", "created_by"]
+
+    def get_created_by(self, obj):
+        if obj.user:
+            return obj.user.user_name
+        return "System"

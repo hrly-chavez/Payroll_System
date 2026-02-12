@@ -37,7 +37,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Department
-        fields = ["id", "name", "shift", "shift_id", "is_active", "created_at"]
+        fields = "__all__"
 
 #gamit pag load sa admin department nga mga employees
 class EmployeeSerializer(serializers.ModelSerializer):

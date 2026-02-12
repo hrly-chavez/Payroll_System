@@ -8,6 +8,7 @@ class Province(models.Model):
 
     def __str__(self):
         return self.name
+
 class City(models.Model):
     name = models.CharField(max_length=100)
     province = models.ForeignKey(Province, on_delete=models.PROTECT, related_name="cities")
@@ -20,6 +21,7 @@ class Barangay(models.Model):
 
     def __str__(self):
         return f"{self.name} {self.city}"
+
 class Address(models.Model):
     province = models.ForeignKey(Province, on_delete=models.PROTECT, related_name="addresses")
     city = models.ForeignKey(City, on_delete=models.PROTECT, related_name="addresses")
@@ -30,6 +32,7 @@ class Address(models.Model):
 
     def __str__(self):
         return f"{self.province} - {self.city} - {self.barangay} - {self.street}"
+
 class Department(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=50)
@@ -168,7 +171,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.user_name} ({self.role})"
-      
+        
 class Employee_Salary(models.Model):
     PAY_TYPES = [
         ("Monthly","Monthly"),
@@ -336,9 +339,6 @@ class Commission_Type(models.Model):
     def __str__(self):
         return self.name
 
-
-
-
 class Attendance(models.Model):
     STATUS_CHOICES = [
         ("PRESENT", "Present"),
@@ -347,7 +347,7 @@ class Attendance(models.Model):
         ("REST_DAY", "Rest Day"),
         ("HOLIDAY", "Holiday"),
     ]
-    #TODO:  TOTAL_WORK_HOURS → total hours worked that day, OVERTIME_HOURS → total overtime for that day
+   
     id = models.AutoField(primary_key=True)
     date = models.DateField()
     status = models.CharField(max_length=20,choices=STATUS_CHOICES,default="PRESENT")
@@ -366,6 +366,54 @@ class Attendance(models.Model):
                 name="unique_attendance_per_employee_per_day"
             )
         ]
+
+class Holiday(models.Model):
+    holiday_types = [
+        ("Regular","Regular"),
+        ("Special Non-Working","Special Non-Working"),
+        ("Special Working","Special Working"),
+        ("Company Holiday","Company Holiday"),
+    ]
+    HOLIDAY_BASE_CHOICES = [
+        ("PH", "Philippines"),
+        ("US", "United States"),
+        ("COMPANY", "Company"),
+    ]
+    
+    id = models.AutoField(primary_key=True)
+    date = models.DateField()
+    name = models.CharField(max_length=50)
+    type = models.CharField(max_length=50, choices=holiday_types)
+    base = models.CharField(max_length=20,choices=HOLIDAY_BASE_CHOICES)
+    remarks = models.TextField(null=True,blank=True)
+    status = models.CharField(max_length=20,choices=[("Pending","Pending"),("Approved","Approved"),("Declined","Declined")],default="Pending")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.date} - {self.name} type {self.type}"
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["date", "base"],
+                name="unique_holiday_per_base_per_date"
+            )
+        ]
+
+# class HolidayPolicy(models.Model):
+#     department = models.ForeignKey(Department, on_delete=models.CASCADE)
+#     holiday_type = models.CharField(max_length=50)  # same choices as Holiday.type
+#     requires_work = models.BooleanField(default=False)
+#     created_at = models.DateTimeField(auto_now_add=True)
+
+#     class Meta:
+#         constraints = [
+#             models.UniqueConstraint(
+#                 fields=["department", "holiday_type"],
+#                 name="unique_holiday_policy_per_dept_type"
+#             )
+#         ]
 
 class Attendance_Event(models.Model):
     TYPE_CHOICES = [
@@ -389,7 +437,8 @@ class Attendance_Event(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_attendance_events")
     attendance = models.ForeignKey(Attendance,on_delete=models.CASCADE,related_name="events")
-    
+    holiday = models.ForeignKey(Holiday, on_delete=models.SET_NULL, null=True, blank=True, related_name="attendance_events")
+
     def __str__(self):
         return self.type
 
@@ -454,40 +503,6 @@ class Leave_Day(models.Model):
             )
         ]
 
-class Holiday(models.Model):
-    holiday_types = [
-        ("Regular","Regular"),
-        ("Special Non-Working","Special Non-Working"),
-        ("Special Working","Special Working"),
-        ("Company Holiday","Company Holiday"),
-    ]
-    HOLIDAY_BASE_CHOICES = [
-        ("PH", "Philippines"),
-        ("US", "United States"),
-        ("COMPANY", "Company"),
-    ]
-    
-    id = models.AutoField(primary_key=True)
-    date = models.DateField()
-    name = models.CharField(max_length=50)
-    type = models.CharField(max_length=50, choices=holiday_types)
-    base = models.CharField(max_length=20,choices=HOLIDAY_BASE_CHOICES)
-    remarks = models.TextField(null=True,blank=True)
-    status = models.CharField(max_length=20,choices=[("Pending","Pending"),("Approved","Approved"),("Declined","Declined")],default="Pending")
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.date} - {self.name} type {self.type}"
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["date", "base"],
-                name="unique_holiday_per_base_per_date"
-            )
-        ]
-
 class Company_Note(models.Model):
     id = models.AutoField(primary_key=True)
     note = models.TextField()
@@ -496,6 +511,7 @@ class Company_Note(models.Model):
 
     def __str__(self):
         return self.note
+
 class Payroll_Period(models.Model):
     period_status_choices = [
         ("Open","Open"),
@@ -522,6 +538,7 @@ class Pay_Rule(models.Model):
         ("Special Holiday","Special Holiday"),
         ("Special Non Working Holiday","Special Non Working Holiday"),
         ("Company Holiday","Company Holiday"),
+        ("Absent","Absent"),
     ]
     categories = [
         ("Earning","Earning"),
@@ -538,16 +555,31 @@ class Pay_Rule(models.Model):
     event_type = models.CharField(max_length=40,choices=event_type_choices)
     category = models.CharField(max_length=20,choices=categories)
     rate_type = models.CharField(max_length=20, choices=RATE_TYPE_CHOICES)
-    rate_value = models.DecimalField(max_digits=10, decimal_places=2)
+    rate_value = models.DecimalField(max_digits=10, decimal_places=4)
     effective_from = models.DateField()
     effective_to = models.DateField(null=True,blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateField(auto_now=True)
+    
     applies_to = models.ForeignKey(Department,on_delete=models.CASCADE,null=True,blank=True,related_name="pay_rules")
     employee = models.ForeignKey("Employee",on_delete=models.SET_NULL,null=True,blank=True,related_name="pay_rules")
-
+    
     def __str__(self):
         return f"{self.name} - {self.event_type}"
+
+class Payroll_Setting(models.Model):
+    id = models.AutoField(primary_key=True)
+
+    # 22 is common for 5-day week companies, 26 for 6-day week
+    daily_rate_divisor = models.PositiveSmallIntegerField(default=22)
+
+    # since you're semi-monthly:
+    is_semi_monthly = models.BooleanField(default=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Payroll Setting (divisor={self.daily_rate_divisor})"
 
 class Payroll(models.Model):
     status_choices = [
@@ -558,7 +590,6 @@ class Payroll(models.Model):
         ("Paid","Paid"),
         ("Void","Void"),
     ]
-    #TODO: PAYROLL_GROSS_PAY, PAYROLL_TOTAL_DEDUCTIONS
     
     id = models.AutoField(primary_key=True)
     status = models.CharField(max_length=20 ,choices=status_choices, default="Draft")
@@ -582,8 +613,62 @@ class Payroll(models.Model):
                 name="unique_payroll_per_period_per_employee"
             )
         ]
-    
 
+class Payslip(models.Model):
+    LINE_TYPES = [
+        ("EARNING", "Earning"),
+        ("DEDUCTION", "Deduction"),
+    ]
+
+    SOURCE_TYPES = [
+        ("ATTENDANCE_EVENT", "Attendance Event"),
+        ("ATTENDANCE", "Attendance"),
+        ("MANUAL", "Manual"),
+        ("ADJUSTMENT", "Adjustment"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+
+    # Which payroll this line belongs to
+    payroll = models.ForeignKey(Payroll,on_delete=models.CASCADE,related_name="payslip_lines")
+
+    # Which rule produced it (optional but recommended for auditability)
+    rule = models.ForeignKey(Pay_Rule,on_delete=models.SET_NULL,null=True,blank=True,related_name="payslip_lines")
+
+    line_type = models.CharField(max_length=20, choices=LINE_TYPES)
+    description = models.TextField()
+
+    # Where it came from
+    source_type = models.CharField(max_length=30,choices=SOURCE_TYPES,null=True,blank=True)
+
+    # ID of the source record (attendance_event.id / attendance.id / manual table later)
+    source_id = models.PositiveIntegerField(null=True, blank=True)
+
+    # For minute-based computations (late/OT/UT)
+    quantity_min = models.PositiveIntegerField(null=True, blank=True)
+
+    # Snapshot of the rate used at generation time (audit)
+    rate_applied = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)
+
+    # Final computed amount for this line (store as positive; line_type tells direction)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+        indexes = [
+            models.Index(fields=["payroll"]),
+            models.Index(fields=["source_type", "source_id"]),
+            models.Index(fields=["rule"]),
+            models.Index(fields=["line_type"]),
+        ]
+        # MySQL note: conditional unique constraints are not supported/enforced,
+        # so we enforce duplicate prevention in application logic (get_or_create / exists checks).
+        constraints = []
+
+    def __str__(self):
+        return f"{self.payroll_id} - {self.get_line_type_display()} - {self.description} ({self.amount})"
 
 class PayrollPeriodEmployee(models.Model):
     STATUS_CHOICES = [
@@ -623,7 +708,7 @@ class PayrollPeriodEmployeeCommission(models.Model):
 
     period = models.ForeignKey(Payroll_Period,on_delete=models.CASCADE,related_name="commissions")
     employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="period_commissions")
-    commission_type = models.ForeignKey(Commission_Type,on_delete=models.PROTECT,related_name="period_employee_commissions")
+    commission_type = models.ForeignKey(Commission_Type,on_delete=models.PROTECT,related_name="period_employee_commissions", null=True,blank=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     remarks = models.TextField(null=True, blank=True)
     created_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="created_period_commissions")
@@ -642,4 +727,4 @@ class PayrollPeriodEmployeeCommission(models.Model):
     def __str__(self):
         return f"{self.employee} - {self.commission_type.code} ({self.amount}) [{self.period.code}]"
 
-#TODO: PAYROLL_RUN_LOG ,AND THE PAYSLIP TABLE
+#TODO: PAYROLL_RUN_LOG 

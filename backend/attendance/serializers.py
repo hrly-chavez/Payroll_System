@@ -7,6 +7,22 @@ class AttendanceSerializer(serializers.ModelSerializer):
         model = Attendance
         fields = "__all__"
 
+class PunchInSerializer(serializers.Serializer):
+    """
+    No input fields needed.
+     use request.user.employee and server time.
+    """
+    def validate(self, attrs):
+        return attrs
+
+class PunchOutSerializer(serializers.Serializer):
+    """
+    No input fields needed.
+     use request.user.employee and server time.
+    """
+    def validate(self, attrs):
+        return attrs
+
 #Each employee Logs
 class AttendanceLogSerializer(serializers.ModelSerializer):
     shift_name = serializers.SerializerMethodField()
@@ -72,19 +88,3 @@ class CEOandHRAttendanceLogSerializer(serializers.ModelSerializer):
     def get_event_types(self, obj):
         types = list(obj.events.values_list("type", flat=True))
         return ", ".join(types) if types else ""
-
-class PunchInSerializer(serializers.Serializer):
-    """
-    No input fields needed.
-     use request.user.employee and server time.
-    """
-    def validate(self, attrs):
-        return attrs
-
-class PunchOutSerializer(serializers.Serializer):
-    """
-    No input fields needed.
-     use request.user.employee and server time.
-    """
-    def validate(self, attrs):
-        return attrs

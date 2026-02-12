@@ -126,7 +126,33 @@ export default function PayRulesTab({ active }: Props) {
       message.error("Failed to save payroll rule.");
     }
   };
+   const formatRateValue = (rule: any) => {
+    const raw = rule?.rate_value ?? 0;
 
+    // keep as number display but don't break if string comes from API
+    const num = Number(raw);
+
+    if (rule.rate_type === "MULTIPLIER") {
+      // show x with 4 decimals (matches backend)
+      return `x${Number.isFinite(num) ? num.toFixed(4) : raw}`;
+    }
+
+    // peso-based types
+    const peso = `₱${Number.isFinite(num) ? num.toFixed(2) : raw}`;
+
+    if (rule.rate_type === "PER_MINUTE") return `${peso}/min`;
+    if (rule.rate_type === "PER_DAY") return `${peso}/day`;
+    // FIXED default
+    return peso;
+  };
+  const formatRateType = (value: string) => {
+    if (!value) return "";
+    if (value === "PER_MINUTE") return "Per Minute";
+    if (value === "PER_DAY") return "Per Day";
+    if (value === "FIXED") return "Fixed";
+    if (value === "MULTIPLIER") return "Multiplier";
+    return value;
+  };
 
   return (
     <div className="table-wrapper">
@@ -142,7 +168,7 @@ export default function PayRulesTab({ active }: Props) {
         <table className="config-table">
           <thead>
             <tr>
-              <th>Rule Name</th>
+              {/* <th>Rule Name</th> */}
               <th>Event Type</th>
               <th>Category</th>
               <th>Rate Type</th>
@@ -156,11 +182,11 @@ export default function PayRulesTab({ active }: Props) {
           <tbody>
             {payRules.map((rule) => (
               <tr key={rule.id}>
-                <td>{rule.name}</td>
+                {/* <td>{rule.name}</td> */}
                 <td>{rule.event_type}</td>
                 <td>{rule.category}</td>
-                <td>{rule.rate_type}</td>
-                <td>₱{rule.rate_value}</td>
+                <td>{formatRateType(rule.rate_type)}</td>
+                <td>{formatRateValue(rule)}</td>
                 <td>{rule.applies_to_name || "All"}</td>
                 <td>{rule.effective_from}</td>
                 <td>

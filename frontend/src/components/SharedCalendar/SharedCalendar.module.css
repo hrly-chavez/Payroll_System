@@ -1,29 +1,64 @@
-.cell {
+/* ===== Tooltip Styling ===== */
+
+.tooltipContainer {
+  min-width: 160px;
+}
+
+.tooltipItem {
   display: flex;
-  justify-content: center;
   align-items: center;
-  margin-top: 4px;
-  gap: 4px;
-}
-
-.dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-/* Header (month + year dropdowns) */
-.calendarHeader {
-  display: flex;
-  justify-content: flex-end;
   gap: 8px;
-  padding-bottom: 6px;
+  margin-bottom: 6px;
 }
 
-.calendarHeader select {
-  padding: 4px 8px;
+.tooltipItem:last-child {
+  margin-bottom: 0;
+}
+
+.tooltipColor {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.tooltipText {
+  font-size: 13px;
+}
+
+/* ===== Full Cell Wrapper ===== */
+
+.fullCellWrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
   border-radius: 6px;
-  border: 1px solid #d9d9d9;
-  font-size: 12px;
+  overflow: hidden;
+}
+
+/* Holiday Full Background */
+
+.holidayBackground {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+}
+
+/* Payroll Smooth Bar */
+
+.payrollBar {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  right: 4px;
+  height: 6px;
+  border-radius: 4px;
+  opacity: 0.9;
+}
+
+/* Date Number */
+
+.dateNumber {
+  position: relative;
+  z-index: 2;
+  text-align: center;
 }

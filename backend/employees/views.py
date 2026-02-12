@@ -12,6 +12,7 @@ from django.db import transaction
 from django.utils.timezone import now
 from django.core.mail import send_mail
 from django.contrib.auth.hashers import make_password
+from shared_model.signals import create_audit_log
 
 import logging
 import secrets
@@ -113,9 +114,20 @@ class UserViewSet(viewsets.ModelViewSet):
             for _ in range(12)
         )
 
-        # Hash the password before saving
-        user.password = make_password(new_password)
+        # Hash password properly
+        user.set_password(new_password)
+
+        # Attach current user for AuditLog
+        user._current_user = request.user
         user.save()
+
+        create_audit_log(
+            instance=user,
+            action="RESET_PASSWORD",
+            old_data="",
+            new_data="Password was reset by admin"
+        )
+
         logger.info(f"Password for user '{user.user_name}' has been reset by admin '{request.user.user_name}'.")
 
         # Attempt to send email
@@ -238,6 +250,12 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
         if employee_id:
             queryset = queryset.filter(employee_id=employee_id)
         return queryset
+    
+    def get_serializer(self, *args, **kwargs):
+        if "context" not in kwargs:
+            kwargs["context"] = {}
+        kwargs["context"]["_current_user"] = self.request.user
+        return super().get_serializer(*args, **kwargs)
 
     @action(detail=False, methods=["get"], url_path="latest")
     def latest_salary(self, request):
@@ -280,22 +298,24 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
         """
         Create a NEW salary row for the employee (for audit) and recompute percent deductions
         """
-        serializer = self.get_serializer(data=request.data)
+        serializer = self.get_serializer(data=request.data, context={"_current_user": request.user})
         serializer.is_valid(raise_exception=True)
 
-        # Create new salary row
+
+        # Create new salary row with current user
         new_salary = serializer.save()
 
         # Recompute percent-based deductions linked to this employee and effective_from
         self._recompute_percentage_deductions(
             employee_id=new_salary.employee_id,
             salary_amount=new_salary.base_rate,
-            effective_from=new_salary.effective_from
+            effective_from=new_salary.effective_from,
+            user=request.user
         )
 
         return Response(self.get_serializer(new_salary).data, status=status.HTTP_201_CREATED)
 
-    def _recompute_percentage_deductions(self, employee_id: int, salary_amount: Decimal, effective_from):
+    def _recompute_percentage_deductions(self, employee_id: int, salary_amount: Decimal, effective_from, user):
         deductions = Employee_Deduction.objects.filter(
             employee_id=employee_id,
             deduction_type__calculation_type="Percent"
@@ -303,8 +323,13 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
 
         for ded in deductions:
             percent_value = ded.deduction_type.amount
-            ded.amount = round(salary_amount * (percent_value / 100), 2)
-            ded.save(update_fields=["amount"])
+            new_amount = round(salary_amount * (percent_value / 100), 2)
+
+            # Only update if changed (avoids unnecessary audit logs)
+            if ded.amount != new_amount:
+                ded.amount = new_amount
+                ded._current_user = user  # attach user BEFORE save
+                ded.save(update_fields=["amount"])
 
 
             
@@ -325,6 +350,23 @@ class EmployeeDeductionViewSet(viewsets.ModelViewSet):
         if self.action in ["list", "retrieve"]:
             return EmployeeDeductionListSerializer
         return EmployeeDeductionCreateSerializer
+    
+    # -----------------
+    # CREATE / UPDATE with _current_user
+    # -----------------
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        obj = serializer.save(_current_user=request.user)  # <-- pass it here
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        obj = serializer.save(_current_user=request.user)  # <-- pass it here
+        return Response(serializer.data)
+
 
 
     # ----------------- NEW ENDPOINT -----------------
@@ -370,6 +412,9 @@ class EmployeeAllowanceViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(employee_id=employee_id)
         return queryset
     
+    def perform_create(self, serializer):
+        serializer.save(_current_user=self.request.user)
+    
     @action(detail=True, methods=["post"])
     def edit_allowance(self, request, pk=None):
         """
@@ -387,7 +432,8 @@ class EmployeeAllowanceViewSet(viewsets.ModelViewSet):
 
         serializer = EmployeeAllowanceCreateSerializer(data=data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        serializer.save(_current_user=request.user)
+
 
         return Response(
             {"message": "Allowance updated successfully"},
@@ -427,11 +473,11 @@ def employee_audit_logs(request, employee_id):
         object_id=str(employee.id)
     )
 
-    # Related logs (only CREATE)
+    # Related logs (ALL actions)
     related_logs = AuditLog.objects.filter(
-        model_name__in=related_models,
-        action="CREATE"
+        model_name__in=related_models
     )
+
 
     # Filter related logs for this employee
     filtered_related_logs = []

@@ -65,8 +65,16 @@ def log_save(sender, instance, created, **kwargs):
     else:
         # UPDATE: log only changed fields
         changed_fields = {}
+        # Fields we never want to log
+        EXCLUDED_FIELDS = ["password", "last_login"]
         for field, new_value in new_data.items():
+
+            # Skip sensitive fields
+            if field in EXCLUDED_FIELDS:
+                continue
+
             old_value = old_data.get(field)
+            
             if old_value != new_value:
                 changed_fields[field] = {"old": old_value, "new": new_value}
 

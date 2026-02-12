@@ -9,28 +9,28 @@ class UserAdmin(admin.ModelAdmin):
 
 @admin.register(Department)
 class DepartmentAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'shift_id')
-    list_filter = ('shift_id',)
-    search_fields = ('name',)
+    list_display = ("id", "name", "is_active", "created_at", "shift_id")
 
 @admin.register(Shift)
 class ShiftAdmin(admin.ModelAdmin):
-    list_display = (
-        "name",
-        "start_time",
-        "end_time",
-        "break_minutes",
-        "grace_minutes",
-        "is_overnight",
-        "is_active",
-    )
+    list_display = ("id","name","start_time","end_time","break_minutes","grace_minutes","is_overnight","is_active",)
     list_filter = ("is_active", "is_overnight")
-    search_fields = ("name",)
-    ordering = ("start_time",)
-    list_editable = ("is_active",)
-admin.site.register(Shift_Workday)
+    search_fields = ("id", "name")
+    ordering = ("id",)
+
+@admin.register(Shift_Workday)
+class ShiftWorkdayAdmin(admin.ModelAdmin):
+    list_display = ("id","shift","day_of_week","is_workday","created_at",)
+    list_filter = ("shift", "is_workday", "day_of_week")
+    search_fields = ("id", "shift__name")
+    ordering = ("shift", "day_of_week")
+
 admin.site.register(Employee)
 admin.site.register(Address)
+
+@admin.register(Payroll_Setting)
+class PayrollSettingAdmin(admin.ModelAdmin):
+    list_display = ("id", "daily_rate_divisor", "is_semi_monthly", "updated_at")
 
 @admin.register(Province)
 class Province(admin.ModelAdmin):
@@ -70,16 +70,29 @@ class Employee_SalaryAdmin(admin.ModelAdmin):
 
 
 @admin.register(Employee_Deduction)
-class Employee_Deduction(admin.ModelAdmin):
-    list_display = ('id', )
+class EmployeeDeductionAdmin(admin.ModelAdmin):
+    list_display = ("id","deduction_type","amount","frequency","status","effective_from","effective_to","balance","created_at",)
+
+    list_filter = ("status","frequency","deduction_type","effective_from",)
+
+    search_fields = ("id","employee__first_name","employee__last_name","deduction_type__name",)
+
+    ordering = ("-created_at",)
+
+    readonly_fields = ("created_at",)
 
 @admin.register(Deduction_Type)
 class DeductionTypeAdmin(admin.ModelAdmin):
-    list_display = ('code', 'calculation_type', 'amount', 'is_active', 'create_at')
-    list_filter = ('calculation_type', 'is_active')
-    search_fields = ('code',)
-    ordering = ('-create_at',)
-    date_hierarchy = 'create_at'
+    list_display = ("id","code","calculation_type","amount","is_active","create_at",)
+
+    list_filter = ("calculation_type","is_active",)
+
+    search_fields = ("id","code",)
+
+    ordering = ("-create_at",)
+
+    date_hierarchy = "create_at"
+
 
 @admin.register(Allowance_Type)
 class Allowance_Type(admin.ModelAdmin):
@@ -128,3 +141,11 @@ class LeaveRequestAdmin(admin.ModelAdmin):
     search_fields = ("employee__user__username", "reason")
     ordering = ("-requested_at",)
     readonly_fields = ("requested_at", "approved_at")
+
+admin.site.register(AuditLog)
+
+# @admin.register(HolidayPolicy)
+# class HolidayPolicyAdmin(admin.ModelAdmin):
+#     list_display = ("department", "holiday_type", "requires_work")
+#     list_filter = ("department", "holiday_type", "requires_work")
+#     search_fields = ("department__name", "holiday_type")

@@ -5,7 +5,7 @@ import React, { useEffect, useState } from "react";
 import { Modal, Descriptions, Tag, Table, Button, Alert, Spin, message } from "antd";
 import api from "../../../../api/axios";
 import AddCommission from "./AddCommission";
-
+import { formatBackendTime } from "../../../helpers";
 type EligibleEmployee = {
   id: number;
   full_name: string;
@@ -95,6 +95,26 @@ type Commission = {
   created_at: string;
 };
 
+type AttendanceEvent = {
+  id: number;
+  type: string;
+  minutes: number;
+  start_time?: string | null;
+  end_time?: string | null;
+  approval_status: "Pending" | "Approved" | "Declined";
+  event_remarks?: string | null;
+  created_at: string;
+};
+
+type AttendanceRow = {
+  id: number;
+  date: string;
+  status: "PRESENT" | "ABSENT" | "HALF_DAY" | "REST_DAY" | "HOLIDAY";
+  time_in?: string | null;
+  time_out?: string | null;
+  events: AttendanceEvent[];
+};
+
 type Snapshot = {
   period_id: number;
   employee_id: number;
@@ -106,8 +126,10 @@ type Snapshot = {
   taxes: Deduction[];
   loans: Deduction[];
   allowances: Allowance[];
+  attendances: AttendanceRow[]; 
   warnings?: string[];
 };
+
 
 
 type Props = {
@@ -233,7 +255,6 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
       render: (v: string) => v || "-",
     },
   ];
-
   const taxColumns = [
     {
       title: "Tax Type",
@@ -251,7 +272,6 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
       render: (v: string) => v || "-",
     },
   ];
-
   const loanColumns = [
     {
       title: "Loan",
@@ -291,6 +311,67 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
       render: (v: string) => v || "-",
     },
   ];
+  const attendanceColumns = [
+    {
+      title: "Date",
+      dataIndex: "date",
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Status",
+      dataIndex: "status",
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Time In",
+      dataIndex: "time_in",
+      render: (v: string | null) =>
+        v ? formatBackendTime(v) : "-",
+    },
+    {
+      title: "Time Out",
+      dataIndex: "time_out",
+      render: (v: string | null) =>
+        v ? formatBackendTime(v) : "-",
+    },
+    
+  ];
+
+  const attendanceEventColumns = [
+    {
+      title: "Type",
+      dataIndex: "type",
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Minutes",
+      dataIndex: "minutes",
+      render: (v: number) => (v ?? 0),
+    },
+    {
+     title: "Start",
+    dataIndex: "start_time",
+    render: (v: string | null) =>
+      v ? formatBackendTime(v) : "-",
+    },
+    {
+      title: "End",
+      dataIndex: "end_time",
+      render: (v: string | null) =>
+        v ? formatBackendTime(v) : "-",
+    },
+    {
+      title: "Approval",
+      dataIndex: "approval_status",
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Remarks",
+      dataIndex: "event_remarks",
+      render: (v: string) => v || "-",
+    },
+  ];
+
   return (
     <Modal
       open={open}
@@ -433,29 +514,55 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
               </div>
 
               <div style={{ marginBottom: 12 }}>
-                <div style={{ fontWeight: 600, marginBottom: 6 }}>Allowances</div>
-                <Table
-                  columns={allowanceColumns}
-                  dataSource={snapshot?.allowances || []}
-                  rowKey="id"
-                  pagination={false}
-                  size="small"
-                  locale={{ emptyText: "No allowances found" }}
-                />
-              </div>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Allowances</div>
+              <Table
+                columns={allowanceColumns}
+                dataSource={snapshot?.allowances || []}
+                rowKey="id"
+                pagination={false}
+                size="small"
+                locale={{ emptyText: "No allowances found" }}
+              />
+            </div>
 
-              <div>
-                <div style={{ fontWeight: 600, marginBottom: 6 }}>Commissions</div>
-                <Table
-                  columns={commissionColumns}
-                  dataSource={commissions}
-                  rowKey="id"
-                  pagination={false}
-                  size="small"
-                  loading={commissionLoading}
-                  locale={{ emptyText: "No commissions added" }}
-                />
-              </div>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Attendance (This Payroll Period)</div>
+              <Table
+                columns={attendanceColumns}
+                dataSource={snapshot?.attendances || []}
+                rowKey="id"
+                pagination={false}
+                size="small"
+                locale={{ emptyText: "No attendance found in this period" }}
+                expandable={{
+                  expandedRowRender: (row: AttendanceRow) => (
+                    <Table
+                      columns={attendanceEventColumns}
+                      dataSource={row.events || []}
+                      rowKey="id"
+                      pagination={false}
+                      size="small"
+                      locale={{ emptyText: "No events" }}
+                    />
+                  ),
+                  rowExpandable: (row: AttendanceRow) => (row.events?.length || 0) > 0,
+                }}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Commissions</div>
+              <Table
+                columns={commissionColumns}
+                dataSource={commissions}
+                rowKey="id"
+                pagination={false}
+                size="small"
+                loading={commissionLoading}
+                locale={{ emptyText: "No commissions added" }}
+              />
+            </div>
+
 
               <AddCommission
                 open={openCommissionModal}

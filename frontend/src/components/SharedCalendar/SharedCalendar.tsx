@@ -1,74 +1,103 @@
 import { Calendar, Tooltip } from "antd";
 import dayjs, { Dayjs } from "dayjs";
+import isBetween from "dayjs/plugin/isBetween";
 import localeData from "dayjs/plugin/localeData";
 import styles from "./SharedCalendar.module.css";
 
+dayjs.extend(isBetween);
 dayjs.extend(localeData);
 
-interface EventItem {
-  date: string; // YYYY-MM-DD
+export interface EventItem {
   type: "holiday" | "payroll";
-  title: string; // label from admin (e.g. "PH Holiday", "Payroll Cutoff")
+  start_date: string;
+  end_date?: string;
+  title: string;
   color: string;
 }
 
 interface Props {
   events: EventItem[];
+  value?: Dayjs;
+  onSelect?: (date: Dayjs) => void;
 }
 
-export default function SharedCalendar({ events }: Props) {
-
-  const dateCellRender = (value: Dayjs) => {
+export default function SharedCalendar({
+  events,
+  value,
+  onSelect,
+}: Props)  
+  { const cellRender = (value: Dayjs) => {
     const dateStr = value.format("YYYY-MM-DD");
-    const dayEvents = events.filter(e => e.date === dateStr);
 
-    if (!dayEvents.length) return null;
+    const dayEvents = events.filter((e) => {
+      if (e.type === "holiday") return e.start_date === dateStr;
+
+      if (e.type === "payroll" && e.end_date) {
+        const start = dayjs(e.start_date);
+        const end = dayjs(e.end_date);
+        return value.isBetween(start, end, "day", "[]");
+      }
+
+      return false;
+    });
+
+    if (!dayEvents.length) {
+      return (
+        <div className={styles.fullCellWrapper}>
+          <div className={styles.dateNumber}>{value.format("DD")}</div>
+        </div>
+      );
+    }
+
+    const holidayEvent = dayEvents.find((e) => e.type === "holiday");
+    const payrollEvent = dayEvents.find((e) => e.type === "payroll");
+
+    // 🔥 Holiday overrides payroll
+    const backgroundColor =
+      holidayEvent?.color || payrollEvent?.color;
+
+    const content = (
+      <div
+        className={styles.fullCellWrapper}
+        style={{ background: backgroundColor }}
+      >
+        <div
+          className={styles.dateNumber}
+          style={{
+            color: holidayEvent ? "#fff" : "#222",
+          }}
+        >
+          {value.format("DD")}
+        </div>
+      </div>
+    );
 
     return (
-      <div className={styles.cell}>
-        {dayEvents.map((e, i) => (
-          <Tooltip key={i} title={e.title}>
-            <span
-              className={styles.dot}
-              style={{ backgroundColor: e.color }}
-            />
-          </Tooltip>
-        ))}
-      </div>
+      <Tooltip
+        title={
+          <div>
+            {dayEvents.map((e, i) => (
+              <div key={i}>{e.title}</div>
+            ))}
+          </div>
+        }
+      >
+        {content}
+      </Tooltip>
     );
   };
 
   return (
     <Calendar
-      fullscreen={false}
-      mode="month"
-      dateCellRender={dateCellRender}
-      headerRender={({ value, onChange }) => {
-        const months = dayjs.monthsShort();
-        const years = Array.from({ length: 10 }, (_, i) => dayjs().year() - 5 + i);
-
-        return (
-          <div className={styles.calendarHeader}>
-            <select
-              value={value.year()}
-              onChange={(e) => onChange(value.year(Number(e.target.value)))}
-            >
-              {years.map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-
-            <select
-              value={value.month()}
-              onChange={(e) => onChange(value.month(Number(e.target.value)))}
-            >
-              {months.map((m, i) => (
-                <option key={i} value={i}>{m}</option>
-              ))}
-            </select>
-          </div>
-        );
-      }}
-    />
+    value={value}
+    onSelect={onSelect}
+    fullscreen={false}
+    cellRender={(current, info) => {
+      if (info.type === "date") {
+        return cellRender(current);
+      }
+      return info.originNode;
+    }}
+/>
   );
 }

@@ -2,9 +2,12 @@ from django.urls import path
 from .views import *
 
 urlpatterns = [
+    
     # Payroll Rules (Pay_Rule)
+    path("superadmin/pay-rules/choices/", PayRuleChoicesView.as_view(), name="superadmin-payrule-choices"),
     path("superadmin/pay-rules/", SuperAdminPayRuleListCreateView.as_view(), name="superadmin-payrule-list-create"),
     path("superadmin/pay-rules/<int:pk>/", SuperAdminPayRuleRetrieveUpdateView.as_view(), name="superadmin-payrule-detail"),
+    
 
     #Deductions
     path('superadmin/deductions/', DeductionListCreateView.as_view(), name='deductions-list-create'),

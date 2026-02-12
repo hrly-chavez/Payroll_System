@@ -37,7 +37,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Department
-        fields = ["id", "name", "shift", "shift_id", "is_active", "created_at"]
+        fields = "__all__"
 
 #User model (user account)
 class UserAccountSerializer(serializers.ModelSerializer):
@@ -372,3 +372,32 @@ class EmployeeAllowanceSerializer(serializers.ModelSerializer):
             "effective_to",
             "status",
         ]
+
+#audit logs
+class AuditLogSerializer(serializers.ModelSerializer):
+    timestamp = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S")  # 24-hour format
+    class Meta:
+        model = AuditLog
+        fields = [
+            "id",
+            "user_id",
+            "action",
+            "model_name",
+            "object_id",
+            "old_data",
+            "new_data",
+            "timestamp",
+        ]
+
+#------------ COMPANY NOTE SERIALIZER-----------
+class CompanyNoteSerializer(serializers.ModelSerializer):
+    created_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Company_Note
+        fields = ["id", "note", "created_at", "created_by"]
+
+    def get_created_by(self, obj):
+        if obj.user:
+            return obj.user.user_name
+        return "System"

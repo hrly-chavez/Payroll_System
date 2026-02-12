@@ -314,6 +314,33 @@ const EmployeeDetailsPage: React.FC = () => {
   ========================== */
   // Modal state
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+
+  /* =========================
+     AUDIT LOGS RETRIEVE STATE
+  ========================== */
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  const fetchAuditLogs = async () => {
+    if (!employeeId) return;
+
+    setLoadingLogs(true);
+    try {
+      const res = await api.get(`/employees/auditlogs/employee/${employeeId}/`);
+      setAuditLogs(res.data);
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to fetch audit logs");
+      setAuditLogs([]);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAuditLogs();
+  }, [employeeId]);
+
   
 
   const salaryColumns = [
@@ -623,6 +650,23 @@ const EmployeeDetailsPage: React.FC = () => {
                     <p>No user account linked to this employee.</p>
                   )}
                 </Tabs.TabPane>
+
+                <Tabs.TabPane tab="Audit Logs" key="6">
+                  <Table
+                    columns={[
+                      { title: "Action", dataIndex: "action", key: "action" },
+                      { title: "User ID", dataIndex: "user_id", key: "user_id" },
+                      { title: "Model", dataIndex: "model_name", key: "model_name" },
+                      { title: "Old Data", dataIndex: "old_data", key: "old_data", render: (val) => JSON.stringify(val) },
+                      { title: "New Data", dataIndex: "new_data", key: "new_data", render: (val) => JSON.stringify(val) },
+                      { title: "Timestamp", dataIndex: "timestamp", key: "timestamp" },
+                    ]}
+                    dataSource={auditLogs}
+                    loading={loadingLogs}
+                    rowKey="id"
+                  />
+                </Tabs.TabPane>
+
 
               </Tabs>
             </Card>

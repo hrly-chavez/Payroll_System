@@ -13,6 +13,12 @@ import SharedCalendar from "./../../../components/SharedCalendar/SharedCalendar"
 import { Pie } from "@ant-design/plots";
 import { Tabs } from "antd";
 import CompanyNote from "./../../../components/CompanyNote/companyNote";
+import {
+  HOLIDAY_LEGEND,
+  HolidayBase,
+  HolidayType,
+} from "../../../components/SharedCalendar/CalendarLegend";
+
 
 
 
@@ -50,11 +56,12 @@ type TodayAttendanceResponse = {
   };
 
   type CalendarEvent = {
-  date: string;
-  type: "holiday" | "payroll";
-  title: string;
-  color: string;
-};
+    type: "holiday" | "payroll";
+    start_date: string;
+    end_date?: string;
+    title: string;
+    color: string;
+  };
 
 const Dashboard: React.FC = () => {
   const [phTime, setPhTime] = useState<Date | null>(null);
@@ -208,49 +215,38 @@ const attendanceChartData =
     const holidays = holidayRes.data;
     const payrolls = payrollRes.data;
 
-    const events: CalendarEvent[] = [];
+    const events = [
+      ...holidays.map((h: any) => {
+          const base = h.base as HolidayBase;
+          const type = h.type as HolidayType;
+
+          const legend = HOLIDAY_LEGEND[base]?.[type];
+
+          return {
+            type: "holiday",
+            start_date: h.date,
+            title: `${h.base} Holiday – ${h.name}`,
+            color: legend?.bgColor || "#999999",
+          };
+        }),
 
 
-    // ===== HOLIDAYS =====
-    holidays.forEach((h: any) => {
-      events.push({
-        date: dayjs(h.date).format("YYYY-MM-DD"),
-        type: "holiday",
-        title: `${h.base} Holiday – ${h.name}`,
-        color:
-          h.base === "PH"
-            ? "#2e7d32"
-            : h.base === "US"
-            ? "#c62828"
-            : "#616161",
-      });
-    });
-
-    // ===== PAYROLL PERIODS =====
-    payrolls.forEach((p: any) => {
-      let cur = dayjs(p.start_date);
-      const end = dayjs(p.end_date);
-
-      while (cur.isSame(end) || cur.isBefore(end)) {
-        events.push({
-          date: cur.format("YYYY-MM-DD"),
-          type: "payroll",
-          title: `Payroll Period (${dayjs(p.start_date).format(
-            "MMM D"
-          )} – ${dayjs(p.end_date).format("MMM D")})`,
-          color: "#1890ff",
-        });
-
-        cur = cur.add(1, "day");
-      }
-    });
+      ...payrolls.map((p: any) => ({
+        type: "payroll",
+        start_date: p.start_date,
+        end_date: p.end_date,
+        title: `Payroll (${dayjs(p.start_date).format("MMM D")} - ${dayjs(
+          p.end_date
+        ).format("MMM D")})`,
+        color: p.color || "#1890ff",
+      })),
+    ];
 
     setCalendarEvents(events);
-  } catch (err) {
+  } catch {
     message.error("Failed to load calendar events");
   }
 };
-
 
     const fetchBaseTime = async (timezone: string, setter: (d: Date) => void) => {
       try {
@@ -372,12 +368,7 @@ const attendanceChartData =
 
           {/* RIGHT: COMPANY NOTE */}
           <Col xs={24} md={11}>
-            <CompanyNote
-              content={`Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-        Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-        Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.`}
-              author="Super Admin"
-            />
+            <CompanyNote />
           </Col>
 
         </Row>

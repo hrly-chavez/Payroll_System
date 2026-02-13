@@ -155,6 +155,38 @@ class UserViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         
+    @action(detail=True, methods=["post"], url_path="deactivate")
+    def deactivate_user(self, request, pk=None):
+        """
+        Toggle user active status (deactivate/reactivate).
+        """
+        user = self.get_object()
+
+        # Attach current user for audit log
+        user._current_user = request.user
+
+        if user.is_active:
+            user.is_active = False
+            action_name = "DEACTIVATED"
+        else:
+            user.is_active = True
+            action_name = "REACTIVATED"
+
+        user.save()
+
+        # Audit log
+        create_audit_log(
+            instance=user,
+            action=action_name,
+            old_data=f"is_active: {not user.is_active}",
+            new_data=f"is_active: {user.is_active}"
+        )
+
+        return Response(
+            {"detail": f"User successfully {action_name.lower()}.", "is_active": user.is_active},
+            status=status.HTTP_200_OK
+        )
+        
 #employee details crud
 class EmployeeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsRole]

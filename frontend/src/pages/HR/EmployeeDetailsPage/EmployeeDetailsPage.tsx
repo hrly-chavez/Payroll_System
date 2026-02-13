@@ -7,6 +7,7 @@ import {
   Table,
   message,
   Spin,
+  Modal,
 } from "antd";
 import { useParams } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
@@ -622,6 +623,33 @@ const EmployeeDetailsPage: React.FC = () => {
                 <Tabs.TabPane tab="Employee Account" key="5">
                   <div className={styles.salaryHeader}>
                     <h3>Employee Account</h3>
+                    {userAccount && (
+                      <Button
+                        type="primary"
+                        danger={userAccount.is_active} // red if active
+                        onClick={() => {
+                          Modal.confirm({
+                            title: `Are you sure you want to ${userAccount.is_active ? "deactivate" : "activate"} this user?`,
+                            okText: userAccount.is_active ? "Deactivate" : "Activate",
+                            cancelText: "Cancel",
+                            onOk: async () => {
+                              try {
+                                const res = await api.post(`/employees/users/${userAccount.user_id}/deactivate/`);
+                                message.success(res.data.detail);
+
+                                // Update local state so status updates instantly
+                                setUserAccount(prev => prev ? { ...prev, is_active: res.data.is_active } : prev);
+                              } catch (err: any) {
+                                console.error(err);
+                                message.error("Failed to change user status");
+                              }
+                            },
+                          });
+                        }}
+                      >
+                        {userAccount.is_active ? "Deactivate" : "Activate"}
+                      </Button>
+                    )}
                     <Button
                       type="primary"
                       onClick={() => setIsForgotPasswordOpen(true)}

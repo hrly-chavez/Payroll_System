@@ -70,9 +70,9 @@ class LeaveTypeUpdateView(generics.RetrieveUpdateAPIView):
 
 class LeaveRequestListCreateView(generics.ListCreateAPIView):
     serializer_class = LeaveRequestSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["EMPLOYEE"]
 
-    # ✅ LIST ONLY OWN REQUESTS
     def get_queryset(self):
         try:
             employee = Employee.objects.get(user=self.request.user)
@@ -82,21 +82,15 @@ class LeaveRequestListCreateView(generics.ListCreateAPIView):
         except Employee.DoesNotExist:
             return Leave_Request.objects.none()
 
-    # ✅ CREATE REQUEST
     def create(self, request, *args, **kwargs):
         try:
             employee = Employee.objects.get(user=request.user)
         except Employee.DoesNotExist:
-            raise ValidationError(
-                {"detail": "Employee profile not found."}
-            )
+            raise ValidationError({"detail": "Employee profile not found."})
 
         date_range = request.data.get("date_range")
-
         if not date_range or len(date_range) != 2:
-            raise ValidationError(
-                {"date_range": "Start and end date are required."}
-            )
+            raise ValidationError({"date_range": "Start and end date are required."})
 
         data = request.data.copy()
         data["date_from"] = date_range[0]
@@ -108,6 +102,22 @@ class LeaveRequestListCreateView(generics.ListCreateAPIView):
         serializer.save(employee=employee)
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    
+class AllLeaveRequestListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = LeaveRequestSerializer
+
+    def get_queryset(self):
+        qs = Leave_Request.objects.all().order_by("-requested_at")
+        print("🔥 QUERYSET COUNT:", qs.count())
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        print("🔥 SERIALIZED DATA:", serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 # ----------------------------
 # LIST

@@ -2,6 +2,7 @@
 from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
+from django.core.exceptions import ValidationError
 
 class Province(models.Model):
     name = models.CharField(max_length=100)
@@ -49,7 +50,28 @@ class Shift(models.Model):
     break_minutes = models.PositiveIntegerField(default=0)
     grace_minutes = models.PositiveIntegerField(default=0)
     is_overnight = models.BooleanField(default=False)
+    crosses_midnight = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+
+    def clean(self):
+        # Validate cross-midnight time logic
+        if self.crosses_midnight:
+            # Example: 22:00 -> 06:00 (end <= start)
+            if self.end_time > self.start_time:
+                raise ValidationError({
+                    "end_time": "For cross-midnight shifts, end_time must be earlier than or equal to start_time (e.g., 22:00 to 06:00)."
+                })
+        else:
+            # Example: 00:00 -> 09:00 (end > start)
+            if self.end_time <= self.start_time:
+                raise ValidationError({
+                    "end_time": "For non-cross-midnight shifts, end_time must be later than start_time (e.g., 08:00 to 17:00)."
+                })
+
+    def save(self, *args, **kwargs):
+        # Ensure admin/UI validation always runs
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
@@ -399,20 +421,27 @@ class Holiday(models.Model):
             )
         ]
 
-# class HolidayPolicy(models.Model):
-#     department = models.ForeignKey(Department, on_delete=models.CASCADE)
-#     holiday_type = models.CharField(max_length=50)  # same choices as Holiday.type
-#     requires_work = models.BooleanField(default=False)
-#     created_at = models.DateTimeField(auto_now_add=True)
+class HolidayPolicy(models.Model):
+    HOLIDAY_TYPES = [
+        ("Regular", "Regular"),
+        ("Special Non-Working", "Special Non-Working"),
+        ("Special Working", "Special Working"),
+        ("Company Holiday", "Company Holiday"),
+    ]
 
-#     class Meta:
-#         constraints = [
-#             models.UniqueConstraint(
-#                 fields=["department", "holiday_type"],
-#                 name="unique_holiday_policy_per_dept_type"
-#             )
-#         ]
+    department = models.ForeignKey(Department, on_delete=models.CASCADE)
+    holiday_type = models.CharField(max_length=50, choices=HOLIDAY_TYPES)
+    requires_work = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["department", "holiday_type"],
+                name="unique_holiday_policy_per_dept_type"
+            )
+        ]
+        
 class Attendance_Event(models.Model):
     TYPE_CHOICES = [
         ("Late","Late"),

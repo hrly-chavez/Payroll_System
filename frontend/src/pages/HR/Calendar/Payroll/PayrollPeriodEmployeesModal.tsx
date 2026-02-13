@@ -124,6 +124,7 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
         scroll={{ y: 360 }}
         onRow={(record) => ({
           onClick: () => {
+            if (loading) return;
             setSelectedEmployee(record);
             setOpenEmployeeModal(true);
           },

@@ -50,7 +50,7 @@ export default function PayRulesTab({ active }: Props) {
     setLoading(true);
     try {
       const res = await API.get("/payroll/superadmin/pay-rules/");
-      setPayRules([...res.data].reverse());
+      setPayRules(res.data);
     } catch (error) {
       console.error(error);
       message.error("Failed to fetch payroll rules.");
@@ -100,7 +100,7 @@ export default function PayRulesTab({ active }: Props) {
         event_type: values.event_type,
         category: values.category,
         rate_type: values.rate_type,
-        rate_value: parseFloat(values.rate_value),
+        rate_value: String(values.rate_value),
         applies_to: values.applies_to || null,
         employee: values.employee || null,
         effective_from: values.effective_from ? values.effective_from.format("YYYY-MM-DD") : null,
@@ -109,9 +109,9 @@ export default function PayRulesTab({ active }: Props) {
       };
 
       if (payRuleEditMode && editingPayRuleId) {
-        await API.put(`/payroll/superadmin/pay-rules/${editingPayRuleId}/`, payload);
+        const res = await API.put(`/payroll/superadmin/pay-rules/${editingPayRuleId}/`, payload);
         setPayRules((prev) =>
-          prev.map((item) => (item.id === editingPayRuleId ? { ...item, ...payload } : item))
+          prev.map((item) => (item.id === editingPayRuleId ? res.data : item))
         );
         message.success("Payroll rule updated successfully");
       } else {
@@ -187,7 +187,7 @@ export default function PayRulesTab({ active }: Props) {
                 <td>{rule.category}</td>
                 <td>{formatRateType(rule.rate_type)}</td>
                 <td>{formatRateValue(rule)}</td>
-                <td>{rule.applies_to_name || "All"}</td>
+                <td>{rule.employee_name || rule.applies_to_name || "All"}</td>
                 <td>{rule.effective_from}</td>
                 <td>
                   <Tag color={rule.is_active ? "green" : "red"}>

@@ -52,7 +52,7 @@ export default function AttendaceLogs({ year, month }: Props) {
         dataIndex: "status",
       },
       {
-        title: "Type",
+        title: "Event",
         dataIndex: "event_types",
         render: (val: string) => (val ? val : "-"),
       },

@@ -169,8 +169,7 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
             **validated_data
         )
         return employee
-
-    
+   
 class EmployeeUpdateSerializer(serializers.ModelSerializer):
     address = AddressSerializer(required=False)
 
@@ -216,10 +215,8 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
             address.save()
 
         return instance
-
-
-    
-#para sa salary
+  
+#for salary
 class EmployeeSalarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee_Salary
@@ -233,8 +230,8 @@ class EmployeeSalarySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("A salary for this employee starting from this date already exists.")
         return attrs
     
-#para sa deduction sa taxes like sss, pagibig, philhealth
-#para sad ni sya sa POST / PUT
+#for deduction sa taxes like sss, pagibig, philhealth
+#for  POST / PUT also
 class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee_Deduction
@@ -302,7 +299,6 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
             defaults=validated_data,
         )
         return obj
-
 
 class EmployeeDeductionListSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()

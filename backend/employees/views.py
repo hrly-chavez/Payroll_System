@@ -435,3 +435,4 @@ class AllowanceTypeListAPIView(APIView):
         allowance_types = Allowance_Type.objects.filter(is_active=True)
         serializer = AllowanceTypeSerializer(allowance_types, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    

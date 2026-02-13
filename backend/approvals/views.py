@@ -9,11 +9,9 @@ from accounts.permissions import IsRole;
 
 class HolidayListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
-    queryset = Holiday.objects.all().order_by('-date')
+    queryset = Holiday.objects.filter(status="Approved",is_active=True).order_by("-date")
     serializer_class = HolidaySerializer
     # public access → no permission_classes
-
-# views.py
 
 class HolidayCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]

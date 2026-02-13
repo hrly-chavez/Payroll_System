@@ -3,6 +3,7 @@ from rest_framework.generics import ListCreateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError
 from shared_model.models import *
 from .serializers import *
 from accounts.permissions import IsRole;
@@ -65,27 +66,56 @@ class LeaveTypeUpdateView(generics.RetrieveUpdateAPIView):
     queryset = Leave_Type.objects.all()
     serializer_class = LeaveTypeSerializer
 
-class LeaveRequestListCreateView(ListCreateAPIView):
+class LeaveRequestListCreateView(generics.ListCreateAPIView):
     serializer_class = LeaveRequestSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["EMPLOYEE"]
 
     def get_queryset(self):
-        return Leave_Request.objects.filter(
-            employee__user=self.request.user
-        ).order_by("-requested_at")
+        try:
+            employee = Employee.objects.get(user=self.request.user)
+            return Leave_Request.objects.filter(
+                employee=employee
+            ).order_by("-requested_at")
+        except Employee.DoesNotExist:
+            return Leave_Request.objects.none()
 
-    def perform_create(self, serializer):
-        user = self.request.user
-        employee = Employee.objects.get(user=user)
+    def create(self, request, *args, **kwargs):
+        try:
+            employee = Employee.objects.get(user=request.user)
+        except Employee.DoesNotExist:
+            raise ValidationError({"detail": "Employee profile not found."})
 
-        date_from, date_to = serializer.validated_data.pop("date_range")
+        date_range = request.data.get("date_range")
+        if not date_range or len(date_range) != 2:
+            raise ValidationError({"date_range": "Start and end date are required."})
 
-        serializer.save(
-            employee=employee,
-            date_from=date_from,
-            date_to=date_to,
-            status="Pending"
-        )
+        data = request.data.copy()
+        data["date_from"] = date_range[0]
+        data["date_to"] = date_range[1]
+        data["employee"] = employee.id
+
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(employee=employee)
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    
+class AllLeaveRequestListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = LeaveRequestSerializer
+
+    def get_queryset(self):
+        qs = Leave_Request.objects.all().order_by("-requested_at")
+        print("🔥 QUERYSET COUNT:", qs.count())
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        print("🔥 SERIALIZED DATA:", serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 # ----------------------------
 # LIST

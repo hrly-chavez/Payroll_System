@@ -1,7 +1,7 @@
 import { Card, Button, Modal, Input, message } from "antd";
 import { useEffect, useState } from "react";
 import api from "../../api/axios";
-import styles from "./CompanyNote.module.css";
+import styles from "./companyNote.module.css";
 
 const { TextArea } = Input;
 

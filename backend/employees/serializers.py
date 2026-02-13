@@ -219,7 +219,7 @@ class EmployeeSalarySerializer(serializers.ModelSerializer):
                 "A salary for this employee starting from this date already exists."
             )
         return attrs
-     def create(self, validated_data):
+    def create(self, validated_data):
         # Get current user from context
         user = self.context.get("_current_user")
         instance = Employee_Salary(**validated_data)

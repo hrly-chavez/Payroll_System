@@ -169,7 +169,7 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
         employee.save()  # triggers post_save, AuditLog sees _current_user
 
         return employee
-
+   
 class EmployeeUpdateSerializer(serializers.ModelSerializer):
     address = AddressSerializer(required=False)
 
@@ -203,10 +203,8 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
 
          # ✅ IMPORTANT: RETURN THE INSTANCE
         return instance
-
-
-    
-#para sa salary
+  
+#for salary
 class EmployeeSalarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee_Salary
@@ -221,7 +219,6 @@ class EmployeeSalarySerializer(serializers.ModelSerializer):
                 "A salary for this employee starting from this date already exists."
             )
         return attrs
-
     def create(self, validated_data):
         # Get current user from context
         user = self.context.get("_current_user")
@@ -239,8 +236,6 @@ class EmployeeSalarySerializer(serializers.ModelSerializer):
             instance._current_user = user
         instance.save()
         return instance
-
-    
 #para sa deduction sa taxes like sss, pagibig, philhealth
 #para sad ni sya sa POST / PUT
 class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
@@ -326,15 +321,6 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
                 obj._current_user = user
             obj.save()  # signal sees _current_user
         return obj
-    
-    def update(self, instance, validated_data):
-        user = validated_data.pop("_current_user", None) or self.context.get("_current_user")
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        if user:
-            instance._current_user = user
-        instance.save()
-        return instance
 
 
 class EmployeeDeductionListSerializer(serializers.ModelSerializer):

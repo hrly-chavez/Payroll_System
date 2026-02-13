@@ -17,7 +17,12 @@ export default function AddPayrollPeriodModal({ open, onClose, onSuccess }: Prop
 
   const handleSubmit = async (values: any) => {
     try {
-      const [start, end] = values.period;
+      const period = values?.period;
+      if (!period || period.length !== 2) {
+        message.error("Please select a payroll period");
+        return;
+      }
+      const [start, end] = period;
 
       await api.post("/payroll/periods/", {
         start_date: start.format("YYYY-MM-DD"),

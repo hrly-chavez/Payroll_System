@@ -1,18 +1,20 @@
+from django.db.models import Q
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from django.utils import timezone
-from django.db.models import Q
 from rest_framework.exceptions import ValidationError
-from accounts.permissions import IsRole;
-from .serializers import *
-from .services import punch_in, punch_out, get_today_status, _get_employee_or_400, _month_date_range
 
+from accounts.permissions import IsRole
+from shared_model.models import Attendance, Shift
+from .serializers import *
+from .services import (punch_in,punch_out,get_today_status,_get_employee_or_400,_month_date_range,)
 
 
 class PunchInView(APIView):
-    permission_classes = [IsAuthenticated]    
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         serializer = PunchInSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -20,7 +22,7 @@ class PunchInView(APIView):
         attendance = punch_in(request.user)
         return Response({
             "message": "Punch in successful.",
-            "attendance": AttendanceSerializer(attendance).data
+            "attendance": AttendanceSerializer(attendance).data,
         })
 
 class PunchOutView(APIView):
@@ -33,10 +35,9 @@ class PunchOutView(APIView):
         attendance = punch_out(request.user)
         return Response({
             "message": "Punch out successful.",
-            "attendance": AttendanceSerializer(attendance).data
+            "attendance": AttendanceSerializer(attendance).data,
         })
 
-#Attendance Status
 class TodayAttendanceView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -44,28 +45,22 @@ class TodayAttendanceView(APIView):
         attendance = get_today_status(request.user)
 
         if not attendance:
-            return Response({
-                "has_attendance": False,
-                "attendance": None
-            })
+            return Response({"has_attendance": False, "attendance": None})
 
         return Response({
             "has_attendance": True,
-            "attendance": AttendanceSerializer(attendance).data
+            "attendance": AttendanceSerializer(attendance).data,
         })
 
-#Each Employee Attendance Logs
 class AttendanceLogsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         employee = _get_employee_or_400(request.user)
 
-        # Query params: ?year=2026&month=2
         year = request.query_params.get("year")
         month = request.query_params.get("month")
 
-        # default: current month/year
         today = timezone.localdate()
         year = int(year) if year else today.year
         month = int(month) if month else today.month
@@ -87,18 +82,14 @@ class AttendanceLogsView(APIView):
             "year": year,
             "month": month,
             "count": qs.count(),
-            "results": AttendanceLogSerializer(qs, many=True).data
+            "results": AttendanceLogSerializer(qs, many=True).data,
         })
 
-#Admin & SuperAdmin Can see All attendance Logs
 class CEOandHRAttendanceLogsView(APIView):
     permission_classes = [IsAuthenticated, IsRole]
     allowed_roles = ["ADMIN", "SUPER_ADMIN"]
 
     def get(self, request):
-        # Query params:
-        # ?year=2026&month=2
-        # optional: ?search=jeremy
         year = request.query_params.get("year")
         month = request.query_params.get("month")
         search = request.query_params.get("search", "").strip()
@@ -128,10 +119,11 @@ class CEOandHRAttendanceLogsView(APIView):
 
         qs = qs.order_by("-date", "employee__lname", "employee__fname")
 
-        # Stats for cards
         total_present = qs.filter(status="PRESENT").count()
-        total_absent = qs.filter(status="ABSENT").count()
         total_lates = qs.filter(events__type="Late").distinct().count()
+
+        # OPTION 1: absences are computed, not stored as Attendance rows
+        total_absent = 0
 
         return Response({
             "year": year,
@@ -142,14 +134,13 @@ class CEOandHRAttendanceLogsView(APIView):
                 "absent": total_absent,
             },
             "count": qs.count(),
-            "results": CEOandHRAttendanceLogSerializer(qs, many=True).data
-        })  
+            "results": CEOandHRAttendanceLogSerializer(qs, many=True).data,
+        })
 
 class ShiftListCreateView(generics.ListCreateAPIView):
     queryset = Shift.objects.all().order_by("start_time")
     serializer_class = ShiftSerializer
     permission_classes = [IsAuthenticated]
-
 
 class ShiftRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Shift.objects.all()

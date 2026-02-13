@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from shared_model.models import *
 from django.utils import timezone
+from decimal import Decimal
+
 class DeductionTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Deduction_Type
@@ -69,11 +71,7 @@ class ShiftMiniSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Shift
-        fields = [
-            "id", "name", "start_time", "end_time",
-            "break_minutes", "grace_minutes", "is_overnight",
-            "workdays"
-        ]
+        fields = '__all__' 
 
 # Returns the employee's latest effective salary for verification preview
 class EmployeeSalaryMiniSerializer(serializers.ModelSerializer):
@@ -199,26 +197,67 @@ class PayrollPeriodEmployeeCommissionCreateSerializer(serializers.ModelSerialize
 
 class PayRuleSerializer(serializers.ModelSerializer):
     applies_to_name = serializers.CharField(source="applies_to.name", read_only=True)
-    employee_name = serializers.CharField(source="employee.full_name", read_only=True)
+    employee_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Pay_Rule
-        fields = '__all__'
+        fields = "__all__"
 
     def validate(self, attrs):
         """
-        Enforce scope rules:
+        Enforce:
         - Either applies_to OR employee OR none (global)
-        - Not both applies_to and employee at the same time
+        - Not both at the same time
+        - effective_to >= effective_from
+        - rate_value >= 0
         """
+
+        # Handle updates properly
         applies_to = attrs.get("applies_to", getattr(self.instance, "applies_to", None))
         employee = attrs.get("employee", getattr(self.instance, "employee", None))
 
+        effective_from = attrs.get(
+            "effective_from",
+            getattr(self.instance, "effective_from", None)
+        )
+        effective_to = attrs.get(
+            "effective_to",
+            getattr(self.instance, "effective_to", None)
+        )
+
+        rate_value = attrs.get(
+            "rate_value",
+            getattr(self.instance, "rate_value", None)
+        )
+
+        # 🔹 Scope validation
         if applies_to and employee:
-            raise serializers.ValidationError(
+            raise ValidationError(
                 {"detail": "Choose only one scope: either Department (applies_to) or Employee, not both."}
             )
 
+        # 🔹 Date validation
+        if effective_to and effective_from and effective_to < effective_from:
+            raise ValidationError(
+                {"detail": "effective_to cannot be earlier than effective_from."}
+            )
+
+        # 🔹 Rate value validation
+        if rate_value is not None:
+            try:
+                if Decimal(rate_value) < 0:
+                    raise ValidationError(
+                        {"rate_value": "Rate value cannot be negative."}
+                    )
+            except Exception:
+                raise ValidationError(
+                    {"rate_value": "Invalid rate value."}
+                )
+
         return attrs
-    
+
+    def get_employee_name(self, obj):
+        if obj.employee:
+            return f"{obj.employee.fname} {obj.employee.lname}".strip()
+        return None
     

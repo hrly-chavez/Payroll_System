@@ -24,6 +24,7 @@ interface EmployeeType {
 
 const AdminDepartmentEmployee: React.FC = () => {
   const { deptId } = useParams<{ deptId: string }>();
+  const [departmentShiftId, setDepartmentShiftId] = useState<number | null>(null);
   const navigate = useNavigate();
   const [employees, setEmployees] = useState<EmployeeType[]>([]);
   const [loading, setLoading] = useState(false);
@@ -120,6 +121,7 @@ const AdminDepartmentEmployee: React.FC = () => {
 
           <AddEmployeeFlow
             open={open}
+            departmentId={Number(deptId)}
             onClose={() => {
               setOpen(false);
               fetchEmployees();

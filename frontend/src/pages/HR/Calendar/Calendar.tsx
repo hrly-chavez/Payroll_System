@@ -13,9 +13,14 @@ import styles from "./calendar.module.css";
 import AddHolidayModal from "./AddHolidayModal";
 import AddPayrollPeriodModal from "./Payroll/AddPayrollPeriodModal";
 import api from "../../../api/axios";
+import { HOLIDAY_LEGEND, PAYROLL_COLOR } from "../../../components/SharedCalendar/CalendarLegend";
+import SharedCalendar from "../../../components/SharedCalendar/SharedCalendar";
+import type { EventItem } from "../../../components/SharedCalendar/SharedCalendar";
+
+
+
 
 const { Content } = Layout;
-
 
 const CalendarPage: React.FC = () => {
 
@@ -27,11 +32,20 @@ const CalendarPage: React.FC = () => {
     status?: string;
   };
 
+  type Holiday = {
+  id: number;
+  date: string;
+  name: string;
+  type: "Regular" | "Special Non-Working" | "Special Working" | "Company Holiday";
+  base: "PH" | "US" | "COMPANY";
+};
+
+
   const [periodModal, setPeriodModal] = useState(false);
   const [holidayModal, setHolidayModal] = useState(false);
   const [calendarValue, setCalendarValue] = useState<Dayjs>(dayjs());
 
-  const [holidays, setHolidays] = useState<any[]>([]);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [payrollPeriods, setPayrollPeriods] = useState<PayrollPeriod[]>([]);
   const [activeTab, setActiveTab] = useState<"holiday" | "payroll">("payroll");
   const [searchText, setSearchText] = useState("");
@@ -56,6 +70,24 @@ const CalendarPage: React.FC = () => {
     }
   };
   
+    const events = useMemo<EventItem[]>(() => {
+      return [
+        ...holidays.map<EventItem>((h) => ({
+          type: "holiday",
+          start_date: h.date,
+          title: h.name,
+          color: HOLIDAY_LEGEND[h.base][h.type].bgColor,
+        })),
+
+        ...payrollPeriods.map<EventItem>((p) => ({
+          type: "payroll",
+          start_date: p.start_date,
+          end_date: p.end_date,
+          title: "Payroll Period",
+          color: PAYROLL_COLOR.bgColor,
+        })),
+      ];
+    }, [holidays, payrollPeriods]);
  
   const holidaysByDate = useMemo(() => {
     const map = new Map<string, any[]>();
@@ -180,6 +212,7 @@ const CalendarPage: React.FC = () => {
                   + Add Holiday
                 </Button>
               </div>
+
           {/* CALENDAR CARD */}
           <Card className={styles.card}>
             <div className={styles.calHeader}>
@@ -210,18 +243,9 @@ const CalendarPage: React.FC = () => {
             </div>
 
             <div className={styles.calendarWrap}>
-              <Calendar
-                value={calendarValue}
-                onSelect={(val) => setCalendarValue(val)}
-                headerRender={() => null}          // removes redundant month/year header
-                fullscreen={false}                 // compact size
-                cellRender={(value) => dateCellRender(value)}
-              />
+              <SharedCalendar events={events} />
             </div>
           </Card>
-
-
-
 
           {/* REQUESTS CARD */}
           <Card className={styles.card}>  

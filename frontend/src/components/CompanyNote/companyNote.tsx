@@ -1,32 +1,96 @@
-import React from "react";
-import styles from "./companyNote.module.css";
+import { Card, Button, Modal, Input, message } from "antd";
+import { useEffect, useState } from "react";
+import api from "../../api/axios";
+import styles from "./CompanyNote.module.css";
 
-type CompanyNoteProps = {
-  title?: string;
-  content: string;
-  author?: string;
-};
+const { TextArea } = Input;
 
-const CompanyNote: React.FC<CompanyNoteProps> = ({
-  title = "Company Note",
-  content,
-  author,
-}) => {
+interface Props {
+  role?: string;
+}
+
+interface CompanyNoteType {
+  id: number;
+  note: string;
+  created_at: string;
+  created_by: string;
+}
+
+export default function CompanyNote({ role }: Props) {
+  const [notes, setNotes] = useState<CompanyNoteType[]>([]);
+  const [open, setOpen] = useState(false);
+  const [content, setContent] = useState("");
+
+  const fetchNotes = async () => {
+    try {
+      const res = await api.get("/employees/company-notes/")
+      setNotes(res.data);
+    } catch {
+      message.error("Failed to load notes");
+    }
+  };
+
+  const handleSubmit = async () => {
+    try {
+      await api.post("/employees/company-notes/", {
+      note: content,
+      })
+      message.success("Note added");
+      setOpen(false);
+      setContent("");
+      fetchNotes();
+    } catch {
+      message.error("Failed to add note");
+    }
+  };
+
+  useEffect(() => {
+    fetchNotes();
+  }, []);
+
+  const latestNote = notes[0];
+
   return (
-    <div className={styles.noteCard}>
-      <h3 className={styles.title}>{title}</h3>
+    <>
+      <Card
+        title="Announcement"
+        extra={
+          role === "ADMIN" || role === "SUPERADMIN" ? (
+            <Button
+              size="small"
+              className={styles.addButton}
+              onClick={() => setOpen(true)}
+            >
+              +
+            </Button>
+          ) : null
+        }
+        className={styles.noteCard}
+      >
+        {latestNote ? (
+          <>
+            <div className={styles.content}>{latestNote.note}</div> {/* ✅ FIXED */}
+            <div className={styles.author}>
+              — {latestNote.created_by}
+            </div>
+          </>
+        ) : (
+          <div>No company notes yet.</div>
+        )}
+      </Card>
 
-      <p className={styles.content}>
-        {content}
-      </p>
-
-      {author && (
-        <div className={styles.author}>
-          — {author}
-        </div>
-      )}
-    </div>
+      <Modal
+        title="Add Company Note"
+        open={open}
+        onCancel={() => setOpen(false)}
+        onOk={handleSubmit}
+      >
+        <TextArea
+          rows={4}
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+        />
+      </Modal>
+    </>
   );
-};
-
-export default CompanyNote;
+}

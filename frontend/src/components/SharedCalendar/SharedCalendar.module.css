@@ -1,29 +1,47 @@
-.cell {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-top: 4px;
-  gap: 4px;
+/* Remove default padding */
+:global(.ant-picker-calendar-date) {
+  padding: 0 !important;
+  margin: 0 !important;
+  height: 110px !important;
 }
 
-.dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  cursor: pointer;
+:global(.ant-picker-calendar-date-content) {
+  margin: 0 !important;
+  height: 100% !important;
 }
 
-/* Header (month + year dropdowns) */
-.calendarHeader {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding-bottom: 6px;
+:global(.ant-picker-cell-inner) {
+  padding: 0 !important;
+  height: 100% !important;
+  background: transparent !important;
 }
 
-.calendarHeader select {
-  padding: 4px 8px;
-  border-radius: 6px;
+:global(.ant-picker-cell-selected .ant-picker-cell-inner) {
+  background: transparent !important;
+}
+
+:global(.ant-picker-calendar-date-today) {
+  border: none !important;
+}
+
+:global(.ant-picker-content td) {
   border: 1px solid #d9d9d9;
-  font-size: 12px;
+}
+
+.fullCellWrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transition: 0.2s ease;
+}
+
+.dateNumber {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  font-weight: 600;
+}
+/* Hide default AntD date number */
+:global(.ant-picker-calendar-date-value) {
+  display: none !important;
 }

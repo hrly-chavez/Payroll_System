@@ -7,6 +7,7 @@ import {
   Table,
   message,
   Spin,
+  Modal,
 } from "antd";
 import { useParams } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
@@ -314,6 +315,33 @@ const EmployeeDetailsPage: React.FC = () => {
   ========================== */
   // Modal state
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+
+  /* =========================
+     AUDIT LOGS RETRIEVE STATE
+  ========================== */
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  const fetchAuditLogs = async () => {
+    if (!employeeId) return;
+
+    setLoadingLogs(true);
+    try {
+      const res = await api.get(`/employees/auditlogs/employee/${employeeId}/`);
+      setAuditLogs(res.data);
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to fetch audit logs");
+      setAuditLogs([]);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAuditLogs();
+  }, [employeeId]);
+
   
 
   const salaryColumns = [
@@ -595,6 +623,33 @@ const EmployeeDetailsPage: React.FC = () => {
                 <Tabs.TabPane tab="Employee Account" key="5">
                   <div className={styles.salaryHeader}>
                     <h3>Employee Account</h3>
+                    {userAccount && (
+                      <Button
+                        type="primary"
+                        danger={userAccount.is_active} // red if active
+                        onClick={() => {
+                          Modal.confirm({
+                            title: `Are you sure you want to ${userAccount.is_active ? "deactivate" : "activate"} this user?`,
+                            okText: userAccount.is_active ? "Deactivate" : "Activate",
+                            cancelText: "Cancel",
+                            onOk: async () => {
+                              try {
+                                const res = await api.post(`/employees/users/${userAccount.user_id}/deactivate/`);
+                                message.success(res.data.detail);
+
+                                // Update local state so status updates instantly
+                                setUserAccount(prev => prev ? { ...prev, is_active: res.data.is_active } : prev);
+                              } catch (err: any) {
+                                console.error(err);
+                                message.error("Failed to change user status");
+                              }
+                            },
+                          });
+                        }}
+                      >
+                        {userAccount.is_active ? "Deactivate" : "Activate"}
+                      </Button>
+                    )}
                     <Button
                       type="primary"
                       onClick={() => setIsForgotPasswordOpen(true)}
@@ -622,6 +677,23 @@ const EmployeeDetailsPage: React.FC = () => {
                   ) : (
                     <p>No user account linked to this employee.</p>
                   )}
+                </Tabs.TabPane>
+
+                <Tabs.TabPane tab="Audit Logs" key="6">
+                  <Table
+                    columns={[
+                      { title: "Action", dataIndex: "action", key: "action" },
+                      { title: "User", dataIndex: "user", key: "user" },
+                      { title: "Model", dataIndex: "model_name", key: "model_name" },
+                      { title: "Old Data", dataIndex: "old_data", key: "old_data" },
+                      { title: "New Data", dataIndex: "new_data", key: "new_data" },
+                      { title: "Timestamp", dataIndex: "timestamp", key: "timestamp" },
+                    ]}
+                    dataSource={auditLogs}
+                    loading={loadingLogs}
+                    rowKey="id"
+                  />
+
                 </Tabs.TabPane>
 
               </Tabs>

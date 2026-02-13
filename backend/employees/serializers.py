@@ -143,31 +143,31 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee
         fields = [
-            "id_no",
-            "fname",
-            "initial",
-            "lname",
-            "suffix",
-            "status",
-            "contact_no",
-            "email",
-            "hired_date",
-            "position",
-            "bank_info",
-            "shift",
-            "department",
-            "address",
+            "id_no", "fname", "initial", "lname", "suffix", "status",
+            "contact_no", "email", "hired_date", "position", "bank_info",
+            "shift", "department", "address",
         ]
 
     def create(self, validated_data):
+        # extract _current_user if passed from view
+        user = validated_data.pop("_current_user", None)
         address_data = validated_data.pop("address")
 
-        address = Address.objects.create(**address_data)
+        # Create Address instance manually
+        address = Address(**address_data)
+        if user:
+            address._current_user = user  # attach user for audit
+        address.save()  # triggers post_save, AuditLog sees _current_user
 
-        employee = Employee.objects.create(
-            address=address,
-            **validated_data
-        )
+        # Instantiate Employee manually
+        employee = Employee(**validated_data)
+        employee.address = address
+
+        if user:
+            employee._current_user = user
+
+        employee.save()  # triggers post_save, AuditLog sees _current_user
+
         return employee
    
 class EmployeeUpdateSerializer(serializers.ModelSerializer):
@@ -176,44 +176,32 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee
         fields = [
-            "fname",
-            "initial",
-            "lname",
-            "suffix",
-            "status",
-            "contact_no",
-            "email",
-            "hired_date",
-            "position",
-            "bank_info",
-            "shift",
-            "department",
-            "address",
-            "is_active",
+            "fname", "initial", "lname", "suffix", "status", "contact_no",
+            "email", "hired_date", "position", "bank_info", "shift",
+            "department", "address", "is_active",
         ]
 
     def update(self, instance, validated_data):
+        user = validated_data.pop("_current_user", None)
         address_data = validated_data.pop("address", None)
 
-        # -------------------
-        # Update Employee fields
-        # -------------------
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
+        if user:
+            instance._current_user = user
+
         instance.save()
 
-        # -------------------
-        # Update Address (CORRECT WAY)
-        # -------------------
         if address_data:
             address = instance.address
-
             for attr, value in address_data.items():
                 setattr(address, attr, value)
-
+            if user:
+                address._current_user = user
             address.save()
 
+         # ✅ IMPORTANT: RETURN THE INSTANCE
         return instance
   
 #for salary
@@ -227,11 +215,29 @@ class EmployeeSalarySerializer(serializers.ModelSerializer):
         employee = attrs.get("employee")
         effective_from = attrs.get("effective_from")
         if Employee_Salary.objects.filter(employee=employee, effective_from=effective_from).exists():
-            raise serializers.ValidationError("A salary for this employee starting from this date already exists.")
+            raise serializers.ValidationError(
+                "A salary for this employee starting from this date already exists."
+            )
         return attrs
-    
-#for deduction sa taxes like sss, pagibig, philhealth
-#for  POST / PUT also
+     def create(self, validated_data):
+        # Get current user from context
+        user = self.context.get("_current_user")
+        instance = Employee_Salary(**validated_data)
+        if user:
+            instance._current_user = user  # attach for AuditLog
+        instance.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        user = self.context.get("_current_user")
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        if user:
+            instance._current_user = user
+        instance.save()
+        return instance
+#para sa deduction sa taxes like sss, pagibig, philhealth
+#para sad ni sya sa POST / PUT
 class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee_Deduction
@@ -292,13 +298,30 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        obj, _ = Employee_Deduction.objects.update_or_create(
+        user = validated_data.pop("_current_user", None)
+
+        # Try to find existing deduction first
+        obj = Employee_Deduction.objects.filter(
             employee=validated_data["employee"],
             deduction_type=validated_data["deduction_type"],
             effective_from=validated_data["effective_from"],
-            defaults=validated_data,
-        )
+        ).first()
+
+        if obj:
+            # Update existing
+            for k, v in validated_data.items():
+                setattr(obj, k, v)
+            if user:
+                obj._current_user = user
+            obj.save()
+        else:
+            # Create new
+            obj = Employee_Deduction(**validated_data)
+            if user:
+                obj._current_user = user
+            obj.save()  # signal sees _current_user
         return obj
+
 
 class EmployeeDeductionListSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
@@ -346,6 +369,17 @@ class EmployeeAllowanceCreateSerializer(serializers.ModelSerializer):
         if existing.exists():
             raise serializers.ValidationError("Allowance already exists for this period")
         return data
+    
+    def create(self, validated_data):
+        user = validated_data.pop("_current_user", None)
+
+        instance = Employee_Allowance(**validated_data)
+
+        if user:
+            instance._current_user = user  # ✅ attach for AuditLog
+
+        instance.save()
+        return instance
 
 class AllowanceTypeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -368,3 +402,36 @@ class EmployeeAllowanceSerializer(serializers.ModelSerializer):
             "effective_to",
             "status",
         ]
+
+#audit logs
+class AuditLogSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(source="user.id", read_only=True)
+    username = serializers.CharField(source="user.user_name", read_only=True)
+    timestamp = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S")  # 24-hour format
+    
+    class Meta:
+        model = AuditLog
+        fields = [
+            "id",
+            "user_id",
+            "username",
+            "action",
+            "model_name",
+            "object_id",
+            "old_data",
+            "new_data",
+            "timestamp",
+        ]
+
+#------------ COMPANY NOTE SERIALIZER-----------
+class CompanyNoteSerializer(serializers.ModelSerializer):
+    created_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Company_Note
+        fields = ["id", "note", "created_at", "created_by"]
+
+    def get_created_by(self, obj):
+        if obj.user:
+            return obj.user.user_name
+        return "System"

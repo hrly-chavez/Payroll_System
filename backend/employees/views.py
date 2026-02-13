@@ -1,7 +1,7 @@
-from rest_framework import viewsets, status, generics
+from rest_framework import viewsets, status, generics, permissions
 from shared_model.models import *
 from .serializers import *
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from accounts.permissions import IsRole;
@@ -12,9 +12,11 @@ from django.db import transaction
 from django.utils.timezone import now
 from django.core.mail import send_mail
 from django.contrib.auth.hashers import make_password
+from shared_model.signals import create_audit_log
 
 import logging
 import secrets
+from .serializers import CompanyNoteSerializer
 
 #--------------------------Address
 # List all provinces
@@ -112,9 +114,20 @@ class UserViewSet(viewsets.ModelViewSet):
             for _ in range(12)
         )
 
-        # Hash the password before saving
-        user.password = make_password(new_password)
+        # Hash password properly
+        user.set_password(new_password)
+
+        # Attach current user for AuditLog
+        user._current_user = request.user
         user.save()
+
+        create_audit_log(
+            instance=user,
+            action="RESET_PASSWORD",
+            old_data="",
+            new_data="Password was reset by admin"
+        )
+
         logger.info(f"Password for user '{user.user_name}' has been reset by admin '{request.user.user_name}'.")
 
         # Attempt to send email
@@ -142,118 +155,119 @@ class UserViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         
+    @action(detail=True, methods=["post"], url_path="deactivate")
+    def deactivate_user(self, request, pk=None):
+        """
+        Toggle user active status (deactivate/reactivate).
+        """
+        user = self.get_object()
+
+        # Attach current user for audit log
+        user._current_user = request.user
+
+        if user.is_active:
+            user.is_active = False
+            action_name = "DEACTIVATED"
+        else:
+            user.is_active = True
+            action_name = "REACTIVATED"
+
+        user.save()
+
+        # Audit log
+        create_audit_log(
+            instance=user,
+            action=action_name,
+            old_data=f"is_active: {not user.is_active}",
+            new_data=f"is_active: {user.is_active}"
+        )
+
+        return Response(
+            {"detail": f"User successfully {action_name.lower()}.", "is_active": user.is_active},
+            status=status.HTTP_200_OK
+        )
+        
 #employee details crud
 class EmployeeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsRole]
     allowed_roles = ["ADMIN", "SUPER_ADMIN"]
     queryset = Employee.objects.filter(is_active=True)
     
-    # Use different serializer for list/details vs creation
     def get_serializer_class(self):
         if self.action == "create":
             return EmployeeCreateSerializer
         return EmployeeSerializer
 
-    @action(
-        detail=False,
-        methods=["get"],
-        url_path=r"by-department/(?P<dept_id>\d+)"
-    )
+    @action(detail=False, methods=["get"], url_path=r"by-department/(?P<dept_id>\d+)")
     def by_department(self, request, dept_id=None):
         employees = self.queryset.filter(department_id=dept_id)
         serializer = self.get_serializer(employees, many=True)
         return Response(serializer.data)
     
-    @action(
-        detail=True,
-        methods=["get"],
-        url_path=r"details"
-    )
+    @action(detail=True, methods=["get"], url_path=r"details")
     def details(self, request, pk=None):
         employee = self.get_object()
         serializer = self.get_serializer(employee)
         return Response(serializer.data)
     
-    # --- Add nested address handling ---
+    # -------------------
+    # CREATE EMPLOYEE
+    # -------------------
     def create(self, request, *args, **kwargs):
         serializer = EmployeeCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        employee = serializer.save()
 
-        # --- Determine the role for the user being created ---
+        # Role restriction
         signed_in_user = request.user
-        requested_role = request.data.get("role", "EMPLOYEE")  # default to EMPLOYEE
+        requested_role = request.data.get("role", "EMPLOYEE")
+        if signed_in_user.role == "ADMIN" and requested_role != "EMPLOYEE":
+            return Response({"error": "ADMINs can only create EMPLOYEE users."}, status=403)
+        if signed_in_user.role == "SUPER_ADMIN" and requested_role not in ["ADMIN", "SUPER_ADMIN"]:
+            return Response({"error": "SUPER_ADMIN can only create ADMIN or SUPER_ADMIN users."}, status=403)
+        if signed_in_user.role not in ["ADMIN", "SUPER_ADMIN"]:
+            return Response({"error": "You do not have permission to create users."}, status=403)
 
-        # Role restriction logic
-        if signed_in_user.role == "ADMIN":
-            # Admins can only create EMPLOYEE users
-            if requested_role != "EMPLOYEE":
-                return Response(
-                    {"error": "ADMINs can only create EMPLOYEE users."},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-        elif signed_in_user.role == "SUPER_ADMIN":
-            # SUPER_ADMIN can create ADMIN or SUPER_ADMIN users
-            if requested_role not in ["ADMIN", "SUPER_ADMIN"]:
-                return Response(
-                    {"error": "SUPER_ADMIN can only create ADMIN or SUPER_ADMIN users."},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-        else:
-            # Employees cannot create users
-            return Response(
-                {"error": "You do not have permission to create users."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        # Save employee WITH _current_user
+        employee = serializer.save(_current_user=request.user)
 
-        # --- Generate username and random password ---
+        # Generate username and password
         username = f"{employee.fname.lower()}{employee.id}"
-        password = "".join(random.choices(string.ascii_letters + string.digits, k=8))  # 8-char random
+        password = "".join(random.choices(string.ascii_letters + string.digits, k=8))
 
-        # --- Create User ---
-        user = User.objects.create_user(
+        # Create user manually and attach _current_user BEFORE saving
+        user = User(
             user_name=username,
-            password=password,
             role=requested_role,
-            employee=employee
+            employee=employee,
         )
+        user.set_password(password)
+        user._current_user = request.user
+        user.save()  # triggers post_save signal, AuditLog sees _current_user
 
-        return Response(
-            {
-                "message": "Employee and user created successfully",
-                "employee_id": employee.id,
-                "username": username,
-                "password": password  # send this so it can be communicated to the employee
-            },
-            status=status.HTTP_201_CREATED
-        )
-    # ---------------------------------
-    # UPDATE EMPLOYEE DETAILS
-    # /employees/employees/<id>/update/
-    # ---------------------------------
-    @action(
-        detail=True,
-        methods=["put", "patch"],
-        url_path="update",
-    )
+        return Response({
+            "message": "Employee and user created successfully",
+            "employee_id": employee.id,
+            "username": username,
+            "password": password
+        }, status=201)
+
+    # -------------------
+    # UPDATE EMPLOYEE
+    # -------------------
+    @action(detail=True, methods=["put", "patch"], url_path="update")
     def update_employee(self, request, pk=None):
         employee = self.get_object()
-
-        serializer = EmployeeUpdateSerializer(
-            employee,
-            data=request.data,
-            partial=True,
-        )
-
+        serializer = EmployeeUpdateSerializer(employee, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
 
-        return Response(
-            {
-                "message": "Employee updated successfully",
-                "employee": EmployeeSerializer(employee).data,
-            }
-        )
+        # Pass _current_user to serializer
+        updated_employee = serializer.save(_current_user=request.user)
+
+        return Response({
+            "message": "Employee updated successfully",
+            "employee": EmployeeSerializer(updated_employee).data
+        })
+
     
 #employee salary
 class EmployeeSalaryViewSet(viewsets.ModelViewSet):
@@ -268,6 +282,12 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
         if employee_id:
             queryset = queryset.filter(employee_id=employee_id)
         return queryset
+    
+    def get_serializer(self, *args, **kwargs):
+        if "context" not in kwargs:
+            kwargs["context"] = {}
+        kwargs["context"]["_current_user"] = self.request.user
+        return super().get_serializer(*args, **kwargs)
 
     @action(detail=False, methods=["get"], url_path="latest")
     def latest_salary(self, request):
@@ -310,22 +330,24 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
         """
         Create a NEW salary row for the employee (for audit) and recompute percent deductions
         """
-        serializer = self.get_serializer(data=request.data)
+        serializer = self.get_serializer(data=request.data, context={"_current_user": request.user})
         serializer.is_valid(raise_exception=True)
 
-        # Create new salary row
+
+        # Create new salary row with current user
         new_salary = serializer.save()
 
         # Recompute percent-based deductions linked to this employee and effective_from
         self._recompute_percentage_deductions(
             employee_id=new_salary.employee_id,
             salary_amount=new_salary.base_rate,
-            effective_from=new_salary.effective_from
+            effective_from=new_salary.effective_from,
+            user=request.user
         )
 
         return Response(self.get_serializer(new_salary).data, status=status.HTTP_201_CREATED)
 
-    def _recompute_percentage_deductions(self, employee_id: int, salary_amount: Decimal, effective_from):
+    def _recompute_percentage_deductions(self, employee_id: int, salary_amount: Decimal, effective_from, user):
         deductions = Employee_Deduction.objects.filter(
             employee_id=employee_id,
             deduction_type__calculation_type="Percent"
@@ -333,8 +355,13 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
 
         for ded in deductions:
             percent_value = ded.deduction_type.amount
-            ded.amount = round(salary_amount * (percent_value / 100), 2)
-            ded.save(update_fields=["amount"])
+            new_amount = round(salary_amount * (percent_value / 100), 2)
+
+            # Only update if changed (avoids unnecessary audit logs)
+            if ded.amount != new_amount:
+                ded.amount = new_amount
+                ded._current_user = user  # attach user BEFORE save
+                ded.save(update_fields=["amount"])
 
 
             
@@ -355,6 +382,23 @@ class EmployeeDeductionViewSet(viewsets.ModelViewSet):
         if self.action in ["list", "retrieve"]:
             return EmployeeDeductionListSerializer
         return EmployeeDeductionCreateSerializer
+    
+    # -----------------
+    # CREATE / UPDATE with _current_user
+    # -----------------
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        obj = serializer.save(_current_user=request.user)  # <-- pass it here
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        obj = serializer.save(_current_user=request.user)  # <-- pass it here
+        return Response(serializer.data)
+
 
 
     # ----------------- NEW ENDPOINT -----------------
@@ -365,7 +409,7 @@ class EmployeeDeductionViewSet(viewsets.ModelViewSet):
         """
         deduction_types = Deduction_Type.objects.filter(
             is_active=True,
-            category="TAX"   # 👈 FILTER HERE
+            category="TAX"   # FILTER HERE
         )
 
         data = [
@@ -400,6 +444,9 @@ class EmployeeAllowanceViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(employee_id=employee_id)
         return queryset
     
+    def perform_create(self, serializer):
+        serializer.save(_current_user=self.request.user)
+    
     @action(detail=True, methods=["post"])
     def edit_allowance(self, request, pk=None):
         """
@@ -417,7 +464,8 @@ class EmployeeAllowanceViewSet(viewsets.ModelViewSet):
 
         serializer = EmployeeAllowanceCreateSerializer(data=data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        serializer.save(_current_user=request.user)
+
 
         return Response(
             {"message": "Allowance updated successfully"},
@@ -436,3 +484,95 @@ class AllowanceTypeListAPIView(APIView):
         serializer = AllowanceTypeSerializer(allowance_types, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
+#--------------------- audit logs
+@api_view(["GET"])
+def employee_audit_logs(request, employee_id):
+    """
+    Return all audit logs related to a specific employee and related tables.
+    Employee logs: all actions
+    Related tables: only CREATE logs
+    """
+    try:
+        employee = Employee.objects.get(pk=employee_id)
+    except Employee.DoesNotExist:
+        return Response({"detail": "Employee not found"}, status=404)
+
+    related_models = ["Employee_Salary", "Employee_Deduction", "Employee_Allowance", "User", "Address"]
+
+    # Employee logs (all actions)
+    employee_logs = AuditLog.objects.filter(
+        model_name="Employee",
+        object_id=str(employee.id)
+    )
+
+    # Related logs (ALL actions)
+    related_logs = AuditLog.objects.filter(
+        model_name__in=related_models
+    )
+
+
+    # Filter related logs for this employee
+    filtered_related_logs = []
+    for log in related_logs:
+        try:
+            if log.model_name == "User":
+                user_instance = User.objects.get(pk=log.object_id)
+                if user_instance.employee and user_instance.employee.id == employee.id:
+                    filtered_related_logs.append(log)
+            elif log.model_name == "Address":
+                address_instance = Address.objects.get(pk=log.object_id)
+                if address_instance == employee.address:
+                    filtered_related_logs.append(log)
+            else:
+                model_class = globals()[log.model_name]
+                instance = model_class.objects.get(pk=log.object_id)
+                if instance.employee.id == employee.id:
+                    filtered_related_logs.append(log)
+        except Exception:
+            continue
+
+    # Combine logs
+    all_logs = list(employee_logs) + filtered_related_logs
+    all_logs.sort(key=lambda x: x.timestamp, reverse=True)
+
+    serialized_logs = []
+    for log in all_logs:
+        old_data = ""
+        new_data = ""
+
+        # UPDATE logs: convert dicts to formatted strings
+        if log.action == "UPDATE":
+            if isinstance(log.old_data, dict):
+                old_data = ", ".join([f'{k}: "{v}"' for k, v in log.old_data.items()])
+            else:
+                old_data = str(log.old_data)
+
+            if isinstance(log.new_data, dict):
+                new_data = ", ".join([f'{k}: "{v}"' for k, v in log.new_data.items()])
+            else:
+                new_data = str(log.new_data)
+
+        user_name = log.user.user_name if log.user else ""
+
+        serialized_logs.append({
+            "id": log.id,
+            "user": user_name,
+            "action": log.action,
+            "model_name": log.model_name,
+            "old_data": old_data,
+            "new_data": new_data,
+            "timestamp": log.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+        })
+
+
+    return Response(serialized_logs)
+
+
+#COMPANY NOTE
+class CompanyNoteListCreateView(generics.ListCreateAPIView):
+    queryset = Company_Note.objects.all().order_by("-created_at")
+    serializer_class = CompanyNoteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)

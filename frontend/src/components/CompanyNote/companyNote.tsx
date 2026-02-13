@@ -23,8 +23,9 @@ export default function CompanyNote({ role }: Props) {
 
   const fetchNotes = async () => {
     try {
-      const res = await api.get("/employees/company-notes/")
-      setNotes(res.data);
+      const res = await api.get("employees/company-notes/");
+      console.log("Notes response:", res.data);
+      setNotes(res.data); 
     } catch {
       message.error("Failed to load notes");
     }
@@ -32,13 +33,13 @@ export default function CompanyNote({ role }: Props) {
 
   const handleSubmit = async () => {
     try {
-      await api.post("/employees/company-notes/", {
-      note: content,
-      })
+      await api.post("employees/company-notes/", {
+        note: content,
+      });
       message.success("Note added");
       setOpen(false);
       setContent("");
-      fetchNotes();
+      fetchNotes(); // refresh immediately
     } catch {
       message.error("Failed to add note");
     }
@@ -48,14 +49,14 @@ export default function CompanyNote({ role }: Props) {
     fetchNotes();
   }, []);
 
-  const latestNote = notes[0];
+  const latestNote = notes[0] || null; 
 
-  return (
+   return (
     <>
       <Card
-        title="Announcement"
+        title="Company Note"
         extra={
-          role === "ADMIN" || role === "SUPERADMIN" ? (
+          role === "ADMIN" || role === "SUPER_ADMIN" ? (
             <Button
               size="small"
               className={styles.addButton}
@@ -69,7 +70,7 @@ export default function CompanyNote({ role }: Props) {
       >
         {latestNote ? (
           <>
-            <div className={styles.content}>{latestNote.note}</div> {/* ✅ FIXED */}
+            <div className={styles.content}>{latestNote.note}</div>
             <div className={styles.author}>
               — {latestNote.created_by}
             </div>

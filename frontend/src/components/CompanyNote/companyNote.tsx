@@ -17,45 +17,53 @@ interface CompanyNoteType {
 }
 
 export default function CompanyNote({ role }: Props) {
-  const [notes, setNotes] = useState<CompanyNoteType[]>([]);
+  const [latestNote, setLatestNote] = useState<CompanyNoteType | null>(null);
   const [open, setOpen] = useState(false);
   const [content, setContent] = useState("");
 
-  const fetchNotes = async () => {
-    try {
-      const res = await api.get("/employees/company-notes/")
-      setNotes(res.data);
-    } catch {
-      message.error("Failed to load notes");
-    }
-  };
+  const fetchLatestNote = async () => {
+  try {
+    const res = await api.get("employees/company-notes/latest/");
+    console.log("Latest note from backend:", res.data); 
+    setLatestNote(res.data); 
+  } catch {
+    message.error("Failed to load notes");
+  }
+};
 
   const handleSubmit = async () => {
-    try {
-      await api.post("/employees/company-notes/", {
+  try {
+    await api.post("employees/company-notes/", {
       note: content,
-      })
-      message.success("Note added");
-      setOpen(false);
-      setContent("");
-      fetchNotes();
-    } catch {
-      message.error("Failed to add note");
-    }
-  };
+    });
+
+    message.success("Note added");
+    setOpen(false);
+    setContent("");
+
+    fetchLatestNote(); // instantly refresh
+  } catch {
+    message.error("Failed to add note");
+  }
+};
+
 
   useEffect(() => {
-    fetchNotes();
-  }, []);
+  fetchLatestNote();
 
-  const latestNote = notes[0];
+  const interval = setInterval(() => {
+    fetchLatestNote();
+  }, 10000);
 
-  return (
+  return () => clearInterval(interval);
+}, []);
+
+   return (
     <>
       <Card
-        title="Announcement"
+        title="Company Note"
         extra={
-          role === "ADMIN" || role === "SUPERADMIN" ? (
+          role === "ADMIN" || role === "SUPER_ADMIN" ? (
             <Button
               size="small"
               className={styles.addButton}
@@ -68,15 +76,16 @@ export default function CompanyNote({ role }: Props) {
         className={styles.noteCard}
       >
         {latestNote ? (
-          <>
-            <div className={styles.content}>{latestNote.note}</div> {/* ✅ FIXED */}
-            <div className={styles.author}>
-              — {latestNote.created_by}
-            </div>
-          </>
-        ) : (
-          <div>No company notes yet.</div>
-        )}
+        <>
+          <div className={styles.content}>{latestNote.note}</div>
+          <div className={styles.author}>
+            — {latestNote.created_by}
+          </div>
+        </>
+      ) : (
+        <div>No company notes yet.</div>
+      )}
+
       </Card>
 
       <Modal

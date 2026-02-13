@@ -17,6 +17,8 @@ from shared_model.signals import create_audit_log
 import logging
 import secrets
 from .serializers import CompanyNoteSerializer
+from rest_framework import generics
+
 
 #--------------------------Address
 # List all provinces
@@ -569,8 +571,18 @@ def employee_audit_logs(request, employee_id):
 
 
 #COMPANY NOTE
-class CompanyNoteListCreateView(generics.ListCreateAPIView):
-    queryset = Company_Note.objects.all().order_by("-created_at")
+class LatestCompanyNoteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        latest_note = Company_Note.objects.order_by("-created_at", "-id").first()
+        if latest_note:
+            serializer = CompanyNoteSerializer(latest_note)
+            return Response(serializer.data)
+        return Response(None)
+
+class CompanyNoteCreateView(generics.CreateAPIView):
+    queryset = Company_Note.objects.all()
     serializer_class = CompanyNoteSerializer
     permission_classes = [permissions.IsAuthenticated]
 

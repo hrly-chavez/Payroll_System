@@ -505,7 +505,7 @@ class Leave_Day(models.Model):
 class Company_Note(models.Model):
     id = models.AutoField(primary_key=True)
     note = models.TextField()
-    created_at = models.DateField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="company_notes")
 
     def __str__(self):

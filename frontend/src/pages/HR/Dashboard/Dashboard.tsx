@@ -16,14 +16,12 @@ import {
   HolidayType,
   PAYROLL_COLOR,
 } from "../../../components/SharedCalendar/CalendarLegend";
-import CompanyNote from "../../../components/CompanyNote/companyNote";
+import CompanyNote from "../../../components/CompanyNote/CompanyNote";
 import { Pie } from "@ant-design/plots";
-
-
-
 
 const { Content } = Layout;
 
+/* ================= TYPES ================= */
 type TodayAttendanceResponse = {
   has_attendance: boolean;
   attendance: null | {
@@ -102,20 +100,7 @@ const Dashboard: React.FC = () => {
 /* =========================================================
      🟢 COMPANY NOTE MODAL STATE (for Add Note button)
      ========================================================= */
-  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [noteContent, setNoteContent] = useState("");
-
-  const handleAddNote = async () => {
-    try {
-      console.log("New Note:", noteContent);
-
-      message.success("Note added successfully");
-      setIsNoteModalOpen(false);
-      setNoteContent("");
-    } catch {
-      message.error("Failed to add note");
-    }
-  };
 
   /* =========================================================
      🟢 CALENDAR EVENTS STATE (holidays + payroll periods)
@@ -670,20 +655,6 @@ const Dashboard: React.FC = () => {
           <SharedCalendar events={calendarEvents} />
         </Card>
       </Col>
-      <Modal
-        title="Add Company Note"
-        open={isNoteModalOpen}
-        onCancel={() => setIsNoteModalOpen(false)}
-        onOk={handleAddNote}
-        okText="Submit"
-      >
-        <Input.TextArea
-          rows={4}
-          value={noteContent}
-          onChange={(e) => setNoteContent(e.target.value)}
-          placeholder="Write company note here..."
-        />
-      </Modal>
     </Row>
         </Content>
       </Layout>

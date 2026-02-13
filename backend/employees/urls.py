@@ -25,6 +25,7 @@ urlpatterns = [
 
     path("auditlogs/employee/<int:employee_id>/", employee_audit_logs, name="employee-audit-logs"),
     #company note
-    path("company-notes/", CompanyNoteListCreateView.as_view(), name="company-notes"),
+    path("company-notes/latest/", LatestCompanyNoteView.as_view(), name="latest-company-note"),
+    path("company-notes/", CompanyNoteCreateView.as_view(), name="create-company-note"),
 
 ]

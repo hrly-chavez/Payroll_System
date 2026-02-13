@@ -10,15 +10,16 @@ from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q
-
+from datetime import date
 
 #helpers
 def _overlaps_period(eff_from, eff_to, period_start, period_end):
-    if eff_from and eff_from > period_end:
-        return False
-    if eff_to and eff_to < period_start:
-        return False
-    return True
+    """
+    Returns True if [eff_from, eff_to] overlaps with [period_start, period_end].
+    eff_to=None means ongoing.
+    """
+    eff_to = eff_to or date.max
+    return eff_from <= period_end and eff_to >= period_start
 
 
 # List and Create

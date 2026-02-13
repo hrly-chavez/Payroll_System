@@ -6,6 +6,7 @@ import { Modal, Descriptions, Tag, Table, Button, Alert, Spin, message } from "a
 import api from "../../../../api/axios";
 import AddCommission from "./AddCommission";
 import { formatBackendTime } from "../../../helpers";
+import dayjs from "dayjs";
 type EligibleEmployee = {
   id: number;
   full_name: string;
@@ -29,7 +30,8 @@ type Shift = {
   end_time: string;
   break_minutes: number;
   grace_minutes: number;
-  is_overnight: boolean;
+  is_overnight: boolean; // night differential enabled
+  crosses_midnight?: boolean;
   workdays: { day_of_week: number; day: string; is_workday: boolean }[];
 };
 
@@ -227,15 +229,15 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
     }
   };
 
-  useEffect(() => {
-    if (open) {
-      loadSnapshot();
-      loadCommissions();
-    } else {
-      setSnapshot(null);
-      setCommissions([]);
-    }
-  }, [open, employee?.id, period?.id]);
+ useEffect(() => {
+  if (open && employee?.id && period?.id) {
+    loadSnapshot();
+    loadCommissions();
+  } else if (!open) {
+    setSnapshot(null);
+    setCommissions([]);
+  }
+}, [open, employee?.id, period?.id]);
 
   const allowanceColumns = [
     {
@@ -390,7 +392,7 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
                 <Descriptions.Item label="Employee ID">{employee.id}</Descriptions.Item>
                 <Descriptions.Item label="Department">{employee.department_name || "-"}</Descriptions.Item>
                 <Descriptions.Item label="Payroll Period">
-                  {period ? `${period.start_date} - ${period.end_date}` : "-"}
+                  {period ? `${dayjs(period.start_date).format("MM/DD/YYYY")} - ${dayjs(period.end_date).format("MM/DD/YYYY")}` : "-"}
                 </Descriptions.Item>
                 <Descriptions.Item label="Status">
                   <Tag color={map[status].color}>{map[status].text}</Tag>

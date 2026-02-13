@@ -107,6 +107,7 @@ export default function PayrollPeriodTab({
         loading={loading}
         onRow={(record) => ({
           onClick: () => {
+            if (!record?.id) return;
             setSelectedPeriodId(record.id);
             setOpenEmployeesModal(true);
           },

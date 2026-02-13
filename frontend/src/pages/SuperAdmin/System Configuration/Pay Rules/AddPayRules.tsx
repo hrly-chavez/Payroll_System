@@ -131,7 +131,18 @@ export default function AddPayRules({open,title,onCancel,onOk,okText = "Save",fo
 
         <Row gutter={12}>
           <Col span={12}>
-            <Form.Item label="Applies To (Department)" name="applies_to">
+            <Form.Item label="Applies To (Department)"name="applies_to"
+                rules={[
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (value && getFieldValue("employee")) {
+                        return Promise.reject(new Error("Choose either Department or Employee, not both."));
+                      }
+                      return Promise.resolve();
+                    },
+                  }),
+                ]}
+              >
               <Select
                 allowClear
                 placeholder="All departments"
@@ -144,14 +155,29 @@ export default function AddPayRules({open,title,onCancel,onOk,okText = "Save",fo
           </Col>
 
           <Col span={12}>
-            <Form.Item label="Applies To (Employee)" name="employee">
+            <Form.Item label="Applies To (Employee)"name="employee"
+              rules={[
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (value && getFieldValue("applies_to")) {
+                      return Promise.reject(new Error("Choose either Department or Employee, not both."));
+                    }
+                    return Promise.resolve();
+                  },
+                }),
+              ]}
+            >
+
               <Select
                 allowClear
                 placeholder="All employees"
                 onChange={(value) => {
                   if (value) form.setFieldsValue({ applies_to: null });
                 }}
-                options={employees.map((e) => ({ value: e.id, label: e.full_name }))}
+               options={employees.map((e) => ({
+                value: e.id,
+                label: e.full_name || `${e.fname || ""} ${e.lname || ""}`.trim() || `Employee #${e.id}`,
+              }))}
               />
             </Form.Item>
           </Col>
@@ -164,13 +190,14 @@ export default function AddPayRules({open,title,onCancel,onOk,okText = "Save",fo
               name="effective_from"
               rules={[{ required: true, message: "Effective from is required" }]}
             >
-              <DatePicker style={{ width: "100%" }} />
+              <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
+
             </Form.Item>
           </Col>
 
           <Col span={12}>
             <Form.Item label="Effective To (Optional)" name="effective_to">
-              <DatePicker style={{ width: "100%" }} />
+              <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
             </Form.Item>
           </Col>
         </Row>

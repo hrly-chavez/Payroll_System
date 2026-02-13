@@ -13,6 +13,19 @@ class HolidaySerializer(serializers.ModelSerializer):
             'base',
             'status',
         )
+    def validate(self, attrs):
+        date = attrs.get("date")
+        qs = Holiday.objects.filter(date=date)
+
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+
+        if qs.exists():
+            raise serializers.ValidationError(  
+                {"date": "Holiday already exists for this date."}
+            )
+
+        return attrs
 
 class PayrollSerializer(serializers.ModelSerializer):
     class Meta:

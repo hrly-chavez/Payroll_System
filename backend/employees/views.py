@@ -17,6 +17,8 @@ from shared_model.signals import create_audit_log
 import logging
 import secrets
 from .serializers import CompanyNoteSerializer
+from rest_framework import generics
+
 
 #--------------------------Address
 # List all provinces
@@ -154,6 +156,38 @@ class UserViewSet(viewsets.ModelViewSet):
                 {"detail": "Password reset successfully, but failed to send email. Check logs for details."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+        
+    @action(detail=True, methods=["post"], url_path="deactivate")
+    def deactivate_user(self, request, pk=None):
+        """
+        Toggle user active status (deactivate/reactivate).
+        """
+        user = self.get_object()
+
+        # Attach current user for audit log
+        user._current_user = request.user
+
+        if user.is_active:
+            user.is_active = False
+            action_name = "DEACTIVATED"
+        else:
+            user.is_active = True
+            action_name = "REACTIVATED"
+
+        user.save()
+
+        # Audit log
+        create_audit_log(
+            instance=user,
+            action=action_name,
+            old_data=f"is_active: {not user.is_active}",
+            new_data=f"is_active: {user.is_active}"
+        )
+
+        return Response(
+            {"detail": f"User successfully {action_name.lower()}.", "is_active": user.is_active},
+            status=status.HTTP_200_OK
+        )
         
 #employee details crud
 class EmployeeViewSet(viewsets.ModelViewSet):
@@ -537,8 +571,18 @@ def employee_audit_logs(request, employee_id):
 
 
 #COMPANY NOTE
-class CompanyNoteListCreateView(generics.ListCreateAPIView):
-    queryset = Company_Note.objects.all().order_by("-created_at")
+class LatestCompanyNoteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        latest_note = Company_Note.objects.order_by("-created_at", "-id").first()
+        if latest_note:
+            serializer = CompanyNoteSerializer(latest_note)
+            return Response(serializer.data)
+        return Response(None)
+
+class CompanyNoteCreateView(generics.CreateAPIView):
+    queryset = Company_Note.objects.all()
     serializer_class = CompanyNoteSerializer
     permission_classes = [permissions.IsAuthenticated]
 

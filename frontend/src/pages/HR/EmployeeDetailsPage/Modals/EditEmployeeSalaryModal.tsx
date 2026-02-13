@@ -1,3 +1,4 @@
+//src/pages/HR/EmployeeDetailPage/Modals/EditEmployeeSalaryModal.tsx
 import { Modal, Form, Select, InputNumber, DatePicker, Button, message } from "antd";
 import api from "api/axios";
 import { useEffect, useState } from "react";

@@ -142,6 +142,11 @@ class LeaveRequestAdmin(admin.ModelAdmin):
     ordering = ("-requested_at",)
     readonly_fields = ("requested_at", "approved_at")
 
+@admin.register(HolidayPolicy)
+class HolidayPolicyAdmin(admin.ModelAdmin):
+    list_display = ("department", "holiday_type", "requires_work")
+    list_filter = ("department", "holiday_type", "requires_work")
+    search_fields = ("department__name", "holiday_type")
 admin.site.register(AuditLog)
 
 # @admin.register(HolidayPolicy)

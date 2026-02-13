@@ -1,30 +1,13 @@
+//src/pages/HR/EmployeeDetailsPage/EmployeeDetailsPage.tsx
 import React, { useEffect, useState } from "react";
-import {
-  Layout,
-  Card,
-  Tabs,
-  Button,
-  Table,
-  message,
-  Spin,
-} from "antd";
+import {Layout,Card,Tabs,Button,Table,message,Spin,Modal,} from "antd";
 import { useParams } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 import styles from "./EmployeeDetPage.module.css";
-import {
-  UserOutlined,
-  BankOutlined,
-  ClockCircleOutlined,
-  CalendarOutlined,
-  MailOutlined,
-  PhoneOutlined,
-  HomeOutlined,
-  CheckCircleOutlined,
-  StopOutlined,
-  EditOutlined,
-} from "@ant-design/icons";
+import {UserOutlined,BankOutlined,ClockCircleOutlined,CalendarOutlined,MailOutlined,PhoneOutlined,HomeOutlined,CheckCircleOutlined,StopOutlined,EditOutlined,} from "@ant-design/icons";
 import api from "api/axios";
+// import api from "../../../api/axios";
 import EditEmployeeSalaryModal from "./Modals/EditEmployeeSalaryModal";
 import EditEmployeeAllowanceModal from "../EmployeeDetailsPage/Modals/EditEmployeeAllowanceModal";
 import EditEmployeeDetailsModal from "./Modals/EditEmployeeDetailsModal";
@@ -53,6 +36,7 @@ interface EmployeeData {
   department_name: string;
   position: string;
   status: string;
+  is_active: boolean;
   shift_info: string | null;
   hired_date: string;
   bank_info: string;
@@ -88,7 +72,11 @@ const EmployeeDetailsPage: React.FC = () => {
       return;
     }
 
-    setSelectedSalary(salaries[0]); // latest salary
+    const latest = [...salaries].sort(
+      (a, b) => new Date(b.effective_from).getTime() - new Date(a.effective_from).getTime()
+    )[0];
+
+    setSelectedSalary(latest);
     setIsSalaryModalOpen(true);
   };
 
@@ -127,17 +115,7 @@ const EmployeeDetailsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (!employeeId) return;
 
-    const empIdNum = Number(employeeId);
-
-    // Fetch allowances
-    fetchAllowances(empIdNum);
-
-    // Fetch salary history
-    fetchSalaries(empIdNum);
-  }, [employeeId]);
 
   /* =========================
      ALLOWANCE RETRIEVE DATA
@@ -153,8 +131,8 @@ const EmployeeDetailsPage: React.FC = () => {
         params: { employee: employeeId }, // backend filters by employee_id
       });
 
-      const tableData = response.data.map((item: any, index: number) => ({
-        key: index.toString(),
+      const tableData = response.data.map((item: any) => ({
+        key: item.id,
         id: item.id,
         allowance_type_id: item.allowance_type.id,
         name: item.allowance_type.name, // linked allowance type name
@@ -173,10 +151,7 @@ const EmployeeDetailsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (!employeeId) return;
-    fetchAllowances(Number(employeeId)); // convert string param to number
-  }, [employeeId]);
+  
 
   /* =========================
      TAX RETRIEVE STATE
@@ -215,10 +190,11 @@ const EmployeeDetailsPage: React.FC = () => {
     if (!employeeId) return;
 
     const empIdNum = Number(employeeId);
-
     fetchAllowances(empIdNum);
     fetchSalaries(empIdNum);
-    fetchDeductions(empIdNum); // ✅ ADD THIS
+    fetchDeductions(empIdNum);
+    fetchUserAccount();
+    fetchAuditLogs();
   }, [employeeId]);
 
 
@@ -366,7 +342,7 @@ const EmployeeDetailsPage: React.FC = () => {
   if (!employee) return <p style={{ marginTop: 100 }}>Employee not found.</p>;
 
   const employeeStatus: "active" | "deactivated" =
-    employee.status.toLowerCase() === "active" ? "active" : "deactivated";
+    (employee as any).is_active ? "active" : "deactivated";
 
   return (
     <Layout className={styles.layout}>
@@ -580,7 +556,7 @@ const EmployeeDetailsPage: React.FC = () => {
                   <Table
                     columns={[
                       { title: "Deduction", dataIndex: "name", key: "name" },
-                      { title: "Type", dataIndex: "type", key: "type" },
+                      
                       { title: "Frequency", dataIndex: "frequency", key: "frequency" },
                       { title: "Effective From", dataIndex: "effective_from", key: "effective_from" },
                       { title: "Amount", dataIndex: "amount", key: "amount" },
@@ -622,6 +598,33 @@ const EmployeeDetailsPage: React.FC = () => {
                 <Tabs.TabPane tab="Employee Account" key="5">
                   <div className={styles.salaryHeader}>
                     <h3>Employee Account</h3>
+                    {userAccount && (
+                      <Button
+                        type="primary"
+                        danger={userAccount.is_active} // red if active
+                        onClick={() => {
+                          Modal.confirm({
+                            title: `Are you sure you want to ${userAccount.is_active ? "deactivate" : "activate"} this user?`,
+                            okText: userAccount.is_active ? "Deactivate" : "Activate",
+                            cancelText: "Cancel",
+                            onOk: async () => {
+                              try {
+                                const res = await api.post(`/employees/users/${userAccount.user_id}/deactivate/`);
+                                message.success(res.data.detail);
+
+                                // Update local state so status updates instantly
+                                setUserAccount(prev => prev ? { ...prev, is_active: res.data.is_active } : prev);
+                              } catch (err: any) {
+                                console.error(err);
+                                message.error("Failed to change user status");
+                              }
+                            },
+                          });
+                        }}
+                      >
+                        {userAccount.is_active ? "Deactivate" : "Activate"}
+                      </Button>
+                    )}
                     <Button
                       type="primary"
                       onClick={() => setIsForgotPasswordOpen(true)}

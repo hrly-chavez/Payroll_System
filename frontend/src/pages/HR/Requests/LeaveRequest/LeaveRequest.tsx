@@ -18,7 +18,7 @@ const LeaveRequests = () => {
   const fetchLeaveRequests = async () => {
     setLoading(true);
     try {
-      const response = await api.get("/approvals/approvals/leaves/");
+      const response = await api.get("/approvals/admin/leaves/");
       setRequests(response.data);
     } catch (error) {
       message.error("Failed to fetch leave requests");
@@ -40,9 +40,7 @@ const LeaveRequests = () => {
       okType: "primary",
       onOk: async () => {
         try {
-          await api.patch(`/approvals/approvals/leaves/${id}/`, {
-            status: "Approved",
-          });
+          await api.post(`/approvals/admin/leaves/${id}/status/`, { status: "Approved" });
 
           message.success("Leave request approved");
           fetchLeaveRequests();
@@ -61,7 +59,7 @@ const LeaveRequests = () => {
     }
 
     try {
-      await api.patch(`/approvals/approvals/leaves/${selectedRequestId}/`, {
+      await api.post(`/approvals/admin/leaves/${selectedRequestId}/status/`, {
         status: "Declined",
         reason: declineReason,
       });

@@ -16,7 +16,7 @@ import {
   HolidayType,
   PAYROLL_COLOR,
 } from "../../../components/SharedCalendar/CalendarLegend";
-import CompanyNote from "../../../components/CompanyNote/CompanyNote";
+import CompanyNote from "../../../components/CompanyNote/companyNote";
 import { Pie } from "@ant-design/plots";
 
 const { Content } = Layout;

@@ -82,7 +82,7 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
 
 
 
-class CommissionTypeSerializer(serializers.ModelSerializer):
+class  CommissionTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Commission_Type
         fields = [

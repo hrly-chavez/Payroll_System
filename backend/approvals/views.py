@@ -7,6 +7,8 @@ from rest_framework.exceptions import ValidationError
 from shared_model.models import *
 from .serializers import *
 from accounts.permissions import IsRole;
+from django.utils import timezone
+from datetime import datetime
 
 class HolidayListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
@@ -93,6 +95,38 @@ class LeaveRequestListCreateView(generics.ListCreateAPIView):
         data = request.data.copy()
         data["date_from"] = date_range[0]
         data["date_to"] = date_range[1]
+        data["employee"] = employee.id
+
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(employee=employee)
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    def create(self, request, *args, **kwargs):
+        try:
+            employee = Employee.objects.get(user=request.user)
+        except Employee.DoesNotExist:
+            raise ValidationError({"detail": "Employee profile not found."})
+
+        date_range = request.data.get("date_range")
+        if not date_range or len(date_range) != 2:
+            raise ValidationError({"date_range": "Start and end date are required."})
+
+        date_from = datetime.strptime(date_range[0], "%Y-%m-%d").date()
+        date_to = datetime.strptime(date_range[1], "%Y-%m-%d").date()
+
+        today = timezone.now().date()
+
+        # ✅ Prevent past dates
+        if date_from < today or date_to < today:
+            raise ValidationError({
+                "date_range": "You cannot request leave for past dates."
+            })
+
+        data = request.data.copy()
+        data["date_from"] = date_from
+        data["date_to"] = date_to
         data["employee"] = employee.id
 
         serializer = self.get_serializer(data=data)

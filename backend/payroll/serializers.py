@@ -6,9 +6,47 @@ from decimal import Decimal
 class DeductionTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Deduction_Type
-        fields = '__all__'  # Sends all fields to the frontend
+        fields = '__all__'
 
+    def validate(self, attrs):
+        salary_from = attrs.get(
+            "salary_range_from",
+            getattr(self.instance, "salary_range_from", None)
+        )
+        salary_to = attrs.get(
+            "salary_range_to",
+            getattr(self.instance, "salary_range_to", None)
+        )
 
+        # 🔹 Basic validation
+        if salary_from is None or salary_to is None:
+            raise serializers.ValidationError(
+                {"detail": "Salary range fields are required."}
+            )
+
+        if salary_from >= salary_to:
+            raise serializers.ValidationError(
+                {"detail": "Salary range 'From' must be less than 'To'."}
+            )
+
+        # 🔹 Exclude self when updating
+        queryset = Deduction_Type.objects.all()
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+
+        # 🔹 Overlap condition:
+        # existing.from < new.to AND existing.to > new.from
+        overlapping = queryset.filter(
+            salary_range_from__lt=salary_to,
+            salary_range_to__gt=salary_from
+        )
+
+        if overlapping.exists():
+            raise serializers.ValidationError(
+                {"detail": "This salary range overlaps with an existing contribution."}
+            )
+
+        return attrs
 
 
 

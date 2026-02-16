@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Form, Input, Button, message } from "antd";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import styles from "./login_styles.module.css";
 import api from "../../api/axios";
+import SuperAdminSetupModal from "../HR/AdminDepartmentEmployee/AddEmployee/AddEmployeeFlow";
 
 interface LoginFormValues {
   username: string;
@@ -16,6 +17,24 @@ export default function Login() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  const [showSuperAdminModal, setShowSuperAdminModal] = useState(false);
+  
+  useEffect(() => {
+    const checkSuperAdmin = async () => {
+      try {
+        const res = await api.get("/accounts/first-superadmin-check/");
+        if (res.data.total_users === 0 || !res.data.super_admin_exists) {
+          setShowSuperAdminModal(true);
+        }
+      } catch (err) {
+        console.error("Failed to check superadmin:", err);
+      }
+    };
+
+    checkSuperAdmin();
+  }, []);
+
 
   const onFinish = async (values: LoginFormValues) => {
     setLoading(true);
@@ -101,6 +120,13 @@ export default function Login() {
           </Form>
         </div>
       </div>
+      {showSuperAdminModal && (
+        <SuperAdminSetupModal
+          open={showSuperAdminModal}
+          onClose={() => setShowSuperAdminModal(false)}
+          mode="SUPERADMIN_SETUP"
+        />
+      )}
     </div>
   );
 }

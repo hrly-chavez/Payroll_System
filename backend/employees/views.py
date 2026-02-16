@@ -47,16 +47,18 @@ class BarangayListByCityAPIView(generics.ListAPIView):
 
 #--------------------------Department
 class DepartmentViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, IsRole]
+    permission_classes = [IsRole]
     allowed_roles = ["ADMIN", "SUPER_ADMIN"]
     queryset = Department.objects.all().order_by("-created_at")
     serializer_class = DepartmentSerializer
+    public_actions = ['list', 'retrieve']
 
 # para ni sa populate ang shifts sa drop down
 class ShiftViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsRole]
     queryset = Shift.objects.filter(is_active=True)
     serializer_class = ShiftSerializer
+    public_actions = ['list', 'retrieve']
     
 #user account
 logger = logging.getLogger(__name__)  # Use Django logging
@@ -187,6 +189,14 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         if self.action == "create":
             return EmployeeCreateSerializer
         return EmployeeSerializer
+    
+    def get_permissions(self):
+        if self.action == "create_first_superadmin":
+            return [AllowAny()]  # bypass auth completely
+        return [IsAuthenticated(), IsRole()]
+    
+    # public actions (unauthenticated) only for first superadmin
+    public_actions = ['create_first_superadmin']
 
     @action(detail=False, methods=["get"], url_path=r"by-department/(?P<dept_id>\d+)")
     def by_department(self, request, dept_id=None):
@@ -199,6 +209,39 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         employee = self.get_object()
         serializer = self.get_serializer(employee)
         return Response(serializer.data)
+    
+    # -------------------
+    # CREATE FIRST SUPER ADMIN EMPLOYEE
+    # -------------------
+    @action(detail=False, methods=["post"], url_path="create-first-superadmin")
+    def create_first_superadmin(self, request):
+        # Check if SUPER_ADMIN exists
+        super_admin_exists = User.objects.filter(role="SUPER_ADMIN", is_superuser=False).exists()
+        if super_admin_exists:
+            return Response({"error": "SUPER_ADMIN already exists."}, status=403)
+
+        # Proceed to create Employee + SUPER_ADMIN user
+        serializer = EmployeeCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        employee = serializer.save()
+
+        username = f"{employee.fname.lower()}{employee.id}"
+        password = "".join(random.choices(string.ascii_letters + string.digits, k=8))
+
+        user = User(
+            user_name=username,
+            role="SUPER_ADMIN",
+            employee=employee,
+        )
+        user.set_password(password)
+        user.save()
+
+        return Response({
+            "message": "First SUPER_ADMIN created successfully",
+            "employee_id": employee.id,
+            "username": username,
+            "password": password
+        }, status=201)
     
     # -------------------
     # CREATE EMPLOYEE
@@ -394,27 +437,34 @@ class EmployeeDeductionViewSet(viewsets.ModelViewSet):
     # ----------------- NEW ENDPOINT -----------------
     @action(detail=False, methods=["get"], url_path="deduction-types")
     def deduction_types(self, request):
-        """
-        Returns ONLY TAX / Government deductions
-        """
+        salary = request.query_params.get("salary")
+
+        if not salary:
+            return Response({"detail": "salary is required"}, status=400)
+
+        try:
+            salary = float(salary)
+        except ValueError:
+            return Response({"detail": "Invalid salary"}, status=400)
+
         deduction_types = Deduction_Type.objects.filter(
             is_active=True,
-            category="TAX"   # FILTER HERE
+            category="TAX",
+            salary_range_from__lte=salary,
+            salary_range_to__gte=salary
         )
 
         data = [
             {
                 "id": d.id,
                 "code": d.code,
-                "category": d.category,
                 "calculation_type": d.calculation_type,
                 "amount": float(d.amount),
-                "salary_range_from": float(d.salary_range_from),
-                "salary_range_to": float(d.salary_range_to),
             }
             for d in deduction_types
         ]
-        return Response(data, status=status.HTTP_200_OK)
+
+        return Response(data)
 
 #--------------------- ALLOWANCE
 class EmployeeAllowanceViewSet(viewsets.ModelViewSet):

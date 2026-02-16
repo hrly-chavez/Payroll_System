@@ -40,31 +40,25 @@ const EmployeeContributionsModal: React.FC<Props> = ({
 
     const load = async () => {
       try {
-        const [salaryRes, deductionRes] = await Promise.all([
-          api.get(`/employees/salaries/latest/?employee=${employeeId}`),
-          api.get("/employees/deductions/deduction-types"),
-        ]);
+        // Get latest salary first
+        const salaryRes = await api.get(
+          `/employees/salaries/latest/?employee=${employeeId}`
+        );
 
-        const baseSalary = Number(salaryRes.data.base_rate);
+        const baseSalary: number = Number(salaryRes.data.base_rate);
         setSalary(baseSalary);
 
-        const computed = deductionRes.data.map((d: any) => {
-          let computed_amount = 0;
+        // Now send salary to backend to get correct bracket
+        const deductionRes = await api.get(
+          `/employees/deductions/deduction-types?salary=${baseSalary}`
+        );
 
-          if (d.calculation_type === "Fixed") {
-            computed_amount = Number(d.amount);
-          } else if (d.calculation_type === "Percent") {
-            computed_amount = baseSalary * (Number(d.amount) / 100);
-          }
-
-          return {
-            ...d,
-            computed_amount: Number(computed_amount.toFixed(2)),
-          };
-        });
+        const computed = deductionRes.data.map((d: any) => ({
+          ...d,
+          computed_amount: Number(d.amount),
+        }));
 
         setDeductionTypes(computed);
-
         setEnabledDeductions(computed.map((d: any) => d.id));
 
       } catch {

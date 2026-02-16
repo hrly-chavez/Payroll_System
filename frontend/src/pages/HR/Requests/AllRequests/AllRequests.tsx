@@ -1,8 +1,100 @@
-import React from "react";
-import { Table, Tag, Button, Space } from "antd";
+import React, { useEffect, useState } from "react";
+import { Table, Tag, Button, Space, message, Modal, Input } from "antd";
+import api from "../../../../api/axios";
 import styles from "./AllRequests.module.css";
 
+const { TextArea } = Input;
+
 const AllRequests: React.FC = () => {
+  const [dataSource, setDataSource] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [declineModalOpen, setDeclineModalOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<any>(null);
+  const [declineReason, setDeclineReason] = useState("");
+
+  const fetchAllRequests = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get("/approvals/all-requests/");
+      setDataSource(res.data);
+    } catch (err) {
+      message.error("Failed to fetch requests");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAllRequests();
+  }, []);
+
+  // ✅ APPROVE
+  const handleApprove = async (record: any) => {
+    Modal.confirm({
+      title: "Approve Request",
+      content: "Are you sure you want to approve this request?",
+      onOk: async () => {
+        try {
+          if (record.model === "leave") {
+            await api.patch(`/approvals/approvals/leaves/${record.id}/`, {
+              status: "Approved",
+            });
+          }
+
+          if (record.model === "holiday") {
+            await api.patch(
+              `/approvals/superadmin/holidays/${record.id}/status/`,
+              { status: "Approved" }
+            );
+          }
+
+          
+
+          message.success("Approved successfully");
+          fetchAllRequests();
+        } catch {
+          message.error("Approval failed");
+        }
+      },
+    });
+  };
+
+  // ✅ DECLINE
+  const handleDeclineClick = (record: any) => {
+    setSelectedRecord(record);
+    setDeclineModalOpen(true);
+  };
+
+  const handleDeclineSubmit = async () => {
+    if (!declineReason.trim()) {
+      message.error("Please provide a reason for declining.");
+      return;
+    }
+
+    try {
+      if (selectedRecord.model === "leave") {
+        await api.patch(`/approvals/approvals/leaves/${selectedRecord.id}/`, {
+          status: "Declined",
+          reason: declineReason,
+        });
+      }
+
+      if (selectedRecord.model === "holiday") {
+        await api.patch(
+          `/approvals/superadmin/holidays/${selectedRecord.id}/status/`,
+          { status: "Declined", remarks: declineReason }
+        );
+      }
+
+      message.success("Declined successfully");
+      setDeclineModalOpen(false);
+      setDeclineReason("");
+      fetchAllRequests();
+    } catch {
+      message.error("Decline failed");
+    }
+  };
+
   const columns = [
     {
       title: "Employee",
@@ -10,12 +102,13 @@ const AllRequests: React.FC = () => {
     },
     {
       title: "Request Type",
-      dataIndex: "requestType",
-      render: (type: string) => (
-        <Tag color={type === "Leave" ? "blue" : "purple"}>
-          {type}
-        </Tag>
-      ),
+      dataIndex: "type",
+      render: (type: string) => {
+        let color = "blue";
+        if (type === "Holiday") color = "purple";
+        if (type === "Attendance") color = "orange";
+        return <Tag color={color}>{type}</Tag>;
+      },
     },
     {
       title: "Details",
@@ -40,44 +133,37 @@ const AllRequests: React.FC = () => {
     },
     {
       title: "Action",
-      render: () => (
-        <Space>
-          <Button type="primary" size="small">
-            Approve
-          </Button>
-          <Button danger size="small">
-            Decline
-          </Button>
-        </Space>
-      ),
-    },
-  ];
+      render: (_: any, record: any) => {
+        // ❌ No actions for Holiday (superadmin handles it)
+        if (record.model === "holiday") {
+          return null;
+        }
 
-  const dataSource = [
-    {
-      key: 1,
-      employee: "Jeremy Neigh",
-      requestType: "Leave",
-      details: "Mar 10 – Mar 12, 2023",
-      reason: "Family trip",
-      status: "Pending",
-    },
-    {
-      key: 2,
-      employee: "Theresa Webb",
-      requestType: "Attendance Correction",
-      details: "Mar 08, 2023 | 8:00 AM – 5:00 PM",
-      reason: "Missed punch",
-      status: "Pending",
-    },
-    {
-      key: 3,
-      employee: "Annette Black",
-      requestType: "Leave",
-      details: "Mar 15, 2023",
-      reason: "Sick leave",
-      status: "Approved",
-    },
+        // Only allow action if still Pending
+        if (record.status !== "Pending") {
+          return null;
+        }
+
+        return (
+          <Space>
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => handleApprove(record)}
+            >
+              Approve
+            </Button>
+            <Button
+              danger
+              size="small"
+              onClick={() => handleDeclineClick(record)}
+            >
+              Decline
+            </Button>
+          </Space>
+        );
+      },
+    }
   ];
 
   return (
@@ -85,8 +171,27 @@ const AllRequests: React.FC = () => {
       <Table
         columns={columns}
         dataSource={dataSource}
+        rowKey={(record) => `${record.model}-${record.id}`}
+        loading={loading}
         pagination={false}
       />
+
+      {/* 🔴 DECLINE MODAL */}
+      <Modal
+        title="Decline Request"
+        open={declineModalOpen}
+        onCancel={() => setDeclineModalOpen(false)}
+        onOk={handleDeclineSubmit}
+        okText="Decline"
+        okButtonProps={{ danger: true }}
+      >
+        <p>Please provide a reason for declining:</p>
+        <TextArea
+          rows={4}
+          value={declineReason}
+          onChange={(e) => setDeclineReason(e.target.value)}
+        />
+      </Modal>
     </div>
   );
 };

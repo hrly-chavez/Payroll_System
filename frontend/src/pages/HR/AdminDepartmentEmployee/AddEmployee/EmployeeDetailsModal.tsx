@@ -10,6 +10,7 @@ interface Props {
   departmentId: number;
   onNext: (employeeId: number, credentials: { username: string; password: string }) => void;
   onClose: () => void;
+  mode?: "ADMIN" | "SUPERADMIN_SETUP";
 }
 
 
@@ -46,7 +47,7 @@ interface Barangay {
   name: string;
 }
 
-const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , onNext, onClose }) => {
+const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , onNext, onClose, mode }) => {
   const [form] = Form.useForm();
 
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -101,22 +102,37 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , onNext, on
     try {
       const values = await form.validateFields();
 
-      // Prepare payload (send IDs for province/city/barangay)
       const payload = {
         ...values,
         hired_date: values.hired_date.format("YYYY-MM-DD"),
       };
 
-      const res = await api.post("/employees/employees/", payload);
+      // 🔥 Decide endpoint based on mode
+      const endpoint =
+        mode === "SUPERADMIN_SETUP"
+          ? "/employees/employees/create-first-superadmin/"
+          : "/employees/employees/";
 
-      message.success("Employee created successfully!");
+      const res = await api.post(endpoint, payload);
+
+      message.success(
+        mode === "SUPERADMIN_SETUP"
+          ? "Super Admin created successfully!"
+          : "Employee created successfully!"
+      );
+
       onNext(res.data.employee_id, {
         username: res.data.username,
         password: res.data.password,
       });
+
     } catch (err: any) {
       console.error(err);
-      message.error(err.response?.data?.message || "Failed to create employee");
+      message.error(
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        "Failed to create employee"
+      );
     }
   };
 

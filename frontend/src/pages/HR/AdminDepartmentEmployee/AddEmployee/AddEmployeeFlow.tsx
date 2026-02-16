@@ -7,10 +7,11 @@ import EmployeeCredentialsModal from "./EmployeeCredentialsModal";
 
 interface Props {
   open: boolean;
+  departmentId: number;
   onClose: () => void;
 }
 
-const AddEmployeeFlow: React.FC<Props> = ({ open, onClose }) => {
+const AddEmployeeFlow: React.FC<Props> = ({ open, departmentId , onClose }) => {
   const [step, setStep] = useState(1);
   const [employeeId, setEmployeeId] = useState<number | null>(null);
   const [credentials, setCredentials] = useState({
@@ -32,6 +33,7 @@ const AddEmployeeFlow: React.FC<Props> = ({ open, onClose }) => {
       {step === 1 && (
         <EmployeeDetailsModal
           open={open}
+          departmentId={departmentId}
           onNext={(id, creds) => {
             setEmployeeId(id);
             setCredentials(creds); // <-- store credentials locally

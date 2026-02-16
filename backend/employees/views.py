@@ -57,18 +57,6 @@ class ShiftViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = Shift.objects.filter(is_active=True)
     serializer_class = ShiftSerializer
-
-class ShiftSerializer(serializers.ModelSerializer):
-    permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["ADMIN"]
-    display_time = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Shift
-        fields = ["id", "name", "start_time", "end_time", "display_time"]
-
-    def get_display_time(self, obj):
-        return f"{obj.start_time.strftime('%H:%M')} - {obj.end_time.strftime('%H:%M')}"
     
 #user account
 logger = logging.getLogger(__name__)  # Use Django logging

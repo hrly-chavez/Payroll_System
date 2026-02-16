@@ -19,12 +19,16 @@ class BarangaySerializer(serializers.ModelSerializer):
         model = Barangay
         fields = ['id', 'name', 'city']
 
-
 class ShiftSerializer(serializers.ModelSerializer):
+    display_time = serializers.SerializerMethodField()
+
     class Meta:
         model = Shift
-        fields = ["id", "start_time", "end_time", "break_minutes", "grace_minutes", "is_overnight", "is_active"]
+        fields = ["id", "name", "start_time", "end_time", "display_time"]
 
+    def get_display_time(self, obj):
+        return f"{obj.start_time.strftime('%H:%M')} - {obj.end_time.strftime('%H:%M')}"
+    
 class DepartmentSerializer(serializers.ModelSerializer):
     # This will display the nested shift details
     shift = ShiftSerializer(read_only=True, source="shift_id")

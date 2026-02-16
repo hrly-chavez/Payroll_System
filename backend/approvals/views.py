@@ -8,6 +8,8 @@ from shared_model.models import *
 from .serializers import *
 from accounts.permissions import IsRole
 from django.utils import timezone
+from rest_framework.decorators import api_view
+from django.shortcuts import get_object_or_404
 
 class HolidayListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
@@ -70,7 +72,7 @@ class LeaveTypeUpdateView(generics.RetrieveUpdateAPIView):
 class LeaveRequestListCreateView(generics.ListCreateAPIView):
     serializer_class = LeaveRequestSerializer
     permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["EMPLOYEE"]
+    allowed_roles = ["EMPLOYEE", "ADMIN"]
 
     def get_queryset(self):
         try:
@@ -101,6 +103,55 @@ class LeaveRequestListCreateView(generics.ListCreateAPIView):
         serializer.save(employee=employee)
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+class AdminLeaveRequestListView(generics.ListAPIView):
+    serializer_class = LeaveRequestSerializer
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["ADMIN", "SUPER_ADMIN"]
+
+    def get_queryset(self):
+        # Admin sees all leave requests, ordered by latest
+        queryset = Leave_Request.objects.all().order_by("-requested_at")
+
+        # Optional filters via query params
+        status_filter = self.request.query_params.get("status")
+        employee_id = self.request.query_params.get("employee")
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        if employee_id:
+            queryset = queryset.filter(employee_id=employee_id)
+
+        return queryset
+
+# -----------------------------
+# Admin action to approve or decline leave
+# -----------------------------
+@api_view(["POST"])
+def admin_update_leave_status(request, pk):
+    """
+    Admin can approve or decline a leave request.
+    Payload example:
+    {
+        "status": "Approved"  # or "Declined"
+    }
+    """
+    user = request.user
+    if user.role not in ["ADMIN", "SUPER_ADMIN"]:
+        return Response({"detail": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+    leave_request = get_object_or_404(Leave_Request, pk=pk)
+    new_status = request.data.get("status")
+
+    if new_status not in ["Approved", "Declined"]:
+        return Response({"detail": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
+
+    leave_request.status = new_status
+    leave_request.approved_by = user
+    leave_request.approved_at = timezone.now()
+    leave_request.save()
+
+    serializer = LeaveRequestSerializer(leave_request)
+    return Response(serializer.data, status=status.HTTP_200_OK)
     
 class LeaveRequestUpdateView(generics.UpdateAPIView):
     queryset = Leave_Request.objects.all()

@@ -1,7 +1,7 @@
 import { Card, Button, Modal, Input, message } from "antd";
 import { useEffect, useState } from "react";
 import api from "../../api/axios";
-import styles from "./companyNote.module.css";
+import styles from "./CompanyNote.module.css";
 
 const { TextArea } = Input;
 
@@ -61,7 +61,7 @@ export default function CompanyNote({ role }: Props) {
    return (
     <>
       <Card
-        title="Company Note"
+        title="Announcements"
         extra={
           role === "ADMIN" || role === "SUPER_ADMIN" ? (
             <Button

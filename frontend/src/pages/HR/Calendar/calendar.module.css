@@ -273,3 +273,52 @@
   font-size: 11px;
   opacity: 0.65;
 }
+.fullHighlight {
+  position: relative;
+  height: 100%;
+}
+
+.fullHighlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(56, 111, 164, 0.18);
+  border-radius: 6px;
+  z-index: 0;
+}
+
+/* Make inner content appear above highlight */
+.fullHighlight > * {
+  position: relative;
+  z-index: 1;
+}
+
+.ppStart::before {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.ppMid::before {
+  border-radius: 0;
+}
+
+.ppEnd::before {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.calHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.calLeftTitle {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.calRight {
+  display: flex;
+  gap: 8px;
+}

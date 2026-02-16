@@ -19,6 +19,7 @@ import {
   HolidayType,
 } from "../../../components/SharedCalendar/CalendarLegend";
 import { PAYROLL_COLOR } from "../../../components/SharedCalendar/CalendarLegend";
+import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
 
 const { Content } = Layout;
 const { Option } = Select;
@@ -470,22 +471,13 @@ const attendanceChartData =
           </Col>
 
           {/* CALENDAR */}
-          <Col xs={24} md={8}>
-          <Card title="Calendar" className={styles.calendarCard}>
-              <SharedCalendar events={calendarEvents} />
-            </Card>
+                <Col xs={24} md={8}>
+                  <Card title="Calendar" className={`${styles.compactCard} ${styles.calendarCard}`}>
+                    <SharedCalendar events={calendarEvents} />
+                    <CalendarLegendDisplay />
+                  </Card>
           </Col>
-
         </Row>
-
-              <Card title="Legend & Holidays" className={styles.legendCard}>
-                <div className={styles.legendSection}>
-                  <div className={styles.legendItem}><span className={styles.legendGreen}></span> PH Holiday</div>
-                  <div className={styles.legendItem}><span className={styles.legendRed}></span> US Holiday</div>
-                  <div className={styles.legendItem}><span className={styles.legendYellow}></span> Work Day</div>
-                  <div className={styles.legendItem}><span className={styles.legendGray}></span> Non-Work</div>
-                </div>
-              </Card>
         </Content>
       </Layout>
     </Layout>

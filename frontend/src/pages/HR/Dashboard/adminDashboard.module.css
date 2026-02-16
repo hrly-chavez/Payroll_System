@@ -2,20 +2,15 @@
   margin: 16px;
 }
 
-.ant-card-body {
-  overflow: auto;
-}
-
 .mainSection {
   margin-top: 20px;
-  align-items: stretch; 
 }
 
-.mainSection .ant-col {
+.equalHeightRow .ant-col {
   display: flex;
 }
 
-.mainSection .ant-card {
+.equalHeightRow .ant-card {
   flex: 1;
 }
 
@@ -235,13 +230,6 @@
   margin-top: 20px;
 }
 
-.compactCard {
-  border-radius: 12px;
-  height: 360px;   
-  display: flex;
-  flex-direction: column;
-}
-
 .dateCard {
   height: 360px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
@@ -316,4 +304,18 @@
 .pendingTabs :global(.ant-tabs-ink-bar) {
   background: #3f6f9c;
   height: 2px;
+}
+
+.dateCard,
+.attendanceCard {
+  min-height: 360px;
+}
+
+.calendarCard {
+  display: flex;
+  flex-direction: column;
+}
+
+.calendarCard :global(.ant-card-body) {
+  padding-top: 8px;
 }

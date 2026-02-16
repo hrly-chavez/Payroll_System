@@ -45,3 +45,10 @@
 :global(.ant-picker-calendar-date-value) {
   display: none !important;
 }
+.calendarHeader {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 8px 0;
+}

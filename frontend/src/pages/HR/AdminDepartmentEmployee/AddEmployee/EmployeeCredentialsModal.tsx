@@ -7,6 +7,7 @@ interface Props {
   credentials: { username: string; password: string };
   onNext: () => void;
   onClose: () => void;
+  mode?: "ADMIN" | "SUPERADMIN_SETUP";
 }
 
 const EmployeeCredentialsModal: React.FC<Props> = ({

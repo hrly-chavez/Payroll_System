@@ -134,22 +134,65 @@ class LeaveRequestListCreateView(generics.ListCreateAPIView):
         serializer.save(employee=employee)
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+class LeaveRequestUpdateView(generics.UpdateAPIView):
+    queryset = Leave_Request.objects.all()
+    serializer_class = LeaveRequestSerializer
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["ADMIN", "HR"]
+
+    def perform_update(self, serializer):
+        status_value = self.request.data.get("status")
+
+        if status_value in ["Approved", "Declined"]:
+            serializer.save(
+                approved_by=self.request.user,
+                approved_at=timezone.now()
+            )
+        else:
+            serializer.save()
 
     
-class AllLeaveRequestListView(generics.ListAPIView):
+class AllRequestsListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = LeaveRequestSerializer
 
     def get_queryset(self):
-        qs = Leave_Request.objects.all().order_by("-requested_at")
-        print("🔥 QUERYSET COUNT:", qs.count())
-        return qs
+        # Not used directly, but required by DRF
+        return Leave_Request.objects.none()
 
     def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        print("🔥 SERIALIZED DATA:", serializer.data)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        data = []
+
+        #  Leave Requests
+        leaves = Leave_Request.objects.all()
+        for leave in leaves:
+            data.append({
+                "id": leave.id,
+                "type": "Leave",
+                "employee": f"{leave.employee.fname} {leave.employee.lname}",
+                "details": f"{leave.date_from} - {leave.date_to}",
+                "reason": leave.reason,
+                "status": leave.status,
+                "model": "leave",
+            })
+
+        #  Holidays
+        holidays = Holiday.objects.all()
+        for holiday in holidays:
+            data.append({
+                "id": holiday.id,
+                "type": "Holiday",
+                "employee": "System",
+                "details": f"{holiday.date} - {holiday.name}",
+                "reason": holiday.remarks,
+                "status": holiday.status,
+                "model": "holiday",
+            })
+
+        #  Attendance Request
+        
+        return Response(data)
 
 # ----------------------------
 # LIST

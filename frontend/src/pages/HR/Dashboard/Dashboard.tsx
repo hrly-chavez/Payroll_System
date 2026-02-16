@@ -18,6 +18,8 @@ import {
 } from "../../../components/SharedCalendar/CalendarLegend";
 import CompanyNote from "../../../components/CompanyNote/companyNote";
 import { Pie } from "@ant-design/plots";
+import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
+
 
 const { Content } = Layout;
 
@@ -520,7 +522,7 @@ const Dashboard: React.FC = () => {
 
           {/* STATS */}
           {/* ROW 1: DATE + ATTENDANCE + COMPANY NOTE */}
-          <Row gutter={16} className={styles.mainSection}>
+          <Row gutter={16} className={`${styles.mainSection} ${styles.equalHeightRow}`}>
 
         {/* DATE CARD */}
         <Col xs={24} md={8}>
@@ -614,8 +616,11 @@ const Dashboard: React.FC = () => {
       </Row>
 
       {/* ROW 2: PENDING + CALENDAR */}
-      <Row gutter={16} className={styles.mainSection}>
-
+      <Row
+        gutter={16}
+        className={styles.mainSection}
+        align="top"
+      >
         {/* PENDING REQUESTS */}
         <Col xs={24} md={16}>
           <Card title="Pending Requests" className={styles.pendingCard}>
@@ -651,9 +656,11 @@ const Dashboard: React.FC = () => {
 
       {/* CALENDAR */}
       <Col xs={24} md={8}>
-        <Card title="Calendar" className={styles.compactCard}>
+        <Card title="Calendar" className={`${styles.compactCard} ${styles.calendarCard}`}>
           <SharedCalendar events={calendarEvents} />
+          <CalendarLegendDisplay />
         </Card>
+
       </Col>
     </Row>
         </Content>

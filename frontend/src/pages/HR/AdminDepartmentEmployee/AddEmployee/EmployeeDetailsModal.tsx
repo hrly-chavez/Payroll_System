@@ -7,8 +7,10 @@ const { Option } = Select;
 
 interface Props {
   open: boolean;
+  departmentId: number;
   onNext: (employeeId: number, credentials: { username: string; password: string }) => void;
   onClose: () => void;
+  mode?: "ADMIN" | "SUPERADMIN_SETUP";
 }
 
 
@@ -21,6 +23,13 @@ interface Shift {
 interface Department {
   id: number;
   name: string;
+  shift?: {
+    id: number;
+    name: string;
+    start_time: string;
+    end_time: string;
+    display_time: string;
+  } | null;
 }
 
 interface Province {
@@ -38,7 +47,7 @@ interface Barangay {
   name: string;
 }
 
-const EmployeeDetailsModal: React.FC<Props> = ({ open, onNext, onClose }) => {
+const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , onNext, onClose, mode }) => {
   const [form] = Form.useForm();
 
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -52,9 +61,25 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, onNext, onClose }) => {
   // Fetch dropdown data
   useEffect(() => {
     api.get("/employees/shifts/").then(res => setShifts(res.data));
-    api.get("/employees/departments/").then(res => setDepartments(res.data));
+
+    api.get("/employees/departments/").then(res => {
+      const deptData = res.data;
+      setDepartments(deptData);
+
+      if (departmentId) {
+        const selectedDept = deptData.find(
+          (d: Department) => d.id === departmentId
+        );
+
+        form.setFieldsValue({
+          department: departmentId,
+          shift: selectedDept?.shift?.id ?? undefined
+        });
+      }
+    });
+
     api.get("/employees/provinces/").then(res => setProvinces(res.data));
-  }, []);
+  }, [departmentId]);
 
   const handleProvinceChange = (provinceId: number) => {
     form.setFieldsValue({ address: { city: null, barangay: null } });
@@ -77,22 +102,37 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, onNext, onClose }) => {
     try {
       const values = await form.validateFields();
 
-      // Prepare payload (send IDs for province/city/barangay)
       const payload = {
         ...values,
         hired_date: values.hired_date.format("YYYY-MM-DD"),
       };
 
-      const res = await api.post("/employees/employees/", payload);
+      // 🔥 Decide endpoint based on mode
+      const endpoint =
+        mode === "SUPERADMIN_SETUP"
+          ? "/employees/employees/create-first-superadmin/"
+          : "/employees/employees/";
 
-      message.success("Employee created successfully!");
+      const res = await api.post(endpoint, payload);
+
+      message.success(
+        mode === "SUPERADMIN_SETUP"
+          ? "Super Admin created successfully!"
+          : "Employee created successfully!"
+      );
+
       onNext(res.data.employee_id, {
         username: res.data.username,
         password: res.data.password,
       });
+
     } catch (err: any) {
       console.error(err);
-      message.error(err.response?.data?.message || "Failed to create employee");
+      message.error(
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        "Failed to create employee"
+      );
     }
   };
 
@@ -196,7 +236,16 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, onNext, onClose }) => {
           <Col xs={24} md={12}>
             <Form.Item name="department" label="Department" rules={[{ required: true }]}>
               <Select
-                options={departments.map(d => ({ value: d.id, label: d.name }))}
+                options={departments.map(d => ({
+                  value: d.id,
+                  label: d.name,
+                }))}
+                onChange={(value) => {
+                  const selectedDept = departments.find(d => d.id === value);
+                  form.setFieldsValue({
+                    shift: selectedDept?.shift?.id || undefined,
+                  });
+                }}
               />
             </Form.Item>
           </Col>

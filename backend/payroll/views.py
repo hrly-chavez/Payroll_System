@@ -12,7 +12,7 @@ from django.db import transaction
 from django.db.models import Exists, OuterRef, Q
 from datetime import date
 
-#helpers
+#helpers    
 def _overlaps_period(eff_from, eff_to, period_start, period_end):
     """
     Returns True if [eff_from, eff_to] overlaps with [period_start, period_end].

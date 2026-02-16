@@ -1,24 +1,26 @@
-// src/pages/Employee/Requests/LeaveRequests.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Table, Tag, Select, message, Spin } from "antd";
+import { Table, Tag, Select, message, Spin, Modal, Input } from "antd";
 import api from "../../../../api/axios";
 
 const { Option } = Select;
+const { TextArea } = Input;
 
 const LeaveRequests = () => {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const [declineModalOpen, setDeclineModalOpen] = useState(false);
+  const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
+  const [declineReason, setDeclineReason] = useState("");
+
   const fetchLeaveRequests = async () => {
     setLoading(true);
     try {
-      const response = await api.get("/approvals/approvals/leaves/"); // make sure baseURL in axios is correct
-      console.log("Fetched leave requests:", response.data);
+      const response = await api.get("/approvals/approvals/leaves/");
       setRequests(response.data);
     } catch (error) {
-      console.error(error);
       message.error("Failed to fetch leave requests");
     } finally {
       setLoading(false);
@@ -29,14 +31,56 @@ const LeaveRequests = () => {
     fetchLeaveRequests();
   }, []);
 
-  const handleStatusChange = async (id: number, value: string) => {
+  // 🔹 APPROVE
+  const handleApprove = (id: number) => {
+    Modal.confirm({
+      title: "Approve Leave Request",
+      content: "Are you sure you want to approve this leave request?",
+      okText: "Approve",
+      okType: "primary",
+      onOk: async () => {
+        try {
+          await api.patch(`/approvals/approvals/leaves/${id}/`, {
+            status: "Approved",
+          });
+
+          message.success("Leave request approved");
+          fetchLeaveRequests();
+        } catch (error) {
+          message.error("Failed to approve request");
+        }
+      },
+    });
+  };
+
+  // 🔹 DECLINE
+  const handleDecline = async () => {
+    if (!declineReason.trim()) {
+      message.error("Please provide a reason for declining.");
+      return;
+    }
+
     try {
-      await api.patch(`/approvals/approvals/leaves/${id}/`, { status: value });
-      message.success("Status updated successfully");
+      await api.patch(`/approvals/approvals/leaves/${selectedRequestId}/`, {
+        status: "Declined",
+        reason: declineReason,
+      });
+
+      message.success("Leave request declined");
+      setDeclineModalOpen(false);
+      setDeclineReason("");
       fetchLeaveRequests();
     } catch (error) {
-      console.error(error);
-      message.error("Failed to update status");
+      message.error("Failed to decline request");
+    }
+  };
+
+  const handleStatusChange = (id: number, value: string) => {
+    if (value === "Approved") {
+      handleApprove(id);
+    } else if (value === "Declined") {
+      setSelectedRequestId(id);
+      setDeclineModalOpen(true);
     }
   };
 
@@ -85,7 +129,7 @@ const LeaveRequests = () => {
             <Tag color="red">Declined</Tag>
           </Option>
           <Option value="Cancelled">
-            <Tag color="grey">Cancelled</Tag>
+            <Tag color="gray">Cancelled</Tag>
           </Option>
         </Select>
       ),
@@ -93,14 +137,34 @@ const LeaveRequests = () => {
   ];
 
   return (
-    <Spin spinning={loading}>
-      <Table
-        columns={columns}
-        dataSource={requests}
-        rowKey="id"
-        pagination={{ pageSize: 10 }}
-      />
-    </Spin>
+    <>
+      <Spin spinning={loading}>
+        <Table
+          columns={columns}
+          dataSource={requests}
+          rowKey="id"
+          pagination={{ pageSize: 10 }}
+        />
+      </Spin>
+
+      {/* 🔹 DECLINE MODAL */}
+      <Modal
+        title="Decline Leave Request"
+        open={declineModalOpen}
+        onCancel={() => setDeclineModalOpen(false)}
+        onOk={handleDecline}
+        okText="Decline"
+        okButtonProps={{ danger: true }}
+      >
+        <p>Please provide a reason for declining:</p>
+        <TextArea
+          rows={4}
+          value={declineReason}
+          onChange={(e) => setDeclineReason(e.target.value)}
+          placeholder="Enter decline reason..."
+        />
+      </Modal>
+    </>
   );
 };
 

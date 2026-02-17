@@ -118,3 +118,51 @@
   border-color: #1677ff;
   background: #fff;
 }
+.calendarCard {
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--card-shadow-soft);
+}
+
+.calendarCard :global(.ant-card-body) {
+  padding: 8px 10px;
+}
+
+/* ================= Legend ================= */
+
+.legendSection {
+  padding-top: 4px;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.legendGreen,
+.legendRed,
+.legendYellow,
+.legendGray {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.legendGreen {
+  background: #3fa34d;
+}
+
+.legendRed {
+  background: #d9534f;
+}
+
+.legendYellow {
+  background: #f0ad4e;
+}
+
+.legendGray {
+  background: #aaaaaa;
+}

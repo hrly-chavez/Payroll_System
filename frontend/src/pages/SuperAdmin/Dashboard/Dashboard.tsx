@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Layout, Row, Col, Calendar, Spin, message, DatePicker, Segmented } from "antd";
+import { Layout, Row, Col, Calendar, Spin, message, DatePicker, Segmented, Card } from "antd";
 import Chart from '../../../components/Chart';
 import Sidebar from '../../../components/Sidebar/Sidebar';
 import Topbar from '../../../components/Topbar/Topbar';
@@ -9,13 +9,23 @@ import dayjs from 'dayjs';
 import type { Dayjs } from "dayjs";
 import { useNavigate } from 'react-router-dom';
 import api from '../../../api/axios';
-import './Dashboard.css';
+import styles from './Dashboard.css';
 
 
 import HolidayModal from './HolidayModal';
 import HolidayDetailModal from './HolidayDetailModal';
 import DeclineReasonModal from './DeclineReasonModal';
 import PendingPayrollModal from './PendingPayrollModal';
+
+import {
+  HOLIDAY_LEGEND,
+  HolidayBase,
+  HolidayType,
+} from "../../../components/SharedCalendar/CalendarLegend";
+import { PAYROLL_COLOR } from "../../../components/SharedCalendar/CalendarLegend";
+import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
+import SharedCalendar from "./../../../components/SharedCalendar/SharedCalendar";
+
 
 const { Content } = Layout;
 
@@ -46,10 +56,60 @@ interface AttendanceRecord {
 type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'OVERTIME' | 'UNDERTIME';
 type RangeMode = "Day" | "Week" | "Month" | "Year";
 
+type CalendarEvent = {
+    type: "holiday" | "payroll";
+    start_date: string;
+    end_date?: string;
+    title: string;
+    color: string;
+  };
+
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
 
+  /* ------------------ Calendar ------------------ */
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+  const loadCalendarEvents = async () => {
+    try {
+      const [holidayRes, payrollRes] = await Promise.all([
+        api.get("/approvals/holidays/"),
+        api.get("/payroll/periods/"),
+      ]);
+
+      const holidays = holidayRes.data;
+      const payrolls = payrollRes.data;
+
+      const events: CalendarEvent[] = [
+        ...holidays.map((h: any) => {
+          const base = h.base as HolidayBase;
+          const type = h.type as HolidayType;
+
+          const legend = HOLIDAY_LEGEND[base]?.[type];
+
+          return {
+            type: "holiday",
+            start_date: h.date,
+            title: `${h.base} Holiday – ${h.name}`,
+            color: legend?.bgColor || "#999999",
+          };
+        }),
+
+        ...payrolls.map((p: any) => ({
+          type: "payroll",
+          start_date: p.start_date,
+          end_date: p.end_date,
+          title: "Payroll",
+          color: PAYROLL_COLOR.bgColor,
+        })),
+      ];
+
+      setCalendarEvents(events);
+    } catch {
+      message.error("Failed to load calendar events");
+    }
+  };
+  
   /* ------------------ Chart state ------------------ */
   const [chartOption, setChartOption] =
     useState<echarts.ComposeOption<echarts.BarSeriesOption>>();
@@ -208,6 +268,7 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     fetchHolidayRequests();
+    loadCalendarEvents();
     fetchPendingPayrolls();
     fetchAttendanceAnalytics(selectedDate, rangeMode);
   }, []);
@@ -327,17 +388,10 @@ const Dashboard: React.FC = () => {
 
 
             <Col xs={24} lg={8}>
-              <div
-                style={{
-                  padding: 24,
-                  background: '#fff',
-                  borderRadius: 8,
-                  marginBottom: 16,
-                }}
-              >
-                <h3 style={{ textAlign: 'center', marginBottom: 12 }}>Calendar</h3>
-                <Calendar fullscreen={false} />
-              </div>
+              <Card title="Calendar" className={`${styles.compactCard} ${styles.calendarCard}`}>
+                  <SharedCalendar events={calendarEvents} />
+                  <CalendarLegendDisplay />
+              </Card>
 
               <Row gutter={[16, 16]} className="stats-row">
                 <Col span={12}>

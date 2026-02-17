@@ -95,11 +95,14 @@ export default function ContributionTab({ active }: Props) {
 
       closeContributionModal();
       fetchContributions();
-    } catch (error) {
-      console.error(error);
+    }catch (error: any) {
+    if (error.response?.data?.detail) {
+      message.error(error.response.data.detail);
+    } else {
       message.error("Failed to save contribution.");
     }
-  };
+  }                                                                                                                                                                                  
+      };
 
   return (
     <div className="table-wrapper">

@@ -6,10 +6,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError
 from shared_model.models import *
 from .serializers import *
-from accounts.permissions import IsRole
+from accounts.permissions import IsRole;
 from django.utils import timezone
 from rest_framework.decorators import api_view
 from django.shortcuts import get_object_or_404
+from datetime import datetime
 
 class HolidayListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
@@ -153,6 +154,38 @@ def admin_update_leave_status(request, pk):
     serializer = LeaveRequestSerializer(leave_request)
     return Response(serializer.data, status=status.HTTP_200_OK)
     
+    def create(self, request, *args, **kwargs):
+        try:
+            employee = Employee.objects.get(user=request.user)
+        except Employee.DoesNotExist:
+            raise ValidationError({"detail": "Employee profile not found."})
+
+        date_range = request.data.get("date_range")
+        if not date_range or len(date_range) != 2:
+            raise ValidationError({"date_range": "Start and end date are required."})
+
+        date_from = datetime.strptime(date_range[0], "%Y-%m-%d").date()
+        date_to = datetime.strptime(date_range[1], "%Y-%m-%d").date()
+
+        today = timezone.now().date()
+
+        # ✅ Prevent past dates
+        if date_from < today or date_to < today:
+            raise ValidationError({
+                "date_range": "You cannot request leave for past dates."
+            })
+
+        data = request.data.copy()
+        data["date_from"] = date_from
+        data["date_to"] = date_to
+        data["employee"] = employee.id
+
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(employee=employee)
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
 class LeaveRequestUpdateView(generics.UpdateAPIView):
     queryset = Leave_Request.objects.all()
     serializer_class = LeaveRequestSerializer
@@ -173,6 +206,7 @@ class LeaveRequestUpdateView(generics.UpdateAPIView):
     
 class AllRequestsListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
+    serializer_class = LeaveRequestSerializer
 
     def get_queryset(self):
         # Not used directly, but required by DRF

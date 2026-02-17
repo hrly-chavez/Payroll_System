@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Modal, Form, Select, DatePicker, Input, Button, message } from "antd";
 import api from "../../../api/axios";
+import dayjs from "dayjs";
+
 
 const { RangePicker } = DatePicker;
 
@@ -82,7 +84,13 @@ const LeaveRequest = ({ open, onClose }: any) => {
           name="date_range"
           rules={[{ required: true, message: "Please select date range" }]}
         >
-          <RangePicker style={{ width: "100%" }} />
+          <RangePicker
+            style={{ width: "100%" }}
+            disabledDate={(current) => {
+              return current && current.startOf("day") < dayjs().startOf("day");
+            }}
+          />
+
         </Form.Item>
 
         {/* Reason */}

@@ -4,12 +4,43 @@ from django.utils import timezone
 from decimal import Decimal
 
 class DeductionTypeSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = Deduction_Type
-        fields = '__all__'  # Sends all fields to the frontend
+        fields = "__all__"
 
+    def validate(self, data):
+        code = data.get("code")
+        salary_from = data.get("salary_range_from")
+        salary_to = data.get("salary_range_to")
 
+        if salary_from > salary_to:
+            raise serializers.ValidationError(
+                "Salary range 'from' cannot be greater than 'to'."
+            )
 
+        # Get existing records with same code
+        queryset = Deduction_Type.objects.filter(code=code)
+
+        # Exclude self when updating
+        if self.instance:
+            queryset = queryset.exclude(id=self.instance.id)
+
+        for deduction in queryset:
+            existing_from = deduction.salary_range_from
+            existing_to = deduction.salary_range_to
+
+            # Check overlap condition
+            if (
+                salary_from <= existing_to and
+                salary_to >= existing_from
+            ):
+                raise serializers.ValidationError(
+                    f"Salary range overlaps with existing range "
+                    f"{existing_from} - {existing_to} for code {code}."
+                )
+
+        return data
 
 
 #==================================PAYROLL PERIOD=================================

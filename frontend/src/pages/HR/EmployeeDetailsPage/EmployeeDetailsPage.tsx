@@ -99,43 +99,6 @@ const EmployeeDetailsPage: React.FC = () => {
       setLoadingSalaries(false);
     }
   };
-
-
-
-  /* =========================
-     ALLOWANCE RETRIEVE DATA
-  ========================== */
-
-  const [allowances, setAllowances] = useState<any[]>([]);
-  const [loadingAllowances, setLoadingAllowances] = useState(false);
-
-  const fetchAllowances = async (employeeId: number) => {
-    setLoadingAllowances(true);
-    try {
-      const response = await api.get("/employees/allowances/", {
-        params: { employee: employeeId }, // backend filters by employee_id
-      });
-
-      const tableData = response.data.map((item: any) => ({
-        key: item.id,
-        id: item.id,
-        allowance_type_id: item.allowance_type.id,
-        name: item.allowance_type.name, // linked allowance type name
-        amount: `₱${item.amount}`,
-        frequency: item.frequency,
-        status: item.status,
-        effective_from: item.effective_from,
-      }));
-
-      setAllowances(tableData);
-    } catch (error: any) {
-      message.error("Failed to fetch allowances");
-      console.error(error);
-    } finally {
-      setLoadingAllowances(false);
-    }
-  };
-
   
 
   /* =========================
@@ -175,7 +138,6 @@ const EmployeeDetailsPage: React.FC = () => {
     if (!employeeId) return;
 
     const empIdNum = Number(employeeId);
-    fetchAllowances(empIdNum);
     fetchSalaries(empIdNum);
     fetchDeductions(empIdNum);
     fetchAuditLogs();
@@ -444,15 +406,9 @@ const EmployeeDetailsPage: React.FC = () => {
 
                 {/* ALLOWANCE */}
                 <Tabs.TabPane tab="Allowance" key="2">
-                  <AllowanceTab
-                    employeeId={Number(employeeId)}
-                    allowances={allowances}
-                    loading={loadingAllowances}
-                    onSuccess={() => {
-                      fetchAllowances(Number(employeeId));
-                    }}
-                  />
+                  <AllowanceTab employeeId={Number(employeeId)} />
                 </Tabs.TabPane>
+
 
                 {/* TAX */}
                 <Tabs.TabPane tab="Tax" key="3">

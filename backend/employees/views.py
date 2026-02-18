@@ -566,6 +566,7 @@ class AllowanceTypeListAPIView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
     
 #--------------------- audit logs
+#for each employee
 @api_view(["GET"])
 def employee_audit_logs(request, employee_id):
     """
@@ -647,6 +648,16 @@ def employee_audit_logs(request, employee_id):
 
 
     return Response(serialized_logs)
+
+#audit logs (Reports)
+class UserActivityLogViewSet(viewsets.ViewSet):
+    """
+    Read-only ViewSet that returns all CREATE/UPDATE/DELETE audit logs.
+    """
+    def list(self, request):
+        logs = AuditLog.objects.filter(action__in=["CREATE", "UPDATE", "DELETE"]).order_by("-timestamp")
+        serializer = UserActivityAuditLogSerializer(logs, many=True)
+        return Response(serializer.data)
 
 
 #COMPANY NOTE

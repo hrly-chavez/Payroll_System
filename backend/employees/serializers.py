@@ -408,24 +408,20 @@ class EmployeeAllowanceSerializer(serializers.ModelSerializer):
         ]
 
 #audit logs
-class AuditLogSerializer(serializers.ModelSerializer):
-    user_id = serializers.IntegerField(source="user.id", read_only=True)
+class UserActivityAuditLogSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.user_name", read_only=True)
-    timestamp = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S")  # 24-hour format
-    
+    role = serializers.SerializerMethodField()
+    timestamp = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S")
+
     class Meta:
         model = AuditLog
-        fields = [
-            "id",
-            "user_id",
-            "username",
-            "action",
-            "model_name",
-            "object_id",
-            "old_data",
-            "new_data",
-            "timestamp",
-        ]
+        fields = ["id", "username", "role", "action", "model_name", "timestamp"]
+
+    def get_role(self, obj):
+        if obj.user:
+            return obj.user.role
+        return "Anonymous"
+
 
 #------------ COMPANY NOTE SERIALIZER-----------
 class CompanyNoteSerializer(serializers.ModelSerializer):

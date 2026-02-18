@@ -3,6 +3,7 @@ from django.dispatch import receiver
 from django.forms.models import model_to_dict
 from django.core.serializers.json import DjangoJSONEncoder
 from .models import AuditLog
+from accounts.current_user import get_current_user
 import json
 
 _old_values = {}
@@ -26,14 +27,16 @@ def store_old_data(sender, instance, **kwargs):
             pass
 
 def get_instance_user(instance):
-    """Return the manually attached _current_user from the view if available."""
     user = getattr(instance, "_current_user", None)
-    if user:
-        print(f"[DEBUG] _current_user found on {instance}: {user.user_name} ({user.role})")
-    else:
-        print(f"[DEBUG] No _current_user on {instance}")
+
+    print("Current user from thread:", get_current_user())
+
+    if not user:
+        user = get_current_user()
+
     if user and user.is_authenticated:
         return user
+
     return None
 
 def create_audit_log(instance, action, old_data=None, new_data=None):

@@ -27,6 +27,81 @@ class ShiftWorkdayAdmin(admin.ModelAdmin):
 
 admin.site.register(Employee)
 admin.site.register(Address)
+@admin.register(Payroll)
+class PayrollAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "employee",
+        "payroll_period",
+        "status",
+        "basic_pay",
+        "total_earnings",
+        "total_deductions",
+        "net_pay",
+        "generated_at",
+    )
+
+    list_filter = (
+        "status",
+        "payroll_period",
+        "generated_at",
+    )
+
+    search_fields = (
+        "employee__fname",
+        "employee__lname",
+        "payroll_period__code",
+    )
+
+    ordering = ("-generated_at",)
+
+    readonly_fields = (
+        "basic_pay",
+        "total_earnings",
+        "total_deductions",
+        "net_pay",
+        "generated_at",
+        "approved_at",
+    )
+@admin.register(Payslip)
+class PayslipAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "payroll",
+        "line_type",
+        "description",
+        "amount",
+        "source_type",
+        "rate_applied",
+        "created_at",
+    )
+
+    list_filter = (
+        "line_type",
+        "source_type",
+        "created_at",
+    )
+
+    search_fields = (
+        "payroll__employee__fname",
+        "payroll__employee__lname",
+        "description",
+    )
+
+    ordering = ("payroll", "id")
+
+    readonly_fields = (
+        "payroll",
+        "rule",
+        "line_type",
+        "description",
+        "source_type",
+        "source_id",
+        "quantity_min",
+        "rate_applied",
+        "amount",
+        "created_at",
+    )
 
 @admin.register(Payroll_Setting)
 class PayrollSettingAdmin(admin.ModelAdmin):
@@ -95,8 +170,34 @@ class DeductionTypeAdmin(admin.ModelAdmin):
 
 
 @admin.register(Allowance_Type)
-class Allowance_Type(admin.ModelAdmin):
-    list_display = ('name', )
+class AllowanceTypeAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "name",
+        "code",
+        "is_active",
+        "created_at",
+    )
+
+    list_filter = (
+        "is_active",
+        "created_at",
+    )
+
+    search_fields = (
+        "name",
+        "code",
+    )
+
+    ordering = ("-created_at",)
+
+    fields = (
+        "name",
+        "code",
+        "is_active",
+        "created_at",
+    )
+
 
 @admin.register(Employee_Allowance)
 class Employee_Allowance(admin.ModelAdmin):
@@ -105,8 +206,39 @@ class Employee_Allowance(admin.ModelAdmin):
 admin.site.register(Attendance)
 admin.site.register(Attendance_Event)
 admin.site.register(Payroll_Period)
-admin.site.register(Commission_Type)
 
+@admin.register(Commission_Type)
+class CommissionTypeAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "name",
+        "code",
+        "is_taxable",
+        "is_active",
+        "created_at",
+    )
+
+    list_filter = (
+        "is_taxable",
+        "is_active",
+        "created_at",
+    )
+
+    search_fields = (
+        "name",
+        "code",
+    )
+
+    ordering = ("-created_at",)
+
+    fields = (
+        "name",
+        "code",
+        "is_taxable",
+        "is_active",
+        "created_at",
+    )
+    
 @admin.register(Pay_Rule)
 class PayRuleAdmin(admin.ModelAdmin):
     list_display = ('name', 'event_type', 'category', 'rate_type', 'rate_value', 'is_active', 'created_at' )

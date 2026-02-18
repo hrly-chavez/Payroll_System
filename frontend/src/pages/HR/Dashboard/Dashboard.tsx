@@ -16,7 +16,7 @@ import {
   HolidayType,
   PAYROLL_COLOR,
 } from "../../../components/SharedCalendar/CalendarLegend";
-import CompanyNote from "../../../components/CompanyNote/CompanyNote";
+import CompanyNote from "../../../components/CompanyNote/companyNote";
 import { Pie } from "@ant-design/plots";
 import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
 
@@ -133,14 +133,14 @@ const Dashboard: React.FC = () => {
   ];
 
  /* =========================================================
-     🟢 TIME STATES
+      TIME STATES
      ========================================================= */
 
-  const [phTime, setPhTime] = useState<Date | null>(null);
-  const [usaTime, setUsaTime] = useState<Date | null>(null);
+  const [nowTick, setNowTick] = useState(0);
+
 
   /* =========================================================
-     🟢 ATTENDANCE STATES
+      ATTENDANCE STATES
      ========================================================= */
 
   const [attendance, setAttendance] = useState<TodayAttendanceResponse["attendance"]>(null);
@@ -271,15 +271,7 @@ const Dashboard: React.FC = () => {
    - Used for real-time clock display
    ========================================================= */
 
-  const fetchBaseTime = async (timezone: string, setter: (d: Date) => void) => {
-    try {
-      const res = await fetch(`https://worldtimeapi.org/api/timezone/${timezone}`);
-      const data = await res.json();
-      setter(new Date(data.datetime));
-    } catch (err) {
-      console.error("Time API error", err);
-    }
-  };
+  
 
 /* =========================================================
    LOAD CALENDAR EVENTS (HOLIDAYS + PAYROLL PERIODS)
@@ -398,13 +390,12 @@ const Dashboard: React.FC = () => {
    ========================================================= */
 
   useEffect(() => {
-  fetchBaseTime("Asia/Manila", setPhTime);
-  fetchBaseTime("America/New_York", setUsaTime);
-  fetchTodayAttendance();
-  loadCalendarEvents();
-  fetchMyDashboardStats();
-  fetchTodayEmployeesAttendance(selectedDate);
-}, []);
+    fetchTodayAttendance();
+    loadCalendarEvents();
+    fetchMyDashboardStats();
+    fetchTodayEmployeesAttendance(selectedDate);
+  }, []);
+
 
 /* =========================================================
    DEBUG CALENDAR EVENTS
@@ -423,12 +414,12 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setPhTime((p) => (p ? new Date(p.getTime() + 1000) : p));
-      setUsaTime((p) => (p ? new Date(p.getTime() + 1000) : p));
+      setNowTick((x) => x + 1);
     }, 1000);
 
     return () => clearInterval(interval);
   }, []);
+
 
   /* =========================================================
    HANDLE PUNCH IN
@@ -577,11 +568,10 @@ const Dashboard: React.FC = () => {
               <div className={styles.timeRow}>
               <div className={styles.timeBox}>
                 <span>PH Time</span>
-                <h2>{formatTime(phTime, "Asia/Manila")}</h2>
-              </div>
+                  <h2>{formatTime(new Date(), "Asia/Manila")}</h2>              </div>
               <div className={styles.timeBox}>
                 <span>USA Time</span>
-                <h2>{formatTime(usaTime, "America/New_York")}</h2>
+                <h2>{formatTime(new Date(), "America/New_York")}</h2>
               </div>
             </div>
 

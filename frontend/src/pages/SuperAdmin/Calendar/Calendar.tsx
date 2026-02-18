@@ -1,22 +1,12 @@
 import React from 'react';
-import Sidebar from '../../../components/Sidebar/Sidebar';
 import { Layout } from 'antd';
-import Topbar from '../../../components/Topbar/Topbar';
+import CalendarPage from 'pages/HR/Calendar/Calendar';
 const { Content } = Layout;
+
 
 const Calendar: React.FC = () => {
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-        <Sidebar />
-        <Layout>
-          <Topbar title="Calendar" />
-          <Content style={{ margin: '16px' }}>
-            <div style={{ padding: 24, background: '#fff' }}>
-              This is the Super Admin Calendar Page
-            </div>
-          </Content>
-        </Layout>
-    </Layout>
+        <CalendarPage showRequests={false} />
   );
 };
 

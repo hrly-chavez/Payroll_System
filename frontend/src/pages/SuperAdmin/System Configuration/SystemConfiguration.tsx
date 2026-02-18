@@ -10,6 +10,7 @@ import ContributionTab from "./Contribution/ContributionTab";
 import LeaveTab from "./Leave/LeaveTab";
 import CommissionTypeTab from "./CommissionType/CommissionTypeTab";
 import ShiftTab from "./Workshifts/ShiftTab";
+import AllowanceTypeTab from "./AllowanceType/AllowanceType";
 
 
 const { Content } = Layout;
@@ -17,7 +18,7 @@ const { Content } = Layout;
 
 
 const SystemConfiguration: React.FC = () => {
-   const [activeTab, setActiveTab] = useState<"contribution" | "payroll" | "leave" | "commission" | "workshifts">("contribution");
+   const [activeTab, setActiveTab] = useState<"contribution" | "payroll" | "leave" | "commission" | "workshifts" | "allowance">("contribution");
 
   return (
     <Layout className="system-layout">
@@ -43,6 +44,10 @@ const SystemConfiguration: React.FC = () => {
               <button className={activeTab === "workshifts" ? "active" : ""} onClick={() => setActiveTab("workshifts")}>
                 Workshifts
               </button>
+              <button className={activeTab === "allowance" ? "active" : ""} onClick={() => setActiveTab("allowance")}>
+                Allowance Types
+              </button>
+
 
             </div>
 
@@ -57,6 +62,8 @@ const SystemConfiguration: React.FC = () => {
                   ? "Leave Types"
                   : activeTab === "workshifts"
                   ? "Workshifts"
+                  : activeTab === "allowance"
+                  ? "Allowance Types" 
                   : "Commission Types"}
               </h3>
             </div>
@@ -67,7 +74,7 @@ const SystemConfiguration: React.FC = () => {
             {activeTab === "leave" && <LeaveTab active />}
             {activeTab === "commission" && <CommissionTypeTab active />}
             {activeTab === "workshifts" && <ShiftTab active />}
-
+            {activeTab === "allowance" && <AllowanceTypeTab active />}
           </div>
         </Content>
       </Layout>

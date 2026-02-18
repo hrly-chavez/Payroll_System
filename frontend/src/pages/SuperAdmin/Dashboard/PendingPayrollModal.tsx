@@ -1,7 +1,7 @@
 // src/components/Modals/PendingPayrollModal.tsx
-import React from 'react';
-import { Modal, Table, Button, Spin } from 'antd';
-import dayjs from 'dayjs';
+import React from "react";
+import { Modal, Table, Button } from "antd";
+import dayjs from "dayjs";
 
 interface Payroll {
   id: number;
@@ -19,22 +19,30 @@ interface Props {
   navigateToAll: () => void;
 }
 
-const PendingPayrollModal: React.FC<Props> = ({ visible, onClose, data, loading, navigateToAll }) => {
+const PendingPayrollModal: React.FC<Props> = ({
+  visible,
+  onClose,
+  data,
+  loading,
+  navigateToAll,
+}) => {
   const payrollColumns = [
-    { title: 'Employee', dataIndex: 'employee_name', key: 'employee_name' },
+    { title: "Employee", dataIndex: "employee_name", key: "employee_name" },
     {
-      title: 'Period',
-      dataIndex: 'period',
-      key: 'period',
-      render: (period: string) => dayjs(period).format('MMM DD, YYYY'),
+      title: "Period",
+      dataIndex: "period",
+      key: "period",
+      render: (period: string) =>
+        dayjs(period).format("MMM DD, YYYY"),
     },
     {
-      title: 'Total Amount',
-      dataIndex: 'total_amount',
-      key: 'total_amount',
-      render: (amount: number) => `₱${amount.toLocaleString()}`,
+      title: "Total Amount",
+      dataIndex: "total_amount",
+      key: "total_amount",
+      render: (amount: number) =>
+        `₱${amount.toLocaleString()}`,
     },
-    { title: 'Status', dataIndex: 'status', key: 'status' },
+    { title: "Status", dataIndex: "status", key: "status" },
   ];
 
   return (
@@ -42,6 +50,7 @@ const PendingPayrollModal: React.FC<Props> = ({ visible, onClose, data, loading,
       title="Pending Payroll(s)"
       open={visible}
       onCancel={onClose}
+      width={800}
       footer={[
         <Button key="see-all" type="link" onClick={navigateToAll}>
           See All
@@ -50,7 +59,6 @@ const PendingPayrollModal: React.FC<Props> = ({ visible, onClose, data, loading,
           Close
         </Button>,
       ]}
-      width={800}
     >
       <Table
         columns={payrollColumns}

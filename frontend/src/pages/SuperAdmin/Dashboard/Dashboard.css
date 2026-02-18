@@ -1,5 +1,6 @@
 .dashboard-layout {
   min-height: 100vh;
+  background: #fff;   /* light grey background */
 }
 
 .dashboard-content {
@@ -8,13 +9,17 @@
 
 /* Cards */
 .card {
-  background: #fff;
-  border-radius: 8px;
+  background: white; /* white card background */
+  border-radius: 12px; /* more rounded */
   padding: 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06); /* soft shadow */
 }
 
 .analytics-card {
-  min-height: 360px;
+  min-height: 300px;  /* slightly shorter like screenshot */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .card-title {
@@ -26,6 +31,7 @@
   margin-bottom: 16px;
 }
 
+
 .calendar-title {
   text-align: center;
   margin-bottom: 12px;
@@ -33,32 +39,103 @@
 
 /* Stats */
 .stats-row {
-  margin-top: 16px;
+  margin-top: 20px;
+  gap: 16px;
 }
 
 .stat-card {
   background: #fff;
-  border-radius: 8px;
-  padding: 16px;
+  border-radius: 12px;
+  padding: 20px;
   text-align: center;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  height: 100%;
+  min-height: 260px;   /* match donut card height */
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 }
 
+/* ===== TILE CARD LAYOUT ===== */
+.stat-tile {
+  height: 100%;
+  min-height: 260px; /* match donut card */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 24px;
+}
+
+/* Title */
+.tile-title {
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Body center */
+.tile-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* Icon */
+.tile-icon {
+  font-size: 56px;
+  opacity: 0.9;
+}
+
+/* Value */
+.tile-value {
+  font-size: 56px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ===== COLOR VARIANTS ===== */
+
+/* Blue primary (Pending Payroll) */
+.stat-card.primary {
+  background: #3f6f9e;
+  color: #fff;
+}
+
+.stat-card.primary .tile-icon,
+.stat-card.primary .tile-value,
+.stat-card.primary .tile-title {
+  color: #fff;
+}
+
+/* Gray secondary (Holiday) */
+.stat-card:not(.primary) {
+  background: #FFF;
+}
+
+.stat-card:not(.primary) .tile-icon {
+  color: #3f6f9e;
+}
+
+.stat-card:not(.primary) .tile-value {
+  color: #3f6f9e;
+}
+
+/* Labels & Values (legacy stat text) */
 .stat-label {
   font-size: 14px;
-  font-weight: 700; /* make the label bold */
+  font-weight: 700;
   color: #000;
-  text-align: center; /* center the label */
+  text-align: center;
   margin-bottom: 8px;
 }
 
 .stat-value {
   font-size: 28px;
   font-weight: 700;
-  text-align: center; /* center the number */
+  text-align: center;
 }
 
 .stat-value.danger {
@@ -117,4 +194,26 @@
   outline: none;
   border-color: #1677ff;
   background: #fff;
+}
+
+/* Hover effect for clickable stat tiles */
+.stat-tile.clickable {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.stat-tile.clickable:hover {
+  filter: brightness(1); /* slightly darken the card */
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25); /* stronger shadow on hover */
+  transform: translateY(-2px); /* optional subtle lift */
+}
+/* Make the bottom row stretch all columns to same height */
+.dashboard-content .ant-row > .ant-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.analytics-card,
+.calendar-card {
+  flex: 1; /* stretch to fill height of parent column */
 }

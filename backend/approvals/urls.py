@@ -24,6 +24,11 @@ urlpatterns = [
     path("superadmin/commission-types/", CommissionTypeListView.as_view(), name="commission-type-list",),
     path("superadmin/commission-types/create/", CommissionTypeCreateView.as_view(), name="commission-type-create",),
     path("superadmin/commission-types/<int:pk>/", CommissionTypeUpdateView.as_view(), name="commission-type-update",),
+
+    #Allowance Type
+    path("allowance-type/add/", AllowanceTypeCreateView.as_view()),
+    path("allowance-type/", AllowanceTypeListView.as_view()),
+    path("allowance-type/<int:pk>/", AllowanceTypeUpdateView.as_view()),
     
 
 ]

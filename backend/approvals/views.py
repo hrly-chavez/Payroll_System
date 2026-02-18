@@ -14,7 +14,7 @@ from datetime import datetime
 
 class HolidayListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
-    queryset = Holiday.objects.filter(status="Approved",is_active=True).order_by("-date")
+    queryset = Holiday.objects.filter(is_active=True).order_by("-date")
     serializer_class = HolidaySerializer
     # public access → no permission_classes
 
@@ -277,3 +277,18 @@ class CommissionTypeUpdateView(generics.UpdateAPIView):
 
     queryset = Commission_Type.objects.all()
     serializer_class = CommissionTypeSerializer
+
+class AllowanceTypeCreateView(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated]
+    queryset = Allowance_Type.objects.all()
+    serializer_class = AllowanceTypeSerializer
+
+class AllowanceTypeListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    queryset = Allowance_Type.objects.all()
+    serializer_class = AllowanceTypeSerializer
+
+class AllowanceTypeUpdateView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    queryset = Allowance_Type.objects.all()
+    serializer_class = AllowanceTypeSerializer

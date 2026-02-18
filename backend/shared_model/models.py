@@ -4,6 +4,7 @@ from django.contrib.auth.hashers import make_password, check_password
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 class Province(models.Model):
     name = models.CharField(max_length=100)
@@ -49,9 +50,10 @@ class Shift(models.Model):
     start_time = models.TimeField()
     end_time = models.TimeField()
     break_minutes = models.PositiveIntegerField(default=0)
-    grace_minutes = models.PositiveIntegerField(default=0)
-    is_overnight = models.BooleanField(default=False)
-    crosses_midnight = models.BooleanField(default=False)
+    grace_minutes = models.PositiveIntegerField(default=0, help_text="Minutes allowed before counting as late/undertime, depending on rules.")
+    is_overnight = models.BooleanField(default=False,help_text="Business label only: check if this is considered a night/graveyard schedule (e.g., 00:00–09:00 or 22:00–06:00).")
+    crosses_midnight = models.BooleanField(default=False,
+        help_text="Technical: check ONLY if the shift ends the next day (end_time earlier than start_time), e.g., 22:00–06:00.")
     is_active = models.BooleanField(default=True)
 
     def clean(self):
@@ -304,7 +306,7 @@ class Allowance_Type(models.Model):
     name = models.CharField(max_length=50)
     code = models.CharField(max_length=50)
     is_active = models.BooleanField(default=True)
-    created_at = models.DateField(auto_now_add=True)
+    created_at = models.DateField(default=timezone.now)
 
     class Meta:
         constraints = [
@@ -322,6 +324,7 @@ class Employee_Allowance(models.Model):
         ("Monthly","Monthly"),
         ("Per Period","Per Period"),
         ("One Time","One Time"),
+        ("Per Day","Per Day"),
     ]
     status_choices = [
         ("Active","Active"),
@@ -350,12 +353,14 @@ class Employee_Allowance(models.Model):
         ]
 
 class Commission_Type(models.Model):
+    
+
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=50)
     code = models.CharField(max_length=50, unique=True)
     is_taxable = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
-    created_at = models.DateField(auto_now_add=True)
+    created_at = models.DateField(default=timezone.now)
 
     def __str__(self):
         return self.name
@@ -445,10 +450,15 @@ class HolidayPolicy(models.Model):
         
 class Attendance_Event(models.Model):
     TYPE_CHOICES = [
+        ("Night Differential","Night Differential"),
         ("Late","Late"),
-        ("OverTime","OverTime"),
-        ("UnderTime","UnderTime"),
-        ("Worked Holiday","Worked Holiday"),
+        ("Undertime","Undertime"),
+        ("Overtime","Overtime"),
+        ("Regular Holiday","Regular Holiday"),  
+        ("Special Holiday","Special Holiday"),
+        ("Special Non Working Holiday","Special Non Working Holiday"),
+        ("Company Holiday","Company Holiday"),
+        ("Absent","Absent"),
     ]
     APPROVAL_STATUS_CHOICES = [
         ("Pending","Pending"),
@@ -456,7 +466,7 @@ class Attendance_Event(models.Model):
         ("Declined","Declined"),
     ]
     id = models.AutoField(primary_key=True)
-    type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    type = models.CharField(max_length=50, choices=TYPE_CHOICES)
     minutes = models.PositiveIntegerField(default=0)
     start_time = models.TimeField(null=True,blank=True)
     end_time = models.TimeField(null=True,blank=True)

@@ -37,6 +37,10 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
   
   const [openEmployeeModal, setOpenEmployeeModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<EligibleEmployee | null>(null);
+  const [generating, setGenerating] = useState(false);
+
+  const canGenerate = !!periodId && (period?.status === "Open");
+  const verifiedCount = employees.filter((e) => e.status === "Verified").length;
 
   const loadEligibleEmployees = async () => {
     if (!periodId) return;
@@ -54,6 +58,37 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
       message.error(msg);
     } finally {
       setLoading(false);
+    }
+  };
+  const handleGeneratePayroll = async () => {
+    if (!periodId) return;
+    if (!canGenerate) {
+      message.error("Payroll period must be Open to generate payroll.");
+      return;
+    }
+    if (verifiedCount === 0) {
+      message.error("No Verified employees to generate payroll for.");
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      const res = await api.post(`/payroll/payroll/periods/${periodId}/generate/`);
+      message.success(res?.data?.detail || "Payroll generated.");
+
+      // refresh list & statuses
+      await loadEligibleEmployees();
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Payroll generation failed";
+      message.error(msg);
+
+      // refresh anyway (in case something partially changed, though your backend rolls back)
+      await loadEligibleEmployees();
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -110,9 +145,31 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
           ) : null}
         </div>
 
-        <Button type="primary" disabled={employees.length === 0}>
-          Generate Payroll
-        </Button>
+        <Button
+            type="primary"
+            disabled={employees.length === 0 || period?.status !== "Open"}
+            loading={loading}
+            onClick={async () => {
+              if (!periodId) return;
+
+              setLoading(true);
+              try {
+                const res = await api.post(`/payroll/periods/${periodId}/generate/`);
+                message.success(res?.data?.detail || "Payroll generated.");
+                await loadEligibleEmployees(); // refresh statuses to Processing
+              } catch (err: any) {
+                const msg =
+                  err?.response?.data?.detail ||
+                  err?.response?.data?.message ||
+                  "Payroll generation failed";
+                message.error(msg);
+              } finally {
+                setLoading(false);
+              }
+            }}
+          >
+            Generate Payroll
+          </Button>
       </div>
 
         <Table

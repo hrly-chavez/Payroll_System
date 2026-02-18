@@ -28,16 +28,12 @@ environ.Env.read_env(BASE_DIR / '.env')
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-5y)_r+#--6qx9#2ez%*6^gfs4*bogq2abe#sr4sl0xp9hxs^7q'
 
-# TODO: ANG GAMITON IF MAKASABOT NAKO(PROD NEEDED)
-#  SECRET_KEY = env('SECRET_KEY')
-#  DEBUG = env('DEBUG')
-#  ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost'])
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["192.168.68.71","localhost", "127.0.0.1"]
+ALLOWED_HOSTS = ["192.168.68.43","localhost", "127.0.0.1"]
 
 AUTH_USER_MODEL = "shared_model.User"
 
@@ -159,7 +155,7 @@ CORS_ALLOWED_ORIGINS = env.list(
     default=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "http://192.168.68.71:3000",
+        "http://192.168.68.43:3000",
     ]
 )
 

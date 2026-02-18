@@ -63,10 +63,16 @@ def _is_true_overnight(shift) -> bool:
 def _compute_minutes_late(shift, target_date: date, time_in) -> int:
     """
     Late if time_in is after (shift.start_time + grace_minutes)
+    Correctly handles true overnight shifts.
     """
     grace = shift.grace_minutes or 0
     start_dt = _combine_date_time(target_date, shift.start_time) + timedelta(minutes=grace)
     in_dt = _combine_date_time(target_date, time_in)
+    
+    # If true overnight (22:00–06:00) and punch-in time is after midnight (e.g., 00:30),
+    # then in_dt must be next day relative to target_date (shift start date).
+    if _is_true_overnight(shift) and time_in < shift.start_time:
+        in_dt = in_dt + timedelta(days=1)
 
     diff = in_dt - start_dt
     minutes = int(diff.total_seconds() // 60)

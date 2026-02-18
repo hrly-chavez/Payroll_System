@@ -11,6 +11,8 @@ from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q
 from datetime import date
+from .services import PayrollGenerationService
+
 
 #helpers
 def _overlaps_period(eff_from, eff_to, period_start, period_end):
@@ -415,4 +417,35 @@ class PayRuleChoicesView(APIView):
             "category_choices": category_choices,
             "rate_type_choices": rate_type_choices,
         })
-    
+
+
+#======================================PAYROLL GENERATION========================================
+
+class GeneratePayrollForPeriodView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, period_id: int):
+        svc = PayrollGenerationService()
+        result = svc.generate_for_period(
+            period_id=period_id,
+            generated_by_user=request.user
+        )
+
+        serializer = GeneratePayrollPeriodResponseSerializer(result)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+class GeneratePayrollForEmployeeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, period_id: int, employee_id: int):
+        svc = PayrollGenerationService()
+        result = svc.generate_for_employee(
+            period_id=period_id,
+            employee_id=employee_id,
+            generated_by_user=request.user
+        )
+
+        serializer = GeneratePayrollEmployeeResponseSerializer(result)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+

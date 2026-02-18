@@ -61,8 +61,7 @@ type TodayAttendanceResponse = {
   };
 
 const Dashboard: React.FC = () => {
-  const [phTime, setPhTime] = useState<Date | null>(null);
-  const [usaTime, setUsaTime] = useState<Date | null>(null);
+  const [nowTick, setNowTick] = useState(0);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
 
   const [attendance, setAttendance] = useState<TodayAttendanceResponse["attendance"]>(null);
@@ -173,7 +172,7 @@ const attendanceChartData =
       setLoadingStats(true);
       try {
         const now = dayjs();
-        const params = { year: now.year(), month: now.month() + 1 };
+        const params = { year: now.year(), month: selectedMonth };
 
         const res = await api.get<AttendanceLogsResponse>("/attendance/logs/", { params });
 
@@ -254,28 +253,19 @@ const attendanceChartData =
         console.error("Time API error", err);
       }
     };
-
     useEffect(() => {
-      const fetchTime = async () => {
-        try {
-          const ph = await fetch("https://worldtimeapi.org/api/timezone/Asia/Manila").then(r => r.json());
-          const us = await fetch("https://worldtimeapi.org/api/timezone/America/New_York").then(r => r.json());
-          setPhTime(new Date(ph.datetime));
-          setUsaTime(new Date(us.datetime));
-        } catch {}
-      };
-      fetchTime();
-      fetchBaseTime("Asia/Manila", setPhTime);
-      fetchBaseTime("America/New_York", setUsaTime);
+    fetchAttendanceStats();
+  }, [selectedMonth]);
+    useEffect(() => {
       fetchTodayAttendance();
       fetchAttendanceStats();
       loadCalendarEvents();
     }, []);
 
+
     useEffect(() => {
       const interval = setInterval(() => {
-        setPhTime(p => p ? new Date(p.getTime() + 1000) : p);
-        setUsaTime(p => p ? new Date(p.getTime() + 1000) : p);
+        setNowTick((x) => x + 1);
       }, 1000);
       return () => clearInterval(interval);
     }, []);
@@ -328,12 +318,12 @@ const attendanceChartData =
               <div className={styles.timeRow}>
                 <div className={styles.timeBox}>
                   <span>PH Time</span>
-                  <h2>{formatTime(phTime, "Asia/Manila")}</h2>
+                  <h2>{formatTime(new Date(), "Asia/Manila")}</h2>
                 </div>
 
                 <div className={styles.timeBox}>
                   <span>USA Time</span>
-                  <h2>{formatTime(usaTime, "America/New_York")}</h2>
+                  <h2>{formatTime(new Date(), "America/New_York")}</h2>
                 </div>
               </div>
 

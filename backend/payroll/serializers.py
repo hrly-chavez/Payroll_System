@@ -8,10 +8,6 @@ class DeductionTypeSerializer(serializers.ModelSerializer):
         model = Deduction_Type
         fields = '__all__'  # Sends all fields to the frontend
 
-
-
-
-
 #==================================PAYROLL PERIOD=================================
 # Used to create and return payroll period data (date range, code, status)
 class PayrollPeriodCreateSerializer(serializers.ModelSerializer):
@@ -230,19 +226,17 @@ class PayRuleSerializer(serializers.ModelSerializer):
             getattr(self.instance, "rate_value", None)
         )
 
-        # 🔹 Scope validation
+        #  Scope validation
         if applies_to and employee:
-            raise ValidationError(
-                {"detail": "Choose only one scope: either Department (applies_to) or Employee, not both."}
-            )
+            raise serializers.ValidationError({"detail": "Choose only one scope: either Department (applies_to) or Employee, not both."})
 
-        # 🔹 Date validation
+        #  Date validation
         if effective_to and effective_from and effective_to < effective_from:
             raise ValidationError(
                 {"detail": "effective_to cannot be earlier than effective_from."}
             )
 
-        # 🔹 Rate value validation
+        #  Rate value validation
         if rate_value is not None:
             try:
                 if Decimal(rate_value) < 0:
@@ -261,3 +255,14 @@ class PayRuleSerializer(serializers.ModelSerializer):
             return f"{obj.employee.fname} {obj.employee.lname}".strip()
         return None
     
+#==========================================PAYROLL GENERATION===========================
+
+class GeneratePayrollPeriodResponseSerializer(serializers.Serializer):
+    detail = serializers.CharField()
+    generated = serializers.IntegerField()
+
+
+class GeneratePayrollEmployeeResponseSerializer(serializers.Serializer):
+    detail = serializers.CharField()
+    employee_id = serializers.IntegerField()
+

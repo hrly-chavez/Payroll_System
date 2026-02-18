@@ -11,8 +11,15 @@ urlpatterns = [
     path('superadmin/leave-types/create/', LeaveTypeCreateView.as_view(), name='leave-create'),
     path('superadmin/leave-types/<int:pk>/', LeaveTypeUpdateView.as_view(), name='leave-update'),
 
-    path("leaves/", LeaveRequestListCreateView.as_view(), name="leave-request"),
+    # for employee
+    path("leaves/", LeaveRequestListCreateView.as_view(), name="leave-requests"),
+    path("approvals/leaves/<int:pk>/", LeaveRequestUpdateView.as_view()),
 
+    #admin
+    path("all-requests/", AllRequestsListCreateView.as_view()),
+    path("admin/leaves/", AdminLeaveRequestListView.as_view(), name="admin-leave-requests"),
+    path("admin/leaves/<int:pk>/status/", admin_update_leave_status, name="admin-leave-update-status"),
+    
     # Commission Types
     path("superadmin/commission-types/", CommissionTypeListView.as_view(), name="commission-type-list",),
     path("superadmin/commission-types/create/", CommissionTypeCreateView.as_view(), name="commission-type-create",),

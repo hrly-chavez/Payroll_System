@@ -5,10 +5,13 @@ import {
   DatePicker,
   Button,
   message,
-  Divider
+  Divider,
+  Select,
 } from "antd";
 import { useEffect, useState } from "react";
 import api from "api/axios";
+
+const { Option } = Select;
 
 interface Props {
   open: boolean;
@@ -16,7 +19,6 @@ interface Props {
   onNext: () => void;
   onClose: () => void;
 }
-
 
 const EmployeeContributionsModal: React.FC<Props> = ({
   open,
@@ -28,11 +30,7 @@ const EmployeeContributionsModal: React.FC<Props> = ({
 
   const [salary, setSalary] = useState<number>(0);
   const [deductionTypes, setDeductionTypes] = useState<any[]>([]);
-
-  //checkbox
   const [enabledDeductions, setEnabledDeductions] = useState<number[]>([]);
-
-
 
   /* -------------------- LOAD SALARY + DEDUCTIONS -------------------- */
   useEffect(() => {
@@ -40,33 +38,27 @@ const EmployeeContributionsModal: React.FC<Props> = ({
 
     const load = async () => {
       try {
-        const [salaryRes, deductionRes] = await Promise.all([
-          api.get(`/employees/salaries/latest/?employee=${employeeId}`),
-          api.get("/employees/deductions/deduction-types"),
-        ]);
+        // Get latest salary first
+        const salaryRes = await api.get(
+          `/employees/salaries/latest/?employee=${employeeId}`
+        );
 
-        const baseSalary = Number(salaryRes.data.base_rate);
+        const baseSalary: number = Number(salaryRes.data.base_rate);
         setSalary(baseSalary);
 
-        const computed = deductionRes.data.map((d: any) => {
-          let computed_amount = 0;
+        // Now send salary to backend to get correct bracket
+        const deductionRes = await api.get(
+          `/employees/deductions/deduction-types?salary=${baseSalary}`
+        );
 
-          if (d.calculation_type === "Fixed") {
-            computed_amount = Number(d.amount);
-          } else if (d.calculation_type === "Percent") {
-            computed_amount = baseSalary * (Number(d.amount) / 100);
-          }
-
-          return {
-            ...d,
-            computed_amount: Number(computed_amount.toFixed(2)),
-          };
-        });
+        const computed = deductionRes.data.map((d: any) => ({
+          ...d,
+          computed_amount: Number(d.amount),
+          frequency: undefined, // start empty, user must choose
+        }));
 
         setDeductionTypes(computed);
-
         setEnabledDeductions(computed.map((d: any) => d.id));
-
       } catch {
         message.error("Failed to load salary or deductions");
       }
@@ -75,31 +67,30 @@ const EmployeeContributionsModal: React.FC<Props> = ({
     load();
   }, [open, employeeId]);
 
-
   /* -------------------- SUBMIT -------------------- */
   const submit = async () => {
     try {
       const values = await form.validateFields();
-
       const effectiveFrom = values.effective_from.format("YYYY-MM-DD");
 
-      // Payload for mandatory deductions with editable amounts
       const systemPayloads = deductionTypes
         .filter(d => enabledDeductions.includes(d.id))
-        .map(d => ({
-          employee: employeeId,
-          deduction_type: d.id,
-          frequency: "Monthly",
-          effective_from: effectiveFrom,
-          status: "Active",
-        }));
+        .map((d, index) => {
+          const amount = form.getFieldValue(["system_deductions", index, "amount"]);
+          const frequency = form.getFieldValue(["system_deductions", index, "frequency"]);
+          return {
+            employee: employeeId,
+            deduction_type: d.id,
+            amount,
+            frequency,
+            effective_from: effectiveFrom,
+            status: "Active",
+          };
+        });
 
-
-      // Submit all together
       await Promise.all(
         systemPayloads.map(p => api.post("/employees/deductions/", p))
       );
-
 
       message.success("Employee contributions saved");
       onNext();
@@ -117,7 +108,6 @@ const EmployeeContributionsModal: React.FC<Props> = ({
       closable={false}
     >
       <Form layout="vertical" form={form}>
-        {/* ---------------- GOVERNMENT CONTRIBUTIONS ---------------- */}
         <Divider>Government Contributions</Divider>
 
         {deductionTypes.map((d, index) => {
@@ -134,6 +124,7 @@ const EmployeeContributionsModal: React.FC<Props> = ({
                 opacity: isEnabled ? 1 : 0.5,
               }}
             >
+              {/* Amount Input */}
               <Form.Item
                 name={["system_deductions", index, "amount"]}
                 label={`${d.code} (${d.calculation_type})`}
@@ -150,6 +141,20 @@ const EmployeeContributionsModal: React.FC<Props> = ({
                   step={0.01}
                   disabled={!isEnabled}
                 />
+              </Form.Item>
+
+              {/* Frequency Select */}
+              <Form.Item
+                name={["system_deductions", index, "frequency"]}
+                label="Frequency"
+                initialValue={d.frequency}
+                rules={isEnabled ? [{ required: true, message: "Please select frequency" }] : []}
+              >
+                <Select disabled={!isEnabled} style={{ width: "100%" }}>
+                  <Option value="Monthly">Monthly</Option>
+                  <Option value="Per Period">Per Period</Option>
+                  <Option value="One Time">One Time</Option>
+                </Select>
               </Form.Item>
 
               <Button
@@ -169,7 +174,7 @@ const EmployeeContributionsModal: React.FC<Props> = ({
           );
         })}
 
-        {/* ---------------- EFFECTIVE DATE ---------------- */}
+        {/* Effective Date */}
         <Form.Item
           name="effective_from"
           label="Effective From"

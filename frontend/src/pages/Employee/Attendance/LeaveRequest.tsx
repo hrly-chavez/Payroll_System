@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Modal, Form, Select, DatePicker, Input, Button, message } from "antd";
 import api from "../../../api/axios";
+import dayjs from "dayjs";
+
 
 const { RangePicker } = DatePicker;
 
@@ -25,13 +27,14 @@ const LeaveRequest = ({ open, onClose }: any) => {
 
     try {
     const payload = {
-      leave_type: values.leave_type,
+      leave_type_id: values.leave_type,   // ✅ must be leave_type_id
       date_range: [
         values.date_range[0].format("YYYY-MM-DD"),
         values.date_range[1].format("YYYY-MM-DD"),
       ],
       reason: values.reason || "",
     };
+
 
 
       await api.post("/approvals/leaves/", payload);
@@ -81,7 +84,13 @@ const LeaveRequest = ({ open, onClose }: any) => {
           name="date_range"
           rules={[{ required: true, message: "Please select date range" }]}
         >
-          <RangePicker style={{ width: "100%" }} />
+          <RangePicker
+            style={{ width: "100%" }}
+            disabledDate={(current) => {
+              return current && current.startOf("day") < dayjs().startOf("day");
+            }}
+          />
+
         </Form.Item>
 
         {/* Reason */}

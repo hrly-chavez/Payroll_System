@@ -7,12 +7,17 @@ import Topbar from "../../../components/Topbar/Topbar";
 import styles from "./EmployeeDetPage.module.css";
 import {UserOutlined,BankOutlined,ClockCircleOutlined,CalendarOutlined,MailOutlined,PhoneOutlined,HomeOutlined,CheckCircleOutlined,StopOutlined,EditOutlined,} from "@ant-design/icons";
 import api from "api/axios";
-// import api from "../../../api/axios";
-import EditEmployeeSalaryModal from "./Modals/EditEmployeeSalaryModal";
-import EditEmployeeAllowanceModal from "../EmployeeDetailsPage/Modals/EditEmployeeAllowanceModal";
+
+//tabs
+import BaseSalaryTab from "./Tabs/BaseSalaryTab";
+import AllowanceTab from "./Tabs/AllowanceTab";
+import TaxTab from "./Tabs/TaxTab";
+import PayslipsTab from "./Tabs/PayslipsTab";
+import EmployeeAccountTab from "./Tabs/EmployeeAccountTab";
+import AuditLogsTab from "./Tabs/AuditLogsTab";
+
 import EditEmployeeDetailsModal from "./Modals/EditEmployeeDetailsModal";
 import EditEmployeeAddressModal from "./Modals/EditEmployeeAddressModal";
-import ForgotPasswordModal from "./Modals/ForgotPasswordModal";
 
 
 const { Content } = Layout;
@@ -61,26 +66,6 @@ const EmployeeDetailsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   /* =========================
-     BASE SALARY MODAL STATE
-  ========================== */
-  const [isSalaryModalOpen, setIsSalaryModalOpen] = useState(false);
-  const [selectedSalary, setSelectedSalary] = useState<any>(null);
-
-  const openSalaryModal = () => {
-    if (!salaries.length) {
-      message.warning("No salary record found");
-      return;
-    }
-
-    const latest = [...salaries].sort(
-      (a, b) => new Date(b.effective_from).getTime() - new Date(a.effective_from).getTime()
-    )[0];
-
-    setSelectedSalary(latest);
-    setIsSalaryModalOpen(true);
-  };
-
-  /* =========================
      SALARY RETRIEVE DATA
   ========================== */
   const [salaries, setSalaries] = useState<
@@ -114,43 +99,6 @@ const EmployeeDetailsPage: React.FC = () => {
       setLoadingSalaries(false);
     }
   };
-
-
-
-  /* =========================
-     ALLOWANCE RETRIEVE DATA
-  ========================== */
-
-  const [allowances, setAllowances] = useState<any[]>([]);
-  const [loadingAllowances, setLoadingAllowances] = useState(false);
-
-  const fetchAllowances = async (employeeId: number) => {
-    setLoadingAllowances(true);
-    try {
-      const response = await api.get("/employees/allowances/", {
-        params: { employee: employeeId }, // backend filters by employee_id
-      });
-
-      const tableData = response.data.map((item: any) => ({
-        key: item.id,
-        id: item.id,
-        allowance_type_id: item.allowance_type.id,
-        name: item.allowance_type.name, // linked allowance type name
-        amount: `₱${item.amount}`,
-        frequency: item.frequency,
-        status: item.status,
-        effective_from: item.effective_from,
-      }));
-
-      setAllowances(tableData);
-    } catch (error: any) {
-      message.error("Failed to fetch allowances");
-      console.error(error);
-    } finally {
-      setLoadingAllowances(false);
-    }
-  };
-
   
 
   /* =========================
@@ -190,30 +138,10 @@ const EmployeeDetailsPage: React.FC = () => {
     if (!employeeId) return;
 
     const empIdNum = Number(employeeId);
-    fetchAllowances(empIdNum);
     fetchSalaries(empIdNum);
     fetchDeductions(empIdNum);
-    fetchUserAccount();
     fetchAuditLogs();
   }, [employeeId]);
-
-
-  /* =========================
-     ALLOWANCE MODAL STATE
-  ========================== */
-  const [isEditAllowanceModalOpen, setIsEditAllowanceModalOpen] = useState(false);
-  const [editingAllowance, setEditingAllowance] = useState<any | null>(null);
-
-  const openEditAllowanceModal = (allowance: any) => {
-    setEditingAllowance(allowance);
-    setIsEditAllowanceModalOpen(true);
-  };
-
-  const closeEditAllowanceModal = () => {
-    setEditingAllowance(null);
-    setIsEditAllowanceModalOpen(false);
-  };
-
 
   /* =========================
      FETCH EMPLOYEE DETAILS
@@ -252,44 +180,6 @@ const EmployeeDetailsPage: React.FC = () => {
   //employee address details
   const [isEditAddressOpen, setIsEditAddressOpen] = useState(false);
 
-  /* =========================
-     EMPLOYEE ACCOUNT RETRIEVE STATE
-  ========================== */
-  // inside EmployeeDetailsPage component, near your other useState declarations
-  const [userAccount, setUserAccount] = useState<{
-    user_id: number;
-    user_name: string;
-    role: string;
-    is_active: boolean;
-  } | null>(null);
-
-  const [loadingUser, setLoadingUser] = useState(false);
-
-  const fetchUserAccount = async () => {
-    if (!employeeId) return;
-
-    setLoadingUser(true);
-    try {
-      const res = await api.get(`/employees/users/employee/${employeeId}/`);
-      setUserAccount(res.data);
-    } catch (err) {
-      console.error(err);
-      message.error("Failed to fetch user account");
-      setUserAccount(null);
-    } finally {
-      setLoadingUser(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUserAccount();
-  }, [employeeId]);
-
-  /* =========================
-     EMPLOYEE ACCOUNT MODAL STATE
-  ========================== */
-  // Modal state
-  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
 
   /* =========================
      AUDIT LOGS RETRIEVE STATE
@@ -502,173 +392,42 @@ const EmployeeDetailsPage: React.FC = () => {
               <Tabs defaultActiveKey="1">
                 {/* BASE SALARY */}
                 <Tabs.TabPane tab="Base Salary" key="1">
-                  <div className={styles.salaryHeader}>
-                    <h3>Base Salary</h3>
-                    <Button type="primary" onClick={openSalaryModal}>
-                      Edit Base Salary
-                    </Button>
-                  </div>
-
-                  <Table
-                    columns={salaryColumns}
-                    dataSource={salaries}
+                  <BaseSalaryTab
+                    employeeId={Number(employeeId)}
+                    salaries={salaries}
                     loading={loadingSalaries}
-                    pagination={false}
+                    onSuccess={() => {
+                      fetchSalaries(Number(employeeId));
+                      fetchDeductions(Number(employeeId));
+                    }}
                   />
                 </Tabs.TabPane>
 
 
                 {/* ALLOWANCE */}
                 <Tabs.TabPane tab="Allowance" key="2">
-                  <div className={styles.salaryHeader}>
-                    <h3>Allowance</h3>
-                  </div>
-
-                  <Table
-                    columns={[
-                      { title: "Allowance Name", dataIndex: "name", key: "name" },
-                      { title: "Amount", dataIndex: "amount", key: "amount" },
-                      { title: "Frequency", dataIndex: "frequency", key: "frequency" },
-                      { title: "Status", dataIndex: "status", key: "status" },
-                      { title: "Effective from", dataIndex: "effective_from", key: "effective_from" },
-                      {
-                        title: "Action",
-                        key: "action",
-                        render: (_text, record) => (
-                          <Button type="link" onClick={() => openEditAllowanceModal(record)}>
-                            Edit
-                          </Button>
-                        ),
-                      }
-                    ]}
-                    dataSource={allowances}
-                    loading={loadingAllowances}
-                    pagination={false}
-                  />
+                  <AllowanceTab employeeId={Number(employeeId)} />
                 </Tabs.TabPane>
+
 
                 {/* TAX */}
                 <Tabs.TabPane tab="Tax" key="3">
-                  <div className={styles.salaryHeader}>
-                    <h3>Mandatory Government Contribution</h3>
-                  </div>
-
-                  <Table
-                    columns={[
-                      { title: "Deduction", dataIndex: "name", key: "name" },
-                      
-                      { title: "Frequency", dataIndex: "frequency", key: "frequency" },
-                      { title: "Effective From", dataIndex: "effective_from", key: "effective_from" },
-                      { title: "Amount", dataIndex: "amount", key: "amount" },
-                    ]}
-                    dataSource={deductions}
+                  <TaxTab
+                    deductions={deductions}
                     loading={loadingDeductions}
-                    pagination={false}
                   />
-
                 </Tabs.TabPane>
 
-                {/* PAYSLIPS */}
                 <Tabs.TabPane tab="Payslips" key="4">
-                  <div className={styles.salaryHeader}>
-                    <h3>Payslip</h3>
-                  </div>
-
-                  <Table
-                    bordered
-                    pagination={false}
-                    columns={[
-                      { title: "Earnings", dataIndex: "earningName", key: "earningName" },
-                      { title: "Amount", dataIndex: "earningAmount", key: "earningAmount" },
-                      { title: "Deductions", dataIndex: "deductionName", key: "deductionName" },
-                      { title: "Amount", dataIndex: "deductionAmount", key: "deductionAmount" },
-                    ]}
-                    dataSource={[
-                      {
-                        key: "1",
-                        earningName: "Basic Salary",
-                        earningAmount: "₱600.00",
-                        deductionName: "Absences",
-                        deductionAmount: "₱600.00 (1 day)",
-                      },
-                    ]}
-                  />
+                  <PayslipsTab />
                 </Tabs.TabPane>
 
                 <Tabs.TabPane tab="Employee Account" key="5">
-                  <div className={styles.salaryHeader}>
-                    <h3>Employee Account</h3>
-                    {userAccount && (
-                      <Button
-                        type="primary"
-                        danger={userAccount.is_active} // red if active
-                        onClick={() => {
-                          Modal.confirm({
-                            title: `Are you sure you want to ${userAccount.is_active ? "deactivate" : "activate"} this user?`,
-                            okText: userAccount.is_active ? "Deactivate" : "Activate",
-                            cancelText: "Cancel",
-                            onOk: async () => {
-                              try {
-                                const res = await api.post(`/employees/users/${userAccount.user_id}/deactivate/`);
-                                message.success(res.data.detail);
-
-                                // Update local state so status updates instantly
-                                setUserAccount(prev => prev ? { ...prev, is_active: res.data.is_active } : prev);
-                              } catch (err: any) {
-                                console.error(err);
-                                message.error("Failed to change user status");
-                              }
-                            },
-                          });
-                        }}
-                      >
-                        {userAccount.is_active ? "Deactivate" : "Activate"}
-                      </Button>
-                    )}
-                    <Button
-                      type="primary"
-                      onClick={() => setIsForgotPasswordOpen(true)}
-                      disabled={!userAccount}
-                    >
-                      Reset Password
-                    </Button>
-                  </div>
-
-                  {userAccount ? (
-                    <Table
-                      columns={[
-                        { title: "Username", dataIndex: "user_name", key: "user_name" },
-                        { title: "Role", dataIndex: "role", key: "role" },
-                        {
-                          title: "Status",
-                          dataIndex: "is_active",
-                          key: "is_active",
-                          render: (val: boolean) => (val ? "Active" : "Inactive"),
-                        },
-                      ]}
-                      dataSource={[userAccount]} // just one row
-                      pagination={false}
-                    />
-                  ) : (
-                    <p>No user account linked to this employee.</p>
-                  )}
+                  <EmployeeAccountTab employeeId={Number(employeeId)} />
                 </Tabs.TabPane>
 
                 <Tabs.TabPane tab="Audit Logs" key="6">
-                  <Table
-                    columns={[
-                      { title: "Action", dataIndex: "action", key: "action" },
-                      { title: "User", dataIndex: "user", key: "user" },
-                      { title: "Model", dataIndex: "model_name", key: "model_name" },
-                      { title: "Old Data", dataIndex: "old_data", key: "old_data" },
-                      { title: "New Data", dataIndex: "new_data", key: "new_data" },
-                      { title: "Timestamp", dataIndex: "timestamp", key: "timestamp" },
-                    ]}
-                    dataSource={auditLogs}
-                    loading={loadingLogs}
-                    rowKey="id"
-                  />
-
+                  <AuditLogsTab logs={auditLogs} loading={loadingLogs} />
                 </Tabs.TabPane>
 
               </Tabs>
@@ -676,29 +435,6 @@ const EmployeeDetailsPage: React.FC = () => {
           </div>
         </Content>
       </Layout>
-
-      <EditEmployeeAllowanceModal
-        open={isEditAllowanceModalOpen}
-        allowance={editingAllowance}
-        employeeId={Number(employeeId)}
-        onClose={closeEditAllowanceModal}
-        onSuccess={() => {
-          fetchAllowances(Number(employeeId));
-          closeEditAllowanceModal();
-        }}
-      />
-
-      <EditEmployeeSalaryModal
-        open={isSalaryModalOpen}
-        employeeId={Number(employeeId)}
-        salary={selectedSalary}
-        onSuccess={() => {
-          fetchSalaries(Number(employeeId));
-          fetchDeductions(Number(employeeId)); //  important
-          setIsSalaryModalOpen(false);
-        }}
-        onClose={() => setIsSalaryModalOpen(false)}
-      />
 
       <EditEmployeeDetailsModal
         open={isEditEmployeeOpen}
@@ -741,17 +477,6 @@ const EmployeeDetailsPage: React.FC = () => {
             `/employees/employees/${employeeId}/details/`
           );
           setEmployee(res.data);
-        }}
-      />
-
-      <ForgotPasswordModal
-        open={isForgotPasswordOpen}
-        username={userAccount?.user_name || ""}
-        userId={userAccount?.user_id} // pass the PK
-        onClose={() => setIsForgotPasswordOpen(false)}
-        onSuccess={() => {
-          setIsForgotPasswordOpen(false);
-          fetchUserAccount();
         }}
       />
     </Layout>

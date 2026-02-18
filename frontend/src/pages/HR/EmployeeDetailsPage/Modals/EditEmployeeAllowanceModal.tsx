@@ -82,9 +82,10 @@ const EditEmployeeAllowanceModal: React.FC<Props> = ({
           rules={[{ required: true, message: "Please select frequency" }]}
         >
           <Select placeholder="Select frequency">
-            <Select.Option value="Per Pay Period">Per Pay Period</Select.Option>
+            <Select.Option value="Per Period">Per Period</Select.Option>
             <Select.Option value="Monthly">Monthly</Select.Option>
-            <Select.Option value="One-time">One-time</Select.Option>
+            <Select.Option value="One time">One time</Select.Option>
+            <Select.Option value="Per Day">Per Day</Select.Option>
           </Select>
         </Form.Item>
 

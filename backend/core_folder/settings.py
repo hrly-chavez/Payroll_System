@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'payroll',
     'approvals',
     'shared_model',
+    'notifications',
 ]
 
 MIDDLEWARE = [

@@ -244,7 +244,7 @@ class Deduction_Type(models.Model):
         ("OTHER", "Other Deduction"),
     ]
     id = models.AutoField(primary_key=True)
-    code = models.CharField(max_length=100,unique=True)
+    code = models.CharField(max_length=100)
     category = models.CharField(max_length=10,choices=CATEGORY_CHOICES,default="TAX",help_text="Used to classify deductions (e.g., TAX vs OTHER)")
     salary_range_from = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     salary_range_to = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
@@ -252,14 +252,6 @@ class Deduction_Type(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     is_active = models.BooleanField(default=True)
     create_at = models.DateField(auto_now_add=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["code"],
-                name="unique_deduction_code"
-            )
-        ]
 
     def __str__(self):
         return self.code   
@@ -544,7 +536,7 @@ class Leave_Day(models.Model):
 class Company_Note(models.Model):
     id = models.AutoField(primary_key=True)
     note = models.TextField()
-    created_at = models.DateField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="company_notes")
 
     def __str__(self):

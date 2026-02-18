@@ -1,0 +1,68 @@
+.dashboard-layout {
+  min-height: 100vh;
+  background-color: #f5f7fa;
+}
+
+.dashboard-content {
+  margin: 16px;
+}
+
+/* Greeting */
+.greeting-card {
+  background: #f0f2f5;
+  padding: 12px 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+/* Cards */
+.card-soft {
+  border-radius: 12px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.card-blue {
+  border-radius: 12px !important;
+  background: #3e6f9e !important;
+  color: white !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.card-note {
+  border-radius: 12px !important;
+  background: #7da3c7 !important;
+  color: white !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Top Section */
+.top-cards {
+  margin-bottom: 20px;
+}
+
+/* Bottom Section */
+.bottom-section {
+  margin-top: 10px;
+}
+
+/* Big Numbers */
+.big-number {
+  font-size: 36px;
+  font-weight: 600;
+  margin-top: 10px;
+}
+
+.big-number.blue {
+  color: #3e6f9e;
+}
+
+/* Circle Placeholder */
+.circle-placeholder {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 10px solid #e6e6e6;
+  border-top: 10px solid #3e6f9e;
+  margin: 20px auto;
+}

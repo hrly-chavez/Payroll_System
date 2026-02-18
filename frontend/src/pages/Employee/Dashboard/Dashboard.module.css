@@ -109,8 +109,7 @@
 }
 /* ================= Attendance Pie ================= */
 .attendancePieCard,
-.statusCard,
-.calendarCard {
+.statusCard {
   height: 300px;
 }
 
@@ -309,11 +308,9 @@
 /* ================= Calendar ================= */
 
 .calendarCard {
-  height: 300px;
   border-radius: 8px;
   background: #ffffff;
   box-shadow: var(--card-shadow-soft);
-  transition: box-shadow 0.2s ease;
 }
 
 .calendarCard :global(.ant-card-body) {
@@ -361,9 +358,6 @@
 
 @media (max-width: 768px) {
   .attendanceCard,
-  .statusCard,
-  .attendancePieCard,
-  .calendarCard,
   .legendCard {
     height: auto;
   }

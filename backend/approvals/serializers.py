@@ -46,22 +46,30 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
         ]
 
 class LeaveRequestSerializer(serializers.ModelSerializer):
-    leave_type = serializers.CharField(
-        source="leave_type.name",
-        read_only=True
+    employee_name = serializers.SerializerMethodField()
+    leave_type = serializers.CharField(source="leave_type.name", read_only=True)
+    leave_type_id = serializers.PrimaryKeyRelatedField(
+        queryset=Leave_Type.objects.all(), source="leave_type", write_only=True
     )
 
-    leave_type_id = serializers.PrimaryKeyRelatedField(
-        queryset=Leave_Type.objects.all(),
-        source="leave_type",
-        write_only=True
-    )
+    def get_employee_name(self, obj):
+        emp = obj.employee
+        if not emp:
+            return None
+        parts = [emp.fname]
+        if emp.initial:
+            parts.append(emp.initial + ".")
+        parts.append(emp.lname)
+        if emp.suffix:
+            parts.append(emp.suffix)
+        return " ".join(parts)
 
     class Meta:
         model = Leave_Request
         fields = [
             "id",
-            "leave_type",   # ← STRING NAME
+            "employee_name",
+            "leave_type",
             "leave_type_id",
             "is_half_day",
             "half_day_part",
@@ -72,7 +80,9 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
             "requested_at",
         ]
 
-class CommissionTypeSerializer(serializers.ModelSerializer):
+
+
+class  CommissionTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Commission_Type
         fields = [

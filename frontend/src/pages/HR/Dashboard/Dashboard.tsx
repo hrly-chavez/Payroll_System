@@ -16,14 +16,14 @@ import {
   HolidayType,
   PAYROLL_COLOR,
 } from "../../../components/SharedCalendar/CalendarLegend";
-import CompanyNote from "../../../components/CompanyNote/companyNote";
+import CompanyNote from "../../../components/CompanyNote/CompanyNote";
 import { Pie } from "@ant-design/plots";
-
-
+import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
 
 
 const { Content } = Layout;
 
+/* ================= TYPES ================= */
 type TodayAttendanceResponse = {
   has_attendance: boolean;
   attendance: null | {
@@ -102,20 +102,7 @@ const Dashboard: React.FC = () => {
 /* =========================================================
      🟢 COMPANY NOTE MODAL STATE (for Add Note button)
      ========================================================= */
-  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [noteContent, setNoteContent] = useState("");
-
-  const handleAddNote = async () => {
-    try {
-      console.log("New Note:", noteContent);
-
-      message.success("Note added successfully");
-      setIsNoteModalOpen(false);
-      setNoteContent("");
-    } catch {
-      message.error("Failed to add note");
-    }
-  };
 
   /* =========================================================
      🟢 CALENDAR EVENTS STATE (holidays + payroll periods)
@@ -278,7 +265,7 @@ const Dashboard: React.FC = () => {
   };
 
 /* =========================================================
-   🟢 FETCH BASE TIME (PH & US CLOCK)
+   FETCH BASE TIME (PH & US CLOCK)
    - Calls WorldTimeAPI
    - Updates time every second via interval
    - Used for real-time clock display
@@ -287,7 +274,7 @@ const Dashboard: React.FC = () => {
   
 
 /* =========================================================
-   🟢 LOAD CALENDAR EVENTS (HOLIDAYS + PAYROLL PERIODS)
+   LOAD CALENDAR EVENTS (HOLIDAYS + PAYROLL PERIODS)
    - Fetches holidays from backend
    - Fetches payroll periods
    - Converts them into calendar event format
@@ -335,7 +322,7 @@ const Dashboard: React.FC = () => {
 };
 
 /* =========================================================
-   🟢 FETCH MONTHLY DASHBOARD STATS
+   FETCH MONTHLY DASHBOARD STATS
    - Gets PRESENT / LATE / ABSENT count
    - Used for summary statistics cards
    ========================================================= */ 
@@ -374,7 +361,7 @@ const Dashboard: React.FC = () => {
   };
 
  /* =========================================================
-   🟢 FETCH TODAY ATTENDANCE (FOR ADMIN USER)
+   FETCH TODAY ATTENDANCE (FOR ADMIN USER)
    - Gets today's punch-in / punch-out status
    - Updates status badge on dashboard
    ========================================================= */ 
@@ -397,7 +384,7 @@ const Dashboard: React.FC = () => {
   };
 
 /* =========================================================
-   🟢 INITIAL DASHBOARD LOAD
+   INITIAL DASHBOARD LOAD
    - Runs only once on component mount
    - Loads everything needed for dashboard
    ========================================================= */
@@ -411,7 +398,7 @@ const Dashboard: React.FC = () => {
 
 
 /* =========================================================
-   🟢 DEBUG CALENDAR EVENTS
+   DEBUG CALENDAR EVENTS
    - Logs calendar events whenever they change
    ========================================================= */
 
@@ -420,7 +407,7 @@ const Dashboard: React.FC = () => {
   }, [calendarEvents]);
 
 /* =========================================================
-   🟢 REAL-TIME CLOCK UPDATE
+   REAL-TIME CLOCK UPDATE
    - Adds 1 second every second
    - Keeps PH and US time live
    ========================================================= */
@@ -435,7 +422,7 @@ const Dashboard: React.FC = () => {
 
 
   /* =========================================================
-   🟢 HANDLE PUNCH IN
+   HANDLE PUNCH IN
    - Calls backend punch-in API
    - Refreshes stats + employee list
    ========================================================= */
@@ -462,7 +449,7 @@ const Dashboard: React.FC = () => {
   };
 
 /* =========================================================
-   🟢 HANDLE PUNCH OUT
+   HANDLE PUNCH OUT
    - Calls backend punch-out API
    - Refreshes stats + employee list
    ========================================================= */
@@ -490,14 +477,14 @@ const Dashboard: React.FC = () => {
   };
 
 /* =========================================================
-   🟢 CURRENT USER NAME
+   CURRENT USER NAME
    - Retrieved from localStorage
    ========================================================= */
 
   const name = localStorage.getItem("user_name") || "User";
 
  /* =========================================================
-   🟢 STATUS LABEL HELPER
+   STATUS LABEL HELPER
    - Determines badge color and text
    ========================================================= */ 
 
@@ -526,7 +513,7 @@ const Dashboard: React.FC = () => {
 
           {/* STATS */}
           {/* ROW 1: DATE + ATTENDANCE + COMPANY NOTE */}
-          <Row gutter={16} className={styles.mainSection}>
+          <Row gutter={16} className={`${styles.mainSection} ${styles.equalHeightRow}`}>
 
         {/* DATE CARD */}
         <Col xs={24} md={8}>
@@ -535,10 +522,10 @@ const Dashboard: React.FC = () => {
               className={`${styles.compactCard} ${styles.dateCard}`}
             >
             <div style={{ padding: 20 }}>
-              {/* 🟢 DAILY DONUT CHART */}
+              {/* DAILY DONUT CHART */}
               <Pie {...dailyPieConfig} height={150} />
 
-              {/* 🟢 LEGEND */}
+              {/* LEGEND */}
               <div style={{ textAlign: "center", marginTop: 10 }}>
                 <span style={{ marginRight: 15 }}>
                   <span
@@ -619,8 +606,11 @@ const Dashboard: React.FC = () => {
       </Row>
 
       {/* ROW 2: PENDING + CALENDAR */}
-      <Row gutter={16} className={styles.mainSection}>
-
+      <Row
+        gutter={16}
+        className={styles.mainSection}
+        align="top"
+      >
         {/* PENDING REQUESTS */}
         <Col xs={24} md={16}>
           <Card title="Pending Requests" className={styles.pendingCard}>
@@ -656,24 +646,12 @@ const Dashboard: React.FC = () => {
 
       {/* CALENDAR */}
       <Col xs={24} md={8}>
-        <Card title="Calendar" className={styles.compactCard}>
+        <Card title="Calendar" className={`${styles.compactCard} ${styles.calendarCard}`}>
           <SharedCalendar events={calendarEvents} />
+          <CalendarLegendDisplay />
         </Card>
+
       </Col>
-      <Modal
-        title="Add Company Note"
-        open={isNoteModalOpen}
-        onCancel={() => setIsNoteModalOpen(false)}
-        onOk={handleAddNote}
-        okText="Submit"
-      >
-        <Input.TextArea
-          rows={4}
-          value={noteContent}
-          onChange={(e) => setNoteContent(e.target.value)}
-          placeholder="Write company note here..."
-        />
-      </Modal>
     </Row>
         </Content>
       </Layout>

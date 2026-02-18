@@ -5,10 +5,11 @@ import Topbar from "../../../components/Topbar/Topbar";
 import styles from "./Requests.module.css";
 
 import AllRequests from "./AllRequests/AllRequests";
-import LeaveRequest from "./LeaveRequest/LeaveRequest";
+import LeaveRequests from "./LeaveRequest/LeaveRequest"; 
 import AttendanceCorrectionRequest from "./AttendanceCorrectionRequest/AttendanceCorrectionRequest";
 
 const { Content } = Layout;
+const { TabPane } = Tabs;
 
 const Requests: React.FC = () => {
   const [activeTab, setActiveTab] = useState("all");
@@ -26,20 +27,20 @@ const Requests: React.FC = () => {
               onChange={setActiveTab}
               className={styles.tabs}
             >
-              <Tabs.TabPane tab="All Requests" key="all">
+              <TabPane tab="All Requests" key="all">
                 <AllRequests />
-              </Tabs.TabPane>
+              </TabPane>
 
-              <Tabs.TabPane tab="Leave Request" key="leave">
-                <LeaveRequest />
-              </Tabs.TabPane>
+              <TabPane tab="Leave Request" key="leave">
+                <LeaveRequests /> 
+              </TabPane>
 
-              <Tabs.TabPane
+              <TabPane
                 tab="Attendance Correction Request"
                 key="attendance"
               >
                 <AttendanceCorrectionRequest />
-              </Tabs.TabPane>
+              </TabPane>
             </Tabs>
           </div>
         </Content>

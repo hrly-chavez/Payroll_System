@@ -14,7 +14,7 @@ from datetime import date
 from .services import PayrollGenerationService
 
 
-#helpers
+#helpers    
 def _overlaps_period(eff_from, eff_to, period_start, period_end):
     """
     Returns True if [eff_from, eff_to] overlaps with [period_start, period_end].
@@ -23,7 +23,7 @@ def _overlaps_period(eff_from, eff_to, period_start, period_end):
     eff_to = eff_to or date.max
     return eff_from <= period_end and eff_to >= period_start
 
-
+#==========================================DEDUCTIONS========================================
 # List and Create
 class DeductionListCreateView(generics.ListCreateAPIView):
     queryset = Deduction_Type.objects.all().order_by('-create_at')

@@ -13,10 +13,13 @@ from django.utils.timezone import now
 from django.core.mail import send_mail
 from django.contrib.auth.hashers import make_password
 from shared_model.signals import create_audit_log
+from datetime import timedelta
 
 import logging
 import secrets
 from .serializers import CompanyNoteSerializer
+from rest_framework import generics
+
 
 #--------------------------Address
 # List all provinces
@@ -45,28 +48,18 @@ class BarangayListByCityAPIView(generics.ListAPIView):
 
 #--------------------------Department
 class DepartmentViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, IsRole]
+    permission_classes = [IsRole]
     allowed_roles = ["ADMIN", "SUPER_ADMIN"]
     queryset = Department.objects.all().order_by("-created_at")
     serializer_class = DepartmentSerializer
+    public_actions = ['list', 'retrieve']
 
 # para ni sa populate ang shifts sa drop down
 class ShiftViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsRole]
     queryset = Shift.objects.filter(is_active=True)
     serializer_class = ShiftSerializer
-
-class ShiftSerializer(serializers.ModelSerializer):
-    permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["ADMIN"]
-    display_time = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Shift
-        fields = ["id", "name", "start_time", "end_time", "display_time"]
-
-    def get_display_time(self, obj):
-        return f"{obj.start_time.strftime('%H:%M')} - {obj.end_time.strftime('%H:%M')}"
+    public_actions = ['list', 'retrieve']
     
 #user account
 logger = logging.getLogger(__name__)  # Use Django logging
@@ -197,6 +190,14 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         if self.action == "create":
             return EmployeeCreateSerializer
         return EmployeeSerializer
+    
+    def get_permissions(self):
+        if self.action == "create_first_superadmin":
+            return [AllowAny()]  # bypass auth completely
+        return [IsAuthenticated(), IsRole()]
+    
+    # public actions (unauthenticated) only for first superadmin
+    public_actions = ['create_first_superadmin']
 
     @action(detail=False, methods=["get"], url_path=r"by-department/(?P<dept_id>\d+)")
     def by_department(self, request, dept_id=None):
@@ -209,6 +210,39 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         employee = self.get_object()
         serializer = self.get_serializer(employee)
         return Response(serializer.data)
+    
+    # -------------------
+    # CREATE FIRST SUPER ADMIN EMPLOYEE
+    # -------------------
+    @action(detail=False, methods=["post"], url_path="create-first-superadmin")
+    def create_first_superadmin(self, request):
+        # Check if SUPER_ADMIN exists
+        super_admin_exists = User.objects.filter(role="SUPER_ADMIN", is_superuser=False).exists()
+        if super_admin_exists:
+            return Response({"error": "SUPER_ADMIN already exists."}, status=403)
+
+        # Proceed to create Employee + SUPER_ADMIN user
+        serializer = EmployeeCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        employee = serializer.save()
+
+        username = f"{employee.fname.lower()}{employee.id}"
+        password = "".join(random.choices(string.ascii_letters + string.digits, k=8))
+
+        user = User(
+            user_name=username,
+            role="SUPER_ADMIN",
+            employee=employee,
+        )
+        user.set_password(password)
+        user.save()
+
+        return Response({
+            "message": "First SUPER_ADMIN created successfully",
+            "employee_id": employee.id,
+            "username": username,
+            "password": password
+        }, status=201)
     
     # -------------------
     # CREATE EMPLOYEE
@@ -347,24 +381,64 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
 
         return Response(self.get_serializer(new_salary).data, status=status.HTTP_201_CREATED)
 
-    def _recompute_percentage_deductions(self, employee_id: int, salary_amount: Decimal, effective_from, user):
-        deductions = Employee_Deduction.objects.filter(
+    def _recompute_percentage_deductions(self, employee_id, salary_amount, effective_from, user):
+
+        active_deductions = Employee_Deduction.objects.filter(
             employee_id=employee_id,
-            deduction_type__calculation_type="Percent"
-        )
+            status="Active"
+        ).select_related("deduction_type")
 
-        for ded in deductions:
-            percent_value = ded.deduction_type.amount
-            new_amount = round(salary_amount * (percent_value / 100), 2)
+        for old_ded in active_deductions:
 
-            # Only update if changed (avoids unnecessary audit logs)
-            if ded.amount != new_amount:
-                ded.amount = new_amount
-                ded._current_user = user  # attach user BEFORE save
-                ded.save(update_fields=["amount"])
+            code = old_ded.deduction_type.code
 
+            # Find correct bracket for new salary
+            new_deduction_type = Deduction_Type.objects.filter(
+                code=code,
+                is_active=True,
+                salary_range_from__lte=salary_amount,
+                salary_range_to__gte=salary_amount,
+            ).order_by("-salary_range_from").first()
 
-            
+            if not new_deduction_type:
+                continue
+
+            # Compute new amount
+            if new_deduction_type.calculation_type == "Fixed":
+                new_amount = new_deduction_type.amount
+            else:  # Percent
+                new_amount = salary_amount * (new_deduction_type.amount / Decimal("100"))
+
+            new_amount = round(new_amount, 2)
+
+            # Check if anything changed
+            bracket_changed = old_ded.deduction_type_id != new_deduction_type.id
+            amount_changed = old_ded.amount != new_amount
+
+            if not bracket_changed and not amount_changed:
+                continue  # Nothing to update
+
+            # Deactivate old deduction
+            old_ded.status = "Inactive"
+            old_ded.effective_to = effective_from - timedelta(days=1)
+            old_ded._current_user = user
+            old_ded.save()
+
+            # Create new deduction
+            new_ded = Employee_Deduction.objects.create(
+                employee_id=employee_id,
+                deduction_type=new_deduction_type,
+                amount=new_amount,
+                frequency = old_ded.frequency,
+                status="Active",
+                effective_from=effective_from,
+                effective_to=None,
+            )
+
+            # Attach user for audit tracking
+            new_ded._current_user = user
+            new_ded.save()
+
 #employee deduction
 class EmployeeDeductionViewSet(viewsets.ModelViewSet):
     queryset = Employee_Deduction.objects.all()
@@ -404,27 +478,34 @@ class EmployeeDeductionViewSet(viewsets.ModelViewSet):
     # ----------------- NEW ENDPOINT -----------------
     @action(detail=False, methods=["get"], url_path="deduction-types")
     def deduction_types(self, request):
-        """
-        Returns ONLY TAX / Government deductions
-        """
+        salary = request.query_params.get("salary")
+
+        if not salary:
+            return Response({"detail": "salary is required"}, status=400)
+
+        try:
+            salary = float(salary)
+        except ValueError:
+            return Response({"detail": "Invalid salary"}, status=400)
+
         deduction_types = Deduction_Type.objects.filter(
             is_active=True,
-            category="TAX"   # FILTER HERE
+            category="TAX",
+            salary_range_from__lte=salary,
+            salary_range_to__gte=salary
         )
 
         data = [
             {
                 "id": d.id,
                 "code": d.code,
-                "category": d.category,
                 "calculation_type": d.calculation_type,
                 "amount": float(d.amount),
-                "salary_range_from": float(d.salary_range_from),
-                "salary_range_to": float(d.salary_range_to),
             }
             for d in deduction_types
         ]
-        return Response(data, status=status.HTTP_200_OK)
+
+        return Response(data)
 
 #--------------------- ALLOWANCE
 class EmployeeAllowanceViewSet(viewsets.ModelViewSet):
@@ -569,8 +650,18 @@ def employee_audit_logs(request, employee_id):
 
 
 #COMPANY NOTE
-class CompanyNoteListCreateView(generics.ListCreateAPIView):
-    queryset = Company_Note.objects.all().order_by("-created_at")
+class LatestCompanyNoteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        latest_note = Company_Note.objects.order_by("-created_at", "-id").first()
+        if latest_note:
+            serializer = CompanyNoteSerializer(latest_note)
+            return Response(serializer.data)
+        return Response(None)
+
+class CompanyNoteCreateView(generics.CreateAPIView):
+    queryset = Company_Note.objects.all()
     serializer_class = CompanyNoteSerializer
     permission_classes = [permissions.IsAuthenticated]
 

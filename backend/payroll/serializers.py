@@ -4,50 +4,43 @@ from django.utils import timezone
 from decimal import Decimal
 
 class DeductionTypeSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = Deduction_Type
-        fields = '__all__'
+        fields = "__all__"
 
-    def validate(self, attrs):
-        salary_from = attrs.get(
-            "salary_range_from",
-            getattr(self.instance, "salary_range_from", None)
-        )
-        salary_to = attrs.get(
-            "salary_range_to",
-            getattr(self.instance, "salary_range_to", None)
-        )
+    def validate(self, data):
+        code = data.get("code")
+        salary_from = data.get("salary_range_from")
+        salary_to = data.get("salary_range_to")
 
-        # 🔹 Basic validation
-        if salary_from is None or salary_to is None:
+        if salary_from > salary_to:
             raise serializers.ValidationError(
-                {"detail": "Salary range fields are required."}
+                "Salary range 'from' cannot be greater than 'to'."
             )
 
-        if salary_from >= salary_to:
-            raise serializers.ValidationError(
-                {"detail": "Salary range 'From' must be less than 'To'."}
-            )
+        # Get existing records with same code
+        queryset = Deduction_Type.objects.filter(code=code)
 
-        # 🔹 Exclude self when updating
-        queryset = Deduction_Type.objects.all()
+        # Exclude self when updating
         if self.instance:
-            queryset = queryset.exclude(pk=self.instance.pk)
+            queryset = queryset.exclude(id=self.instance.id)
 
-        # 🔹 Overlap condition:
-        # existing.from < new.to AND existing.to > new.from
-        overlapping = queryset.filter(
-            salary_range_from__lt=salary_to,
-            salary_range_to__gt=salary_from
-        )
+        for deduction in queryset:
+            existing_from = deduction.salary_range_from
+            existing_to = deduction.salary_range_to
 
-        if overlapping.exists():
-            raise serializers.ValidationError(
-                {"detail": "This salary range overlaps with an existing contribution."}
-            )
+            # Check overlap condition
+            if (
+                salary_from <= existing_to and
+                salary_to >= existing_from
+            ):
+                raise serializers.ValidationError(
+                    f"Salary range overlaps with existing range "
+                    f"{existing_from} - {existing_to} for code {code}."
+                )
 
-        return attrs
-
+        return data
 
 
 #==================================PAYROLL PERIOD=================================

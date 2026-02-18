@@ -16,7 +16,7 @@ import {
   HolidayType,
   PAYROLL_COLOR,
 } from "../../../components/SharedCalendar/CalendarLegend";
-import CompanyNote from "../../../components/CompanyNote/companyNote";
+import CompanyNote from "../../../components/CompanyNote/CompanyNote";
 import { Pie } from "@ant-design/plots";
 import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
 
@@ -265,7 +265,7 @@ const Dashboard: React.FC = () => {
   };
 
 /* =========================================================
-   🟢 FETCH BASE TIME (PH & US CLOCK)
+   FETCH BASE TIME (PH & US CLOCK)
    - Calls WorldTimeAPI
    - Updates time every second via interval
    - Used for real-time clock display
@@ -282,7 +282,7 @@ const Dashboard: React.FC = () => {
   };
 
 /* =========================================================
-   🟢 LOAD CALENDAR EVENTS (HOLIDAYS + PAYROLL PERIODS)
+   LOAD CALENDAR EVENTS (HOLIDAYS + PAYROLL PERIODS)
    - Fetches holidays from backend
    - Fetches payroll periods
    - Converts them into calendar event format
@@ -330,7 +330,7 @@ const Dashboard: React.FC = () => {
 };
 
 /* =========================================================
-   🟢 FETCH MONTHLY DASHBOARD STATS
+   FETCH MONTHLY DASHBOARD STATS
    - Gets PRESENT / LATE / ABSENT count
    - Used for summary statistics cards
    ========================================================= */ 
@@ -369,7 +369,7 @@ const Dashboard: React.FC = () => {
   };
 
  /* =========================================================
-   🟢 FETCH TODAY ATTENDANCE (FOR ADMIN USER)
+   FETCH TODAY ATTENDANCE (FOR ADMIN USER)
    - Gets today's punch-in / punch-out status
    - Updates status badge on dashboard
    ========================================================= */ 
@@ -392,7 +392,7 @@ const Dashboard: React.FC = () => {
   };
 
 /* =========================================================
-   🟢 INITIAL DASHBOARD LOAD
+   INITIAL DASHBOARD LOAD
    - Runs only once on component mount
    - Loads everything needed for dashboard
    ========================================================= */
@@ -407,7 +407,7 @@ const Dashboard: React.FC = () => {
 }, []);
 
 /* =========================================================
-   🟢 DEBUG CALENDAR EVENTS
+   DEBUG CALENDAR EVENTS
    - Logs calendar events whenever they change
    ========================================================= */
 
@@ -416,7 +416,7 @@ const Dashboard: React.FC = () => {
   }, [calendarEvents]);
 
 /* =========================================================
-   🟢 REAL-TIME CLOCK UPDATE
+   REAL-TIME CLOCK UPDATE
    - Adds 1 second every second
    - Keeps PH and US time live
    ========================================================= */
@@ -431,7 +431,7 @@ const Dashboard: React.FC = () => {
   }, []);
 
   /* =========================================================
-   🟢 HANDLE PUNCH IN
+   HANDLE PUNCH IN
    - Calls backend punch-in API
    - Refreshes stats + employee list
    ========================================================= */
@@ -458,7 +458,7 @@ const Dashboard: React.FC = () => {
   };
 
 /* =========================================================
-   🟢 HANDLE PUNCH OUT
+   HANDLE PUNCH OUT
    - Calls backend punch-out API
    - Refreshes stats + employee list
    ========================================================= */
@@ -486,14 +486,14 @@ const Dashboard: React.FC = () => {
   };
 
 /* =========================================================
-   🟢 CURRENT USER NAME
+   CURRENT USER NAME
    - Retrieved from localStorage
    ========================================================= */
 
   const name = localStorage.getItem("user_name") || "User";
 
  /* =========================================================
-   🟢 STATUS LABEL HELPER
+   STATUS LABEL HELPER
    - Determines badge color and text
    ========================================================= */ 
 
@@ -531,10 +531,10 @@ const Dashboard: React.FC = () => {
               className={`${styles.compactCard} ${styles.dateCard}`}
             >
             <div style={{ padding: 20 }}>
-              {/* 🟢 DAILY DONUT CHART */}
+              {/* DAILY DONUT CHART */}
               <Pie {...dailyPieConfig} height={150} />
 
-              {/* 🟢 LEGEND */}
+              {/* LEGEND */}
               <div style={{ textAlign: "center", marginTop: 10 }}>
                 <span style={{ marginRight: 15 }}>
                   <span

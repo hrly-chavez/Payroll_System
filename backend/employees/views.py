@@ -13,6 +13,7 @@ from django.utils.timezone import now
 from django.core.mail import send_mail
 from django.contrib.auth.hashers import make_password
 from shared_model.signals import create_audit_log
+from datetime import timedelta
 
 import logging
 import secrets
@@ -380,24 +381,64 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
 
         return Response(self.get_serializer(new_salary).data, status=status.HTTP_201_CREATED)
 
-    def _recompute_percentage_deductions(self, employee_id: int, salary_amount: Decimal, effective_from, user):
-        deductions = Employee_Deduction.objects.filter(
+    def _recompute_percentage_deductions(self, employee_id, salary_amount, effective_from, user):
+
+        active_deductions = Employee_Deduction.objects.filter(
             employee_id=employee_id,
-            deduction_type__calculation_type="Percent"
-        )
+            status="Active"
+        ).select_related("deduction_type")
 
-        for ded in deductions:
-            percent_value = ded.deduction_type.amount
-            new_amount = round(salary_amount * (percent_value / 100), 2)
+        for old_ded in active_deductions:
 
-            # Only update if changed (avoids unnecessary audit logs)
-            if ded.amount != new_amount:
-                ded.amount = new_amount
-                ded._current_user = user  # attach user BEFORE save
-                ded.save(update_fields=["amount"])
+            code = old_ded.deduction_type.code
 
+            # Find correct bracket for new salary
+            new_deduction_type = Deduction_Type.objects.filter(
+                code=code,
+                is_active=True,
+                salary_range_from__lte=salary_amount,
+                salary_range_to__gte=salary_amount,
+            ).order_by("-salary_range_from").first()
 
-            
+            if not new_deduction_type:
+                continue
+
+            # Compute new amount
+            if new_deduction_type.calculation_type == "Fixed":
+                new_amount = new_deduction_type.amount
+            else:  # Percent
+                new_amount = salary_amount * (new_deduction_type.amount / Decimal("100"))
+
+            new_amount = round(new_amount, 2)
+
+            # Check if anything changed
+            bracket_changed = old_ded.deduction_type_id != new_deduction_type.id
+            amount_changed = old_ded.amount != new_amount
+
+            if not bracket_changed and not amount_changed:
+                continue  # Nothing to update
+
+            # Deactivate old deduction
+            old_ded.status = "Inactive"
+            old_ded.effective_to = effective_from - timedelta(days=1)
+            old_ded._current_user = user
+            old_ded.save()
+
+            # Create new deduction
+            new_ded = Employee_Deduction.objects.create(
+                employee_id=employee_id,
+                deduction_type=new_deduction_type,
+                amount=new_amount,
+                frequency = old_ded.frequency,
+                status="Active",
+                effective_from=effective_from,
+                effective_to=None,
+            )
+
+            # Attach user for audit tracking
+            new_ded._current_user = user
+            new_ded.save()
+
 #employee deduction
 class EmployeeDeductionViewSet(viewsets.ModelViewSet):
     queryset = Employee_Deduction.objects.all()

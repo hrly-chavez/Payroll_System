@@ -99,6 +99,7 @@ const EmployeeAllowanceModal: React.FC<Props> = ({ open, employeeId, onNext, onC
             { label: "Monthly", value: "Monthly" },
             { label: "Per Period", value: "Per Period" },
             { label: "One Time", value: "One Time" },
+            { label: "Per Day", value: "Per Day" },
           ]} />
         </Form.Item>
 

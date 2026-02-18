@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Layout, Row, Col, Spin, message, DatePicker, Segmented } from "antd";
+import { Layout, Row, Col, Spin, message, DatePicker, Segmented, Card } from "antd";
 import Chart from "../../../components/Chart";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
@@ -22,6 +22,16 @@ import HolidayDetailModal from "./HolidayDetailModal";
 import DeclineReasonModal from "./DeclineReasonModal";
 import PendingPayrollModal from "./PendingPayrollModal";
 import { HourglassOutlined } from "@ant-design/icons";
+
+import {
+  HOLIDAY_LEGEND,
+  HolidayBase,
+  HolidayType,
+} from "../../../components/SharedCalendar/CalendarLegend";
+import { PAYROLL_COLOR } from "../../../components/SharedCalendar/CalendarLegend";
+import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
+import SharedCalendar from "./../../../components/SharedCalendar/SharedCalendar";
+
 
 const { Content } = Layout;
 
@@ -51,12 +61,63 @@ type AttendanceStatus =
 
 type RangeMode = "Day" | "Week" | "Month" | "Year";
 
+type CalendarEvent = {
+    type: "holiday" | "payroll";
+    start_date: string;
+    end_date?: string;
+    title: string;
+    color: string;
+  };
+
+
 const Dashboard: React.FC = () => {
   const currentDate = dayjs().format("MMMM D, YYYY");
 
   const navigate = useNavigate();
 
-  /* ================= CHART STATE ================= */
+  /* ------------------ Calendar ------------------ */
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+  const loadCalendarEvents = async () => {
+    try {
+      const [holidayRes, payrollRes] = await Promise.all([
+        api.get("/approvals/holidays/"),
+        api.get("/payroll/periods/"),
+      ]);
+
+      const holidays = holidayRes.data;
+      const payrolls = payrollRes.data;
+
+      const events: CalendarEvent[] = [
+        ...holidays.map((h: any) => {
+          const base = h.base as HolidayBase;
+          const type = h.type as HolidayType;
+
+          const legend = HOLIDAY_LEGEND[base]?.[type];
+
+          return {
+            type: "holiday",
+            start_date: h.date,
+            title: `${h.base} Holiday – ${h.name}`,
+            color: legend?.bgColor || "#999999",
+          };
+        }),
+
+        ...payrolls.map((p: any) => ({
+          type: "payroll",
+          start_date: p.start_date,
+          end_date: p.end_date,
+          title: "Payroll",
+          color: PAYROLL_COLOR.bgColor,
+        })),
+      ];
+
+      setCalendarEvents(events);
+    } catch {
+      message.error("Failed to load calendar events");
+    }
+  };
+  
+  /* ------------------ Chart state ------------------ */
   const [chartOption, setChartOption] =
     useState<echarts.ComposeOption<echarts.BarSeriesOption>>();
   const [chartHeight, setChartHeight] = useState<number>(360);
@@ -211,6 +272,7 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     fetchHolidayRequests();
+    loadCalendarEvents();
     fetchPendingPayrolls();
     fetchAttendanceAnalytics(selectedDate, rangeMode);
   }, []);

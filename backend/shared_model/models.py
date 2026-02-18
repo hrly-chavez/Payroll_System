@@ -242,7 +242,7 @@ class Deduction_Type(models.Model):
         ("OTHER", "Other Deduction"),
     ]
     id = models.AutoField(primary_key=True)
-    code = models.CharField(max_length=100,unique=True)
+    code = models.CharField(max_length=100)
     category = models.CharField(max_length=10,choices=CATEGORY_CHOICES,default="TAX",help_text="Used to classify deductions (e.g., TAX vs OTHER)")
     salary_range_from = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     salary_range_to = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
@@ -250,14 +250,6 @@ class Deduction_Type(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     is_active = models.BooleanField(default=True)
     create_at = models.DateField(auto_now_add=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["code"],
-                name="unique_deduction_code"
-            )
-        ]
 
     def __str__(self):
         return self.code   
@@ -322,6 +314,7 @@ class Employee_Allowance(models.Model):
         ("Monthly","Monthly"),
         ("Per Period","Per Period"),
         ("One Time","One Time"),
+        ("Per Day","Per Day"),
     ]
     status_choices = [
         ("Active","Active"),

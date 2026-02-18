@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Modal, Form, Select, DatePicker, Input, Button, message } from "antd";
 import api from "../../../api/axios";
 import dayjs from "dayjs";
-
+import styles from "./../Attendance/LeaveRequest.module.css";
 
 const { RangePicker } = DatePicker;
 
@@ -11,7 +11,7 @@ const LeaveRequest = ({ open, onClose }: any) => {
   const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  /* 🔹 Fetch leave types from backend */
+  /*Fetch leave types from backend */
   useEffect(() => {
     if (open) {
       api.get("/approvals/superadmin/leave-types/")
@@ -27,7 +27,7 @@ const LeaveRequest = ({ open, onClose }: any) => {
 
     try {
     const payload = {
-      leave_type_id: values.leave_type,   // ✅ must be leave_type_id
+      leave_type_id: values.leave_type,
       date_range: [
         values.date_range[0].format("YYYY-MM-DD"),
         values.date_range[1].format("YYYY-MM-DD"),
@@ -103,8 +103,9 @@ const LeaveRequest = ({ open, onClose }: any) => {
           block
           htmlType="submit"
           loading={loading}
+          className={styles.submitBtn}
         >
-          Submit Request
+          Submit Request  
         </Button>
       </Form>
     </Modal>

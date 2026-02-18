@@ -11,6 +11,8 @@ from django.utils import timezone
 from rest_framework.decorators import api_view
 from django.shortcuts import get_object_or_404
 from datetime import datetime
+from shared_model.models import User
+from notifications.models import Notification
 
 class HolidayListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
@@ -44,13 +46,25 @@ class HolidayUpdateStatusView(APIView):
 
         holiday.status = new_status
         holiday.save()
+        # If SUPER_ADMIN updated holiday → notify ADMIN
+        if request.user.role == "SUPER_ADMIN":
+                    admins = User.objects.filter(role="ADMIN")
 
-        # Use serializer only for returning data
+                    for admin in admins:
+                        Notification.objects.create(
+                            user=admin,
+                            title="Holiday Status Updated",
+                            description=f"Holiday '{holiday.name}' was {new_status}.",
+                            category="holiday",
+                            redirect_url="/admin/holiday-requests"
+                        )
+
         serializer = HolidaySerializer(holiday)
+
         return Response({
-            'detail': 'Status updated',
-            'holiday': serializer.data
-        }, status=status.HTTP_200_OK)
+                'detail': 'Status updated',
+                'holiday': serializer.data
+            }, status=status.HTTP_200_OK)
     
 class LeaveTypeListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
@@ -103,6 +117,19 @@ class LeaveRequestListCreateView(generics.ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save(employee=employee)
 
+        admins = User.objects.filter(role="ADMIN")
+
+
+    
+# Notify Admins
+        for admin in admins:
+            Notification.objects.create(
+                user=admin,
+                title="New Leave Request",
+                description=f"{employee.fname} {employee.lname} submitted a leave request.",
+                category="leave",
+                redirect_url="/admin/leave-requests"
+            )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
 class AdminLeaveRequestListView(generics.ListAPIView):
@@ -150,6 +177,15 @@ def admin_update_leave_status(request, pk):
     leave_request.approved_by = user
     leave_request.approved_at = timezone.now()
     leave_request.save()
+
+    # Notify Employee about leave status update
+    Notification.objects.create(
+        user=leave_request.employee.user,
+        title="Leave Request Updated",
+        description=f"Your leave request was {new_status}.",
+        category="leave",
+        redirect_url="/employee/leave-history"
+    )
 
     serializer = LeaveRequestSerializer(leave_request)
     return Response(serializer.data, status=status.HTTP_200_OK)

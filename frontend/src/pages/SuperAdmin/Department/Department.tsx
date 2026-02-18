@@ -5,6 +5,7 @@ import { PlusOutlined, SearchOutlined, SlidersOutlined } from "@ant-design/icons
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
+import AddDepartment from "../../HR/Department/AddDepartment"; // reuse import from admin side 
 import styles from "../../HR/Department/Department.module.css";
 import api from "../../../api/axios";
 
@@ -30,7 +31,6 @@ const Department: React.FC = () => {
   const fetchDepartments = async () => {
     setLoading(true);
     try {
-      // use your axios instance that adds the token automatically
       const res = await api.get("/employees/departments/");
       setDepartments(res.data);
     } catch (err) {
@@ -40,7 +40,6 @@ const Department: React.FC = () => {
       setLoading(false);
     }
   };
-
 
   useEffect(() => {
     fetchDepartments();
@@ -61,9 +60,7 @@ const Department: React.FC = () => {
       title: "Department",
       dataIndex: "name",
       key: "name",
-      render: (text) => (
-        <span className={styles.rowLink}>{text}</span>
-      ),
+      render: (text) => <span className={styles.rowLink}>{text}</span>,
     },
     {
       title: "Workshift",
@@ -77,7 +74,6 @@ const Department: React.FC = () => {
         return shift;
       },
     },
-
   ];
 
   return (
@@ -101,6 +97,15 @@ const Department: React.FC = () => {
               </Button>
             </div>
 
+            {/* ✅ ADD BUTTON */}
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              className={styles.addBtn}
+              onClick={() => setOpen(true)}
+            >
+              Add Department
+            </Button>
           </div>
 
           <Table<DepartmentType>
@@ -113,10 +118,19 @@ const Department: React.FC = () => {
             onRow={(record) => ({
               onClick: () =>
                 navigate(`/super-admin/department-employee/${record.id}`, {
-                  state: { deptName: record.name }, // <-- pass department name here
+                  state: { deptName: record.name },
                 }),
               style: { cursor: "pointer" },
             })}
+          />
+
+          {/* ✅ MODAL */}
+          <AddDepartment
+            open={open}
+            onClose={() => {
+              setOpen(false);
+              fetchDepartments(); // refresh after adding
+            }}
           />
         </Layout.Content>
       </Layout>

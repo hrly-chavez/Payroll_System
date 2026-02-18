@@ -122,6 +122,7 @@ const AdminDepartmentEmployee: React.FC = () => {
           <AddEmployeeFlow
             open={open}
             departmentId={Number(deptId)}
+            allowedRoles={["EMPLOYEE"]} 
             onClose={() => {
               setOpen(false);
               fetchEmployees();

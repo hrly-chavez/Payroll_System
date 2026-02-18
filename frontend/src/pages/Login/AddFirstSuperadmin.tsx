@@ -1,39 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { Modal, Form, Input, Select, Button, DatePicker, Row, Col, message } from "antd";
-import api from "api/axios";
-import styles from "../AddAdDeptEmployee.module.css";
+import api from "../../api/axios"; // adjust path if needed
+import styles from "../HR/AdminDepartmentEmployee/AddAdDeptEmployee.module.css";
 
 const { Option } = Select;
 
 interface Props {
   open: boolean;
-  departmentId: number;
-  allowedRoles: ("EMPLOYEE" | "ADMIN" | "SUPER_ADMIN")[];
-  onNext: (
-    employeeId: number,
-    credentials: { username: string; password: string }
-  ) => void;
+  onNext: (employeeId: number, credentials: { username: string; password: string }) => void;
   onClose: () => void;
-}
-
-
-
-interface Shift {
-  id: number;
-  start_time: string;
-  end_time: string;
-}
-
-interface Department {
-  id: number;
-  name: string;
-  shift?: {
-    id: number;
-    name: string;
-    start_time: string;
-    end_time: string;
-    display_time: string;
-  } | null;
+  mode?: "SUPERADMIN_SETUP";
 }
 
 interface Province {
@@ -51,42 +27,17 @@ interface Barangay {
   name: string;
 }
 
-const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRoles, onNext, onClose }) => {
+const AddFirstSuperadmin: React.FC<Props> = ({ open, onNext, onClose, mode }) => {
   const [form] = Form.useForm();
-
-  const [shifts, setShifts] = useState<Shift[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [cities, setCities] = useState<City[]>([]);
   const [barangays, setBarangays] = useState<Barangay[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // Show role selector only if SUPER_ADMIN is allowed
-  const showRoleField = allowedRoles.includes("SUPER_ADMIN");
-
-  const formatTime = (t: string) => t.slice(0, 5);
-
-  // Fetch dropdown data
   useEffect(() => {
-    api.get("/employees/shifts/").then(res => setShifts(res.data));
-
-    api.get("/employees/departments/").then(res => {
-      const deptData = res.data;
-      setDepartments(deptData);
-
-      if (departmentId) {
-        const selectedDept = deptData.find(
-          (d: Department) => d.id === departmentId
-        );
-
-        form.setFieldsValue({
-          department: departmentId,
-          shift: selectedDept?.shift?.id ?? undefined
-        });
-      }
-    });
-
+    // fetch provinces
     api.get("/employees/provinces/").then(res => setProvinces(res.data));
-  }, [departmentId]);
+  }, []);
 
   const handleProvinceChange = (provinceId: number) => {
     form.setFieldsValue({ address: { city: null, barangay: null } });
@@ -108,35 +59,49 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
   const handleNext = async () => {
     try {
       const values = await form.validateFields();
+      setLoading(true);
 
       const payload = {
-        ...values,
+        fname: values.fname,
+        lname: values.lname,
+        initial: values.initial || "",
+        suffix: values.suffix || "",
+        contact_no: values.contact_no,
+        email: values.email,
         hired_date: values.hired_date.format("YYYY-MM-DD"),
+        position: values.position,
+        bank_info: values.bank_info || "",
+        status: values.status,
+        address: {
+          street: values.address.street,
+          sitio: values.address.sitio || "",
+          barangay: values.address.barangay,
+          city: values.address.city,
+          province: values.address.province,
+          zip_code: values.address.zip_code || "",
+        },
       };
 
-      const res = await api.post("/employees/employees/", payload);
+      const res = await api.post("/employees/employees/create-first-superadmin/", payload);
 
-      message.success("Employee created successfully!");
-
-      onNext(res.data.employee_id, {
-        username: res.data.username,
-        password: res.data.password,
-      });
-
+      message.success(`SUPER_ADMIN created! Username: ${res.data.username}, Password: ${res.data.password}`);
+      form.resetFields();
+      onNext(res.data.employee_id, { username: res.data.username, password: res.data.password });
     } catch (err: any) {
       console.error(err);
       message.error(
         err.response?.data?.error ||
         err.response?.data?.message ||
-        "Failed to create employee"
+        "Failed to create SUPER_ADMIN"
       );
+    } finally {
+      setLoading(false);
     }
   };
 
-
   return (
     <Modal
-      title="Employee Details"
+      title="Create First SUPER_ADMIN"
       open={open}
       onCancel={onClose}
       footer={null}
@@ -147,24 +112,7 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
     >
       <Form layout="vertical" form={form} className={styles.form}>
         <Row gutter={16}>
-          {/* Employee Basic Info */}
-          <Col xs={24} md={12}>
-            <Form.Item name="id_no" label="Employee Number" rules={[{ required: true }]}>
-              <Input />
-            </Form.Item>
-          </Col>
-
-          <Col xs={24} md={12}>
-            <Form.Item name="status" label="Marital Status" rules={[{ required: true }]}>
-              <Select>
-                <Option value="SINGLE">Single</Option>
-                <Option value="MARRIED">Married</Option>
-                <Option value="WIDOWED">Widowed</Option>
-                <Option value="SEPARATED">Separated</Option>
-              </Select>
-            </Form.Item>
-          </Col>
-
+          {/* Employee Info */}
           <Col xs={24} md={12}>
             <Form.Item name="fname" label="First Name" rules={[{ required: true }]}>
               <Input />
@@ -190,7 +138,7 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
           </Col>
 
           <Col xs={24} md={12}>
-            <Form.Item name="contact_no" label="Contact Number">
+            <Form.Item name="contact_no" label="Contact Number" rules={[{ required: true }]}>
               <Input />
             </Form.Item>
           </Col>
@@ -214,60 +162,12 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
           </Col>
 
           <Col xs={24} md={12}>
-            <Form.Item name="bank_info" label="Bank Information">
+            <Form.Item name="bank_info" label="Bank Info">
               <Input />
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
-            <Form.Item name="shift" label="Shift">
-              <Select>
-                {shifts.map(s => (
-                  <Option key={s.id} value={s.id}>
-                    {formatTime(s.start_time)} - {formatTime(s.end_time)}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Col>
-
-          <Col xs={24} md={12}>
-            <Form.Item name="department" label="Department" rules={[{ required: true }]}>
-              <Select
-                options={departments.map(d => ({
-                  value: d.id,
-                  label: d.name,
-                }))}
-                onChange={(value) => {
-                  const selectedDept = departments.find(d => d.id === value);
-                  form.setFieldsValue({
-                    shift: selectedDept?.shift?.id || undefined,
-                  });
-                }}
-              />
-            </Form.Item>
-          </Col>
-          
-          {showRoleField && (
-            <Col xs={24} md={12}>
-              <Form.Item
-                name="role"
-                label="Role"
-                rules={[{ required: true }]}
-              >
-                <Select>
-                  {allowedRoles.map((role) => (
-                    <Select.Option key={role} value={role}>
-                      {role.replace("_", " ")}
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-          )}
-
-          {/* Address */}
-          <Col span={24}><h3>Address</h3></Col>
+          <Col xs={24}><h3>Address</h3></Col>
 
           <Col xs={24} md={12}>
             <Form.Item name={["address", "province"]} label="Province" rules={[{ required: true }]}>
@@ -313,14 +213,16 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
         </Row>
 
         <div className={styles.actions}>
-          <Button type="primary" onClick={handleNext}>
-            Next
+          <Button type="primary" onClick={handleNext} loading={loading}>
+            Create SUPER_ADMIN
           </Button>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose} style={{ marginLeft: 8 }}>
+            Cancel
+          </Button>
         </div>
       </Form>
     </Modal>
   );
 };
 
-export default EmployeeDetailsModal;
+export default AddFirstSuperadmin;

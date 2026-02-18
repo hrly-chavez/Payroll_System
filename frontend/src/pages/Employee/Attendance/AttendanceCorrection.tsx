@@ -40,10 +40,10 @@ const AttendanceCorrection: React.FC<Props> = ({ open, onClose }) => {
             Request
             </Button>
             <Button
-            type="primary"
-            className={styles.cancelModalBtn}
+              className={styles.cancelModalBtn}
+              onClick={onClose}
             >
-            Cancel
+              Cancel
             </Button>
         </div>
       </div>

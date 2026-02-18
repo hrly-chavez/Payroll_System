@@ -21,7 +21,7 @@ import type { EventItem } from "../../../components/SharedCalendar/SharedCalenda
 import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
 
 interface CalendarPageProps {
-  showRequests?: boolean; // default to true if not provided
+  showRequests?: boolean;
 }
 
 const { Content } = Layout;
@@ -145,23 +145,6 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ showRequests = true }) => {
             {/* Header Controls */}
              <div className={styles.calLeftTitle}>
               {calendarValue.format("MMMM YYYY")}
-            </div>
-            <div className={styles.calRight}>
-              <Select
-                size="small"
-                value={month}
-                options={monthOptions}
-                onChange={setMonth}
-                style={{ width: 120 }}
-              />
-
-              <Select
-                size="small"
-                value={year}
-                options={years.map((y) => ({ label: y, value: y }))}
-                onChange={setYear}
-                style={{ width: 90 }}
-              />
             </div>
 
             {/* Calendar */}

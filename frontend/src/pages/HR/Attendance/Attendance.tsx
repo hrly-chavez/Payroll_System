@@ -54,10 +54,10 @@ const Attendance: React.FC = () => {
   type RangeMode = "Month" | "Week" | "Day";
 
   const [rangeMode, setRangeMode] = useState<RangeMode>("Month");
-  const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs());   // anchor for Day/Week
-  const [selectedMonth, setSelectedMonth] = useState<Dayjs>(dayjs()); // month for API fetch
+  const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs());   
+  const [selectedMonth, setSelectedMonth] = useState<Dayjs>(dayjs()); 
 
-  const [allRows, setAllRows] = useState<HRLogRow[]>([]); // raw month rows
+  const [allRows, setAllRows] = useState<HRLogRow[]>([]); 
 
 
   const computeStatsFromRows = (list: HRLogRow[]) => {
@@ -180,18 +180,20 @@ const Attendance: React.FC = () => {
 
         <Content className={styles.content}>
           <Row gutter={16}>
-            <Col span={6}>
-              <Card>
+            <Col xs={24} sm={12} md={8}>
+              <Card className={`${styles.statCard} ${styles.presentCard}`}>
                 <Statistic title="Total Present" value={stats.present} />
               </Card>
             </Col>
-            <Col span={6}>
-              <Card>
+
+            <Col xs={24} sm={12} md={8}>
+              <Card className={`${styles.statCard} ${styles.lateCard}`}>
                 <Statistic title="Total Lates" value={stats.lates} />
               </Card>
             </Col>
-            <Col span={6}>
-              <Card>
+
+            <Col xs={24} sm={12} md={8}>
+              <Card className={`${styles.statCard} ${styles.absentCard}`}>
                 <Statistic title="Total Absences" value={stats.absent} />
               </Card>
             </Col>
@@ -250,11 +252,11 @@ const Attendance: React.FC = () => {
               </div>
               <Search
                 placeholder="Search name / department"
-                className="search-input"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onSearch={(v) => fetchLogs({ keyword: v })}
                 allowClear
+                className={styles.searchRight}
               />
             </div>
 

@@ -1,9 +1,12 @@
 "use client";
 //frontend/src/pages/Calendar/AddHolidayModal.tsx
+import React, { useState } from "react";
 import { Modal, Form, Input, DatePicker, Select, Button } from "antd";
 import dayjs from "dayjs";
 import { message } from "antd";
 import api from "../../../api/axios";
+import styles from "./../Calendar/calendar.module.css";
+
 
 
 interface Props {
@@ -14,6 +17,7 @@ interface Props {
 
 export default function AddHolidayModal({ open, onClose, onSuccess }: Props) {
   const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (values: any) => {
   try {
@@ -30,14 +34,16 @@ export default function AddHolidayModal({ open, onClose, onSuccess }: Props) {
     onClose();
     onSuccess();
   } catch (err: any) {
-  console.log("SERVER ERROR:", err.response?.data);
-  message.error("Failed to submit holiday request");
-}
-};
+    console.log("SERVER ERROR:", err.response?.data);
+    message.error("Failed to submit holiday request");
+  }finally {
+        setLoading(false);
+      }
+  };
 
 
   return (
-    <Modal open={open} onCancel={onClose} footer={null} title="Add Holiday">
+    <Modal open={open} onCancel={onClose} footer={null} title="Add Holiday"  centered >
       <Form form={form} layout="vertical" onFinish={handleSubmit}>
         <Form.Item name="name" label="Holiday Name" rules={[{ required: true }]}>
           <Input />
@@ -68,7 +74,13 @@ export default function AddHolidayModal({ open, onClose, onSuccess }: Props) {
         <Input.TextArea rows={3} />
         </Form.Item>
 
-        <Button type="primary" htmlType="submit" block>
+        <Button
+          type="primary"
+          htmlType="submit"
+          block
+          loading={loading}
+          className={styles.submitBtn}
+        >
           Submit
         </Button>
       </Form>

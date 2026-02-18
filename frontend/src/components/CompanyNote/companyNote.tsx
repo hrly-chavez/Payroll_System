@@ -93,6 +93,7 @@ export default function CompanyNote({ role }: Props) {
         open={open}
         onCancel={() => setOpen(false)}
         onOk={handleSubmit}
+        centered
       >
         <TextArea
           rows={4}

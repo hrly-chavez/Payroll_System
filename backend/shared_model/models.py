@@ -254,7 +254,7 @@ class Deduction_Type(models.Model):
     create_at = models.DateField(auto_now_add=True)
 
     def __str__(self):
-        return self.code   
+        return self.code  
 
 class Employee_Deduction(models.Model):
     frequency_choices = [
@@ -406,7 +406,7 @@ class Holiday(models.Model):
     remarks = models.TextField(null=True,blank=True)
     status = models.CharField(max_length=20,choices=[("Pending","Pending"),("Approved","Approved"),("Declined","Declined")],default="Pending")
     is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
     
     def __str__(self):
         return f"{self.date} - {self.name} type {self.type}"
@@ -430,7 +430,7 @@ class HolidayPolicy(models.Model):
     department = models.ForeignKey(Department, on_delete=models.CASCADE)
     holiday_type = models.CharField(max_length=50, choices=HOLIDAY_TYPES)
     requires_work = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
         constraints = [
@@ -479,7 +479,7 @@ class Leave_Type(models.Model):
     pay_rate = models.DecimalField(max_digits=4, decimal_places=2,default=1.00)
     requires_approval = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True) 
-    created_at = models.DateField(auto_now=True)
+    created_at = models.DateField(default=timezone.now)
 
     def __str__(self):
         return f"{self.name} {self.is_paid}"
@@ -785,3 +785,21 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.action} {self.model_name} ({self.object_id})"
+    
+class Notification(models.Model):
+    CATEGORY_CHOICES = [
+        ('leave', 'Leave'),
+        ('attendance', 'Attendance'),
+        ('holiday', 'Holiday'),
+        ('payroll', 'Payroll'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    is_read = models.BooleanField(default=False)
+    redirect_url = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    

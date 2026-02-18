@@ -11,12 +11,12 @@ from django.utils import timezone
 from rest_framework.decorators import api_view
 from django.shortcuts import get_object_or_404
 from datetime import datetime
-from shared_model.models import User
-from notifications.models import Notification
+from shared_model.models import *
+
 
 class HolidayListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
-    queryset = Holiday.objects.filter(status="Approved",is_active=True).order_by("-date")
+    queryset = Holiday.objects.filter(is_active=True).order_by("-date")
     serializer_class = HolidaySerializer
     # public access → no permission_classes
 
@@ -313,3 +313,18 @@ class CommissionTypeUpdateView(generics.UpdateAPIView):
 
     queryset = Commission_Type.objects.all()
     serializer_class = CommissionTypeSerializer
+
+class AllowanceTypeCreateView(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated]
+    queryset = Allowance_Type.objects.all()
+    serializer_class = AllowanceTypeSerializer
+
+class AllowanceTypeListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    queryset = Allowance_Type.objects.all()
+    serializer_class = AllowanceTypeSerializer
+
+class AllowanceTypeUpdateView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    queryset = Allowance_Type.objects.all()
+    serializer_class = AllowanceTypeSerializer

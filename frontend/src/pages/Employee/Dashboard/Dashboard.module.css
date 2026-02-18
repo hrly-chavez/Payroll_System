@@ -14,6 +14,14 @@
   margin-top: 12px;
 }
 
+.mainSection .ant-col {
+  display: flex;
+}
+
+.mainSection .ant-col > * {
+  flex: 1;
+}
+
 /* ================= Greeting ================= */
 
 .greetingCard {
@@ -64,8 +72,6 @@
   border-radius: 8px;
   font-size: 13px;
   line-height: 1.45;
-  margin-bottom: 12px;
-  height: 460px;
   background: #ffffff;
   box-shadow: var(--card-shadow-soft);
   transition: box-shadow 0.2s ease;
@@ -74,10 +80,8 @@
 /* ================= Attendance Card ================= */
 
 .attendanceCard {
-  margin-bottom: 12px;
   border-radius: 8px;
   overflow: hidden;
-  height: 238px;
   box-shadow: var(--card-shadow-soft);
   transition: box-shadow 0.2s ease;
 }
@@ -89,7 +93,7 @@
 
 .attendanceCard :global(.ant-card-head-title) {
   color: #000000;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
 }
 
@@ -98,7 +102,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .legendCard {
@@ -354,6 +358,9 @@
 
 .legendGray {
   background: #aaaaaa;
+}
+.tightSection {
+  margin-top: 6px; 
 }
 
 @media (max-width: 768px) {

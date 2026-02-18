@@ -2,7 +2,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Button, Form, Spin, message, Tag } from "antd";import { EditOutlined } from "@ant-design/icons";
+import { Button, Form, Spin, message, Tag, Switch, Tooltip, Modal } from "antd";
+import { EditOutlined } from "@ant-design/icons";
 import API from "../../../../api/axios";
 import "../SystemConfiguration.css";
 
@@ -29,7 +30,7 @@ export default function PayRulesTab({ active }: Props) {
   const fetchDepartments = async () => {
     try {
       const res = await API.get("/employees/departments/");
-      setDepartments(res.data);     
+      setDepartments(res.data);
     } catch (error) {
       console.error(error);
       message.error("Failed to fetch departments.");
@@ -46,11 +47,13 @@ export default function PayRulesTab({ active }: Props) {
     }
   };
 
+  // ✅ newest first (latest on top)
   const fetchPayRules = async () => {
     setLoading(true);
     try {
       const res = await API.get("/payroll/superadmin/pay-rules/");
-      setPayRules(res.data);
+      const sorted = [...res.data].sort((a: any, b: any) => b.id - a.id);
+      setPayRules(sorted);
     } catch (error) {
       console.error(error);
       message.error("Failed to fetch payroll rules.");
@@ -71,6 +74,8 @@ export default function PayRulesTab({ active }: Props) {
     setPayRuleEditMode(false);
     setEditingPayRuleId(null);
     payrollForm.resetFields();
+    // ✅ default for add
+    payrollForm.setFieldsValue({ is_active: true });
   };
 
   const closePayrollModal = () => {
@@ -80,7 +85,7 @@ export default function PayRulesTab({ active }: Props) {
     payrollForm.resetFields();
   };
 
-    const handleEditPayRule = (rule: any) => {
+  const handleEditPayRule = (rule: any) => {
     editPayRule({
       rule,
       setPayRuleEditMode,
@@ -88,12 +93,51 @@ export default function PayRulesTab({ active }: Props) {
       setPayrollModalOpen,
       payrollForm,
     });
+
+    // ✅ remove "Active" checkbox in edit modal by forcing hidden state
+    // (we will control status using the switch in Actions)
+    payrollForm.setFieldsValue({ is_active: undefined });
   };
 
+  // ✅ Confirm modal + status patch (same behavior as contributions)
+  const confirmToggleStatus = (rule: any, nextStatus: boolean) => {
+    const actionText = nextStatus ? "activate" : "deactivate";
+
+    Modal.confirm({
+      title: "Confirm Status Change",
+      content: `Are you sure you want to ${actionText} this payroll rule?`,
+      okText: "Yes",
+      cancelText: "No",
+      centered: true,
+      async onOk() {
+        try {
+          // 🔥 adjust if your endpoint differs
+          await API.patch(`/payroll/superadmin/pay-rules/${rule.id}/`, {
+            is_active: nextStatus,
+          });
+
+          message.success("Status updated");
+
+          setPayRules((prev) => {
+            const updated = prev.map((item) =>
+              item.id === rule.id ? { ...item, is_active: nextStatus } : item
+            );
+            return updated.sort((a: any, b: any) => b.id - a.id);
+          });
+        } catch (error) {
+          console.error(error);
+          message.error("Failed to update status");
+        }
+      },
+    });
+  };
 
   const handleSavePayRule = async () => {
     try {
       const values = await payrollForm.validateFields();
+
+      // ✅ preserve existing active state on edit
+      const existing = payRules.find((r) => r.id === editingPayRuleId);
 
       const payload = {
         name: values.name,
@@ -103,48 +147,65 @@ export default function PayRulesTab({ active }: Props) {
         rate_value: String(values.rate_value),
         applies_to: values.applies_to || null,
         employee: values.employee || null,
-        effective_from: values.effective_from ? values.effective_from.format("YYYY-MM-DD") : null,
-        effective_to: values.effective_to ? values.effective_to.format("YYYY-MM-DD") : null,
-        is_active: values.is_active ?? true,
+        effective_from: values.effective_from
+          ? values.effective_from.format("YYYY-MM-DD")
+          : null,
+        effective_to: values.effective_to
+          ? values.effective_to.format("YYYY-MM-DD")
+          : null,
+
+        // ✅ on edit: keep existing is_active
+        // ✅ on add: default true
+        is_active: payRuleEditMode ? existing?.is_active : true,
       };
 
       if (payRuleEditMode && editingPayRuleId) {
-        const res = await API.put(`/payroll/superadmin/pay-rules/${editingPayRuleId}/`, payload);
-        setPayRules((prev) =>
-          prev.map((item) => (item.id === editingPayRuleId ? res.data : item))
+        const res = await API.put(
+          `/payroll/superadmin/pay-rules/${editingPayRuleId}/`,
+          payload
         );
+
+        setPayRules((prev) => {
+          const updated = prev.map((item) =>
+            item.id === editingPayRuleId ? res.data : item
+          );
+          return updated.sort((a: any, b: any) => b.id - a.id);
+        });
+
         message.success("Payroll rule updated successfully");
+        closePayrollModal();
       } else {
         const res = await API.post("/payroll/superadmin/pay-rules/", payload);
-        setPayRules((prev) => [res.data, ...prev]);
-        message.success("Payroll rule added successfully");
-      }
 
-      closePayrollModal();
+        setPayRules((prev) => {
+          const next = [res.data, ...prev];
+          return next.sort((a: any, b: any) => b.id - a.id);
+        });
+
+        message.success("Payroll rule added successfully");
+        closePayrollModal();
+      }
     } catch (error) {
       console.error(error);
       message.error("Failed to save payroll rule.");
     }
   };
-   const formatRateValue = (rule: any) => {
-    const raw = rule?.rate_value ?? 0;
 
-    // keep as number display but don't break if string comes from API
+  const formatRateValue = (rule: any) => {
+    const raw = rule?.rate_value ?? 0;
     const num = Number(raw);
 
     if (rule.rate_type === "MULTIPLIER") {
-      // show x with 4 decimals (matches backend)
       return `x${Number.isFinite(num) ? num.toFixed(4) : raw}`;
     }
 
-    // peso-based types
     const peso = `₱${Number.isFinite(num) ? num.toFixed(2) : raw}`;
 
     if (rule.rate_type === "PER_MINUTE") return `${peso}/min`;
     if (rule.rate_type === "PER_DAY") return `${peso}/day`;
-    // FIXED default
     return peso;
   };
+
   const formatRateType = (value: string) => {
     if (!value) return "";
     if (value === "PER_MINUTE") return "Per Minute";
@@ -156,7 +217,13 @@ export default function PayRulesTab({ active }: Props) {
 
   return (
     <div className="table-wrapper">
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          marginBottom: 12,
+        }}
+      >
         <Button type="primary" onClick={openPayrollModal}>
           Add New Payroll Rule
         </Button>
@@ -168,51 +235,63 @@ export default function PayRulesTab({ active }: Props) {
         <table className="config-table">
           <thead>
             <tr>
-              {/* <th>Rule Name</th> */}
               <th>Event Type</th>
               <th>Category</th>
               <th>Rate Type</th>
               <th>Rate Value</th>
               <th>Scope</th>
               <th>Effective From</th>
-              <th>Status</th>
-              <th>Actions</th>
+              <th style={{ textAlign: "center" }}>Actions</th>
             </tr>
           </thead>
+
           <tbody>
             {payRules.map((rule) => (
               <tr key={rule.id}>
-                {/* <td>{rule.name}</td> */}
                 <td>{rule.event_type}</td>
                 <td>{rule.category}</td>
                 <td>{formatRateType(rule.rate_type)}</td>
                 <td>{formatRateValue(rule)}</td>
                 <td>{rule.employee_name || rule.applies_to_name || "All"}</td>
                 <td>{rule.effective_from}</td>
-                <td>
-                  <Tag color={rule.is_active ? "green" : "red"}>
-                    {rule.is_active ? "Active" : "Inactive"}
-                  </Tag>
-                </td>
-                <td className="actions">
-                  <EditOutlined onClick={() => handleEditPayRule(rule)} />
-                </td>
+                {/* ✅ Actions: Switch + Edit */}
+                <td
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
+                >
+                  <Tooltip title={rule.is_active ? "Deactivate" : "Activate"}>
+                    <Switch
+                      size="small"
+                      checked={rule.is_active}
+                      onChange={(checked) => confirmToggleStatus(rule, checked)}
+                    />
+                  </Tooltip>
 
+                  <EditOutlined
+                    onClick={() => handleEditPayRule(rule)}
+                    style={{ cursor: "pointer" }}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
-              <AddPayRules
-                open={payrollModalOpen}
-                title={payRuleEditMode ? "Edit Payroll Rule" : "Add Payroll Rule"}
-                onCancel={closePayrollModal}
-                onOk={handleSavePayRule}
-                okText="Save"
-                form={payrollForm}
-                departments={departments}
-                employees={employees}
-            />
+
+      <AddPayRules
+        open={payrollModalOpen}
+        title={payRuleEditMode ? "Edit Payroll Rule" : "Add Payroll Rule"}
+        onCancel={closePayrollModal}
+        onOk={handleSavePayRule}
+        okText="Save"
+        form={payrollForm}
+        departments={departments}
+        employees={employees}
+      />
     </div>
   );
 }

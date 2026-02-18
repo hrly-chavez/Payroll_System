@@ -124,7 +124,8 @@ export default function CommissionTypeTab({ active }: Props) {
               <th>Code</th>
               <th>Taxable?</th>
               <th>Active</th>
-              <th>Created</th>
+              <th >Created</th>
+              <th style={{ textAlign: "center" }}>Actions</th>
               {/* <th>Actions</th> */}
             </tr>
           </thead>

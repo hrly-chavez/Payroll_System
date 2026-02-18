@@ -80,8 +80,6 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
             "requested_at",
         ]
 
-
-
 class  CommissionTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Commission_Type
@@ -93,3 +91,17 @@ class  CommissionTypeSerializer(serializers.ModelSerializer):
             "is_active",
             "created_at",
         ]
+
+
+class AllowanceTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Allowance_Type
+        fields = "__all__"
+        read_only_fields = ["id", "created_at"]
+
+    def validate_code(self, value):
+        if Allowance_Type.objects.filter(code=value).exists():
+            raise serializers.ValidationError(
+                "Allowance code already exists."
+            )
+        return value

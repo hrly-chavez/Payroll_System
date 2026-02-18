@@ -4,11 +4,20 @@
   padding: 20px 24px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
   color: #ffffff;
+  height: 100%;        
+  display: flex;         
+  flex-direction: column;
+}
+
+.noteCard :global(.ant-card-body) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .title {
   margin: 0 0 12px 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
 }
 

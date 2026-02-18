@@ -20,9 +20,13 @@ import SharedCalendar from "../../../components/SharedCalendar/SharedCalendar";
 import type { EventItem } from "../../../components/SharedCalendar/SharedCalendar";
 import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
 
+interface CalendarPageProps {
+  showRequests?: boolean; // default to true if not provided
+}
+
 const { Content } = Layout;
 
-const CalendarPage: React.FC = () => {
+const CalendarPage: React.FC<CalendarPageProps> = ({ showRequests = true }) => {
   type PayrollPeriod = {
     id: number;
     code?: string;
@@ -117,21 +121,24 @@ const CalendarPage: React.FC = () => {
 
         <Content className={styles.content}>
           {/* ACTION BUTTONS */}
-          <div className={styles.actions}>
-            <Button
-              className={styles.payrollBtn}
-              onClick={() => setPeriodModal(true)}
-            >
-              + Add Payroll Period
-            </Button>
+          {showRequests && (
+            <div className={styles.actions}>
+              <Button
+                className={styles.payrollBtn}
+                onClick={() => setPeriodModal(true)}
+              >
+                + Add Payroll Period
+              </Button>
 
-            <Button
-              className={styles.holidayBtn}
-              onClick={() => setHolidayModal(true)}
-            >
-              + Add Holiday
-            </Button>
-          </div>
+              <Button
+                className={styles.holidayBtn}
+                onClick={() => setHolidayModal(true)}
+              >
+                + Add Holiday
+              </Button>
+            </div>
+          )}
+
 
           {/* ================= CALENDAR CARD ================= */}
           <Card className={styles.card}>
@@ -175,51 +182,46 @@ const CalendarPage: React.FC = () => {
           </Card>
 
           {/* ================= REQUESTS CARD ================= */}
-          <Card className={styles.card}>
-            <div className={styles.requestHeader}>
-              <div className={styles.tabSwitch}>
-                <button
-                  className={`${styles.pillTab} ${
-                    activeTab === "payroll"
-                      ? styles.pillActive
-                      : ""
-                  }`}
-                  onClick={() => setActiveTab("payroll")}
-                  type="button"
-                >
-                  Payroll Period
-                </button>
+          {showRequests && (
+            <Card className={styles.card}>
+              <div className={styles.requestHeader}>
+                <div className={styles.tabSwitch}>
+                  <button
+                    className={`${styles.pillTab} ${activeTab === "payroll" ? styles.pillActive : ""}`}
+                    onClick={() => setActiveTab("payroll")}
+                    type="button"
+                  >
+                    Payroll Period
+                  </button>
 
-                <button
-                  className={`${styles.pillTab} ${
-                    activeTab === "holiday"
-                      ? styles.pillActive
-                      : ""
-                  }`}
-                  onClick={() => setActiveTab("holiday")}
-                  type="button"
-                >
-                  Holiday Request
-                </button>
+                  <button
+                    className={`${styles.pillTab} ${activeTab === "holiday" ? styles.pillActive : ""}`}
+                    onClick={() => setActiveTab("holiday")}
+                    type="button"
+                  >
+                    Holiday Request
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {activeTab === "holiday" && (
-              <HolidayTab
-                active
-                searchText={searchText}
-                refreshKey={holidayRefreshKey}
-              />
-            )}
+              {activeTab === "holiday" && (
+                <HolidayTab
+                  active
+                  searchText={searchText}
+                  refreshKey={holidayRefreshKey}
+                />
+              )}
 
-            {activeTab === "payroll" && (
-              <PayrollPeriodTab
-                active
-                searchText={searchText}
-                refreshKey={payrollRefreshKey}
-              />
-            )}
-          </Card>
+              {activeTab === "payroll" && (
+                <PayrollPeriodTab
+                  active
+                  searchText={searchText}
+                  refreshKey={payrollRefreshKey}
+                />
+              )}
+            </Card>
+          )}
+
         </Content>
       </Layout>
 

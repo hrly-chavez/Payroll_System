@@ -1,9 +1,18 @@
-//src/pages/SuperAdmin/System Configuration/Pay Rules/AddPayRules.tsx
-
+// src/pages/SuperAdmin/System Configuration/Pay Rules/AddPayRules.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Modal, Form, Input, Select, DatePicker, Checkbox, Row, Col, Spin, InputNumber } from "antd";
+import {
+  Modal,
+  Form,
+  Input,
+  Select,
+  DatePicker,
+  Row,
+  Col,
+  Spin,
+  InputNumber,
+} from "antd";
 import api from "../../../../api/axios";
 
 type Props = {
@@ -20,8 +29,16 @@ type Props = {
 
 type Choice = { value: string; label: string };
 
-export default function AddPayRules({open,title,onCancel,onOk,okText = "Save",form,departments,employees,}: Props) {
-
+export default function AddPayRules({
+  open,
+  title,
+  onCancel,
+  onOk,
+  okText = "Save",
+  form,
+  departments,
+  employees,
+}: Props) {
   const [eventTypes, setEventTypes] = useState<Choice[]>([]);
   const [categories, setCategories] = useState<Choice[]>([]);
   const [rateTypes, setRateTypes] = useState<Choice[]>([]);
@@ -35,6 +52,8 @@ export default function AddPayRules({open,title,onCancel,onOk,okText = "Save",fo
     ? "Example: 1 = 100% of base (daily_rate/hourly_rate), 1.5 = 150%"
     : "Enter exact peso amount based on rate type (e.g., ₱10 per minute).";
 
+  // ✅ detect edit mode based on modal title (simple + no prop changes)
+  const isEditMode = title.toLowerCase().includes("edit");
 
   useEffect(() => {
     const fetchChoices = async () => {
@@ -53,8 +72,6 @@ export default function AddPayRules({open,title,onCancel,onOk,okText = "Save",fo
     if (open) fetchChoices();
   }, [open]);
 
- 
-
   return (
     <Modal
       title={title}
@@ -66,7 +83,11 @@ export default function AddPayRules({open,title,onCancel,onOk,okText = "Save",fo
       width={650}
     >
       <Form form={form} layout="vertical">
-        <Form.Item label="Rule Name" name="name" rules={[{ required: true, message: "Rule name is required" }]}>
+        <Form.Item
+          label="Rule Name"
+          name="name"
+          rules={[{ required: true, message: "Rule name is required" }]}
+        >
           <Input placeholder="Enter rule name" />
         </Form.Item>
 
@@ -87,7 +108,11 @@ export default function AddPayRules({open,title,onCancel,onOk,okText = "Save",fo
           </Col>
 
           <Col span={12}>
-            <Form.Item label="Category" name="category" rules={[{ required: true, message: "Category is required" }]}>
+            <Form.Item
+              label="Category"
+              name="category"
+              rules={[{ required: true, message: "Category is required" }]}
+            >
               <Select
                 placeholder="Select category"
                 loading={loadingChoices}
@@ -100,7 +125,11 @@ export default function AddPayRules({open,title,onCancel,onOk,okText = "Save",fo
 
         <Row gutter={12}>
           <Col span={12}>
-            <Form.Item label="Rate Type" name="rate_type" rules={[{ required: true, message: "Rate type is required" }]}>
+            <Form.Item
+              label="Rate Type"
+              name="rate_type"
+              rules={[{ required: true, message: "Rate type is required" }]}
+            >
               <Select
                 placeholder="Select rate type"
                 loading={loadingChoices}
@@ -115,7 +144,14 @@ export default function AddPayRules({open,title,onCancel,onOk,okText = "Save",fo
               label={rateLabel}
               name="rate_value"
               help={rateHelp}
-              rules={[{ required: true, message: isMultiplier ? "Multiplier is required" : "Rate value is required" }]}
+              rules={[
+                {
+                  required: true,
+                  message: isMultiplier
+                    ? "Multiplier is required"
+                    : "Rate value is required",
+                },
+              ]}
             >
               <InputNumber
                 style={{ width: "100%" }}
@@ -131,18 +167,22 @@ export default function AddPayRules({open,title,onCancel,onOk,okText = "Save",fo
 
         <Row gutter={12}>
           <Col span={12}>
-            <Form.Item label="Applies To (Department)"name="applies_to"
-                rules={[
-                  ({ getFieldValue }) => ({
-                    validator(_, value) {
-                      if (value && getFieldValue("employee")) {
-                        return Promise.reject(new Error("Choose either Department or Employee, not both."));
-                      }
-                      return Promise.resolve();
-                    },
-                  }),
-                ]}
-              >
+            <Form.Item
+              label="Applies To (Department)"
+              name="applies_to"
+              rules={[
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (value && getFieldValue("employee")) {
+                      return Promise.reject(
+                        new Error("Choose either Department or Employee, not both.")
+                      );
+                    }
+                    return Promise.resolve();
+                  },
+                }),
+              ]}
+            >
               <Select
                 allowClear
                 placeholder="All departments"
@@ -155,29 +195,35 @@ export default function AddPayRules({open,title,onCancel,onOk,okText = "Save",fo
           </Col>
 
           <Col span={12}>
-            <Form.Item label="Applies To (Employee)"name="employee"
+            <Form.Item
+              label="Applies To (Employee)"
+              name="employee"
               rules={[
                 ({ getFieldValue }) => ({
                   validator(_, value) {
                     if (value && getFieldValue("applies_to")) {
-                      return Promise.reject(new Error("Choose either Department or Employee, not both."));
+                      return Promise.reject(
+                        new Error("Choose either Department or Employee, not both.")
+                      );
                     }
                     return Promise.resolve();
                   },
                 }),
               ]}
             >
-
               <Select
                 allowClear
                 placeholder="All employees"
                 onChange={(value) => {
                   if (value) form.setFieldsValue({ applies_to: null });
                 }}
-               options={employees.map((e) => ({
-                value: e.id,
-                label: e.full_name || `${e.fname || ""} ${e.lname || ""}`.trim() || `Employee #${e.id}`,
-              }))}
+                options={employees.map((e) => ({
+                  value: e.id,
+                  label:
+                    e.full_name ||
+                    `${e.fname || ""} ${e.lname || ""}`.trim() ||
+                    `Employee #${e.id}`,
+                }))}
               />
             </Form.Item>
           </Col>
@@ -191,7 +237,6 @@ export default function AddPayRules({open,title,onCancel,onOk,okText = "Save",fo
               rules={[{ required: true, message: "Effective from is required" }]}
             >
               <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
-
             </Form.Item>
           </Col>
 
@@ -202,9 +247,13 @@ export default function AddPayRules({open,title,onCancel,onOk,okText = "Save",fo
           </Col>
         </Row>
 
-        <Form.Item name="is_active" valuePropName="checked" initialValue={true}>
-          <Checkbox>Active</Checkbox>
-        </Form.Item>
+        {/* ✅ Removed Active checkbox in EDIT mode */}
+        {!isEditMode && (
+          <Form.Item name="is_active" valuePropName="checked" initialValue={true}>
+            {/* keep default active on add (but invisible on edit) */}
+            {/* If you want it always true on add without UI, tell me and I’ll remove UI too */}
+          </Form.Item>
+        )}
       </Form>
     </Modal>
   );

@@ -1,7 +1,16 @@
-import { Table, Button, Space, Popconfirm, message, Spin, Tag } from "antd";
+import {
+  Table,
+  Button,
+  Space,
+  Popconfirm,
+  message,
+  Spin,
+  Tag,
+  Tooltip,
+} from "antd";
 import { useEffect, useRef, useState } from "react";
 import api from "../../../../api/axios";
-import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { EditOutlined } from "@ant-design/icons";
 
 import AddAllowanceType from "./AddAllowanceType";
 import EditAllowanceType from "./EditAllowanceType";
@@ -16,6 +25,19 @@ export type AllowanceType = {
   code: string;
   is_active: boolean;
   created_at: string;
+};
+
+const toBool = (v: any) => {
+  if (v === true || v === 1) return true;
+  if (v === false || v === 0) return false;
+
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (s === "true" || s === "1") return true;
+    if (s === "false" || s === "0") return false;
+  }
+
+  return Boolean(v);
 };
 
 const Allowance = ({ active }: Props) => {
@@ -34,7 +56,14 @@ const Allowance = ({ active }: Props) => {
     setLoading(true);
     try {
       const res = await api.get("/approvals/allowance-type");
-      setAllowances(res.data);
+
+      // ✅ normalize is_active so Tag display is accurate
+      const normalized = (res.data || []).map((item: any) => ({
+        ...item,
+        is_active: toBool(item.is_active),
+      }));
+
+      setAllowances(normalized);
       hasFetched.current = true;
     } catch (err) {
       console.error(err);
@@ -51,8 +80,6 @@ const Allowance = ({ active }: Props) => {
     }
   }, [active]);
 
-
-
   // TABLE COLUMNS
   const columns = [
     {
@@ -66,8 +93,8 @@ const Allowance = ({ active }: Props) => {
     {
       title: "Status",
       dataIndex: "is_active",
-      render: (active: boolean) =>
-        active ? (
+      render: (isActive: boolean) =>
+        isActive ? (
           <Tag color="green">Active</Tag>
         ) : (
           <Tag color="red">Inactive</Tag>
@@ -76,21 +103,21 @@ const Allowance = ({ active }: Props) => {
     {
       title: "Created At",
       dataIndex: "created_at",
-      render: (date: string) =>
-        new Date(date).toLocaleDateString(),
+      render: (date: string) => new Date(date).toLocaleDateString(),
     },
     {
       title: "Actions",
       render: (_: any, record: AllowanceType) => (
         <Space size="middle">
+        <Tooltip title="Edit allowance type">
           <EditOutlined
-            style={{ cursor: "pointer", color: "#1677ff" }}
+            style={{ cursor: "pointer", color: "black" }}
             onClick={() => {
               setSelectedAllowance(record);
               setEditOpen(true);
             }}
           />
-
+        </Tooltip>
         </Space>
       ),
     },

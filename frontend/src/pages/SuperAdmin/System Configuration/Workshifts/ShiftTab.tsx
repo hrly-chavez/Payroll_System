@@ -1,9 +1,9 @@
-import { Table, Button, Space, Popconfirm, message, Spin } from "antd";
+import { Table, Button, Space, message, Spin } from "antd";
 import { useEffect, useRef, useState } from "react";
 import api from "../../../../api/axios";
 import AddShift from "./AddShift";
 import EditShift from "./EditShift";
-import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { EditOutlined } from "@ant-design/icons";
 
 type Props = {
   active: boolean;
@@ -17,7 +17,6 @@ const ShiftTab = ({ active }: Props) => {
   const [editOpen, setEditOpen] = useState(false);
   const [selectedShift, setSelectedShift] = useState<any>(null);
 
-  // prevents refetching every time tab toggles
   const hasFetched = useRef(false);
 
   const fetchShifts = async () => {
@@ -42,12 +41,6 @@ const ShiftTab = ({ active }: Props) => {
     }
   }, [active]);
 
-  const deleteShift = async (id: number) => {
-    await api.delete(`/attendance/shifts/${id}/`);
-    message.success("Shift deleted");
-    fetchShifts();
-  };
-
   const columns = [
     { title: "Name", dataIndex: "name" },
     { title: "Start", dataIndex: "start_time" },
@@ -59,20 +52,12 @@ const ShiftTab = ({ active }: Props) => {
       render: (_: any, record: any) => (
         <Space size="middle">
           <EditOutlined
-            style={{ cursor: "pointer", color: "#bla" }}
+            style={{ cursor: "pointer" }}
             onClick={() => {
               setSelectedShift(record);
               setEditOpen(true);
             }}
           />
-          <Popconfirm
-            title="Delete this shift?"
-            onConfirm={() => deleteShift(record.id)}
-          >
-            <DeleteOutlined
-              style={{ cursor: "pointer", color: "#ff4d4f" }}
-            />
-          </Popconfirm>
         </Space>
       ),
     },

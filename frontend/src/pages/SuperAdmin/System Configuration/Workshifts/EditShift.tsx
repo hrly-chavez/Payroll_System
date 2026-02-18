@@ -1,5 +1,17 @@
-import { Modal, Form, Input, TimePicker, InputNumber, Switch, message } from "antd";
-import api from "../../../../api/axios";import { useEffect } from "react";
+import {
+  Modal,
+  Form,
+  Input,
+  TimePicker,
+  InputNumber,
+  Switch,
+  message,
+  Row,
+  Col,
+  Tooltip,
+} from "antd";
+import api from "../../../../api/axios";
+import { useEffect } from "react";
 import dayjs from "dayjs";
 
 const EditShift = ({ open, onClose, shift, refresh }: any) => {
@@ -11,16 +23,44 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
         ...shift,
         start_time: dayjs(shift.start_time, "HH:mm"),
         end_time: dayjs(shift.end_time, "HH:mm"),
+        // ensure booleans exist (avoid undefined issues)
+        is_overnight: !!shift.is_overnight,
+        is_active: shift.is_active ?? true,
       });
     }
-  }, [shift]);
+  }, [shift, form]);
+
+  const confirmToggle = (fieldName: "is_overnight" | "is_active") => {
+    const currentValue = !!form.getFieldValue(fieldName);
+    const nextValue = !currentValue;
+
+    const messageText =
+      fieldName === "is_active"
+        ? currentValue
+          ? "Are you sure you want to deactivate this shift?"
+          : "Are you sure you want to activate this shift?"
+        : currentValue
+        ? "Are you sure you want to remove overnight from this shift?"
+        : "Are you sure you want to mark this shift as overnight?";
+
+    Modal.confirm({
+      title: "Confirm Change",
+      content: messageText,
+      okText: "Yes",
+      cancelText: "No",
+      centered: true,
+      onOk() {
+        form.setFieldsValue({ [fieldName]: nextValue });
+      },
+    });
+  };
 
   const onFinish = async (values: any) => {
     await api.put(`attendance/shifts/${shift.id}/`, {
       ...values,
       start_time: values.start_time.format("HH:mm"),
       end_time: values.end_time.format("HH:mm"),
-    }); 
+    });
 
     message.success("Shift updated");
     onClose();
@@ -55,9 +95,49 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
           <InputNumber min={0} style={{ width: "100%" }} />
         </Form.Item>
 
-        <Form.Item name="is_overnight" label="Overnight" valuePropName="checked">
-          <Switch />
+        {/* ✅ Keep values in form, but NOT bind switches directly (prevents toggle lock) */}
+        <Form.Item name="is_overnight" initialValue={false} hidden>
+          <Input />
         </Form.Item>
+
+        <Form.Item name="is_active" initialValue={true} hidden>
+          <Input />
+        </Form.Item>
+
+        {/* ✅ Overnight + Active side by side with hover + confirm */}
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item label="Overnight">
+              <Form.Item noStyle shouldUpdate>
+                {({ getFieldValue }) => {
+                  const value = !!getFieldValue("is_overnight");
+
+                  return (
+                    <Tooltip title={value ? "Remove Overnight" : "Mark as Overnight"}>
+                      <Switch checked={value} onClick={() => confirmToggle("is_overnight")} />
+                    </Tooltip>
+                  );
+                }}
+              </Form.Item>
+            </Form.Item>
+          </Col>
+
+          <Col span={12}>
+            <Form.Item label="Active">
+              <Form.Item noStyle shouldUpdate>
+                {({ getFieldValue }) => {
+                  const value = !!getFieldValue("is_active");
+
+                  return (
+                    <Tooltip title={value ? "Deactivate" : "Activate"}>
+                      <Switch checked={value} onClick={() => confirmToggle("is_active")} />
+                    </Tooltip>
+                  );
+                }}
+              </Form.Item>
+            </Form.Item>
+          </Col>
+        </Row>
       </Form>
     </Modal>
   );

@@ -22,10 +22,15 @@ const AddAllowanceType = ({ open, onClose, refresh }: Props) => {
       onClose();
       refresh();
     } catch (err: any) {
-      message.error(
-        err?.response?.data?.code ||
-          "Failed to add allowance type"
-      );
+      const data = err?.response?.data;
+
+      const backendMsg =
+        (Array.isArray(data?.code) && data.code[0]) ||
+        (Array.isArray(data?.name) && data.name[0]) ||
+        data?.detail ||
+        "Failed to add allowance type";
+
+      message.error(backendMsg);
     }
   };
 
@@ -33,10 +38,13 @@ const AddAllowanceType = ({ open, onClose, refresh }: Props) => {
     <Modal
       open={open}
       title="Add Allowance Type"
-      onCancel={onClose}
+      onCancel={() => {
+        form.resetFields();
+        onClose();
+      }}
       onOk={submit}
       okText="Save"
-      destroyOnClose
+      destroyOnHidden   // ✅ Updated for AntD v5
     >
       <Form form={form} layout="vertical">
         <Form.Item

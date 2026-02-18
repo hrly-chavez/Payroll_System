@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Button, Form, Spin, message } from "antd";
+import { Button, Form, Spin, message, Switch, Tooltip, Modal } from "antd";
 import { EditOutlined } from "@ant-design/icons";
 import API from "../../../../api/axios";
 import "../SystemConfiguration.css";
@@ -16,9 +16,7 @@ type Props = {
 
 export default function ContributionTab({ active }: Props) {
   const [loading, setLoading] = useState(false);
-
   const [contributions, setContributions] = useState<any[]>([]);
-
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -26,13 +24,15 @@ export default function ContributionTab({ active }: Props) {
 
   const [form] = Form.useForm();
 
+  // ✅ ALWAYS newest first (latest added on top)
   const fetchContributions = async () => {
     setLoading(true);
     try {
       const res = await API.get("/payroll/superadmin/deductions/");
-      setContributions([...res.data].reverse());
-    } catch (error) {
-      console.error(error);
+
+      const sorted = [...res.data].sort((a: any, b: any) => b.id - a.id);
+      setContributions(sorted);
+    } catch {
       message.error("Failed to fetch contributions.");
     }
     setLoading(false);
@@ -41,7 +41,6 @@ export default function ContributionTab({ active }: Props) {
   useEffect(() => {
     if (!active) return;
     fetchContributions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
   const openContributionModal = () => {
@@ -71,42 +70,93 @@ export default function ContributionTab({ active }: Props) {
     });
   };
 
+  // ✅ Confirm modal + status update
+  const confirmToggleStatus = (record: any, nextStatus: boolean) => {
+    const actionText = nextStatus ? "activate" : "deactivate";
+
+    Modal.confirm({
+      title: "Confirm Status Change",
+      content: `Are you sure you want to ${actionText} this contribution?`,
+      okText: "Yes",
+      cancelText: "No",
+      centered: true,
+      async onOk() {
+        try {
+          await API.patch(
+            `/payroll/superadmin/deductions/${record.id}/status/`,
+            { is_active: nextStatus }
+          );
+
+          message.success("Status updated");
+
+          setContributions((prev) => {
+            const updated = prev.map((item) =>
+              item.id === record.id ? { ...item, is_active: nextStatus } : item
+            );
+            // keep newest-first order intact
+            return updated.sort((a: any, b: any) => b.id - a.id);
+          });
+        } catch {
+          message.error("Failed to update status");
+        }
+      },
+    });
+  };
+
   const handleSaveContribution = async () => {
     try {
       const values = await form.validateFields();
 
+      const existing = contributions.find((c) => c.id === editingId);
+
       const payload = {
         code: values.name,
-         category: values.category,
+        category: values.category,
         salary_range_from: parseFloat(values.salaryFrom),
         salary_range_to: parseFloat(values.salaryTo),
         calculation_type: values.amountType === "manual" ? "Fixed" : "Percent",
         amount: parseFloat(values.amount),
-        is_active: true,
+
+        // 🔥 PRESERVE active state during edit
+        is_active: isEditMode ? existing?.is_active : true,
       };
 
       if (isEditMode && editingId) {
         await API.put(`/payroll/superadmin/deductions/${editingId}/`, payload);
         message.success("Contribution updated successfully");
-      } else {
-        await API.post("/payroll/superadmin/deductions/", payload);
-        message.success("Contribution added successfully");
-      }
 
-      closeContributionModal();
-      fetchContributions();
-    }catch (error: any) {
-    if (error.response?.data?.detail) {
-      message.error(error.response.data.detail);
-    } else {
-      message.error("Failed to save contribution.");
+        closeContributionModal();
+        fetchContributions();
+      } else {
+        // ✅ add new then put it on TOP immediately
+        const res = await API.post("/payroll/superadmin/deductions/", payload);
+        message.success("Contribution added successfully");
+
+        setContributions((prev) => {
+          const next = [res.data, ...prev];
+          return next.sort((a: any, b: any) => b.id - a.id);
+        });
+
+        closeContributionModal();
+      }
+    } catch (error: any) {
+      if (error.response?.data?.detail) {
+        message.error(error.response.data.detail);
+      } else {
+        message.error("Failed to save contribution.");
+      }
     }
-  }                                                                                                                                                                                  
-      };
+  };
 
   return (
     <div className="table-wrapper">
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          marginBottom: 12,
+        }}
+      >
         <Button type="primary" onClick={openContributionModal}>
           Add New Contribution
         </Button>
@@ -140,8 +190,30 @@ export default function ContributionTab({ active }: Props) {
                     ? `${Number(c.amount)}%`
                     : `₱${Number(c.amount).toFixed(2)}`}
                 </td>
-                <td className="actions">
-                  <EditOutlined onClick={() => handleEditContribution(c)} />
+
+                {/* 🔥 ACTIONS: Toggle + Edit */}
+                <td
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
+                >
+                  {/* ✅ Tooltip + Confirm Modal */}
+                  <Tooltip title={c.is_active ? "Deactivate" : "Activate"}>
+                    <Switch
+                      size="small"
+                      checked={c.is_active}
+                      onChange={(checked) => confirmToggleStatus(c, checked)}
+                    />
+                  </Tooltip>
+
+                  {/* Edit Icon */}
+                  <EditOutlined
+                    onClick={() => handleEditContribution(c)}
+                    style={{ cursor: "pointer" }}
+                  />
                 </td>
               </tr>
             ))}

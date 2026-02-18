@@ -1,25 +1,29 @@
+/* ================= Layout ================= */
+
 .dashboard-layout {
   min-height: 100vh;
-  background: #fff;   /* light grey background */
+  background: #fff; /* light background */
 }
 
 .dashboard-content {
   margin: 16px;
 }
 
-/* Cards */
+/* ================= Cards ================= */
+
 .card {
-  background: white; /* white card background */
-  border-radius: 12px; /* more rounded */
+  background: #fff;
+  border-radius: 12px;
   padding: 24px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06); /* soft shadow */
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
 }
 
 .analytics-card {
-  min-height: 300px;  /* slightly shorter like screenshot */
+  min-height: 360px;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  flex: 1; /* stretch equal height */
 }
 
 .card-title {
@@ -29,15 +33,23 @@
 
 .calendar-card {
   margin-bottom: 16px;
+  flex: 1; /* stretch equal height */
 }
-
 
 .calendar-title {
   text-align: center;
   margin-bottom: 12px;
 }
 
-/* Stats */
+/* ================= Equal Height Columns ================= */
+
+.dashboard-content .ant-row > .ant-col {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ================= Stats ================= */
+
 .stats-row {
   margin-top: 20px;
   gap: 16px;
@@ -53,28 +65,27 @@
   justify-content: center;
   align-items: center;
   height: 100%;
-  min-height: 260px;   /* match donut card height */
+  min-height: 260px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 }
 
 /* ===== TILE CARD LAYOUT ===== */
+
 .stat-tile {
   height: 100%;
-  min-height: 260px; /* match donut card */
+  min-height: 260px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   padding: 24px;
 }
 
-/* Title */
 .tile-title {
   font-size: 20px;
   font-weight: 700;
   text-align: center;
 }
 
-/* Body center */
 .tile-body {
   flex: 1;
   display: flex;
@@ -83,13 +94,11 @@
   gap: 16px;
 }
 
-/* Icon */
 .tile-icon {
   font-size: 56px;
   opacity: 0.9;
 }
 
-/* Value */
 .tile-value {
   font-size: 56px;
   font-weight: 700;
@@ -98,7 +107,6 @@
 
 /* ===== COLOR VARIANTS ===== */
 
-/* Blue primary (Pending Payroll) */
 .stat-card.primary {
   background: #3f6f9e;
   color: #fff;
@@ -110,20 +118,17 @@
   color: #fff;
 }
 
-/* Gray secondary (Holiday) */
 .stat-card:not(.primary) {
-  background: #FFF;
+  background: #fff;
 }
 
-.stat-card:not(.primary) .tile-icon {
-  color: #3f6f9e;
-}
-
+.stat-card:not(.primary) .tile-icon,
 .stat-card:not(.primary) .tile-value {
   color: #3f6f9e;
 }
 
-/* Labels & Values (legacy stat text) */
+/* ===== Legacy Stat Text ===== */
+
 .stat-label {
   font-size: 14px;
   font-weight: 700;
@@ -142,7 +147,21 @@
   color: #ff4d4f;
 }
 
-/* Holiday Detail Modal */
+/* ================= Hover Effects ================= */
+
+.stat-tile.clickable {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.stat-tile.clickable:hover {
+  filter: brightness(1);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  transform: translateY(-2px);
+}
+
+/* ================= Holiday Modal ================= */
+
 .holiday-detail {
   display: flex;
   flex-direction: column;
@@ -172,6 +191,7 @@
 }
 
 /* Footer buttons */
+
 .holiday-modal-footer {
   display: flex;
   justify-content: flex-end;
@@ -179,6 +199,7 @@
 }
 
 /* Decline textarea */
+
 .decline-textarea {
   min-height: 100px;
   padding: 8px 12px;
@@ -196,27 +217,8 @@
   background: #fff;
 }
 
-/* Hover effect for clickable stat tiles */
-.stat-tile.clickable {
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
+/* ================= Calendar Card ================= */
 
-.stat-tile.clickable:hover {
-  filter: brightness(1); /* slightly darken the card */
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25); /* stronger shadow on hover */
-  transform: translateY(-2px); /* optional subtle lift */
-}
-/* Make the bottom row stretch all columns to same height */
-.dashboard-content .ant-row > .ant-col {
-  display: flex;
-  flex-direction: column;
-}
-
-.analytics-card,
-.calendar-card {
-  flex: 1; /* stretch to fill height of parent column */
-}
 .calendarCard {
   border-radius: 8px;
   background: #ffffff;

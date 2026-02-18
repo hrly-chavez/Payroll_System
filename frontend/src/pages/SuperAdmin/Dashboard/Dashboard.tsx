@@ -29,8 +29,6 @@ import {
   HolidayType,
 } from "../../../components/SharedCalendar/CalendarLegend";
 import { PAYROLL_COLOR } from "../../../components/SharedCalendar/CalendarLegend";
-import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
-import SharedCalendar from "./../../../components/SharedCalendar/SharedCalendar";
 
 
 const { Content } = Layout;
@@ -377,12 +375,14 @@ const Dashboard: React.FC = () => {
                     label={false}
                     tooltip={false}
                     height={170}
-                    color={({ type }: { type: string }) => {
-                      if (type === "Reported") return "#1677ff";
-                      if (type === "Not Reported") return "#c62828";
-                      return "#e0e0e0";
+                    scale={{
+                      color: {
+                        domain: ["Reported", "Not Reported"],
+                        range: ["#1677ff", "#c62828"],
+                      },
                     }}
                   />
+
                   {/* 🟢 CUSTOM LEGEND */}
                   <div
                     style={{
@@ -505,10 +505,10 @@ const Dashboard: React.FC = () => {
             </Col>
 
             <Col xs={24} lg={8}>
-              <div className="card calendar-card">
-                <SharedCalendar events={[]} />
-                <CalendarLegendDisplay />
-              </div>
+            <div className="card calendar-card">
+              <SharedCalendar events={calendarEvents} />
+              <CalendarLegendDisplay />
+            </div>
             </Col>
           </Row>
 

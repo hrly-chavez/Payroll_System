@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Notification
+from shared_model.models import *
 
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:

@@ -11,8 +11,8 @@ from django.utils import timezone
 from rest_framework.decorators import api_view
 from django.shortcuts import get_object_or_404
 from datetime import datetime
-from shared_model.models import User
-from notifications.models import Notification
+from shared_model.models import *
+
 
 class HolidayListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]

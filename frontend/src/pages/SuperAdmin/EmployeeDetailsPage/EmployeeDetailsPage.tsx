@@ -32,6 +32,19 @@ import api from "api/axios";
 
 const { Content } = Layout;
 
+interface AddressData {
+  id: number;
+  province: number;       // FK ID
+  province_name: string;  // the name we want to display
+  city: number;
+  city_name: string;
+  barangay: number;
+  barangay_name: string;
+  sitio?: string;
+  street?: string;
+  zip_code?: string;
+}
+
 interface EmployeeData {
   id: number;
   name: string;
@@ -43,7 +56,7 @@ interface EmployeeData {
   bank_info: string;
   email: string;
   contact_no: string;
-  address: string;
+  address: AddressData;
 }
 
 interface DeductionRow {
@@ -176,7 +189,7 @@ const EmployeeDetailsPage: React.FC = () => {
     }, [employeeId]);
 
   /* =========================
-     TAX MODAL STATE
+     TAX RETRIEVE STATE
   ========================== */
   
   const [deductions, setDeductions] = useState<DeductionRow[]>([]);
@@ -215,9 +228,34 @@ const EmployeeDetailsPage: React.FC = () => {
 
     fetchAllowances(empIdNum);
     fetchSalaries(empIdNum);
-    fetchDeductions(empIdNum); // ✅ ADD THIS
+    fetchDeductions(empIdNum); // ADD THIS
   }, [employeeId]);
 
+  /* =========================
+     AUDIT LOGS RETRIEVE STATE
+  ========================== */
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  const fetchAuditLogs = async () => {
+    if (!employeeId) return;
+
+    setLoadingLogs(true);
+    try {
+      const res = await api.get(`/employees/auditlogs/employee/${employeeId}/`);
+      setAuditLogs(res.data);
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to fetch audit logs");
+      setAuditLogs([]);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAuditLogs();
+  }, [employeeId]);
 
 
   const salaryColumns = [
@@ -338,10 +376,27 @@ const EmployeeDetailsPage: React.FC = () => {
                   <div className={styles.iconBox}>
                     <HomeOutlined />
                   </div>
-                  <div>
-                    <span className={styles.label}>Address</span>
-                    <p>{employee.address}</p>
+                  <div className={styles.infoRow}>
+                    <div className={styles.iconBox}>
+                      <HomeOutlined />
+                    </div>
+                    <div>
+                      <span className={styles.label}>Address</span>
+                      <p>
+                        {[
+                          employee.address?.street,
+                          employee.address?.sitio,
+                          employee.address?.barangay_name,
+                          employee.address?.city_name,
+                          employee.address?.province_name,
+                          employee.address?.zip_code,
+                        ]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </p>
+                    </div>
                   </div>
+
                 </div>
 
                 <div className={styles.statusRow}>
@@ -413,7 +468,6 @@ const EmployeeDetailsPage: React.FC = () => {
                   <Table
                     columns={[
                       { title: "Deduction", dataIndex: "name", key: "name" },
-                      { title: "Type", dataIndex: "type", key: "type" },
                       { title: "Frequency", dataIndex: "frequency", key: "frequency" },
                       { title: "Effective From", dataIndex: "effective_from", key: "effective_from" },
                       { title: "Amount", dataIndex: "amount", key: "amount" },
@@ -451,6 +505,29 @@ const EmployeeDetailsPage: React.FC = () => {
                     ]}
                   />
                 </Tabs.TabPane>
+
+                {/* AUDIT LOGS */}
+                <Tabs.TabPane tab="Audit Logs" key="5">
+                  <div className={styles.salaryHeader}>
+                    <h3>Audit Logs</h3>
+                  </div>
+
+                  <Table
+                    columns={[
+                      { title: "Action", dataIndex: "action", key: "action" },
+                      { title: "User", dataIndex: "user", key: "user" },
+                      { title: "Model", dataIndex: "model_name", key: "model_name" },
+                      { title: "Old Data", dataIndex: "old_data", key: "old_data" },
+                      { title: "New Data", dataIndex: "new_data", key: "new_data" },
+                      { title: "Timestamp", dataIndex: "timestamp", key: "timestamp" },
+                    ]}
+                    dataSource={auditLogs}
+                    loading={loadingLogs}
+                    rowKey="id"
+                    pagination={{ pageSize: 10 }}
+                  />
+                </Tabs.TabPane>
+
 
               </Tabs>
             </Card>

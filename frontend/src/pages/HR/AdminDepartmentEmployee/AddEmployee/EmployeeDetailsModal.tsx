@@ -8,10 +8,14 @@ const { Option } = Select;
 interface Props {
   open: boolean;
   departmentId: number;
-  onNext: (employeeId: number, credentials: { username: string; password: string }) => void;
+  allowedRoles: ("EMPLOYEE" | "ADMIN" | "SUPER_ADMIN")[];
+  onNext: (
+    employeeId: number,
+    credentials: { username: string; password: string }
+  ) => void;
   onClose: () => void;
-  mode?: "ADMIN" | "SUPERADMIN_SETUP";
 }
+
 
 
 interface Shift {
@@ -47,7 +51,7 @@ interface Barangay {
   name: string;
 }
 
-const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , onNext, onClose, mode }) => {
+const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRoles, onNext, onClose }) => {
   const [form] = Form.useForm();
 
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -55,6 +59,9 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , onNext, on
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [cities, setCities] = useState<City[]>([]);
   const [barangays, setBarangays] = useState<Barangay[]>([]);
+
+  // Show role selector only if SUPER_ADMIN is allowed
+  const showRoleField = allowedRoles.includes("SUPER_ADMIN");
 
   const formatTime = (t: string) => t.slice(0, 5);
 
@@ -107,19 +114,9 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , onNext, on
         hired_date: values.hired_date.format("YYYY-MM-DD"),
       };
 
-      // 🔥 Decide endpoint based on mode
-      const endpoint =
-        mode === "SUPERADMIN_SETUP"
-          ? "/employees/employees/create-first-superadmin/"
-          : "/employees/employees/";
+      const res = await api.post("/employees/employees/", payload);
 
-      const res = await api.post(endpoint, payload);
-
-      message.success(
-        mode === "SUPERADMIN_SETUP"
-          ? "Super Admin created successfully!"
-          : "Employee created successfully!"
-      );
+      message.success("Employee created successfully!");
 
       onNext(res.data.employee_id, {
         username: res.data.username,
@@ -135,6 +132,7 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , onNext, on
       );
     }
   };
+
 
   return (
     <Modal
@@ -249,6 +247,24 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , onNext, on
               />
             </Form.Item>
           </Col>
+          
+          {showRoleField && (
+            <Col xs={24} md={12}>
+              <Form.Item
+                name="role"
+                label="Role"
+                rules={[{ required: true }]}
+              >
+                <Select>
+                  {allowedRoles.map((role) => (
+                    <Select.Option key={role} value={role}>
+                      {role.replace("_", " ")}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          )}
 
           {/* Address */}
           <Col span={24}><h3>Address</h3></Col>

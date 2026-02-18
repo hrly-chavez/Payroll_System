@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Layout, Table, Input, Button, message } from "antd";
 import type { TableProps } from "antd";
 import { PlusOutlined, SearchOutlined, SlidersOutlined } from "@ant-design/icons";
-import { useNavigate, useParams } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
+import AddEmployeeFlow from "../../HR/AdminDepartmentEmployee/AddEmployee/AddEmployeeFlow"; // ✅ import flow
 import styles from "../../HR/AdminDepartmentEmployee/Admin_DepartmentEmployee.module.css";
 import api from "api/axios";
 
@@ -20,27 +20,33 @@ interface EmployeeType {
   hired_date: string;
 }
 
-const AdminDepartmentEmployee: React.FC = () => {
+const SuperAdminDepartmentEmployee: React.FC = () => {
   const { deptId } = useParams<{ deptId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [employees, setEmployees] = useState<EmployeeType[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  const location = useLocation();
-  const deptName = (location.state as { deptName?: string })?.deptName || "Employees";
+  const deptName =
+    (location.state as { deptName?: string })?.deptName || "Employees";
 
   const fetchEmployees = async () => {
     if (!deptId) return;
 
     setLoading(true);
     try {
-      const res = await api.get(`/employees/employees/by-department/${deptId}/`);
-      setEmployees(res.data); // axios already parses JSON
+      const res = await api.get(
+        `/employees/employees/by-department/${deptId}/`
+      );
+      setEmployees(res.data);
     } catch (err: any) {
       console.error(err);
-      message.error(err.response?.data?.message || "Failed to load employees");
+      message.error(
+        err.response?.data?.message || "Failed to load employees"
+      );
     } finally {
       setLoading(false);
     }
@@ -59,9 +65,7 @@ const AdminDepartmentEmployee: React.FC = () => {
       title: "Employee Name",
       dataIndex: "name",
       key: "name",
-      render: (text) => (
-        <span className={styles.empLink}>{text}</span>
-      ),
+      render: (text) => <span className={styles.empLink}>{text}</span>,
     },
     { title: "Position", dataIndex: "position", key: "position" },
     { title: "Status", dataIndex: "status", key: "status" },
@@ -90,6 +94,15 @@ const AdminDepartmentEmployee: React.FC = () => {
               </Button>
             </div>
 
+            {/* ✅ ADD EMPLOYEE BUTTON */}
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              className={styles.addBtn}
+              onClick={() => setOpen(true)}
+            >
+              Add Employee
+            </Button>
           </div>
 
           <Table<EmployeeType>
@@ -108,10 +121,22 @@ const AdminDepartmentEmployee: React.FC = () => {
             })}
           />
 
+          {/* ✅ EMPLOYEE FLOW MODAL */}
+          {deptId && (
+            <AddEmployeeFlow
+              open={open}
+              departmentId={Number(deptId)}
+              allowedRoles={["SUPER_ADMIN", "ADMIN"]}
+              onClose={() => {
+                setOpen(false);
+                fetchEmployees();
+              }}
+            />
+          )}
         </Layout.Content>
       </Layout>
     </Layout>
   );
 };
 
-export default AdminDepartmentEmployee;
+export default SuperAdminDepartmentEmployee;

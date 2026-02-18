@@ -7,15 +7,32 @@ import EmployeeCredentialsModal from "./EmployeeCredentialsModal";
 
 interface Props {
   open: boolean;
-  departmentId?: number; // optional if superadmin setup
+  departmentId: number;
+  allowedRoles: ("EMPLOYEE" | "ADMIN" | "SUPER_ADMIN")[];
   onClose: () => void;
-  mode?: "ADMIN" | "SUPERADMIN_SETUP"; // default is ADMIN
 }
 
-const AddEmployeeFlow: React.FC<Props> = ({ open, departmentId, onClose, mode = "ADMIN" }) => {
+const AddEmployeeFlow: React.FC<Props> = ({
+  open,
+  departmentId,
+  onClose,
+}) => {
   const [step, setStep] = useState(1);
   const [employeeId, setEmployeeId] = useState<number | null>(null);
-  const [credentials, setCredentials] = useState({ username: "", password: "" });
+
+  const currentUserRole = localStorage.getItem("role");
+
+  const allowedRoles: ("EMPLOYEE" | "ADMIN" | "SUPER_ADMIN")[] =
+    currentUserRole === "SUPER_ADMIN"
+      ? ["ADMIN", "SUPER_ADMIN"] // this is where you add the Roles value in EmployeeDetailsModal
+      : ["EMPLOYEE"];
+
+
+
+  const [credentials, setCredentials] = useState({
+    username: "",
+    password: "",
+  });
 
   useEffect(() => {
     if (open) {
@@ -31,14 +48,14 @@ const AddEmployeeFlow: React.FC<Props> = ({ open, departmentId, onClose, mode = 
       {step === 1 && (
         <EmployeeDetailsModal
           open={open}
-          departmentId={departmentId || 0} // can pass 0 or undefined for superadmin
+          departmentId={departmentId}
+          allowedRoles={allowedRoles}
           onNext={(id, creds) => {
             setEmployeeId(id);
             setCredentials(creds);
-            setStep(mode === "SUPERADMIN_SETUP" ? 2 : 2); // could skip steps if needed
+            setStep(2);
           }}
           onClose={onClose}
-          mode={mode}
         />
       )}
 
@@ -47,14 +64,13 @@ const AddEmployeeFlow: React.FC<Props> = ({ open, departmentId, onClose, mode = 
         <EmployeeCredentialsModal
           open
           credentials={credentials}
-          onNext={() => setStep(mode === "SUPERADMIN_SETUP" ? 3 : 3)}
+          onNext={() => setStep(3)}
           onClose={onClose}
-          mode={mode}
         />
       )}
 
-      {/* Additional steps only for Admin flow */}
-      {mode === "ADMIN" && step === 3 && employeeId && (
+      {/* Step 3: Salary */}
+      {step === 3 && employeeId && (
         <EmployeeSalaryModal
           open
           employeeId={employeeId}
@@ -63,7 +79,8 @@ const AddEmployeeFlow: React.FC<Props> = ({ open, departmentId, onClose, mode = 
         />
       )}
 
-      {mode === "ADMIN" && step === 4 && employeeId && (
+      {/* Step 4: Contributions */}
+      {step === 4 && employeeId && (
         <EmployeeContributionsModal
           open
           employeeId={employeeId}
@@ -72,17 +89,17 @@ const AddEmployeeFlow: React.FC<Props> = ({ open, departmentId, onClose, mode = 
         />
       )}
 
-      {mode === "ADMIN" && step === 5 && employeeId && (
+      {/* Step 5: Allowances */}
+      {step === 5 && employeeId && (
         <EmployeeAllowanceModal
           open
           employeeId={employeeId}
           onClose={onClose}
-          onNext={() => setStep(step + 1)}
+          onNext={() => setStep(6)}
         />
       )}
     </>
   );
 };
-
 
 export default AddEmployeeFlow;

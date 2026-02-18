@@ -12,7 +12,7 @@ import { formatBackendTime,formatTime, getAttendanceStatusLabel } from "../../he
 import SharedCalendar from "./../../../components/SharedCalendar/SharedCalendar";
 import { Pie } from "@ant-design/plots";
 import { Tabs } from "antd";
-import CompanyNote from "../../../components/CompanyNote/CompanyNote";
+import CompanyNote from "../../../components/CompanyNote/companyNote";
 import {
   HOLIDAY_LEGEND,
   HolidayBase,

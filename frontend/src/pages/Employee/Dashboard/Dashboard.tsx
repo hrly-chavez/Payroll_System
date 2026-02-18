@@ -311,8 +311,11 @@ const attendanceChartData =
           </div>
 
          {/* ROW: ATTENDANCE + COMPANY NOTE */}
-        <Row gutter={16} className={styles.mainSection}>
-
+          <Row
+            gutter={16}
+            className={styles.mainSection}
+            align="stretch"
+          >
           {/* LEFT: ATTENDANCE */}
           <Col xs={24} md={13}>
           <Card title="Attendance" className={styles.attendanceCard}>
@@ -361,58 +364,15 @@ const attendanceChartData =
 
         </Row>
 
-        {/* ROW: STATUS + ATTENDANCE PIE + CALENDAR */}
-        <Row gutter={16} className={styles.mainSection}>
-
-          {/* STATUS */}
-          <Col xs={24} md={8}>
-          <Card title="Status" className={styles.statusCard}>
-              <Tabs
-                defaultActiveKey="payslip"
-                items={[
-                  {
-                    key: "payslip",
-                    label: "Payslip",
-                    children: (
-                      <div className={styles.payslipList}>
-                        <div className={styles.payslipRow}>
-                          <span className={styles.payslipStatus}>Pending</span>
-                          <span className={styles.payslipDate}>
-                            March 20, 2025 10:21
-                          </span>
-                        </div>
-
-                        <div className={styles.payslipRow}>
-                          <span className={styles.payslipStatus}>Pending</span>
-                          <span className={styles.payslipDate}>
-                            January 1, 2026 08:00
-                          </span>
-                        </div>
-                      </div>
-                    ),
-                  },
-                  {
-                    key: "attendance correction",
-                    label: "Attendance Correction",
-                    children: (
-                      <div className={styles.payslipList}>
-                        <div className={styles.payslipRow}>
-                          <span className={styles.payslipStatus}>Pending</span>
-                          <span className={styles.payslipDate}>
-                            March 20, 2025 10:21
-                          </span>
-                        </div>
-                      </div>
-                    ),
-                  },
-                ]}
-              />
-            </Card>
-          </Col>
+        {/* ROW: ATTENDANCE PIE + CALENDAR */}
+        <Row gutter={16} className={styles.tightSection}>
 
           {/* ATTENDANCE PIE */}
-          <Col xs={24} md={8}>
-            <Card
+          <Col
+            xs={24}
+            md={13}
+            style={{ display: "flex", flexDirection: "column", gap: 8 }}
+          >            <Card
               title={
                 <div className={styles.attendanceHeader}>
                   <span>Attendance</span>
@@ -458,10 +418,53 @@ const attendanceChartData =
                 <span><i className={styles.purpleDot} /> Undertime</span>
               </div>
             </Card>
+
+            <Card title="Status" className={styles.statusCard}>
+              <Tabs
+                defaultActiveKey="payslip"
+                items={[
+                  {
+                    key: "payslip",
+                    label: "Payslip",
+                    children: (
+                      <div className={styles.payslipList}>
+                        <div className={styles.payslipRow}>
+                          <span className={styles.payslipStatus}>Pending</span>
+                          <span className={styles.payslipDate}>
+                            March 20, 2025 10:21
+                          </span>
+                        </div>
+
+                        <div className={styles.payslipRow}>
+                          <span className={styles.payslipStatus}>Pending</span>
+                          <span className={styles.payslipDate}>
+                            January 1, 2026 08:00
+                          </span>
+                        </div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "attendance correction",
+                    label: "Attendance Correction",
+                    children: (
+                      <div className={styles.payslipList}>
+                        <div className={styles.payslipRow}>
+                          <span className={styles.payslipStatus}>Pending</span>
+                          <span className={styles.payslipDate}>
+                            March 20, 2025 10:21
+                          </span>
+                        </div>
+                      </div>
+                    ),
+                  },
+                ]}
+              />
+            </Card>
           </Col>
 
           {/* CALENDAR */}
-                <Col xs={24} md={8}>
+                <Col xs={24} md={11}>
                   <Card title="Calendar" className={`${styles.compactCard} ${styles.calendarCard}`}>
                     <SharedCalendar events={calendarEvents} />
                     <CalendarLegendDisplay />

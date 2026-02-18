@@ -247,21 +247,6 @@ const Attendance: React.FC = () => {
               align="middle"
               className={styles.headerRow}
             >
-              <div className={styles.monthPicker}>
-                <Select
-                  size="large"
-                  value={month}
-                  options={monthOptions}
-                  onChange={setMonth}
-                />
-                <Select
-                  size="large"
-                  value={year}
-                  options={years.map((y) => ({ label: y, value: y }))}
-                  onChange={setYear}
-                />
-              </div>
-
               <div className={styles.actions}>
                 <Button
                   className={styles.requestBtn}
@@ -307,7 +292,7 @@ const Attendance: React.FC = () => {
 
           {/* ===== Logs & Requests ===== */}
           <Card className={styles.historyCard}>
-            <Tabs defaultActiveKey="logs">
+              <Tabs defaultActiveKey="logs" className={styles.pillTabs}>
               <Tabs.TabPane tab="Attendance Logs" key="logs">
                 <AttendaceLogs year={year} month={month + 1} />
               </Tabs.TabPane>

@@ -6,7 +6,9 @@ import { UserOutlined, LockOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import styles from "./login_styles.module.css";
 import api from "../../api/axios";
-import SuperAdminSetupModal from "../HR/AdminDepartmentEmployee/AddEmployee/AddEmployeeFlow";
+
+// NEW import for first-time super admin creation
+import AddFirstSuperadmin from "./AddFirstSuperadmin";
 
 interface LoginFormValues {
   username: string;
@@ -24,6 +26,7 @@ export default function Login() {
     const checkSuperAdmin = async () => {
       try {
         const res = await api.get("/accounts/first-superadmin-check/");
+        // Show modal only if there are no users or no super admin
         if (res.data.total_users === 0 || !res.data.super_admin_exists) {
           setShowSuperAdminModal(true);
         }
@@ -35,30 +38,23 @@ export default function Login() {
     checkSuperAdmin();
   }, []);
 
-
   const onFinish = async (values: LoginFormValues) => {
     setLoading(true);
     try {
-      // 1️⃣ Get JWT tokens
       const tokenRes = await api.post("/auth/token/", {
         user_name: values.username,
         password: values.password,
       });
 
       const { access, refresh } = tokenRes.data;
-
       localStorage.setItem("access_token", access);
       localStorage.setItem("refresh_token", refresh);
 
-      // 2️⃣ Get logged-in user info
       const meRes = await api.get("/accounts/me/");
-
       localStorage.setItem("user_name", meRes.data.user_name);
       localStorage.setItem("role", meRes.data.role);
 
-      // 3️⃣ Role-based redirect
       const role = meRes.data.role;
-
       if (role === "EMPLOYEE") navigate("/employee_dashboard");
       else if (role === "ADMIN") navigate("/admin/dashboard");
       else if (role === "SUPER_ADMIN") navigate("/super-admin/dashboard");
@@ -120,13 +116,19 @@ export default function Login() {
           </Form>
         </div>
       </div>
+
       {showSuperAdminModal && (
-        <SuperAdminSetupModal
+        <AddFirstSuperadmin
           open={showSuperAdminModal}
           onClose={() => setShowSuperAdminModal(false)}
+          onNext={(employeeId, credentials) => {
+            console.log("SUPER_ADMIN created!", employeeId, credentials);
+            setShowSuperAdminModal(false);
+          }}
           mode="SUPERADMIN_SETUP"
         />
       )}
+
     </div>
   );
 }

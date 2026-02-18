@@ -37,6 +37,7 @@ import {
   HOLIDAY_LEGEND,
   PAYROLL_COLOR,
 } from "../../../components/SharedCalendar/CalendarLegend";
+import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
 
 
 
@@ -288,6 +289,12 @@ const Attendance: React.FC = () => {
 
               <SharedCalendar events={events} />
             </div>
+
+            {/* Legend BELOW calendar */}
+            <div style={{ marginTop: 16 }}>
+              <CalendarLegendDisplay />
+            </div>
+            
           </Card>
 
           {/* ===== Logs & Requests ===== */}

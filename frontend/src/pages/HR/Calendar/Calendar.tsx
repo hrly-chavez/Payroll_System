@@ -175,7 +175,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ showRequests = true }) => {
               />
             </div>
 
-            {/* Legend BELOW calendar */}
+            
             <div style={{ marginTop: 16 }}>
               <CalendarLegendDisplay />
             </div>

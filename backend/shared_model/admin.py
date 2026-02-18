@@ -121,14 +121,38 @@ class Barangay(admin.ModelAdmin):
 
 @admin.register(Holiday)
 class HolidayAdmin(admin.ModelAdmin):
-    list_display = ('name','date','type','base','is_active','created_at','status')
-    list_filter = ('type','base','is_active',)
+    list_display = (
+        'name',
+        'date',
+        'type',
+        'base',
+        'is_active',
+        'created_at',
+        'status'
+    )
+
+    list_filter = (
+        'type',
+        'base',
+        'is_active',
+    )
+
     search_fields = ('name',)
     ordering = ('-date',)
     date_hierarchy = 'date'
-    readonly_fields = ('created_at',)
-    list_editable = ('is_active',)
 
+    fields = (
+        'date',
+        'name',
+        'type',
+        'base',
+        'remarks',
+        'status',
+        'is_active',
+        'created_at',
+    )
+
+    list_editable = ('is_active',)
 
 
 @admin.register(Employee_Salary)
@@ -252,11 +276,33 @@ class PayRuleAdmin(admin.ModelAdmin):
 
 @admin.register(Leave_Type)
 class LeaveTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'is_paid', 'pay_rate', 'requires_approval', 'is_active', 'created_at')
-    list_filter = ('is_paid', 'requires_approval', 'is_active')
-    search_fields = ['name'] 
-    ordering = ['-created_at']  
-    readonly_fields = ('created_at',)
+    list_display = (
+        'id',
+        'name',
+        'is_paid',
+        'pay_rate',
+        'requires_approval',
+        'is_active',
+        'created_at'
+    )
+
+    list_filter = (
+        'is_paid',
+        'requires_approval',
+        'is_active'
+    )
+
+    search_fields = ['name']
+    ordering = ['-created_at']
+
+    fields = (
+        'name',
+        'is_paid',
+        'pay_rate',
+        'requires_approval',
+        'is_active',
+        'created_at'
+    )
 
 @admin.register(Leave_Request)
 class LeaveRequestAdmin(admin.ModelAdmin):
@@ -276,13 +322,33 @@ class LeaveRequestAdmin(admin.ModelAdmin):
 
 @admin.register(HolidayPolicy)
 class HolidayPolicyAdmin(admin.ModelAdmin):
-    list_display = ("department", "holiday_type", "requires_work")
-    list_filter = ("department", "holiday_type", "requires_work")
-    search_fields = ("department__name", "holiday_type")
+    list_display = (
+        "department",
+        "holiday_type",
+        "requires_work",
+        "created_at",
+    )
+
+    list_filter = (
+        "department",
+        "holiday_type",
+        "requires_work",
+    )
+
+    search_fields = (
+        "department__name",
+        "holiday_type",
+    )
+
+    fields = (
+        "department",
+        "holiday_type",
+        "requires_work",
+        "created_at",
+    )
+
+    ordering = ("-created_at",)
+
+
 admin.site.register(AuditLog)
 
-# @admin.register(HolidayPolicy)
-# class HolidayPolicyAdmin(admin.ModelAdmin):
-#     list_display = ("department", "holiday_type", "requires_work")
-#     list_filter = ("department", "holiday_type", "requires_work")
-#     search_fields = ("department__name", "holiday_type")

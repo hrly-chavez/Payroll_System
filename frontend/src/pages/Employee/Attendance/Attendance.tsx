@@ -37,6 +37,7 @@ import {
   HOLIDAY_LEGEND,
   PAYROLL_COLOR,
 } from "../../../components/SharedCalendar/CalendarLegend";
+import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
 
 
 
@@ -269,25 +270,23 @@ const Attendance: React.FC = () => {
             {/* ===== Calendar ===== */}
             <div className={styles.calendarSection}>
               <div className={styles.calendarHeader}>
-                <div className={styles.calendarNav}>
-                  <Button
-                    size="small"
-                    icon={<LeftOutlined />}
-                    onClick={goPrevMonth}
-                  />
-                  <span className={styles.calendarTitle}>
+                <div className={styles.calLeftTitle}>
                     {calendarValue.format("MMMM YYYY")}
-                  </span>
-                  <Button
-                    size="small"
-                    icon={<RightOutlined />}
-                    onClick={goNextMonth}
-                  />
-                </div>
+                  </div>
               </div>
 
-              <SharedCalendar events={events} />
+              <SharedCalendar
+                events={events}
+                value={calendarValue}
+                onPanelChange={(val) => setCalendarValue(val)}
+              />
             </div>
+
+            {/* Legend BELOW calendar */}
+            <div style={{ marginTop: 16 }}>
+              <CalendarLegendDisplay />
+            </div>
+            
           </Card>
 
           {/* ===== Logs & Requests ===== */}
@@ -313,11 +312,12 @@ const Attendance: React.FC = () => {
           {/* ===== Modals ===== */}
           <AttendanceCorrection
             open={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
+            onClose={() => setIsModalOpen(false)} 
           />
           <LeaveRequest
             open={isLeaveOpen}
             onClose={() => setIsLeaveOpen(false)}
+            centered
           />
         </Content>
       </Layout>

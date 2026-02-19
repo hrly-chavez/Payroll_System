@@ -1,8 +1,9 @@
 "use client";
-
-import React from "react";
 import { Modal, Form, DatePicker, Button, message } from "antd";
 import api from "../../../../api/axios";
+import styles from "./../calendar.module.css";
+import React, { useState } from "react";
+
 
 const { RangePicker } = DatePicker;
 
@@ -14,9 +15,12 @@ interface Props {
 
 export default function AddPayrollPeriodModal({ open, onClose, onSuccess }: Props) {
   const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (values: any) => {
     try {
+      setLoading(true);
+
       const period = values?.period;
       if (!period || period.length !== 2) {
         message.error("Please select a payroll period");
@@ -40,11 +44,13 @@ export default function AddPayrollPeriodModal({ open, onClose, onSuccess }: Prop
         err?.response?.data?.message ||
         "Failed to create payroll period";
       message.error(msg);
-    }
+    } finally {
+    setLoading(false);
+  }
   };
 
   return (
-    <Modal open={open} onCancel={onClose} footer={null} title="Add Payroll Period">
+    <Modal open={open} onCancel={onClose} footer={null} title="Add Payroll Period"  centered>
          <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Form.Item
             name="period"
@@ -54,8 +60,14 @@ export default function AddPayrollPeriodModal({ open, onClose, onSuccess }: Prop
             <RangePicker style={{ width: "100%" }} />
           </Form.Item>
 
-          <Button type="primary" htmlType="submit" block>
-            Save
+          <Button
+            type="primary"
+            block
+            htmlType="submit"
+            loading={loading}
+            className={styles.submitBtn}
+          >
+              Save
           </Button>
         </Form>
       </Modal>

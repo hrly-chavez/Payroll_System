@@ -8,7 +8,23 @@
 }
 
 .tableHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 16px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.headerLeft {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.searchRight {
+  width: 280px;
 }
 
 .nameCell {
@@ -19,4 +35,37 @@
 
 .rowStyle:hover {
   background-color: #f5faff !important;
+}
+.statCard {
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border-left: 6px solid transparent;
+}
+
+/* Present */
+.presentCard {
+  border-left-color: #2e7d32;
+}
+
+.presentCard :global(.ant-statistic-content) {
+  color: #2e7d32;
+}
+
+/* Late */
+.lateCard {
+  border-left-color: #f57c00;
+}
+
+.lateCard :global(.ant-statistic-content) {
+  color: #f57c00;
+}
+
+/* Absent */
+.absentCard {
+  border-left-color: #c62828;
+}
+
+.absentCard :global(.ant-statistic-content) {
+  color: #c62828;
 }

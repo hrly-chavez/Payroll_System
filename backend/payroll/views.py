@@ -69,7 +69,7 @@ class PayrollPeriodListCreateView(generics.ListCreateAPIView):
             status="Open",
         )
 
-#for clicking the payroll period (shows modal with employees)
+#for clicking the payroll period (shows modal with employees) fetch
 class PayrollPeriodEligibleEmployeesView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -90,13 +90,26 @@ class PayrollPeriodEligibleEmployeesView(APIView):
 
         eligible_employees = (
             Employee.objects
+            # exclude inactive employees
             .filter(is_active=True)
+
+            # exclude employees that already have payroll in this period
             .exclude(id__in=payroll_employee_ids)
-            # "No CEO" filter (best-practice: exclude by position and/or linked user role)
-            .exclude(Q(position__iexact="CEO") | Q(user__role="SUPERADMIN"))
+
+            # exclude CEO (position) and Super Admin users (role)
+            .exclude(
+                Q(position__iexact="CEO") |
+                Q(user__role__iexact="SUPER_ADMIN")
+            )
+
+            # OPTIONAL (but matches your ask): exclude employees whose linked user is inactive
+            # (keeps employees with no linked user)
+            .exclude(Q(user__isnull=False) & Q(user__is_active=False))
+
             # must have at least 1 attendance within the period
             .annotate(has_attendance=Exists(attendance_in_period))
             .filter(has_attendance=True)
+
             .select_related("department", "user")
         )
 
@@ -131,6 +144,7 @@ class PayrollPeriodEligibleEmployeesView(APIView):
             "period": PayrollPeriodCreateSerializer(period).data,
             "eligible_employees": EligibleEmployeeSerializer(ppe_qs, many=True).data
         })
+
 
 #=========================VERIFY EMPLOYEE==========================
 

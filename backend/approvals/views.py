@@ -12,7 +12,9 @@ from rest_framework.decorators import api_view
 from django.shortcuts import get_object_or_404
 from datetime import datetime
 from shared_model.models import *
-
+from django.db import transaction
+from datetime import timedelta
+from decimal import Decimal
 
 class HolidayListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
@@ -66,6 +68,8 @@ class HolidayUpdateStatusView(APIView):
                 'holiday': serializer.data
             }, status=status.HTTP_200_OK)
     
+
+#Leave Type    
 class LeaveTypeListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Leave_Type.objects.all().order_by('-created_at')
@@ -84,6 +88,7 @@ class LeaveTypeUpdateView(generics.RetrieveUpdateAPIView):
     queryset = Leave_Type.objects.all()
     serializer_class = LeaveTypeSerializer
 
+#Leave Request
 class LeaveRequestListCreateView(generics.ListCreateAPIView):
     serializer_class = LeaveRequestSerializer
     permission_classes = [IsAuthenticated, IsRole]
@@ -155,6 +160,7 @@ class AdminLeaveRequestListView(generics.ListAPIView):
 # Admin action to approve or decline leave
 # -----------------------------
 @api_view(["POST"])
+@transaction.atomic
 def admin_update_leave_status(request, pk):
     """
     Admin can approve or decline a leave request.
@@ -173,10 +179,68 @@ def admin_update_leave_status(request, pk):
     if new_status not in ["Approved", "Declined"]:
         return Response({"detail": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
 
+    # Update request status first (audit)
     leave_request.status = new_status
     leave_request.approved_by = user
     leave_request.approved_at = timezone.now()
-    leave_request.save()
+    leave_request.save(update_fields=["status", "approved_by", "approved_at"])
+
+    employee = leave_request.employee
+    leave_type = leave_request.leave_type
+
+    # Build inclusive date list
+    start = leave_request.date_from
+    end = leave_request.date_to
+    if end < start:
+        raise ValidationError({"detail": "Invalid leave date range."})
+
+    dates = []
+    d = start
+    while d <= end:
+        dates.append(d)
+        d += timedelta(days=1)
+
+    if new_status == "Approved":
+        # 1) Prevent overlap with other approved leaves (conflict with unique constraint employee+date)
+        conflict = (
+            Leave_Day.objects
+            .filter(employee=employee, date__in=dates)
+            .exclude(leave_request=leave_request)
+            .exists()
+        )
+        if conflict:
+            raise ValidationError({"detail": "Cannot approve. One or more dates already have a leave day for this employee."})
+
+        # 2) Idempotent approve: remove old days for this request then recreate
+        Leave_Day.objects.filter(leave_request=leave_request).delete()
+
+        # 3) Create Leave_Day rows
+        is_half = bool(leave_request.is_half_day)
+        units = Decimal("0.50") if is_half else Decimal("1.00")
+
+        # Your simple rule for now:
+        # - paid leave: pay_rate = 1.00 (means 100% of daily rate in payroll)
+        # - unpaid leave: pay_rate = 0.00
+        is_paid = bool(leave_type.is_paid)
+        pay_rate = Decimal("1.00") if is_paid else Decimal("0.00")
+
+        bulk = []
+        for day in dates:
+            bulk.append(
+                Leave_Day(
+                    employee=employee,
+                    leave_request=leave_request,
+                    date=day,
+                    units=units,
+                    is_paid=is_paid,
+                    pay_rate=pay_rate,
+                )
+            )
+        Leave_Day.objects.bulk_create(bulk)
+
+    elif new_status == "Declined":
+        # If declined (or changed from approved to declined), remove its leave days
+        Leave_Day.objects.filter(leave_request=leave_request).delete()
 
     # Notify Employee about leave status update
     Notification.objects.create(
@@ -188,39 +252,8 @@ def admin_update_leave_status(request, pk):
     )
 
     serializer = LeaveRequestSerializer(leave_request)
-    return Response(serializer.data, status=status.HTTP_200_OK)
-    
-    def create(self, request, *args, **kwargs):
-        try:
-            employee = Employee.objects.get(user=request.user)
-        except Employee.DoesNotExist:
-            raise ValidationError({"detail": "Employee profile not found."})
+    return Response(serializer.data, status=status.HTTP_200_OK) 
 
-        date_range = request.data.get("date_range")
-        if not date_range or len(date_range) != 2:
-            raise ValidationError({"date_range": "Start and end date are required."})
-
-        date_from = datetime.strptime(date_range[0], "%Y-%m-%d").date()
-        date_to = datetime.strptime(date_range[1], "%Y-%m-%d").date()
-
-        today = timezone.now().date()
-
-        # ✅ Prevent past dates
-        if date_from < today or date_to < today:
-            raise ValidationError({
-                "date_range": "You cannot request leave for past dates."
-            })
-
-        data = request.data.copy()
-        data["date_from"] = date_from
-        data["date_to"] = date_to
-        data["employee"] = employee.id
-
-        serializer = self.get_serializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save(employee=employee)
-
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
     
 class LeaveRequestUpdateView(generics.UpdateAPIView):
     queryset = Leave_Request.objects.all()
@@ -239,7 +272,7 @@ class LeaveRequestUpdateView(generics.UpdateAPIView):
         else:
             serializer.save()
 
-    
+
 class AllRequestsListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = LeaveRequestSerializer

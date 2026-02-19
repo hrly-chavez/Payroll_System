@@ -29,40 +29,15 @@ admin.site.register(Employee)
 admin.site.register(Address)
 @admin.register(Payroll)
 class PayrollAdmin(admin.ModelAdmin):
-    list_display = (
-        "id",
-        "employee",
-        "payroll_period",
-        "status",
-        "basic_pay",
-        "total_earnings",
-        "total_deductions",
-        "net_pay",
-        "generated_at",
-    )
+    list_display = ( "id", "employee","payroll_period","status","basic_pay","total_earnings","total_deductions","net_pay","generated_at",)
 
-    list_filter = (
-        "status",
-        "payroll_period",
-        "generated_at",
-    )
+    list_filter = ("status","payroll_period","generated_at",)
 
-    search_fields = (
-        "employee__fname",
-        "employee__lname",
-        "payroll_period__code",
-    )
+    search_fields = ("employee__fname","employee__lname","payroll_period__code",)
 
     ordering = ("-generated_at",)
 
-    readonly_fields = (
-        "basic_pay",
-        "total_earnings",
-        "total_deductions",
-        "net_pay",
-        "generated_at",
-        "approved_at",
-    )
+    readonly_fields = ("basic_pay","total_earnings","total_deductions","net_pay","generated_at","approved_at",)
 @admin.register(Payslip)
 class PayslipAdmin(admin.ModelAdmin):
     list_display = (
@@ -228,8 +203,104 @@ class AllowanceTypeAdmin(admin.ModelAdmin):
 class Employee_Allowance(admin.ModelAdmin):
     list_display = ('id', )
 
-admin.site.register(Attendance)
-admin.site.register(Attendance_Event)
+class AttendanceEventInline(admin.TabularInline):
+    model = Attendance_Event
+    extra = 0
+    fields = ("type", "minutes", "start_time", "end_time", "approval_status", "approved_by", "holiday", "created_at")
+    readonly_fields = ("created_at",)
+
+
+@admin.register(Attendance)
+class AttendanceAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "date",
+        "status",
+        "employee",
+        "employee_id_no",
+        "employee_department",
+        "time_in",
+        "time_out",
+        "created_at",
+    )
+
+    list_filter = (
+        "status",
+        "date",
+        "employee__department",
+    )
+
+    search_fields = (
+        "employee__id_no",
+        "employee__fname",
+        "employee__lname",
+    )
+
+    ordering = ("-date", "-id")
+    date_hierarchy = "date"
+
+    inlines = [AttendanceEventInline] 
+
+    def employee_id_no(self, obj):
+        return getattr(obj.employee, "id_no", "")
+    employee_id_no.short_description = "Employee ID No"
+
+    def employee_department(self, obj):
+        dept = getattr(obj.employee, "department", None)
+        return getattr(dept, "name", "") if dept else ""
+    employee_department.short_description = "Department"
+
+@admin.register(Attendance_Event)
+class AttendanceEventAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "type",
+        "approval_status",
+        "minutes",
+        "start_time",
+        "end_time",
+        "attendance_date",
+        "employee",
+        "employee_id_no",
+        "holiday",
+        "approved_by",
+        "created_at",
+    )
+
+    list_filter = (
+        "type",
+        "approval_status",
+        "attendance__date",
+        "attendance__employee__department",
+        "holiday__base",
+        "holiday__type",
+    )
+
+    search_fields = (
+        "attendance__employee__id_no",
+        "attendance__employee__fname",
+        "attendance__employee__lname",
+        "approved_by__user_name",   # adjust if your User model uses user_name
+        "event_remarks",
+    )
+
+    ordering = ("-attendance__date", "-id")
+    date_hierarchy = "attendance__date"
+
+    def attendance_date(self, obj):
+        return obj.attendance.date if obj.attendance else None
+    attendance_date.short_description = "Attendance Date"
+
+    def employee(self, obj):
+        return obj.attendance.employee if obj.attendance else None
+    employee.short_description = "Employee"
+
+    def employee_id_no(self, obj):
+        emp = obj.attendance.employee if obj.attendance else None
+        return getattr(emp, "id_no", "") if emp else ""
+    employee_id_no.short_description = "Employee ID No"
+
+
 admin.site.register(Payroll_Period)
 
 @admin.register(Commission_Type)
@@ -299,7 +370,7 @@ class LeaveTypeAdmin(admin.ModelAdmin):
     fields = (
         'name',
         'is_paid',
-        'pay_rate',
+        
         'requires_approval',
         'is_active',
         'created_at'

@@ -20,7 +20,6 @@ export function editLeaveType({
   leaveForm.setFieldsValue({
     name: leave.name,
     is_paid: leave.is_paid,
-    pay_rate: leave.pay_rate,
     requires_approval: leave.requires_approval,
     is_active: leave.is_active,
   });

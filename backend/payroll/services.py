@@ -158,7 +158,7 @@ class PayrollGenerationService:
         if not ppe:
             raise ValidationError({"detail": "Employee is not included in this payroll period."})
 
-        self._validate_ppe(ppe)
+        self._validate_ppe(ppe,period)
         self._generate_single_locked(period, ppe, generated_by_user)
 
         return {"detail": "Payroll generated for employee.", "employee_id": employee_id}
@@ -172,17 +172,48 @@ class PayrollGenerationService:
         if period.end_date < period.start_date:
             raise ValidationError({"detail": "Invalid payroll period date range."})
 
-    def _validate_ppe(self, ppe: PayrollPeriodEmployee):
+    def _validate_ppe(self, ppe: PayrollPeriodEmployee, period: Payroll_Period):
+        employee = ppe.employee
+
+        # must be verified
         if ppe.status != "Verified":
             raise ValidationError({"detail": f"Employee must be Verified. Current status: {ppe.status}."})
+
+        # block inactive employee
+        if not getattr(employee, "is_active", True):
+            raise ValidationError({"detail": "Employee is inactive."})
+
+        # block CEO by position
+        if (getattr(employee, "position", "") or "").strip().lower() == "ceo":
+            raise ValidationError({"detail": "CEO is not eligible for payroll generation."})
+
+        # block SUPER_ADMIN and inactive linked user (if exists)
+        u = getattr(employee, "user", None)
+        if u is not None:
+            if (getattr(u, "role", "") or "").strip().upper() == "SUPER_ADMIN":
+                raise ValidationError({"detail": "SUPER_ADMIN is not eligible for payroll generation."})
+            if getattr(u, "is_active", True) is False:
+                raise ValidationError({"detail": "Employee's user account is inactive."})
+
+        # block if payroll already exists
         if Payroll.objects.filter(payroll_period_id=ppe.period_id, employee_id=ppe.employee_id).exists():
             raise ValidationError({"detail": "Payroll already exists for this employee in this period."})
+
+        # block if no attendance within the period
+        has_attendance = Attendance.objects.filter(
+            employee_id=ppe.employee_id,
+            date__gte=period.start_date,
+            date__lte=period.end_date,
+        ).exists()
+        if not has_attendance:
+            raise ValidationError({"detail": "Employee has no attendance within this payroll period."})
+
 
     # -------------------------
     # internal runner
     # -------------------------
     def _generate_single_locked(self, period: Payroll_Period, ppe: PayrollPeriodEmployee, generated_by_user):
-        self._validate_ppe(ppe)
+        self._validate_ppe(ppe,period)
 
         ctx = self._build_context(period, ppe)
 
@@ -224,7 +255,7 @@ class PayrollGenerationService:
         self._apply_absent_deduction(payroll=payroll,absent_days=absent_days,absent_rule=absent_rule,rates=rates,)
 
         # 8 allowances / deductions / commissions
-        self._apply_allowances(payroll=payroll,allowances=ctx["allowances"],period=period,employee=ctx["employee"],shift=ctx["shift"],)
+        self._apply_allowances(payroll=payroll,allowances=ctx["allowances"],period=period,employee=ctx["employee"],shift=ctx["shift"],leave_map=ctx["leave_map"],)
         self._apply_commissions(payroll, ctx["commissions"])
         self._apply_deductions(payroll, ctx["deductions"], period)
 
@@ -339,9 +370,20 @@ class PayrollGenerationService:
                     late_dates.add(ev.attendance.date)
         return late_dates
 
-    def _get_leave_map(self, employee: Employee, period: Payroll_Period):
-        # placeholder for future Leave_Day integration
-        return {}
+    def _get_leave_map(self, employee: Employee, period: Payroll_Period) -> dict[date, Leave_Day]:
+        """
+        Map of leave days within this payroll period.
+        Only leave days created from Approved requests should exist,
+        because we create Leave_Day only when Approved.
+        """
+        rows = Leave_Day.objects.filter(
+            employee=employee,
+            date__gte=period.start_date,
+            date__lte=period.end_date,
+        ).select_related("leave_request", "leave_request__leave_type")
+
+        # If somehow duplicates exist (shouldn't due to constraint), last one wins
+        return {r.date: r for r in rows}
 
     def _get_holiday_map(self, period: Payroll_Period, department: Department):
         rows = Holiday.objects.filter(
@@ -554,10 +596,27 @@ class PayrollGenerationService:
 
         # Daily / Hourly should be attendance-based (as you decided)
         if pay_type == "Daily":
-            # count only worked days (PRESENT) + paid leave (when implemented)
+            # PRESENT days
             worked_days = sum(1 for a in attendance_map.values() if a.status == "PRESENT")
-            amount = _d2(rates.daily_rate * Decimal(worked_days))
-            self._create_line(payroll, "EARNING", f"Daily Pay ({worked_days} day(s))", amount, source_type="ATTENDANCE")
+
+            # Paid leave days (units-based)
+            paid_leave_units = DEC_0
+            for ld in leave_map.values():
+                if ld.is_paid:
+                    units = _safe_decimal(ld.units, "units")
+                    pay_rate = _safe_decimal(ld.pay_rate, "pay_rate")  # usually 1.00
+                    paid_leave_units += (units * pay_rate)
+
+            total_units = Decimal(worked_days) + paid_leave_units
+
+            amount = _d2(rates.daily_rate * total_units)
+            self._create_line(
+                payroll,
+                "EARNING",
+                f"Daily Pay ({total_units.quantize(Decimal('0.00'))} day units)",
+                amount,
+                source_type="ATTENDANCE",
+            )
             return amount
 
         if pay_type == "Hourly":
@@ -566,19 +625,75 @@ class PayrollGenerationService:
                 if a.status != "PRESENT":
                     continue
                 total_minutes += self._attendance_work_minutes(a, ctx["shift"])
+
             hours = Decimal(total_minutes) / Decimal("60")
-            amount = _d2(rates.hourly_rate * hours)
-            self._create_line(payroll, "EARNING", f"Hourly Pay ({hours.quantize(Decimal('0.01'))} hrs)", amount, source_type="ATTENDANCE")
+            worked_amount = _d2(rates.hourly_rate * hours)
+
+            # Paid leave is paid using daily_rate * units * pay_rate (same as Daily logic)
+            paid_leave_units = DEC_0
+            for ld in leave_map.values():
+                if ld.is_paid:
+                    units = _safe_decimal(ld.units, "units")
+                    pay_rate = _safe_decimal(ld.pay_rate, "pay_rate")
+                    paid_leave_units += (units * pay_rate)
+
+            leave_amount = _d2(rates.daily_rate * paid_leave_units) if paid_leave_units > 0 else DEC_0
+
+            amount = _d2(worked_amount + leave_amount)
+
+            desc = f"Hourly Pay ({hours.quantize(Decimal('0.01'))} hrs"
+            if paid_leave_units > 0:
+                desc += f" + {paid_leave_units.quantize(Decimal('0.00'))} leave day units"
+            desc += ")"
+
+            self._create_line(
+                payroll,
+                "EARNING",
+                desc,
+                amount,
+                source_type="ATTENDANCE",
+            )
             return amount
 
         raise ValidationError({"detail": f"Unsupported salary pay_type: {pay_type}"})
 
     # -------------------------
-    # 7.2 Paid Leaves (placeholder)
+    # 7.2 Paid Leaves 
     # -------------------------
-    def _apply_paid_leaves(self, payroll, leave_map, rates: Rates):
-        # leave_map empty for now
-        return
+    def _apply_paid_leaves(self, payroll: Payroll, leave_map: dict[date, Leave_Day], rates: Rates):
+        """
+        - Paid leave money is integrated into Basic Pay computation
+        - Payslip lines here are INFORMATION only (audit trail)
+        """
+        if not leave_map:
+            return
+
+        for d in sorted(leave_map.keys()):
+            ld = leave_map[d]
+
+            # show both paid/unpaid as info (useful for auditing)
+            units = _safe_decimal(ld.units, "units")
+            pay_rate = _safe_decimal(ld.pay_rate, "pay_rate")
+            is_paid = bool(ld.is_paid)
+
+            # compute the "would-be" amount for reference (NOT included in totals)
+            ref_amount = _d2(rates.daily_rate * units * pay_rate) if is_paid else DEC_0
+
+            label = "Paid" if is_paid else "Unpaid"
+            desc = f"{label} Leave ({d}) ({units} day) (rate {pay_rate})"
+
+            self._create_line(
+                payroll,
+                "INFORMATION",
+                desc,
+                ref_amount,                 # safe to store for display/reference
+                source_type="LEAVE_DAY",
+                source_id=ld.id,
+                quantity_min=None,
+                rate_applied=pay_rate,
+            )
+        
+
 
     # -------------------------
     # 7.3 Attendance Events
@@ -821,13 +936,8 @@ class PayrollGenerationService:
     # -------------------------
     # 8) Allowances, Commissions, Deductions
     # -------------------------
-    def _compute_allowance_eligible_days_for_month(
-        self,
-        employee: Employee,
-        shift: Shift,
-        month_start: date,
-        month_end: date,
-    ) -> int:
+    def _compute_allowance_eligible_days_for_month(self,employee: Employee,shift: Shift,month_start: date,month_end: date,leave_map: dict[date, Leave_Day],) -> int:
+
         expected_days = self._expected_workdays(shift, month_start, month_end)
 
         rows = Attendance.objects.filter(
@@ -839,6 +949,10 @@ class PayrollGenerationService:
 
         eligible = 0
         for d in expected_days:
+            #  If leave day (paid or unpaid) -> no allowance
+            if d in leave_map:
+                continue
+
             att = attendance_map.get(d)
 
             # ABSENT => void
@@ -853,9 +967,10 @@ class PayrollGenerationService:
 
             eligible += 1
 
+
         return eligible
 
-    def _apply_allowances(self,payroll: Payroll,allowances,period: Payroll_Period,employee: Employee,shift: Shift,):
+    def _apply_allowances(self,payroll: Payroll,allowances,period: Payroll_Period,employee: Employee,shift: Shift,leave_map: dict[date, Leave_Day],):
         for a in allowances:
             at = a.allowance_type
             name = at.name if at else "Allowance"
@@ -875,6 +990,7 @@ class PayrollGenerationService:
                         shift=shift,
                         month_start=month_start,
                         month_end=month_end,
+                        leave_map=leave_map,
                     )
                     if eligible_days <= 0:
                         continue
@@ -968,8 +1084,11 @@ class PayrollGenerationService:
         for ln in lines:
             if ln.line_type == "EARNING":
                 earnings += ln.amount
-            else:
+            elif ln.line_type == "DEDUCTION":
                 deductions += ln.amount
+            else:
+                # INFORMATION -> does not affect totals
+                continue
 
         payroll.total_earnings = _d2(earnings)
         payroll.total_deductions = _d2(deductions)

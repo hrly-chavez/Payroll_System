@@ -94,8 +94,15 @@ class AllowanceTypeSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at"]
 
     def validate_code(self, value):
-        if Allowance_Type.objects.filter(code=value).exists():
+        qs = Allowance_Type.objects.filter(code__iexact=value.strip())
+
+        # ✅ If updating, exclude current instance
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+
+        if qs.exists():
             raise serializers.ValidationError(
                 "Allowance code already exists."
             )
-        return value
+
+        return value.strip()

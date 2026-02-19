@@ -423,4 +423,5 @@ class HolidayPolicyAdmin(admin.ModelAdmin):
 
 
 admin.site.register(AuditLog)
+admin.site.register(Company_Note)
 

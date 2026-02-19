@@ -13,6 +13,7 @@ router.register(r"salaries", EmployeeSalaryViewSet)
 router.register(r"deductions", EmployeeDeductionViewSet) 
 router.register(r"allowances", EmployeeAllowanceViewSet)
 router.register(r"users", UserViewSet, basename="users")
+router.register(r"user-activity-logs", UserActivityLogViewSet, basename="user-activity-logs")
 
 
 urlpatterns = [
@@ -23,6 +24,7 @@ urlpatterns = [
     path("cities/<int:city_id>/barangays/", BarangayListByCityAPIView.as_view(), name="barangays-by-city"),
     path("allowance-types/", AllowanceTypeListAPIView.as_view(), name="allowance-types-list"),
 
+    #audit logs for each employee
     path("auditlogs/employee/<int:employee_id>/", employee_audit_logs, name="employee-audit-logs"),
     #company note
     path("company-notes/latest/", LatestCompanyNoteView.as_view(), name="latest-company-note"),

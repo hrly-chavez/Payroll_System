@@ -70,6 +70,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware', 
+    'accounts.middleware.CurrentUserMiddleware',
 ]
 
 ROOT_URLCONF = 'core_folder.urls'
@@ -159,6 +160,11 @@ CORS_ALLOWED_ORIGINS = env.list(
         "http://192.168.68.15:3000",
     ]
 )
+
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 
 CORS_ALLOW_CREDENTIALS = True
 

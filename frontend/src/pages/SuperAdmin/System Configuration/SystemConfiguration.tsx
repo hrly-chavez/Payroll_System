@@ -1,5 +1,6 @@
-//src/pages/SuperAdmin/System Configuration/SystemConfiguration.tsx
-import React, { useState } from "react";
+// src/pages/SuperAdmin/System Configuration/SystemConfiguration.tsx
+
+import React, { useState, useEffect } from "react";
 import { Layout } from "antd";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
@@ -12,13 +13,27 @@ import CommissionTypeTab from "./CommissionType/CommissionTypeTab";
 import ShiftTab from "./Workshifts/ShiftTab";
 import AllowanceTypeTab from "./AllowanceType/AllowanceType";
 
-
 const { Content } = Layout;
 
-
+type TabType =
+  | "contribution"
+  | "payroll"
+  | "leave"
+  | "commission"
+  | "workshifts"
+  | "allowance";
 
 const SystemConfiguration: React.FC = () => {
-   const [activeTab, setActiveTab] = useState<"contribution" | "payroll" | "leave" | "commission" | "workshifts" | "allowance">("contribution");
+  // ✅ Load last saved tab from localStorage
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const savedTab = localStorage.getItem("systemConfigTab") as TabType;
+    return savedTab || "contribution";
+  });
+
+  // ✅ Save tab whenever it changes
+  useEffect(() => {
+    localStorage.setItem("systemConfigTab", activeTab);
+  }, [activeTab]);
 
   return (
     <Layout className="system-layout">
@@ -29,26 +44,47 @@ const SystemConfiguration: React.FC = () => {
           <div className="config-container">
             {/* Tabs */}
             <div className="config-tabs">
-              <button className={activeTab === "contribution" ? "active" : ""} onClick={() => setActiveTab("contribution")}>
+              <button
+                className={activeTab === "contribution" ? "active" : ""}
+                onClick={() => setActiveTab("contribution")}
+              >
                 Contribution Table
               </button>
-              <button className={activeTab === "payroll" ? "active" : ""} onClick={() => setActiveTab("payroll")}>
+
+              <button
+                className={activeTab === "payroll" ? "active" : ""}
+                onClick={() => setActiveTab("payroll")}
+              >
                 Payroll Rules
               </button>
-              <button className={activeTab === "leave" ? "active" : ""} onClick={() => setActiveTab("leave")}>
+
+              <button
+                className={activeTab === "leave" ? "active" : ""}
+                onClick={() => setActiveTab("leave")}
+              >
                 Leave Types
               </button>
-              <button className={activeTab === "commission" ? "active" : ""} onClick={() => setActiveTab("commission")}>
+
+              <button
+                className={activeTab === "commission" ? "active" : ""}
+                onClick={() => setActiveTab("commission")}
+              >
                 Commission Types
               </button>
-              <button className={activeTab === "workshifts" ? "active" : ""} onClick={() => setActiveTab("workshifts")}>
+
+              <button
+                className={activeTab === "workshifts" ? "active" : ""}
+                onClick={() => setActiveTab("workshifts")}
+              >
                 Workshifts
               </button>
-              <button className={activeTab === "allowance" ? "active" : ""} onClick={() => setActiveTab("allowance")}>
+
+              <button
+                className={activeTab === "allowance" ? "active" : ""}
+                onClick={() => setActiveTab("allowance")}
+              >
                 Allowance Types
               </button>
-
-
             </div>
 
             {/* Section Header */}
@@ -63,7 +99,7 @@ const SystemConfiguration: React.FC = () => {
                   : activeTab === "workshifts"
                   ? "Workshifts"
                   : activeTab === "allowance"
-                  ? "Allowance Types" 
+                  ? "Allowance Types"
                   : "Commission Types"}
               </h3>
             </div>

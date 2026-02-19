@@ -53,9 +53,13 @@ const AdminDepartmentEmployee: React.FC = () => {
     fetchEmployees();
   }, [deptId]);
 
-  const filteredEmployees = employees.filter((emp) =>
+  const filteredEmployees = [...employees]
+  .filter((emp) =>
     emp.name.toLowerCase().includes(search.toLowerCase())
-  );
+  )
+  .sort((a, b) => {
+    return new Date(b.hired_date).getTime() - new Date(a.hired_date).getTime();
+  });
 
   const columns: TableProps<EmployeeType>["columns"] = [
     {
@@ -108,7 +112,12 @@ const AdminDepartmentEmployee: React.FC = () => {
             dataSource={filteredEmployees}
             rowKey="id"
             loading={loading}
-            pagination={false}
+            pagination={{
+              pageSize: 10,
+              showSizeChanger: true,
+              pageSizeOptions: ["5", "10", "20", "50"],
+              showTotal: (total) => `Total ${total} employees`,
+            }}
             className={styles.table}
             onRow={(record) => ({
               onClick: () =>

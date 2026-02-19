@@ -2,11 +2,17 @@
 
 .dashboard-layout {
   min-height: 100vh;
-  background: #fff; /* light background */
+  background: #fff;
 }
 
 .dashboard-content {
-  margin: 16px;
+  margin: 10px;
+}
+
+/* Make cols stretch equal height (you already had this, keep it) */
+.dashboard-content .ant-row > .ant-col {
+  display: flex;
+  flex-direction: column;
 }
 
 /* ================= Cards ================= */
@@ -14,8 +20,9 @@
 .card {
   background: #fff;
   border-radius: 12px;
-  padding: 24px;
+  padding: 16px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  height: 100%;
 }
 
 .analytics-card {
@@ -23,7 +30,7 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  flex: 1; /* stretch equal height */
+  flex: 1;
 }
 
 .card-title {
@@ -32,40 +39,25 @@
 }
 
 .calendar-card {
-  margin-bottom: 16px;
-  flex: 1; /* stretch equal height */
-}
-
-.calendar-title {
-  text-align: center;
-  margin-bottom: 12px;
-}
-
-/* ================= Equal Height Columns ================= */
-
-.dashboard-content .ant-row > .ant-col {
-  display: flex;
-  flex-direction: column;
+  flex: 1;
 }
 
 /* ================= Stats ================= */
 
-.stats-row {
-  margin-top: 20px;
-  gap: 16px;
-}
-
 .stat-card {
   background: #fff;
   border-radius: 12px;
-  padding: 20px;
+  padding: 14px;
   text-align: center;
+
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
+
   height: 100%;
-  min-height: 260px;
+  min-height: 200px;
+
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 }
 
@@ -73,15 +65,17 @@
 
 .stat-tile {
   height: 100%;
-  min-height: 260px;
+  min-height: 200px;
+
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 24px;
+
+  padding: 16px;
 }
 
 .tile-title {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 700;
   text-align: center;
 }
@@ -95,12 +89,12 @@
 }
 
 .tile-icon {
-  font-size: 56px;
+  font-size: 42px;
   opacity: 0.9;
 }
 
 .tile-value {
-  font-size: 56px;
+  font-size: 42px;
   font-weight: 700;
   line-height: 1;
 }
@@ -127,26 +121,6 @@
   color: #3f6f9e;
 }
 
-/* ===== Legacy Stat Text ===== */
-
-.stat-label {
-  font-size: 14px;
-  font-weight: 700;
-  color: #000;
-  text-align: center;
-  margin-bottom: 8px;
-}
-
-.stat-value {
-  font-size: 28px;
-  font-weight: 700;
-  text-align: center;
-}
-
-.stat-value.danger {
-  color: #ff4d4f;
-}
-
 /* ================= Hover Effects ================= */
 
 .stat-tile.clickable {
@@ -158,6 +132,28 @@
   filter: brightness(1);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
   transform: translateY(-2px);
+}
+
+/* ================= Filter Row (Segmented + DatePicker) ================= */
+
+.filter-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap; /* IMPORTANT for small screens */
+  margin-bottom: 16px;
+}
+
+/* Make controls not overflow on small devices */
+.filter-row .ant-segmented {
+  flex: 1 1 320px;
+  min-width: 240px;
+}
+
+.filter-row .ant-picker {
+  flex: 0 1 220px;
+  min-width: 180px;
 }
 
 /* ================= Holiday Modal ================= */
@@ -190,15 +186,11 @@
   font-size: 14px;
 }
 
-/* Footer buttons */
-
 .holiday-modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
 }
-
-/* Decline textarea */
 
 .decline-textarea {
   min-height: 100px;
@@ -215,18 +207,6 @@
   outline: none;
   border-color: #1677ff;
   background: #fff;
-}
-
-/* ================= Calendar Card ================= */
-
-.calendarCard {
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: var(--card-shadow-soft);
-}
-
-.calendarCard :global(.ant-card-body) {
-  padding: 8px 10px;
 }
 
 /* ================= Legend ================= */
@@ -252,18 +232,151 @@
   border-radius: 3px;
 }
 
-.legendGreen {
-  background: #3fa34d;
+.legendGreen { background: #3fa34d; }
+.legendRed { background: #d9534f; }
+.legendYellow { background: #f0ad4e; }
+.legendGray { background: #aaaaaa; }
+
+/* =======================================================
+   ✅ RESPONSIVE BREAKPOINTS
+   ======================================================= */
+
+/* XL desktops */
+@media (min-width: 1400px) {
+  .dashboard-content {
+    margin: 20px;
+  }
+  .card {
+    padding: 26px;
+  }
 }
 
-.legendRed {
-  background: #d9534f;
+/* Laptops / medium desktops */
+@media (max-width: 1199px) {
+  .stat-card,
+  .stat-tile {
+    min-height: 240px;
+  }
+
+  .tile-icon,
+  .tile-value {
+    font-size: 48px;
+  }
+
+  .tile-title {
+    font-size: 18px;
+  }
+
+  .analytics-card {
+    min-height: 300px;
+  }
 }
 
-.legendYellow {
-  background: #f0ad4e;
+/* Tablets */
+@media (max-width: 991px) {
+  .dashboard-content {
+    margin: 12px;
+  }
+
+  .card {
+    padding: 18px;
+  }
+
+  .stat-card,
+  .stat-tile {
+    min-height: 220px;
+    padding: 18px;
+  }
+
+  .tile-icon,
+  .tile-value {
+    font-size: 44px;
+  }
+
+  .tile-title {
+    font-size: 17px;
+  }
+
+  .analytics-card {
+    min-height: 320px;
+  }
 }
 
-.legendGray {
-  background: #aaaaaa;
+/* Large phones */
+@media (max-width: 767px) {
+  .dashboard-content {
+    margin: 10px;
+  }
+
+  .card {
+    padding: 16px;
+    border-radius: 10px;
+  }
+
+  .stat-card,
+  .stat-tile {
+    min-height: 200px;
+    padding: 16px;
+  }
+
+  .tile-body {
+    gap: 12px;
+  }
+
+  .tile-icon,
+  .tile-value {
+    font-size: 40px;
+  }
+
+  .tile-title {
+    font-size: 16px;
+  }
+
+  /* filter row becomes stacked */
+  .filter-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-row .ant-segmented,
+  .filter-row .ant-picker {
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .analytics-card {
+    min-height: 300px;
+  }
+}
+
+/* Small phones */
+@media (max-width: 480px) {
+  .dashboard-content {
+    margin: 8px;
+  }
+
+  .card {
+    padding: 14px;
+  }
+
+  .stat-card,
+  .stat-tile {
+    min-height: 180px;
+    padding: 14px;
+  }
+
+  .tile-icon,
+  .tile-value {
+    font-size: 36px;
+  }
+
+  .tile-title {
+    font-size: 15px;
+  }
+
+  .card-title {
+    margin-bottom: 12px;
+    font-size: 14px;
+  }
 }

@@ -3,6 +3,7 @@ from django.dispatch import receiver
 from django.forms.models import model_to_dict
 from django.core.serializers.json import DjangoJSONEncoder
 from .models import AuditLog
+from accounts.current_user import get_current_user
 import json
 
 _old_values = {}
@@ -35,6 +36,7 @@ def get_instance_user(instance):
     if user and user.is_authenticated:
         return user
     return None
+
 
 def create_audit_log(instance, action, old_data=None, new_data=None):
     """Helper to create audit logs with optional data."""

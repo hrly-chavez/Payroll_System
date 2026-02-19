@@ -1,9 +1,18 @@
 // src/pages/SuperAdmin/System Configuration/Pay Rules/PayRulesTab.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Button, Form, Spin, message, Tag, Switch, Tooltip, Modal } from "antd";
-import { EditOutlined } from "@ant-design/icons";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  Button,
+  Form,
+  Spin,
+  message,
+  Switch,
+  Tooltip,
+  Modal,
+  Input,
+} from "antd";
+import { EditOutlined, SearchOutlined } from "@ant-design/icons";
 import API from "../../../../api/axios";
 import "../SystemConfiguration.css";
 
@@ -24,6 +33,9 @@ export default function PayRulesTab({ active }: Props) {
 
   const [departments, setDepartments] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
+
+  // ✅ Search
+  const [search, setSearch] = useState("");
 
   const [payrollForm] = Form.useForm();
 
@@ -52,7 +64,7 @@ export default function PayRulesTab({ active }: Props) {
     setLoading(true);
     try {
       const res = await API.get("/payroll/superadmin/pay-rules/");
-      const sorted = [...res.data].sort((a: any, b: any) => b.id - a.id);
+      const sorted = [...(res.data || [])].sort((a: any, b: any) => b.id - a.id);
       setPayRules(sorted);
     } catch (error) {
       console.error(error);
@@ -74,8 +86,7 @@ export default function PayRulesTab({ active }: Props) {
     setPayRuleEditMode(false);
     setEditingPayRuleId(null);
     payrollForm.resetFields();
-    // ✅ default for add
-    payrollForm.setFieldsValue({ is_active: true });
+    payrollForm.setFieldsValue({ is_active: true }); // default for add
   };
 
   const closePayrollModal = () => {
@@ -94,12 +105,11 @@ export default function PayRulesTab({ active }: Props) {
       payrollForm,
     });
 
-    // ✅ remove "Active" checkbox in edit modal by forcing hidden state
-    // (we will control status using the switch in Actions)
+    // remove "Active" checkbox in edit modal
     payrollForm.setFieldsValue({ is_active: undefined });
   };
 
-  // ✅ Confirm modal + status patch (same behavior as contributions)
+  // ✅ Confirm modal + status patch
   const confirmToggleStatus = (rule: any, nextStatus: boolean) => {
     const actionText = nextStatus ? "activate" : "deactivate";
 
@@ -111,7 +121,6 @@ export default function PayRulesTab({ active }: Props) {
       centered: true,
       async onOk() {
         try {
-          // 🔥 adjust if your endpoint differs
           await API.patch(`/payroll/superadmin/pay-rules/${rule.id}/`, {
             is_active: nextStatus,
           });
@@ -136,7 +145,6 @@ export default function PayRulesTab({ active }: Props) {
     try {
       const values = await payrollForm.validateFields();
 
-      // ✅ preserve existing active state on edit
       const existing = payRules.find((r) => r.id === editingPayRuleId);
 
       const payload = {
@@ -154,8 +162,7 @@ export default function PayRulesTab({ active }: Props) {
           ? values.effective_to.format("YYYY-MM-DD")
           : null,
 
-        // ✅ on edit: keep existing is_active
-        // ✅ on add: default true
+        // preserve existing active state on edit, default true on add
         is_active: payRuleEditMode ? existing?.is_active : true,
       };
 
@@ -215,15 +222,55 @@ export default function PayRulesTab({ active }: Props) {
     return value;
   };
 
+  // ✅ Search filter (keeps newest-first)
+  const filteredPayRules = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return payRules;
+
+    return payRules
+      .filter((rule) => {
+        const haystack = [
+          rule.name,
+          rule.event_type,
+          rule.category,
+          formatRateType(rule.rate_type),
+          formatRateValue(rule),
+          rule.employee_name || rule.applies_to_name || "All",
+          rule.effective_from,
+          rule.effective_to,
+          rule.is_active ? "active yes" : "inactive no",
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        return haystack.includes(q);
+      })
+      .sort((a: any, b: any) => b.id - a.id);
+  }, [payRules, search]);
+
   return (
     <div className="table-wrapper">
+      {/* ✅ Search (left) + Add button (right) */}
       <div
         style={{
           display: "flex",
-          justifyContent: "flex-end",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
           marginBottom: 12,
+          flexWrap: "wrap",
         }}
       >
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search payroll rules..."
+          allowClear
+          prefix={<SearchOutlined />}
+          style={{ width: 320, maxWidth: "100%" }}
+        />
+
         <Button type="primary" onClick={openPayrollModal}>
           Add New Payroll Rule
         </Button>
@@ -246,7 +293,7 @@ export default function PayRulesTab({ active }: Props) {
           </thead>
 
           <tbody>
-            {payRules.map((rule) => (
+            {filteredPayRules.map((rule) => (
               <tr key={rule.id}>
                 <td>{rule.event_type}</td>
                 <td>{rule.category}</td>
@@ -254,7 +301,7 @@ export default function PayRulesTab({ active }: Props) {
                 <td>{formatRateValue(rule)}</td>
                 <td>{rule.employee_name || rule.applies_to_name || "All"}</td>
                 <td>{rule.effective_from}</td>
-                {/* ✅ Actions: Switch + Edit */}
+
                 <td
                   style={{
                     display: "flex",
@@ -278,6 +325,14 @@ export default function PayRulesTab({ active }: Props) {
                 </td>
               </tr>
             ))}
+
+            {filteredPayRules.length === 0 && (
+              <tr>
+                <td colSpan={7} style={{ textAlign: "center", padding: 16 }}>
+                  No payroll rules found.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       )}

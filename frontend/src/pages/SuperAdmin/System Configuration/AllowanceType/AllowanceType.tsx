@@ -2,15 +2,15 @@ import {
   Table,
   Button,
   Space,
-  Popconfirm,
   message,
   Spin,
   Tag,
   Tooltip,
+  Input,
 } from "antd";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../../../api/axios";
-import { EditOutlined } from "@ant-design/icons";
+import { EditOutlined, SearchOutlined } from "@ant-design/icons";
 
 import AddAllowanceType from "./AddAllowanceType";
 import EditAllowanceType from "./EditAllowanceType";
@@ -49,19 +49,22 @@ const Allowance = ({ active }: Props) => {
   const [selectedAllowance, setSelectedAllowance] =
     useState<AllowanceType | null>(null);
 
+  const [search, setSearch] = useState("");
+
   const hasFetched = useRef(false);
 
-  // FETCH
+  // ✅ FETCH (Newest First)
   const fetchAllowanceTypes = async () => {
     setLoading(true);
     try {
       const res = await api.get("/approvals/allowance-type");
 
-      // ✅ normalize is_active so Tag display is accurate
-      const normalized = (res.data || []).map((item: any) => ({
-        ...item,
-        is_active: toBool(item.is_active),
-      }));
+      const normalized = (res.data || [])
+        .map((item: any) => ({
+          ...item,
+          is_active: toBool(item.is_active),
+        }))
+        .sort((a: AllowanceType, b: AllowanceType) => b.id - a.id); //  newest first
 
       setAllowances(normalized);
       hasFetched.current = true;
@@ -80,16 +83,25 @@ const Allowance = ({ active }: Props) => {
     }
   }, [active]);
 
-  // TABLE COLUMNS
+  // ✅ Filtered + preserve newest first
+  const filteredAllowances = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return allowances;
+
+    return allowances
+      .filter((a) => {
+        const haystack = [a.name, a.code]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(q);
+      })
+      .sort((a, b) => b.id - a.id); //  keep newest on top
+  }, [allowances, search]);
+
   const columns = [
-    {
-      title: "Name",
-      dataIndex: "name",
-    },
-    {
-      title: "Code",
-      dataIndex: "code",
-    },
+    { title: "Name", dataIndex: "name" },
+    { title: "Code", dataIndex: "code" },
     {
       title: "Status",
       dataIndex: "is_active",
@@ -109,15 +121,15 @@ const Allowance = ({ active }: Props) => {
       title: "Actions",
       render: (_: any, record: AllowanceType) => (
         <Space size="middle">
-        <Tooltip title="Edit allowance type">
-          <EditOutlined
-            style={{ cursor: "pointer", color: "black" }}
-            onClick={() => {
-              setSelectedAllowance(record);
-              setEditOpen(true);
-            }}
-          />
-        </Tooltip>
+          <Tooltip title="Edit allowance type">
+            <EditOutlined
+              style={{ cursor: "pointer" }}
+              onClick={() => {
+                setSelectedAllowance(record);
+                setEditOpen(true);
+              }}
+            />
+          </Tooltip>
         </Space>
       ),
     },
@@ -125,34 +137,43 @@ const Allowance = ({ active }: Props) => {
 
   if (!active) return null;
 
-  return (
+  return (  
     <>
-      {/* ADD BUTTON */}
-      <Space
+      {/* Search + Add */}
+      <div
         style={{
-          width: "100%",
-          justifyContent: "flex-end",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
           marginBottom: 12,
         }}
       >
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search allowance types..."
+          allowClear
+          prefix={<SearchOutlined />}
+          style={{ width: 320, maxWidth: "100%" }}
+        />
+
         <Button type="primary" onClick={() => setAddOpen(true)}>
           Add Allowance Type
         </Button>
-      </Space>
+      </div>
 
-      {/* TABLE */}
       {loading ? (
-        <Spin style={{ marginTop: 16 }} />
+        <Spin />
       ) : (
         <Table
           rowKey="id"
           columns={columns}
-          dataSource={allowances}
-          style={{ marginTop: 16 }}
+          dataSource={filteredAllowances}
         />
       )}
 
-      {/* MODALS */}
       <AddAllowanceType
         open={addOpen}
         onClose={() => setAddOpen(false)}

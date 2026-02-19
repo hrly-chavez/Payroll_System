@@ -68,6 +68,15 @@ const Attendance: React.FC = () => {
     base: "PH" | "US" | "COMPANY";
   };
 
+  type AttendanceRecord = {
+    id: number;
+    date: string;
+    time_in: string | null;
+    time_out: string | null;
+  };
+
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [payrollPeriods, setPayrollPeriods] = useState<PayrollPeriod[]>([]);
 
@@ -77,6 +86,21 @@ const Attendance: React.FC = () => {
       setHolidays(res.data);
     } catch {
       console.error("Failed to load holidays");
+    }
+  };
+
+  const loadAttendance = async () => {
+    try {
+      const res = await api.get("/attendance/logs/", {
+        params: {
+          year: calendarValue.year(),
+          month: calendarValue.month() + 1,
+        },
+      });
+
+      setAttendanceRecords(res.data.results || []);
+    } catch (err) {
+      console.error("Failed to load attendance", err);
     }
   };
 
@@ -120,7 +144,16 @@ const Attendance: React.FC = () => {
   fetchLeaveRequests();
   loadHolidays();
   loadPayrollPeriods();
+  loadAttendance();   
 }, []);
+
+  useEffect(() => {
+    console.log("Calendar Attendance:", attendanceRecords);
+  }, [attendanceRecords]);
+
+  useEffect(() => {
+    loadAttendance();
+  }, [calendarValue]);
 
 
     /* =========================
@@ -129,12 +162,21 @@ const Attendance: React.FC = () => {
 
   const events = useMemo<EventItem[]>(() => {
     return [
+      // ATTENDANCE EVENTS
+      ...attendanceRecords.map<EventItem>((a) => ({
+        type: "attendance",
+        start_date: a.date,
+        time_in: a.time_in ?? undefined,
+        time_out: a.time_out ?? undefined,
+      })),
+      // HOLIDAYS
       ...holidays.map<EventItem>((h) => ({
         type: "holiday",
         start_date: h.date,
         title: `${h.base} Holiday – ${h.name}`,
         color: HOLIDAY_LEGEND[h.base][h.type].bgColor,
       })),
+      // PAYROLL PERIODS
       ...payrollPeriods.map<EventItem>((p) => ({
         type: "payroll",
         start_date: p.start_date,
@@ -143,7 +185,7 @@ const Attendance: React.FC = () => {
         color: PAYROLL_COLOR.bgColor,
       })),
     ];
-  }, [holidays, payrollPeriods]);
+  }, [holidays, payrollPeriods, attendanceRecords]);
 
 
 

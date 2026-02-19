@@ -39,7 +39,7 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
             'id',
             'name',
             'is_paid',
-            'pay_rate',
+            
             'requires_approval',
             'is_active',
             'created_at',

@@ -122,6 +122,7 @@ class Barangay(admin.ModelAdmin):
 @admin.register(Holiday)
 class HolidayAdmin(admin.ModelAdmin):
     list_display = (
+        'id',
         'name',
         'date',
         'type',
@@ -280,7 +281,7 @@ class LeaveTypeAdmin(admin.ModelAdmin):
         'id',
         'name',
         'is_paid',
-        'pay_rate',
+        
         'requires_approval',
         'is_active',
         'created_at'

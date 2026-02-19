@@ -5,7 +5,7 @@ import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 
 import SharedCalendar from "../../../components/SharedCalendar/SharedCalendar";
-import CompanyNote from "../../../components/CompanyNote/CompanyNote";
+import CompanyNote from "../../../components/CompanyNote/companyNote";
 import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
 
 import { Pie } from "@ant-design/plots";

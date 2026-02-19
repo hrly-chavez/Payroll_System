@@ -17,11 +17,16 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+
+from django.conf import settings
+from django.conf.urls.static import static
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("api/auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
-    #api routes for every app
+
+    # API routes
     path('api/accounts/', include('accounts.urls')),
     path("api/auth/", include("accounts.urls")),
     path('api/employees/', include('employees.urls')),
@@ -29,5 +34,6 @@ urlpatterns = [
     path("api/attendance/", include("attendance.urls")),
     path("api/payroll/", include("payroll.urls")),
     path("api/notifications/", include("notifications.urls")),
-
 ]
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

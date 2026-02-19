@@ -65,6 +65,21 @@ class DepartmentViewSet(viewsets.ModelViewSet):
         department.save()
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+
+        # Attach user BEFORE saving
+        instance._current_user = request.user
+
+        self.perform_update(serializer)
+
+        return Response(serializer.data)
+
 
 
 # para ni sa populate ang shifts sa drop down

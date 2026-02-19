@@ -484,7 +484,7 @@ class Leave_Type(models.Model):
     is_paid = models.BooleanField(default=True)
     requires_approval = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True) 
-    created_at = models.DateField(default=timezone.now)
+    created_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
         return f"{self.name} {self.is_paid}"

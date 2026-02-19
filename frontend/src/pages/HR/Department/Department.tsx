@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Layout, Table, Input, Button, message } from "antd";
+import { Layout, Table, Input, Button, message, Select } from "antd";
 import type { TableProps } from "antd";
-import { PlusOutlined, SearchOutlined, SlidersOutlined } from "@ant-design/icons";
+import { PlusOutlined, SearchOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
@@ -19,6 +19,7 @@ interface DepartmentType {
   id: number;
   name: string;
   shift: ShiftType | number;
+  holiday_base: string;
 }
 
 const Department: React.FC = () => {
@@ -27,11 +28,11 @@ const Department: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [holidayFilter, setHolidayFilter] = useState<string | null>(null);
 
   const fetchDepartments = async () => {
     setLoading(true);
     try {
-      // use your axios instance that adds the token automatically
       const res = await api.get("/employees/departments/");
       setDepartments(res.data);
     } catch (err) {
@@ -42,14 +43,21 @@ const Department: React.FC = () => {
     }
   };
 
-
   useEffect(() => {
     fetchDepartments();
   }, []);
 
-  const filteredDepartments = departments.filter((dept) =>
-    dept.name.toLowerCase().includes(search.toLowerCase())
-  );
+  // Combined filtering (search + holiday)
+  const filteredDepartments = departments.filter((dept) => {
+    const matchesSearch = dept.name
+      .toLowerCase()
+      .includes(search.toLowerCase());
+
+    const matchesHoliday =
+      !holidayFilter || dept.holiday_base === holidayFilter;
+
+    return matchesSearch && matchesHoliday;
+  });
 
   const columns: TableProps<DepartmentType>["columns"] = [
     {
@@ -62,6 +70,8 @@ const Department: React.FC = () => {
       title: "Department",
       dataIndex: "name",
       key: "name",
+      sorter: (a, b) => a.name.localeCompare(b.name), // alphabetical sort
+      sortDirections: ["ascend", "descend"],
       render: (text) => (
         <span className={styles.rowLink}>{text}</span>
       ),
@@ -78,7 +88,15 @@ const Department: React.FC = () => {
         return shift;
       },
     },
-
+    {
+      title: "Holiday Base",
+      dataIndex: "holiday_base",
+      key: "holiday_base",
+      sorter: (a, b) =>
+        (a.holiday_base || "").localeCompare(b.holiday_base || ""),
+      sortDirections: ["ascend", "descend"],
+      render: (value) => (value ? value : "—"),
+    },
   ];
 
   return (
@@ -97,9 +115,21 @@ const Department: React.FC = () => {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              <Button icon={<SlidersOutlined />} className={styles.filterBtn}>
-                Filter
-              </Button>
+
+              {/* Holiday Base Filter Dropdown */}
+              <Select
+                placeholder="Holiday Base"
+                allowClear
+                style={{ width: 160 }}
+                value={holidayFilter || undefined}
+                onChange={(value) => setHolidayFilter(value)}
+                options={Array.from(
+                  new Set(departments.map((d) => d.holiday_base))
+                ).map((value) => ({
+                  label: value,
+                  value,
+                }))}
+              />
             </div>
 
             <Button
@@ -122,7 +152,7 @@ const Department: React.FC = () => {
             onRow={(record) => ({
               onClick: () =>
                 navigate(`/admin/department-employee/${record.id}`, {
-                  state: { deptName: record.name }, // <-- pass department name here
+                  state: { deptName: record.name },
                 }),
               style: { cursor: "pointer" },
             })}

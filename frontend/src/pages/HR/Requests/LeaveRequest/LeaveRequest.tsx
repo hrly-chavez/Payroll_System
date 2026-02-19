@@ -134,18 +134,27 @@ const LeaveRequests = () => {
     },
   ];
 
+  const sortedRequests = [...requests].sort((a, b) => {
+    return new Date(b.date_from).getTime() - new Date(a.date_from).getTime();
+  });
+
   return (
     <>
       <Spin spinning={loading}>
         <Table
           columns={columns}
-          dataSource={requests}
           rowKey="id"
-          pagination={{ pageSize: 10 }}
+          dataSource={sortedRequests}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            pageSizeOptions: ["5", "10", "20", "50"],
+            showTotal: (total) => `Total ${total} leave requests`,
+          }}
         />
       </Spin>
 
-      {/* 🔹 DECLINE MODAL */}
+      {/*DECLINE MODAL */}
       <Modal
         title="Decline Leave Request"
         open={declineModalOpen}

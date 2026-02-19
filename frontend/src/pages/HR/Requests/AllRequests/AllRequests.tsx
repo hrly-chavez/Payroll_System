@@ -28,7 +28,7 @@ const AllRequests: React.FC = () => {
     fetchAllRequests();
   }, []);
 
-  // ✅ APPROVE
+  //APPROVE
   const handleApprove = async (record: any) => {
     Modal.confirm({
       title: "Approve Request",
@@ -59,7 +59,7 @@ const AllRequests: React.FC = () => {
     });
   };
 
-  // ✅ DECLINE
+  //DECLINE
   const handleDeclineClick = (record: any) => {
     setSelectedRecord(record);
     setDeclineModalOpen(true);
@@ -134,7 +134,7 @@ const AllRequests: React.FC = () => {
     {
       title: "Action",
       render: (_: any, record: any) => {
-        // ❌ No actions for Holiday (superadmin handles it)
+        // No actions for Holiday (superadmin handles it)
         if (record.model === "holiday") {
           return null;
         }
@@ -166,17 +166,26 @@ const AllRequests: React.FC = () => {
     }
   ];
 
+  const sortedData = [...dataSource].sort((a, b) => {
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
   return (
     <div className={styles.wrapper}>
       <Table
         columns={columns}
-        dataSource={dataSource}
         rowKey={(record) => `${record.model}-${record.id}`}
         loading={loading}
-        pagination={false}
+        dataSource={sortedData}
+        pagination={{
+          pageSize: 10,
+          showSizeChanger: true,
+          pageSizeOptions: ["5", "10", "20", "50"],
+          showTotal: (total) => `Total ${total} requests`,
+        }}
       />
 
-      {/* 🔴 DECLINE MODAL */}
+      {/*DECLINE MODAL */}
       <Modal
         title="Decline Request"
         open={declineModalOpen}

@@ -82,6 +82,16 @@ export default function PayrollPeriodTab({
 
   const filtered = useMemo(() => {
     const q = (searchText || "").trim().toLowerCase();
+
+    let data = [...payrollPeriods];
+
+      //SORT NEWEST FIRST
+      data.sort((a, b) => {
+        const dateA = a.created_at || a.start_date;
+        const dateB = b.created_at || b.start_date;
+        return dayjs(dateB).valueOf() - dayjs(dateA).valueOf();
+      });
+
     if (!q) return payrollPeriods;
 
     return payrollPeriods.filter((p) =>
@@ -103,7 +113,12 @@ export default function PayrollPeriodTab({
         columns={payrollColumns}
         dataSource={filtered}
         rowKey="id"
-        pagination={false}
+        pagination={{
+          pageSize: 10,
+          showSizeChanger: true,
+          pageSizeOptions: ["5", "10", "20", "50"],
+          showTotal: (total) => `Total ${total} items`,
+        }}
         loading={loading}
         onRow={(record) => ({
           onClick: () => {

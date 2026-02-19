@@ -1,9 +1,9 @@
 // src/pages/SuperAdmin/System Configuration/Contribution/ContributionTab.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Button, Form, Spin, message, Switch, Tooltip, Modal } from "antd";
-import { EditOutlined } from "@ant-design/icons";
+import React, { useEffect, useMemo, useState } from "react";
+import { Button, Form, Spin, message, Switch, Tooltip, Modal, Input } from "antd";
+import { EditOutlined, SearchOutlined } from "@ant-design/icons";
 import API from "../../../../api/axios";
 import "../SystemConfiguration.css";
 
@@ -22,6 +22,9 @@ export default function ContributionTab({ active }: Props) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [amountType, setAmountType] = useState<"manual" | "percent">("manual");
 
+  // ✅ Search
+  const [search, setSearch] = useState("");
+
   const [form] = Form.useForm();
 
   // ✅ ALWAYS newest first (latest added on top)
@@ -29,7 +32,6 @@ export default function ContributionTab({ active }: Props) {
     setLoading(true);
     try {
       const res = await API.get("/payroll/superadmin/deductions/");
-
       const sorted = [...res.data].sort((a: any, b: any) => b.id - a.id);
       setContributions(sorted);
     } catch {
@@ -93,7 +95,6 @@ export default function ContributionTab({ active }: Props) {
             const updated = prev.map((item) =>
               item.id === record.id ? { ...item, is_active: nextStatus } : item
             );
-            // keep newest-first order intact
             return updated.sort((a: any, b: any) => b.id - a.id);
           });
         } catch {
@@ -128,7 +129,6 @@ export default function ContributionTab({ active }: Props) {
         closeContributionModal();
         fetchContributions();
       } else {
-        // ✅ add new then put it on TOP immediately
         const res = await API.post("/payroll/superadmin/deductions/", payload);
         message.success("Contribution added successfully");
 
@@ -148,15 +148,50 @@ export default function ContributionTab({ active }: Props) {
     }
   };
 
+  // ✅ Filtered list (search by code/category/type/amount/salary range)
+  const filteredContributions = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return contributions;
+
+    return contributions.filter((c) => {
+      const haystack = [
+        c.code,
+        c.category,
+        c.calculation_type,
+        c.amount,
+        c.salary_range_from,
+        c.salary_range_to,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(q);
+    });
+  }, [contributions, search]);
+
   return (
     <div className="table-wrapper">
+      {/* ✅ Search (left) + Add button (right) aligned in same row */}
       <div
         style={{
           display: "flex",
-          justifyContent: "flex-end",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
           marginBottom: 12,
+          flexWrap: "wrap",
         }}
       >
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search contributions..."
+          allowClear
+          prefix={<SearchOutlined />}
+          style={{ width: 320, maxWidth: "100%" }}
+        />
+
         <Button type="primary" onClick={openContributionModal}>
           Add New Contribution
         </Button>
@@ -178,7 +213,7 @@ export default function ContributionTab({ active }: Props) {
             </tr>
           </thead>
           <tbody>
-            {contributions.map((c) => (
+            {filteredContributions.map((c) => (
               <tr key={c.id}>
                 <td>{c.code}</td>
                 <td>{c.category || "-"}</td>
@@ -191,7 +226,6 @@ export default function ContributionTab({ active }: Props) {
                     : `₱${Number(c.amount).toFixed(2)}`}
                 </td>
 
-                {/* 🔥 ACTIONS: Toggle + Edit */}
                 <td
                   style={{
                     display: "flex",
@@ -200,7 +234,6 @@ export default function ContributionTab({ active }: Props) {
                     gap: 12,
                   }}
                 >
-                  {/* ✅ Tooltip + Confirm Modal */}
                   <Tooltip title={c.is_active ? "Deactivate" : "Activate"}>
                     <Switch
                       size="small"
@@ -209,7 +242,6 @@ export default function ContributionTab({ active }: Props) {
                     />
                   </Tooltip>
 
-                  {/* Edit Icon */}
                   <EditOutlined
                     onClick={() => handleEditContribution(c)}
                     style={{ cursor: "pointer" }}
@@ -217,6 +249,15 @@ export default function ContributionTab({ active }: Props) {
                 </td>
               </tr>
             ))}
+
+            {/* Optional: show empty state row */}
+            {filteredContributions.length === 0 && (
+              <tr>
+                <td colSpan={7} style={{ textAlign: "center", padding: 16 }}>
+                  No contributions found.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       )}

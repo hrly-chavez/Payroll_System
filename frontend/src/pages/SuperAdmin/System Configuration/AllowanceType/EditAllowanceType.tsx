@@ -32,8 +32,6 @@ const EditAllowanceType = ({ open, onClose, allowance, refresh }: Props) => {
         code: allowance.code ?? "",
         is_active: toBool(allowance.is_active),
       });
-
-      // ✅ reset "changed" flag whenever we load a record
       setDirty(false);
     }
   }, [allowance, open, form]);
@@ -42,21 +40,43 @@ const EditAllowanceType = ({ open, onClose, allowance, refresh }: Props) => {
     try {
       const values = await form.validateFields();
 
-      // ✅ Reliable: if user didn't change anything
       if (!dirty) {
         message.info("No changes to update");
         return;
       }
 
-      await api.patch(`/approvals/allowance-type/${allowance.id}/`, {
-        name: values.name,
-        code: values.code,
-        is_active: toBool(values.is_active),
-      });
+      const nextIsActive = toBool(values.is_active);
+      const prevIsActive = toBool(allowance?.is_active);
 
-      message.success("Allowance type updated");
-      onClose();
-      refresh();
+      const proceedUpdate = async () => {
+        await api.patch(`/approvals/allowance-type/${allowance.id}/`, {
+          name: values.name,
+          code: values.code,
+          is_active: nextIsActive,
+        });
+
+        message.success("Allowance type updated");
+        onClose();
+        refresh();
+      };
+
+      // ✅ confirm ONLY when deactivating (Active -> Inactive)
+      const isDeactivating = prevIsActive === true && nextIsActive === false;
+
+      if (isDeactivating) {
+        Modal.confirm({
+          title: "Deactivate Allowance Type?",
+          content: "Are you sure you want to deactivate this allowance type?",
+          okText: "Yes, Deactivate",
+          okType: "danger",
+          cancelText: "Cancel",
+          onOk: proceedUpdate,
+        });
+        return;
+      }
+
+      // normal update (activate or edit fields)
+      await proceedUpdate();
     } catch (err: any) {
       const data = err?.response?.data;
 
@@ -82,7 +102,6 @@ const EditAllowanceType = ({ open, onClose, allowance, refresh }: Props) => {
       <Form
         form={form}
         layout="vertical"
-        // ✅ mark as changed on ANY update (including switch)
         onValuesChange={() => setDirty(true)}
       >
         <Form.Item label="Name" name="name" rules={[{ required: true }]}>
@@ -93,10 +112,16 @@ const EditAllowanceType = ({ open, onClose, allowance, refresh }: Props) => {
           <Input />
         </Form.Item>
 
-        <Form.Item label="Active" name="is_active" valuePropName="checked">
-          <Tooltip title="Toggle to activate or deactivate this allowance type">
-            <Switch />
-          </Tooltip>
+        <Form.Item
+          label={
+            <Tooltip title="Toggle to activate or deactivate this allowance type">
+              <span>Active</span>
+            </Tooltip>
+          }
+          name="is_active"
+          valuePropName="checked"
+        >
+          <Switch />
         </Form.Item>
       </Form>
     </Modal>

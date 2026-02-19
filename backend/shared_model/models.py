@@ -35,17 +35,13 @@ class Address(models.Model):
     def __str__(self):
         return f"{self.province.name} - {self.city.name} - {self.barangay.name}"
 class Department(models.Model):
-    HOLIDAY_BASE_CHOICES = [
-        ("PH", "Philippines"),
-        ("US", "United States"),
-        ("COMPANY", "Company"),
-    ]
+    
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=50)
     is_active = models.BooleanField(default=True)
     created_at = models.DateField(auto_now_add=True)
     shift_id = models.ForeignKey("Shift", on_delete=models.SET_NULL,related_name="departments",null=True,blank=True)
-    holiday_base = models.CharField(max_length=20,choices=HOLIDAY_BASE_CHOICES,default="PH",help_text="This department follows THIS holiday calendar..")
+    
     def __str__(self):
         return self.name
 

@@ -20,19 +20,37 @@ class HolidayListView(generics.ListAPIView):
     serializer_class = HolidaySerializer
     # public access → no permission_classes
 
+#done logs
 class HolidayCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Holiday.objects.all()
     serializer_class = HolidaySerializer
 
     def perform_create(self, serializer):
-        # backend controls status
-        serializer.save(status="Pending", is_active=True)
+        # Save holiday with backend-controlled fields
+        holiday = serializer.save(status="Pending", is_active=True)
 
+        # Attach current user for audit
+        holiday._current_user = self.request.user
+
+        # Manually create custom audit log
+        AuditLog.objects.create(
+            user=self.request.user,
+            action="Pending Holiday Request",
+            model_name="Holiday",
+            object_id=str(holiday.pk),
+            old_data="",
+            new_data="Pending"
+        )
+
+#done logs
 class HolidayUpdateStatusView(APIView):
     permission_classes = [IsAuthenticated]
+
     """
-    Update status of a single holiday
+    Update the status of a single holiday,
+    create manual audit log for Approved/Declined,
+    and notify admins (without extra audit logs from notifications)
     """
     def post(self, request, pk):
         try:
@@ -44,33 +62,54 @@ class HolidayUpdateStatusView(APIView):
         if new_status not in ['Approved', 'Declined']:
             return Response({'detail': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
 
+        old_status = holiday.status
+
+        # Skip automatic signals to prevent duplicate logs
+        holiday._skip_audit_log = True
+
+        # Update the holiday status
         holiday.status = new_status
         holiday.save()
-        # If SUPER_ADMIN updated holiday → notify ADMIN
-        if request.user.role == "SUPER_ADMIN":
-                    admins = User.objects.filter(role="ADMIN")
 
-                    for admin in admins:
-                        Notification.objects.create(
-                            user=admin,
-                            title="Holiday Status Updated",
-                            description=f"Holiday '{holiday.name}' was {new_status}.",
-                            category="holiday",
-                            redirect_url="/admin/holiday-requests"
-                        )
+        # Manual audit log for human-readable action
+        action_name = "Approved Holiday Request" if new_status == "Approved" else "Declined Holiday Request"
+
+        AuditLog.objects.create(
+            user=request.user,
+            action=action_name,
+            model_name="Holiday",
+            object_id=str(holiday.pk),
+            old_data={"status": old_status},
+            new_data={"status": new_status}
+        )
+
+        # Notify admins if SUPER_ADMIN updated the holiday
+        if request.user.role == "SUPER_ADMIN":
+            admins = User.objects.filter(role="ADMIN")
+            for admin in admins:
+                Notification.objects.create(
+                    user=admin,
+                    title="Holiday Status Updated",
+                    description=f"Holiday '{holiday.name}' was {new_status}.",
+                    category="holiday",
+                    redirect_url="/admin/holiday-requests"
+                )
+                # Notifications do NOT touch _current_user, so no audit log triggered
 
         serializer = HolidaySerializer(holiday)
-
         return Response({
-                'detail': 'Status updated',
-                'holiday': serializer.data
-            }, status=status.HTTP_200_OK)
-    
+            'detail': 'Status updated',
+            'holiday': serializer.data
+        }, status=status.HTTP_200_OK)
+
+
+
 class LeaveTypeListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Leave_Type.objects.all().order_by('-created_at')
     serializer_class = LeaveTypeSerializer
 
+#undone logs
 class LeaveTypeCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Leave_Type.objects.all()
@@ -79,11 +118,13 @@ class LeaveTypeCreateView(generics.CreateAPIView):
     def perform_create(self, serializer):
         serializer.save(is_active=True)
 
+#undone logs
 class LeaveTypeUpdateView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Leave_Type.objects.all()
     serializer_class = LeaveTypeSerializer
 
+#undone logs
 class LeaveRequestListCreateView(generics.ListCreateAPIView):
     serializer_class = LeaveRequestSerializer
     permission_classes = [IsAuthenticated, IsRole]

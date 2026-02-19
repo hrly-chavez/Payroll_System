@@ -672,14 +672,15 @@ class UserActivityLogViewSet(viewsets.ViewSet):
     triggered from DRF API requests (not Django admin).
     """
     def list(self, request):
+        #delete logs after a day
+        one_day_ago = timezone.now() - timedelta(days=1)
+        AuditLog.objects.filter(timestamp__lt=one_day_ago).delete()
+        
         # Only include logs where user is NOT None and NOT a superuser
-        logs = AuditLog.objects.filter(
-            action__in=["CREATE", "UPDATE", "DELETE"],
-        ).exclude(
+        logs = AuditLog.objects.exclude(
             user__isnull=True
-        ).exclude(
-            user__is_staff=True  # optional: exclude admin users if you want
         ).order_by("-timestamp")
+
 
         serializer = UserActivityAuditLogSerializer(logs, many=True)
         return Response(serializer.data)

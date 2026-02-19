@@ -37,24 +37,22 @@ export default function AddLeaveType({ open, title, onCancel, onOk, form }: Prop
           <Input placeholder="Enter leave name" />
         </Form.Item>
 
-        <Form.Item label="Pay Rate" name="pay_rate" rules={[{ required: true, message: "Please enter pay rate" }]}>
-          <Input type="number" step="0.01" placeholder="Enter pay rate" style={{ width: "100%" }} />
-        </Form.Item>
+        
 
         <Form.Item label="Options">
           <Row gutter={16}>
             <Col>
-              <Form.Item name="is_paid" valuePropName="checked" noStyle>
+              <Form.Item name="is_paid" valuePropName="checked" noStyle initialValue={true}>
                 <Checkbox>Paid Leave</Checkbox>
               </Form.Item>
             </Col>
             <Col>
-              <Form.Item name="requires_approval" valuePropName="checked" noStyle>
+              <Form.Item name="requires_approval" valuePropName="checked" noStyle initialValue={true}>
                 <Checkbox>Requires Approval</Checkbox>
               </Form.Item>
             </Col>
             <Col>
-              <Form.Item name="is_active" valuePropName="checked" noStyle>
+              <Form.Item name="is_active" valuePropName="checked" noStyle initialValue={true}>
                 <Checkbox>Active</Checkbox>
               </Form.Item>
             </Col>

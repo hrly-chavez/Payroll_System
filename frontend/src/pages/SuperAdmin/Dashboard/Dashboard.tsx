@@ -5,7 +5,7 @@ import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 
 import SharedCalendar from "../../../components/SharedCalendar/SharedCalendar";
-import CompanyNote from "../../../components/CompanyNote/companyNote";
+import CompanyNote from "../../../components/CompanyNote/CompanyNote";
 import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
 
 import { Pie } from "@ant-design/plots";
@@ -30,6 +30,7 @@ import {
 } from "../../../components/SharedCalendar/CalendarLegend";
 import { PAYROLL_COLOR } from "../../../components/SharedCalendar/CalendarLegend";
 
+const role = localStorage.getItem("role") || "";
 
 const { Content } = Layout;
 
@@ -118,7 +119,7 @@ const Dashboard: React.FC = () => {
   /* ------------------ Chart state ------------------ */
   const [chartOption, setChartOption] =
     useState<echarts.ComposeOption<echarts.BarSeriesOption>>();
-  const [chartHeight, setChartHeight] = useState<number>(360);
+  const [chartHeight, setChartHeight] = useState<number>(280);
 
   /* ================= HOLIDAY STATE ================= */
   const [holidayData, setHolidayData] = useState<HolidayRequest[]>([]);
@@ -378,7 +379,7 @@ const Dashboard: React.FC = () => {
                     scale={{
                       color: {
                         domain: ["Reported", "Not Reported"],
-                        range: ["#1677ff", "#c62828"],
+                        range: ["#1677ff", "#6BE0E0"],
                       },
                     }}
                   />
@@ -399,7 +400,7 @@ const Dashboard: React.FC = () => {
                         style={{
                           width: 10,
                           height: 10,
-                          background: "#c62828",
+                          background: "#6BE0E0",
                           borderRadius: "50%",
                           marginRight: 6,
                           display: "inline-block",
@@ -471,7 +472,7 @@ const Dashboard: React.FC = () => {
 
 
             <Col xs={24} md={10}>
-                <CompanyNote />
+               <CompanyNote role={role} />
             </Col>
           </Row>
 

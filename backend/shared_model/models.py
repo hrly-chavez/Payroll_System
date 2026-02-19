@@ -513,6 +513,7 @@ class Leave_Request(models.Model):
     approved_at = models.DateTimeField(null=True, blank=True)
     employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="leave_requests")
     leave_type = models.ForeignKey(Leave_Type,on_delete=models.PROTECT,related_name="leave_requests")
+    
 
     def __str__(self):
         return f"{self.date_from} to {self.date_to}" 
@@ -653,6 +654,7 @@ class Payslip(models.Model):
     LINE_TYPES = [
         ("EARNING", "Earning"),
         ("DEDUCTION", "Deduction"),
+        ("INFORMATION", "Information"),
     ]
 
     SOURCE_TYPES = [

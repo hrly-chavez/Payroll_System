@@ -19,18 +19,15 @@ def _get_employee_or_400(user):
 def _get_today_local_date():
     return timezone.localdate()
 
-
 def _get_now_local_dt():
     # local timezone-aware datetime
     return timezone.localtime()
-
 
 def _month_date_range(year: int, month: int):
     last_day = monthrange(year, month)[1]
     start = date(year, month, 1)
     end = date(year, month, last_day)
     return start, end
-
 
 def _is_workday_for_shift(shift, target_date: date) -> bool:
     """
@@ -44,10 +41,8 @@ def _is_workday_for_shift(shift, target_date: date) -> bool:
         return True  # if not configured, assume workday
     return workday.is_workday
 
-
 def _combine_date_time(d: date, t) -> datetime:
     return datetime.combine(d, t)
-
 
 def _is_true_overnight(shift) -> bool:
     """
@@ -58,7 +53,6 @@ def _is_true_overnight(shift) -> bool:
     if not shift:
         return False
     return bool(getattr(shift, "crosses_midnight", False))
-
 
 def _compute_minutes_late(shift, target_date: date, time_in) -> int:
     """
@@ -77,7 +71,6 @@ def _compute_minutes_late(shift, target_date: date, time_in) -> int:
     diff = in_dt - start_dt
     minutes = int(diff.total_seconds() // 60)
     return max(0, minutes)
-
 
 def _compute_minutes_undertime(shift, target_date: date, time_out) -> int:
     """
@@ -99,7 +92,6 @@ def _compute_minutes_undertime(shift, target_date: date, time_out) -> int:
     diff = end_dt - out_dt
     minutes = int(diff.total_seconds() // 60)
     return max(0, minutes)
-
 
 def _resolve_attendance_for_punch_out(employee, shift):
     """

@@ -64,7 +64,7 @@ const Allowance = ({ active }: Props) => {
           ...item,
           is_active: toBool(item.is_active),
         }))
-        .sort((a: AllowanceType, b: AllowanceType) => b.id - a.id); // 🔥 newest first
+        .sort((a: AllowanceType, b: AllowanceType) => b.id - a.id); //  newest first
 
       setAllowances(normalized);
       hasFetched.current = true;
@@ -96,7 +96,7 @@ const Allowance = ({ active }: Props) => {
           .toLowerCase();
         return haystack.includes(q);
       })
-      .sort((a, b) => b.id - a.id); // 🔥 keep newest on top
+      .sort((a, b) => b.id - a.id); //  keep newest on top
   }, [allowances, search]);
 
   const columns = [

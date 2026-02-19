@@ -4,32 +4,10 @@ import Sidebar from '../../../components/Sidebar/Sidebar';
 import Topbar from '../../../components/Topbar/Topbar';
 import './Reports.css';
 
+import UserActivity from './User activity/UserActivity';
+
 const { Content } = Layout;
 const { TabPane } = Tabs;
-
-/* ---------------- USER ACTIVITY LOGS ---------------- */
-const userActivityColumns = [
-  { title: 'Date / Time', dataIndex: 'date' },
-  { title: 'Name', dataIndex: 'name' },
-  { title: 'User', dataIndex: 'user' },
-  { title: 'Role', dataIndex: 'role' },
-  { title: 'Action', dataIndex: 'action' },
-  { title: 'Module', dataIndex: 'module' },
-  { title: 'Record ID', dataIndex: 'recordId' },
-];
-
-const userActivityData = [
-  {
-    key: '1',
-    date: 'March 20, 2025 10:21',
-    name: 'Jeremy Neigh',
-    user: 'admin01',
-    role: 'Admin / HR',
-    action: 'Edit Attendance',
-    module: 'Attendance',
-    recordId: 'ATT-554',
-  },
-];
 
 /* ---------------- ATTENDANCE MODIFICATIONS ---------------- */
 const attendanceColumns = [
@@ -197,14 +175,7 @@ const Reports: React.FC = () => {
               </div>
             </div>
 
-            {activeTab === '1' && (
-              <Table
-                columns={userActivityColumns}
-                dataSource={userActivityData}
-                pagination={{ pageSize: 5 }}
-                scroll={{ x: 900 }}
-              />
-            )}
+            {activeTab === '1' && <UserActivity />}
 
             {activeTab === '2' && (
               <Table

@@ -30,10 +30,7 @@ class ShiftSerializer(serializers.ModelSerializer):
         return f"{obj.start_time.strftime('%H:%M')} - {obj.end_time.strftime('%H:%M')}"
     
 class DepartmentSerializer(serializers.ModelSerializer):
-    # This will display the nested shift details
     shift = ShiftSerializer(read_only=True, source="shift_id")
-    
-    # This is for creating/updating a department
     shift_id = serializers.PrimaryKeyRelatedField(
         queryset=Shift.objects.all(),
         write_only=True
@@ -42,6 +39,19 @@ class DepartmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Department
         fields = "__all__"
+
+    def create(self, validated_data):
+        # Pop the _current_user from context instead of kwargs
+        current_user = self.context.get("current_user")
+        
+        # Create the instance normally
+        instance = Department.objects.create(**validated_data)
+
+        # Attach _current_user for your signals
+        instance._current_user = current_user
+        instance.save()
+        return instance
+
 
 #User model (user account)
 class UserAccountSerializer(serializers.ModelSerializer):
@@ -408,24 +418,20 @@ class EmployeeAllowanceSerializer(serializers.ModelSerializer):
         ]
 
 #audit logs
-class AuditLogSerializer(serializers.ModelSerializer):
-    user_id = serializers.IntegerField(source="user.id", read_only=True)
+class UserActivityAuditLogSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.user_name", read_only=True)
-    timestamp = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S")  # 24-hour format
-    
+    role = serializers.SerializerMethodField()
+    timestamp = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S")
+
     class Meta:
         model = AuditLog
-        fields = [
-            "id",
-            "user_id",
-            "username",
-            "action",
-            "model_name",
-            "object_id",
-            "old_data",
-            "new_data",
-            "timestamp",
-        ]
+        fields = ["id", "username", "role", "action", "model_name", "timestamp"]
+
+    def get_role(self, obj):
+        if obj.user:
+            return obj.user.role
+        return "Anonymous"
+
 
 #------------ COMPANY NOTE SERIALIZER-----------
 class CompanyNoteSerializer(serializers.ModelSerializer):
@@ -439,3 +445,12 @@ class CompanyNoteSerializer(serializers.ModelSerializer):
         if obj.user:
             return obj.user.user_name
         return "System"
+
+    def create(self, validated_data):
+        request = self.context["request"]
+        user = request.user
+
+        return Company_Note.objects.create(
+            user=user,   # ✅ SAVE USER TO DB
+            **validated_data
+        )

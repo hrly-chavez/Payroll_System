@@ -27,11 +27,6 @@ class HolidaySerializer(serializers.ModelSerializer):
 
         return attrs
 
-class PayrollSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Payroll
-        fields = ['id', 'employee_name', 'period', 'total_amount', 'status']
-
 class LeaveTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Leave_Type
@@ -91,7 +86,6 @@ class  CommissionTypeSerializer(serializers.ModelSerializer):
             "is_active",
             "created_at",
         ]
-
 
 class AllowanceTypeSerializer(serializers.ModelSerializer):
     class Meta:

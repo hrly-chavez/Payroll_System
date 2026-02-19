@@ -4,6 +4,7 @@
 import React from "react";
 import { Card, Table, Tag } from "antd";
 import styles from "./Requests.module.css";
+import dayjs from "dayjs";
 
 const Requests: React.FC = () => {
   const columns = [
@@ -69,12 +70,20 @@ const Requests: React.FC = () => {
     },
   ];
 
+  const sortedRequests = [...dataSource].sort((a, b) => {
+    return dayjs(b.submittedAt).valueOf() - dayjs(a.submittedAt).valueOf();
+  });
+
   return (
     <Card className={styles.card} title="My Requests">
       <Table
         columns={columns}
-        dataSource={dataSource}
-        pagination={false}
+        dataSource={sortedRequests}
+        pagination={{
+          pageSize: 5,
+          showSizeChanger: true,
+          pageSizeOptions: ["5", "10", "20"],
+        }}
         className={styles.table}
       />
     </Card>

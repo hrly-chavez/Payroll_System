@@ -48,6 +48,7 @@ const AttendanceCorrectionRequest: React.FC = () => {
     },
   ];
 
+
   const dataSource = [
     {
       key: 1,
@@ -71,8 +72,14 @@ const AttendanceCorrectionRequest: React.FC = () => {
     <div className={styles.wrapper}>
       <Table
         columns={columns}
-        dataSource={dataSource}
-        pagination={false}
+        dataSource={[...dataSource].sort((a, b) => {
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        })}        
+        pagination={{
+          pageSize: 5,
+          showSizeChanger: true,
+          pageSizeOptions: ["5", "10", "20"],
+        }}
       />
     </div>
   );

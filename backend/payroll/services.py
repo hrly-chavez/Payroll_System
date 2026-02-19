@@ -251,7 +251,7 @@ class PayrollGenerationService:
         # Leave placeholder for now (ready when other team finishes)
         leave_map = self._get_leave_map(employee, period)
 
-        holiday_map = self._get_holiday_map(period)
+        holiday_map = self._get_holiday_map(period, department)
         holiday_policy_map = self._get_holiday_policy_map(department)
 
         allowances = self._get_allowances(employee, period)
@@ -293,9 +293,9 @@ class PayrollGenerationService:
         }
 
     def _get_employee_shift(self, employee: Employee) -> Shift | None:
-        if employee.shift_id:
+        if employee.shift:
             return employee.shift
-        if employee.department_id and employee.department.shift_id_id:
+        if employee.department and employee.department.shift_id:
             return employee.department.shift_id
         return None
 
@@ -343,12 +343,13 @@ class PayrollGenerationService:
         # placeholder for future Leave_Day integration
         return {}
 
-    def _get_holiday_map(self, period: Payroll_Period):
+    def _get_holiday_map(self, period: Payroll_Period, department: Department):
         rows = Holiday.objects.filter(
             date__gte=period.start_date,
             date__lte=period.end_date,
             status="Approved",
             is_active=True,
+            base=department.holiday_base,   # <-- IMPORTANT
         )
         return {h.date: h for h in rows}
 

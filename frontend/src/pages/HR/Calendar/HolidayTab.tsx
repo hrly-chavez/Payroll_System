@@ -98,7 +98,12 @@ export default function HolidayTab({ active, searchText, refreshKey }: Props) {
       columns={holidayColumns}
       dataSource={filtered}
       rowKey="id"
-      pagination={false}
+      pagination={{
+        pageSize: 10,
+        showSizeChanger: true,
+        pageSizeOptions: ["5", "10", "20", "50"],
+        showTotal: (total) => `Total ${total} holidays`,
+      }}
       loading={loading}
     />
   );

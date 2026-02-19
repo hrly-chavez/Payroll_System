@@ -79,6 +79,10 @@ export default function AttendaceLogs({ year, month }: Props) {
     fetchLogs();
   }, [year, month]);
 
+  const sortedRows = [...rows].sort((a, b) => {
+    return dayjs(b.date).valueOf() - dayjs(a.date).valueOf();
+  });
+
   return (
     <Card className={styles.historyCard}>
       {loading ? (
@@ -89,8 +93,13 @@ export default function AttendaceLogs({ year, month }: Props) {
         <Table
           rowKey="id"
           columns={columns as any}
-          dataSource={rows}
-          pagination={false}
+          dataSource={sortedRows}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            pageSizeOptions: ["5", "10", "20"],
+            showTotal: (total) => `Total ${total} records`,
+          }}
         />
       )}
     </Card>

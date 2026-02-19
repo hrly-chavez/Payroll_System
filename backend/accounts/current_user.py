@@ -1,10 +1,13 @@
-# utils/current_user.py
 import threading
 
-_user_ctx = threading.local()
+_user_storage = threading.local()
 
 def set_current_user(user):
-    _user_ctx.user = user
+    _user_storage.user = user
 
 def get_current_user():
-    return getattr(_user_ctx, "user", None)
+    return getattr(_user_storage, "user", None)
+
+def clear_current_user():
+    if hasattr(_user_storage, "user"):
+        del _user_storage.user

@@ -30,10 +30,7 @@ class ShiftSerializer(serializers.ModelSerializer):
         return f"{obj.start_time.strftime('%H:%M')} - {obj.end_time.strftime('%H:%M')}"
     
 class DepartmentSerializer(serializers.ModelSerializer):
-    # This will display the nested shift details
     shift = ShiftSerializer(read_only=True, source="shift_id")
-    
-    # This is for creating/updating a department
     shift_id = serializers.PrimaryKeyRelatedField(
         queryset=Shift.objects.all(),
         write_only=True
@@ -42,6 +39,19 @@ class DepartmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Department
         fields = "__all__"
+
+    def create(self, validated_data):
+        # Pop the _current_user from context instead of kwargs
+        current_user = self.context.get("current_user")
+        
+        # Create the instance normally
+        instance = Department.objects.create(**validated_data)
+
+        # Attach _current_user for your signals
+        instance._current_user = current_user
+        instance.save()
+        return instance
+
 
 #User model (user account)
 class UserAccountSerializer(serializers.ModelSerializer):
@@ -435,3 +445,12 @@ class CompanyNoteSerializer(serializers.ModelSerializer):
         if obj.user:
             return obj.user.user_name
         return "System"
+
+    def create(self, validated_data):
+        request = self.context["request"]
+        user = request.user
+
+        return Company_Note.objects.create(
+            user=user,   # ✅ SAVE USER TO DB
+            **validated_data
+        )

@@ -33,7 +33,7 @@ SECRET_KEY = 'django-insecure-5y)_r+#--6qx9#2ez%*6^gfs4*bogq2abe#sr4sl0xp9hxs^7q
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["192.168.68.43","localhost", "127.0.0.1"]
+ALLOWED_HOSTS = ["192.168.68.15","localhost", "127.0.0.1"]
 
 AUTH_USER_MODEL = "shared_model.User"
 
@@ -157,7 +157,7 @@ CORS_ALLOWED_ORIGINS = env.list(
     default=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "http://192.168.68.43:3000",
+        "http://192.168.68.15:3000",
     ]
 )
 

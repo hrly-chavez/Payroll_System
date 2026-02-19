@@ -47,12 +47,25 @@ class BarangayListByCityAPIView(generics.ListAPIView):
         return Barangay.objects.filter(city_id=city_id)
 
 #--------------------------Department
+#done logs
 class DepartmentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsRole]
     allowed_roles = ["ADMIN", "SUPER_ADMIN"]
     queryset = Department.objects.all().order_by("-created_at")
     serializer_class = DepartmentSerializer
     public_actions = ['list', 'retrieve']
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Manually create instance
+        department = Department(**serializer.validated_data)
+        department._current_user = request.user  # attach before saving
+        department.save()
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
 
 # para ni sa populate ang shifts sa drop down
 class ShiftViewSet(viewsets.ModelViewSet):
@@ -62,6 +75,7 @@ class ShiftViewSet(viewsets.ModelViewSet):
     public_actions = ['list', 'retrieve']
     
 #user account
+#done logs
 logger = logging.getLogger(__name__)  # Use Django logging
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -180,6 +194,7 @@ class UserViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
         
+#done logs
 #employee details crud
 class EmployeeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsRole]
@@ -302,7 +317,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             "employee": EmployeeSerializer(updated_employee).data
         })
 
-    
+#done logs
 #employee salary
 class EmployeeSalaryViewSet(viewsets.ModelViewSet):
     queryset = Employee_Salary.objects.all().order_by("-effective_from")
@@ -439,6 +454,7 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
             new_ded._current_user = user
             new_ded.save()
 
+#done logs
 #employee deduction
 class EmployeeDeductionViewSet(viewsets.ModelViewSet):
     queryset = Employee_Deduction.objects.all()
@@ -506,7 +522,7 @@ class EmployeeDeductionViewSet(viewsets.ModelViewSet):
         ]
 
         return Response(data)
-
+#done logs
 #--------------------- ALLOWANCE
 class EmployeeAllowanceViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsRole]
@@ -652,14 +668,23 @@ def employee_audit_logs(request, employee_id):
 #audit logs (Reports)
 class UserActivityLogViewSet(viewsets.ViewSet):
     """
-    Read-only ViewSet that returns all CREATE/UPDATE/DELETE audit logs.
+    Read-only ViewSet that returns all CREATE/UPDATE/DELETE audit logs
+    triggered from DRF API requests (not Django admin).
     """
     def list(self, request):
-        logs = AuditLog.objects.filter(action__in=["CREATE", "UPDATE", "DELETE"]).order_by("-timestamp")
+        # Only include logs where user is NOT None and NOT a superuser
+        logs = AuditLog.objects.filter(
+            action__in=["CREATE", "UPDATE", "DELETE"],
+        ).exclude(
+            user__isnull=True
+        ).exclude(
+            user__is_staff=True  # optional: exclude admin users if you want
+        ).order_by("-timestamp")
+
         serializer = UserActivityAuditLogSerializer(logs, many=True)
         return Response(serializer.data)
 
-
+#done logs
 #COMPANY NOTE
 class LatestCompanyNoteView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -677,4 +702,4 @@ class CompanyNoteCreateView(generics.CreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        serializer.save()

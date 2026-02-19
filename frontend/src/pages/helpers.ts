@@ -6,20 +6,34 @@
  *
  * Used for displaying time_in / time_out values returned by the backend.
  */
-export const formatBackendTime = (time: string | null): string => {
-  if (!time) return "";
+export const formatBackendTime = (value: string | null): string => {
+  if (!value) return "";
 
-  // Remove microseconds if present (02:13:42.183639 → 02:13:42)
-  const cleanTime = time.split(".")[0];
+  // Case A: ISO datetime string (DateTimeField output), ex: 2026-02-23T07:58:00+08:00
+  if (value.includes("T")) {
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return "";
+    return dt.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  }
 
-  const [hours, minutes, seconds] = cleanTime.split(":").map(Number);
+  // Case B: time-only string (TimeField output), ex: 02:13:42 or 02:13:42.183639
+  const cleanTime = value.split(".")[0]; // strip microseconds
+  const [hoursStr, minutesStr, secondsStr] = cleanTime.split(":");
 
-  if (hours === undefined || minutes === undefined) return "";
+  const hours = Number(hoursStr);
+  const minutes = Number(minutesStr);
+  const seconds = Number(secondsStr || "0");
 
-  const date = new Date();
-  date.setHours(hours, minutes, seconds || 0);
+  if (Number.isNaN(hours) || Number.isNaN(minutes) || Number.isNaN(seconds)) return "";
 
-  return date.toLocaleTimeString("en-US", {
+  const d = new Date();
+  d.setHours(hours, minutes, seconds, 0);
+
+  return d.toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,

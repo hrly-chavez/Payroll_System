@@ -36,6 +36,16 @@ type TodayAttendanceResponse = {
     created_at: string;
   };
 };
+type PunchInEligibilityResponse = {
+  can_punch_in: boolean;
+  reason: string;
+  shift_start_dt: string | null;
+  shift_end_dt: string | null;
+  earliest_allowed_dt: string | null;
+  now_dt: string;
+  work_date: string;
+};
+
   type AttendanceLogRow = {
     id: number;
     date: string;
@@ -71,6 +81,9 @@ const Dashboard: React.FC = () => {
   const [loadingStatus, setLoadingStatus] = useState(false);
   const [stats, setStats] = useState({ present: 0, lates: 0, absent: 0 });
   const [loadingStats, setLoadingStats] = useState(false);
+
+  const [punchInEligibility, setPunchInEligibility] = useState<PunchInEligibilityResponse | null>(null);
+  const [loadingPunchInEligibility, setLoadingPunchInEligibility] = useState(false);
 
   const [selectedMonth, setSelectedMonth] = useState(dayjs().month() + 1); // 1–12
   const [selectedFilter, setSelectedFilter] = useState<
@@ -130,6 +143,27 @@ const attendanceChartData =
           setLoadingStatus(false);
         }
     };
+    const fetchPunchInEligibility = async () => {
+      setLoadingPunchInEligibility(true);
+      try {
+        const res = await api.get<PunchInEligibilityResponse>("/attendance/punch-in-eligibility/");
+        setPunchInEligibility(res.data);
+      } catch (err: any) {
+        console.error(err);
+        // Don’t spam errors for this “helper” endpoint. Just set a safe default.
+        setPunchInEligibility({
+          can_punch_in: false,
+          reason: "Unable to check punch-in eligibility.",
+          shift_start_dt: null,
+          shift_end_dt: null,
+          earliest_allowed_dt: null,
+          now_dt: dayjs().toISOString(),
+          work_date: dayjs().format("YYYY-MM-DD"),
+        });
+      } finally {
+        setLoadingPunchInEligibility(false);
+      }
+    };
 
     const handlePunchIn = async () => {
       setLoadingPunchIn(true);
@@ -138,6 +172,7 @@ const attendanceChartData =
         message.success(res.data?.message || "Punch in successful.");
         setAttendance(res.data.attendance);
         fetchAttendanceStats();
+        fetchPunchInEligibility();
       } catch (err: any) {
         console.error(err);
         const msg =
@@ -145,6 +180,7 @@ const attendanceChartData =
           err?.response?.data?.message ||
           "Punch in failed.";
         message.error(msg);
+        fetchPunchInEligibility();
       } finally {
         setLoadingPunchIn(false);
       }
@@ -257,13 +293,22 @@ const attendanceChartData =
     useEffect(() => {
     fetchAttendanceStats();
   }, [selectedMonth]);
+
     useEffect(() => {
       fetchTodayAttendance();
+      fetchPunchInEligibility();
       fetchAttendanceStats();
       loadCalendarEvents();
     }, []);
 
+    useEffect(() => {
+      // Refresh eligibility every 20 seconds (server-based)
+      const interval = setInterval(() => {
+        fetchPunchInEligibility();
+      }, 20000);
 
+      return () => clearInterval(interval);
+    }, []);
     useEffect(() => {
       const interval = setInterval(() => {
         setNowTick((x) => x + 1);
@@ -277,21 +322,25 @@ const attendanceChartData =
 
       const name = localStorage.getItem("user_name") || "User";
 
-      const getStatusLabel = (att: TodayAttendanceResponse["attendance"]) => {
-        if (!att || !att.time_in) return "STATUS : Not Clocked In";
-        if (att.time_in && !att.time_out) return `STATUS : Clocked In (${att.time_in})`;
-        return `STATUS : Clocked Out (${att.time_out})`;
-      };
+      
+  
     
-    const { key: statusKey, label: statusLabel } = getAttendanceStatusLabel(
-      attendance,
-      formatBackendTime
-    );
-    
+  
+
+  const { key: statusKey, label: statusLabel } = getAttendanceStatusLabel(
+    attendance,
+    formatBackendTime
+  );
     const monthOptions = Array.from({ length: 12 }, (_, i) => ({
     value: i + 1,
     label: dayjs().month(i).format("MMMM"),
   }));
+  const punchInDisabled =
+    loadingStatus ||
+    loadingPunchInEligibility ||
+    loadingPunchIn ||
+    !!attendance?.time_in ||
+    !(punchInEligibility?.can_punch_in ?? false);
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -332,17 +381,16 @@ const attendanceChartData =
               </div>
 
               <div className={styles.buttonRow}>
-                <Button
+               <Button
                   icon={<LoginOutlined />}
                   className={styles.punchInBtn}
                   size="large"
                   onClick={handlePunchIn}
                   loading={loadingPunchIn}
-                  disabled={loadingStatus || !!attendance?.time_in}
+                  disabled={punchInDisabled}
                 >
                   Punch in
                 </Button>
-
                 <Button
                   icon={<LogoutOutlined />}
                   className={styles.punchOutBtn}
@@ -354,6 +402,11 @@ const attendanceChartData =
                   Punch out
                 </Button>
               </div>
+              {punchInEligibility && !punchInEligibility.can_punch_in ? (
+                  <div className={styles.punchInHint}>
+                    {punchInEligibility.reason}
+                  </div>
+                ) : null}
             </Card>
           </Col>
 

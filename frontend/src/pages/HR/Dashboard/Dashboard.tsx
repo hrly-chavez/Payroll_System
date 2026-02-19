@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
-import { Layout, Row, Col, Card, Statistic, Table, DatePicker, Calendar, List, Button, message } from "antd";
+import { Layout, Row, Col, Card, Statistic, Table, DatePicker, Calendar, List, Button, message,Alert } from "antd";
 import { LoginOutlined, LogoutOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import styles from "./adminDashboard.module.css";
@@ -35,6 +35,15 @@ type TodayAttendanceResponse = {
     employee: number;
     created_at: string;
   };
+};
+type PunchInEligibilityResponse = {
+  can_punch_in: boolean;
+  reason: string;
+  shift_start_dt: string | null;
+  shift_end_dt: string | null;
+  earliest_allowed_dt: string | null;
+  now_dt: string;
+  work_date: string;
 };
 
 type AttendanceLogRow = {
@@ -100,20 +109,17 @@ const Dashboard: React.FC = () => {
   const today = dayjs().format("MMMM D, YYYY");
 
 /* =========================================================
-     🟢 COMPANY NOTE MODAL STATE (for Add Note button)
+      COMPANY NOTE MODAL STATE (for Add Note button)
      ========================================================= */
   const [noteContent, setNoteContent] = useState("");
 
   /* =========================================================
-     🟢 CALENDAR EVENTS STATE (holidays + payroll periods)
+     CALENDAR EVENTS STATE (holidays + payroll periods)
      ========================================================= */
   
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
-
-    /* =========================================================
-     🟢 DAILY SUMMARY STATE (FOR THE DATE PIE CHART)
-     👉 This fixes your setDailySummary error
-     ========================================================= */
+  const [punchInEligibility, setPunchInEligibility] = useState<PunchInEligibilityResponse | null>(null);
+    const [loadingPunchInEligibility, setLoadingPunchInEligibility] = useState(false);
 
   const [dailySummary, setDailySummary] = useState({
     present: 0,
@@ -151,7 +157,7 @@ const Dashboard: React.FC = () => {
   const [loadingMyStats, setLoadingMyStats] = useState(false);
 
   /* =========================================================
-     🟢 TODAY EMPLOYEE TABLE STATES
+      TODAY EMPLOYEE TABLE STATES
      ========================================================= */
 
   const [todayRows, setTodayRows] = useState<TodayRow[]>([]);
@@ -159,8 +165,8 @@ const Dashboard: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(dayjs()); 
 
   /* =========================================================
-     🟢 FETCH TODAY EMPLOYEE ATTENDANCE
-     👉 ALSO UPDATES THE DAILY PIE CHART
+      FETCH TODAY EMPLOYEE ATTENDANCE
+      ALSO UPDATES THE DAILY PIE CHART
      ========================================================= */
 
   const fetchTodayEmployeesAttendance = async (d?: dayjs.Dayjs) => {
@@ -170,6 +176,7 @@ const Dashboard: React.FC = () => {
       const params = { year: target.year(), month: target.month() + 1 };
 
       const res = await api.get<AdminLogsResponse>("/attendance/admin/logs/", { params });
+      
 
       const targetStr = target.format("YYYY-MM-DD");
 
@@ -187,8 +194,8 @@ const Dashboard: React.FC = () => {
           return {
             key: r.id,
             name: r.full_name,
-            in: r.time_in ? dayjs(`2000-01-01 ${r.time_in}`).format("h:mm A") : "-",
-            out: r.time_out ? dayjs(`2000-01-01 ${r.time_out}`).format("h:mm A") : "-",
+            in: r.time_in ? formatBackendTime(r.time_in) : "-",
+            out: r.time_out ? formatBackendTime(r.time_out) : "-",
             status: isLate ? "Late" : "Present",
           };
         });
@@ -196,7 +203,7 @@ const Dashboard: React.FC = () => {
       setTodayRows(filtered);
 
 /* =========================================================
-         🟢 DAILY SUMMARY CALCULATION (FOR DATE PIE)
+          DAILY SUMMARY CALCULATION (FOR DATE PIE)
          ========================================================= */
 
       const totalEmployees = res.data.results.length;
@@ -215,7 +222,7 @@ const Dashboard: React.FC = () => {
   };
 
 /* =========================================================
-     🟢 PIE CONFIG FOR DATE CARD
+      PIE CONFIG FOR DATE CARD
      ========================================================= */
 
   const dailyPieConfig = {
@@ -264,22 +271,6 @@ const Dashboard: React.FC = () => {
   },
   };
 
-/* =========================================================
-   FETCH BASE TIME (PH & US CLOCK)
-   - Calls WorldTimeAPI
-   - Updates time every second via interval
-   - Used for real-time clock display
-   ========================================================= */
-
-  
-
-/* =========================================================
-   LOAD CALENDAR EVENTS (HOLIDAYS + PAYROLL PERIODS)
-   - Fetches holidays from backend
-   - Fetches payroll periods
-   - Converts them into calendar event format
-   - Applies legend color mapping
-   ========================================================= */
 
   const loadCalendarEvents = async () => {
   try {
@@ -382,7 +373,27 @@ const Dashboard: React.FC = () => {
       setLoadingStatus(false);
     }
   };
-
+  const fetchPunchInEligibility = async () => {
+    setLoadingPunchInEligibility(true);
+    try {
+      const res = await api.get<PunchInEligibilityResponse>("/attendance/punch-in-eligibility/");
+      setPunchInEligibility(res.data);
+    } catch (err: any) {
+      console.error(err);
+      // Don't spam errors; just set safe default state
+      setPunchInEligibility({
+        can_punch_in: false,
+        reason: "Unable to check punch-in eligibility.",
+        shift_start_dt: null,
+        shift_end_dt: null,
+        earliest_allowed_dt: null,
+        now_dt: dayjs().toISOString(),
+        work_date: dayjs().format("YYYY-MM-DD"),
+      });
+    } finally {
+      setLoadingPunchInEligibility(false);
+    }
+  };
 /* =========================================================
    INITIAL DASHBOARD LOAD
    - Runs only once on component mount
@@ -391,11 +402,18 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     fetchTodayAttendance();
+    fetchPunchInEligibility();
     loadCalendarEvents();
     fetchMyDashboardStats();
     fetchTodayEmployeesAttendance(selectedDate);
   }, []);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchPunchInEligibility();
+    }, 20000);
 
+    return () => clearInterval(interval);
+  }, []);
 
 /* =========================================================
    DEBUG CALENDAR EVENTS
@@ -435,7 +453,7 @@ const Dashboard: React.FC = () => {
       setAttendance(res.data.attendance);
       fetchMyDashboardStats();
       fetchTodayEmployeesAttendance(selectedDate);
-
+      fetchPunchInEligibility();
     } catch (err: any) {
       console.error(err);
       const msg =
@@ -443,11 +461,11 @@ const Dashboard: React.FC = () => {
         err?.response?.data?.message ||
         "Punch in failed.";
       message.error(msg);
+      fetchPunchInEligibility();
     } finally {
       setLoadingPunchIn(false);
     }
   };
-
 /* =========================================================
    HANDLE PUNCH OUT
    - Calls backend punch-out API
@@ -493,7 +511,12 @@ const Dashboard: React.FC = () => {
     formatBackendTime
   );
       
-
+  const punchInDisabled =
+    loadingStatus ||
+    loadingPunchInEligibility ||
+    loadingPunchIn ||
+    !!attendance?.time_in ||
+    !(punchInEligibility?.can_punch_in ?? false);
   return (
     <Layout style={{ minHeight: "100vh" }}>
       <Sidebar />
@@ -564,37 +587,45 @@ const Dashboard: React.FC = () => {
           <Card
             title="Attendance"
             className={`${styles.compactCard} ${styles.attendanceCard}`}
-          >            
+          >
+            <div className={styles.attendanceCenter}>
               <div className={styles.timeRow}>
-              <div className={styles.timeBox}>
-                <span>PH Time</span>
-                  <h2>{formatTime(new Date(), "Asia/Manila")}</h2>              </div>
-              <div className={styles.timeBox}>
-                <span>USA Time</span>
-                <h2>{formatTime(new Date(), "America/New_York")}</h2>
+                <div className={styles.timeBox}>
+                  <span>PH Time</span>
+                  <h2>{formatTime(new Date(), "Asia/Manila")}</h2>
+                </div>
+                <div className={styles.timeBox}>
+                  <span>USA Time</span>
+                  <h2>{formatTime(new Date(), "America/New_York")}</h2>
+                </div>
               </div>
-            </div>
 
-            <div className={styles.buttonRow}>
-              <Button
-                icon={<LoginOutlined />}
-                className={styles.punchInBtn}
-                onClick={handlePunchIn}
-                loading={loadingPunchIn}
-                disabled={loadingStatus || !!attendance?.time_in}
-              >
-                Punch in
-              </Button>
+              <div className={styles.buttonRow}>
+                <Button
+                  icon={<LoginOutlined />}
+                  className={styles.punchInBtn}
+                  onClick={handlePunchIn}
+                  loading={loadingPunchIn}
+                  disabled={punchInDisabled}
+                >
+                  Punch in
+                </Button>
+                <Button
+                  icon={<LogoutOutlined />}
+                  className={styles.punchOutBtn}
+                  onClick={handlePunchOut}
+                  loading={loadingPunchOut}
+                  disabled={loadingStatus || !attendance?.time_in || !!attendance?.time_out}
+                >
+                  Punch out
+                </Button>
+              </div>
 
-              <Button
-                icon={<LogoutOutlined />}
-                className={styles.punchOutBtn}
-                onClick={handlePunchOut}
-                loading={loadingPunchOut}
-                disabled={loadingStatus || !attendance?.time_in || !!attendance?.time_out}
-              >
-                Punch out
-              </Button>
+              {punchInEligibility && !punchInEligibility.can_punch_in ? (
+                <div className={styles.punchInHint}>
+                  {punchInEligibility.reason}
+                </div>
+              ) : null}
             </div>
           </Card>
         </Col>

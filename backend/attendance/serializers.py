@@ -15,6 +15,19 @@ class PunchInSerializer(serializers.Serializer):
     def validate(self, attrs):
         return attrs
 
+class PunchInEligibilitySerializer(serializers.Serializer):
+    can_punch_in = serializers.BooleanField()
+    reason = serializers.CharField()
+
+    # ISO datetime strings; can be null if shift missing
+    shift_start_dt = serializers.CharField(allow_null=True)
+    shift_end_dt = serializers.CharField(allow_null=True)
+    earliest_allowed_dt = serializers.CharField(allow_null=True)
+    now_dt = serializers.CharField()
+
+    # ISO date string (YYYY-MM-DD)
+    work_date = serializers.CharField()
+
 class PunchOutSerializer(serializers.Serializer):
     """
     No input fields needed.
@@ -108,7 +121,7 @@ class ShiftSerializer(serializers.ModelSerializer):
             "grace_minutes",
             "is_overnight",
             "is_active",
-            "workdays",   # ✅ added
+            "workdays",   #  added
         ]
 
     def create(self, validated_data):
@@ -117,10 +130,10 @@ class ShiftSerializer(serializers.ModelSerializer):
 
         workdays_data = validated_data.pop("workdays", [])
 
-        # ✅ DO NOT use objects.create()
+        #  DO NOT use objects.create()
         shift = Shift(**validated_data)
 
-        # ✅ Attach user BEFORE save
+        #  Attach user BEFORE save
         if user:
             shift._current_user = user
 
@@ -148,7 +161,7 @@ class ShiftSerializer(serializers.ModelSerializer):
         for attr, val in validated_data.items():
             setattr(instance, attr, val)
 
-        # ✅ Attach user BEFORE save
+        #  Attach user BEFORE save
         if user:
             instance._current_user = user
 

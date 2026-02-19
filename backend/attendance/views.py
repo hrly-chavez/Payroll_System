@@ -9,7 +9,7 @@ from rest_framework.exceptions import ValidationError
 from accounts.permissions import IsRole
 from shared_model.models import Attendance, Shift
 from .serializers import *
-from .services import (punch_in,punch_out,get_today_status,_get_employee_or_400,_month_date_range,)
+from .services import (punch_in,punch_out,get_today_status,_get_employee_or_400,_month_date_range,punch_in_eligibility)
 
 
 class PunchInView(APIView):
@@ -24,6 +24,13 @@ class PunchInView(APIView):
             "message": "Punch in successful.",
             "attendance": AttendanceSerializer(attendance).data,
         })
+
+class PunchInEligibilityView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        result = punch_in_eligibility(request.user)
+        return Response(PunchInEligibilitySerializer(result).data)
 
 class PunchOutView(APIView):
     permission_classes = [IsAuthenticated]

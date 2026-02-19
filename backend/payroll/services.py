@@ -90,25 +90,27 @@ class PayrollGenerationService:
 
     def _is_late_beyond_grace(self, att: Attendance, shift: Shift) -> bool:
         """
-        Late if time_in > shift.start_time + grace_minutes.
-        Correctly handles true overnight shifts where Attendance.date is the shift start date.
+        Late if time_in_dt > (shift_start_dt + grace_minutes).
+        Attendance.time_in is a DateTimeField (timezone-aware).
         """
         if att.time_in is None:
             return False
 
         grace = int(getattr(shift, "grace_minutes", 0) or 0)
 
-        shift_start_dt = datetime.combine(att.date, shift.start_time)
-        grace_deadline = shift_start_dt + timedelta(minutes=grace)
+        # Build shift start datetime (local)
+        shift_start_dt = timezone.make_aware(
+            datetime.combine(att.date, shift.start_time),
+            timezone.get_current_timezone(),
+        )
+        deadline = shift_start_dt + timedelta(minutes=grace)
 
-        time_in_dt = datetime.combine(att.date, att.time_in)
+        time_in_dt = att.time_in
+        if timezone.is_naive(time_in_dt):
+            time_in_dt = timezone.make_aware(time_in_dt, timezone.get_current_timezone())
 
-        # True overnight case (22:00 -> 06:00): after-midnight punch-in belongs to next day
-        if getattr(shift, "crosses_midnight", False) and att.time_in < shift.start_time:
-            time_in_dt = time_in_dt + timedelta(days=1)
-
-        return time_in_dt > grace_deadline
-
+        return time_in_dt > deadline
+        
     # -------------------------
     # 1) Public Entry Points
     # -------------------------
@@ -1183,20 +1185,64 @@ class PayrollGenerationService:
     # helpers: attendance interval & worked minutes
     # -------------------------
     def _attendance_interval(self, att: Attendance):
-        start_dt = datetime.combine(att.date, att.time_in)
-        end_dt = datetime.combine(att.date, att.time_out)
+        """
+        Attendance.time_in/time_out are DateTimeFields.
+        Return timezone-aware datetimes (start_dt, end_dt).
+        """
+        if att.time_in is None or att.time_out is None:
+            return None, None
 
-        # If end < start, assume it crossed to next day
-        if end_dt <= start_dt:
-            end_dt = end_dt + timedelta(days=1)
+        start_dt = att.time_in
+        end_dt = att.time_out
+
+        tz = timezone.get_current_timezone()
+        if timezone.is_naive(start_dt):
+            start_dt = timezone.make_aware(start_dt, tz)
+        if timezone.is_naive(end_dt):
+            end_dt = timezone.make_aware(end_dt, tz)
+
+        # Safety: if time_out is somehow earlier (bad device time), clamp it to start_dt
+        if end_dt < start_dt:
+            end_dt = start_dt
 
         return start_dt, end_dt
 
     def _attendance_work_minutes(self, att: Attendance, shift: Shift) -> int:
-        if att.time_in is None or att.time_out is None:
-            return 0
+        """
+        Basic work minutes should be counted ONLY within the shift window:
+        - If employee punches in early (up to 60 mins), basic minutes start at shift start.
+        - If employee punches out late, basic minutes stop at shift end.
+        Overtime is handled separately later (Approval flow).
+        """
         start_dt, end_dt = self._attendance_interval(att)
-        minutes = int((end_dt - start_dt).total_seconds() // 60)
+        if not start_dt or not end_dt:
+            return 0
+
+        tz = timezone.get_current_timezone()
+
+        shift_start_dt = timezone.make_aware(
+            datetime.combine(att.date, shift.start_time),
+            tz,
+        )
+        shift_end_dt = timezone.make_aware(
+            datetime.combine(att.date, shift.end_time),
+            tz,
+        )
+
+        # Overnight shift end is next day
+        if getattr(shift, "crosses_midnight", False):
+            shift_end_dt = shift_end_dt + timedelta(days=1)
+
+        # Clamp actual interval to shift window
+        effective_start = max(start_dt, shift_start_dt)
+        effective_end = min(end_dt, shift_end_dt)
+
+        if effective_end <= effective_start:
+            return 0
+
+        minutes = int((effective_end - effective_start).total_seconds() // 60)
+
+        # Break minutes deducted once per day/shift (simple and consistent)
         minutes = max(0, minutes - int(shift.break_minutes or 0))
         return minutes
 

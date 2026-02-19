@@ -3,6 +3,7 @@ from .views import *
 
 urlpatterns = [
     path("punch-in/", PunchInView.as_view(), name="attendance-punch-in"),
+    path("punch-in-eligibility/", PunchInEligibilityView.as_view(), name="attendance-punch-in-eligibility"),
     path("punch-out/", PunchOutView.as_view(), name="attendance-punch-out"),
     path("today/", TodayAttendanceView.as_view(), name="attendance-today"),
     path("logs/", AttendanceLogsView.as_view(), name="attendance-logs"),

@@ -495,7 +495,7 @@ class PayRuleChoicesView(APIView):
 
 
 #======================================PAYROLL GENERATION========================================
-
+#Ari nlaang butang notif para sa CEO kay after ma generate need na dayon approval
 class GeneratePayrollForPeriodView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -702,7 +702,7 @@ class PayrollApproveEmployeeView(APIView):
         _recompute_period_status(period)
 
         return Response({"detail": "Payroll approved."}, status=http_status.HTTP_200_OK)
-
+#Ari nalang sad butang ang notif kung sa payroll period kay naay gi declined na employee para mo notif ditso sa HR
 class PayrollDeclineEmployeeView(APIView):
     permission_classes = [IsAuthenticated]
 

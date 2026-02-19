@@ -24,6 +24,28 @@ export default function LeaveTab({ active }: Props) {
 
   const [leaveForm] = Form.useForm();
 
+  const getApiErrorMessage = (err: any, fallback: string) => {
+    const data = err?.response?.data;
+
+    if (!data) return fallback;
+
+    // DRF common styles
+    if (typeof data === "string") return data;
+    if (data.detail) return data.detail;
+    if (data.message) return data.message;
+
+    // Field errors: { field: ["msg"] }
+    if (typeof data === "object") {
+      const firstKey = Object.keys(data)[0];
+      const val = (data as any)[firstKey];
+      if (Array.isArray(val) && val.length) return `${firstKey}: ${val[0]}`;
+      if (typeof val === "string") return `${firstKey}: ${val}`;
+    }
+
+    return fallback;
+  };
+
+
   const fetchLeaveTypes = async () => {
     setLoading(true);
     try {
@@ -72,10 +94,9 @@ export default function LeaveTab({ active }: Props) {
 
       const payload = {
         name: values.name,
-        is_paid: values.is_paid,
-        pay_rate: parseFloat(values.pay_rate),
-        requires_approval: values.requires_approval,
-        is_active: values.is_active,
+        is_paid: values.is_paid ?? false,
+        requires_approval: values.requires_approval ?? true,
+        is_active: values.is_active ?? true,
       };
 
       if (leaveEditMode && editingLeaveId) {
@@ -88,9 +109,9 @@ export default function LeaveTab({ active }: Props) {
 
       closeLeaveModal();
       fetchLeaveTypes();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      message.error("Failed to save leave type.");
+      message.error(getApiErrorMessage(error, "Failed to save leave type."));
     }
   };
 
@@ -110,7 +131,7 @@ export default function LeaveTab({ active }: Props) {
             <tr>
               <th>Name</th>
               <th>Paid?</th>
-              <th>Pay Rate</th>
+              
               <th>Requires Approval</th>
               <th>Active</th>
               <th>Actions</th>
@@ -121,7 +142,7 @@ export default function LeaveTab({ active }: Props) {
               <tr key={leave.id}>
                 <td>{leave.name}</td>
                 <td>{leave.is_paid ? "Yes" : "No"}</td>
-                <td>{leave.pay_rate}</td>
+                
                 <td>{leave.requires_approval ? "Yes" : "No"}</td>
                 <td>{leave.is_active ? "Yes" : "No"}</td>
                 <td className="actions">

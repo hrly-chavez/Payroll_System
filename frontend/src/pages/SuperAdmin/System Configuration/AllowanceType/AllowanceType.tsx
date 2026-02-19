@@ -137,7 +137,7 @@ const Allowance = ({ active }: Props) => {
 
   if (!active) return null;
 
-  return (
+  return (  
     <>
       {/* Search + Add */}
       <div

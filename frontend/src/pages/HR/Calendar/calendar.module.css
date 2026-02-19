@@ -322,3 +322,17 @@
   display: flex;
   gap: 8px;
 }
+
+.submitBtn {
+  background-color: #386FA4 !important;
+  border-color: #386FA4 !important;
+  color: #ffffff !important;
+  height: 40px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.submitBtn:hover {
+  background-color: #2f5f8d !important;
+  border-color: #2f5f8d !important;
+}

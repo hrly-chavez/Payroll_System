@@ -88,3 +88,50 @@
   font-weight: 600;
   font-size: 16px;
 }
+
+/* ================= PILLED TABS ================= */
+
+.pillTabs :global(.ant-tabs-nav) {
+  margin-bottom: 20px;
+}
+
+.pillTabs :global(.ant-tabs-nav-list) {
+  background: #f0f2f5;
+  padding: 4px;
+  border-radius: 30px;
+}
+
+.pillTabs :global(.ant-tabs-tab) {
+  border-radius: 25px !important;
+  padding: 6px 18px !important;
+  margin: 0 !important;
+  transition: all 0.2s ease;
+}
+
+.pillTabs :global(.ant-tabs-tab-btn) {
+  font-weight: 500;
+}
+
+.pillTabs :global(.ant-tabs-tab-active) {
+  background: #386fa4 !important;
+}
+
+.pillTabs :global(.ant-tabs-tab-active .ant-tabs-tab-btn) {
+  color: #ffffff !important;
+}
+
+.pillTabs :global(.ant-tabs-ink-bar) {
+  display: none;
+}
+
+.calHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.calLeftTitle {
+  font-size: 16px;
+  font-weight: 600;
+}

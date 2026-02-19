@@ -162,8 +162,8 @@ const Reports: React.FC = () => {
           <div className="reports-card">
             <Tabs activeKey={activeTab} onChange={setActiveTab}>
               <TabPane tab="User Activity Logs" key="1" />
-              <TabPane tab="Attendance Modifications Logs" key="2" />
-              <TabPane tab="Payroll Adjustment Logs" key="3" />
+              <TabPane tab="Attendance Correction Logs" key="2" />
+              <TabPane tab="Payroll Release Logs" key="3" />
               <TabPane tab="Payroll Approval and Release Logs" key="4" />
             </Tabs>
 

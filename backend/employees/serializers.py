@@ -51,6 +51,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
         instance._current_user = current_user
         instance.save()
         return instance
+        
 
 
 #User model (user account)

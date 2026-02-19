@@ -2,7 +2,7 @@ from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
 from django.forms.models import model_to_dict
 from django.core.serializers.json import DjangoJSONEncoder
-from .models import AuditLog
+from .models import AuditLog, Notification
 from accounts.current_user import get_current_user
 import json
 
@@ -35,6 +35,9 @@ def get_instance_user(instance):
         print(f"[DEBUG] No _current_user on {instance}")
     if user and user.is_authenticated:
         return user
+    
+    if hasattr(instance, "user") and instance.user:
+        return instance.user
     return None
 
 
@@ -55,6 +58,13 @@ def create_audit_log(instance, action, old_data=None, new_data=None):
 def log_save(sender, instance, created, **kwargs):
     """Log CREATE or UPDATE actions."""
     if sender == AuditLog:
+        return
+    
+    if sender in [AuditLog, Notification]:
+        return
+
+    # Skip if manually set
+    if getattr(instance, "_skip_audit_log", False):
         return
 
     old_data = _old_values.get((sender, instance.pk), {}) if not created else {}

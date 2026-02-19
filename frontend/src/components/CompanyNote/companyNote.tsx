@@ -61,9 +61,16 @@ export default function CompanyNote({ role }: Props) {
    return (
     <>
       <Card
-        title="Announcements"
-        extra={
-          role === "ADMIN" || role === "SUPER_ADMIN" ? (
+      title="Announcements"
+      extra={
+        (() => {
+          const normalizedRole = (role || "").toUpperCase().replace(" ", "_");
+
+          const canAdd =
+            normalizedRole === "ADMIN" ||
+            normalizedRole === "SUPER_ADMIN";
+
+          return canAdd ? (
             <Button
               size="small"
               className={styles.addButton}
@@ -71,11 +78,12 @@ export default function CompanyNote({ role }: Props) {
             >
               +
             </Button>
-          ) : null
-        }
-        className={styles.noteCard}
-      >
-        {latestNote ? (
+          ) : null;
+        })()
+      }
+      className={styles.noteCard}
+    >
+      {latestNote ? (
         <>
           <div className={styles.content}>{latestNote.note}</div>
           <div className={styles.author}>
@@ -85,8 +93,8 @@ export default function CompanyNote({ role }: Props) {
       ) : (
         <div>No company notes yet.</div>
       )}
+    </Card>
 
-      </Card>
 
       <Modal
         title="Add Company Note"

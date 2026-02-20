@@ -25,27 +25,45 @@ def _overlaps_period(eff_from, eff_to, period_start, period_end):
 
 #==========================================DEDUCTIONS========================================
 # List and Create
+#done logs
 class DeductionListCreateView(generics.ListCreateAPIView):
     queryset = Deduction_Type.objects.all().order_by('-create_at')
     serializer_class = DeductionTypeSerializer
+    permission_classes = [IsAuthenticated]
 
 # Retrieve, Update, Delete
+#done logs
 class DeductionDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Deduction_Type.objects.all()
     serializer_class = DeductionTypeSerializer
 
 # Optional: Update only 'is_active' status
+#done logs
 class DeductionUpdateStatusView(APIView):
     def patch(self, request, pk):
         try:
             deduction = Deduction_Type.objects.get(pk=pk)
         except Deduction_Type.DoesNotExist:
-            return Response({"error": "Deduction not found"}, status=status.HTTP_404_NOT_FOUND)
-        
+            return Response(
+                {"error": "Deduction not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
         # Update only is_active
-        deduction.is_active = request.data.get('is_active', deduction.is_active)
+        deduction.is_active = request.data.get(
+            "is_active",
+            deduction.is_active
+        )
+
+        # Attach user BEFORE save
+        deduction._current_user = request.user
+
         deduction.save()
-        serializer = DeductionTypeSerializer(deduction)
+
+        serializer = DeductionTypeSerializer(
+            deduction,
+            context={"request": request}  # good practice
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -432,6 +450,7 @@ class PayrollPeriodEmployeeCommissionListCreateView(APIView):
 
 
 #==========================================PAYRULE========================================
+#done logs
 class SuperAdminPayRuleListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = PayRuleSerializer
@@ -450,6 +469,7 @@ class SuperAdminPayRuleListCreateView(generics.ListCreateAPIView):
 
         serializer.save()
 
+#done logs
 class SuperAdminPayRuleRetrieveUpdateView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = PayRuleSerializer

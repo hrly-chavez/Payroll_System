@@ -4,6 +4,7 @@ import { ArrowLeftOutlined, LogoutOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import "./Topbar.css";
 import NotificationBell from "../Notification/NotificationBell";
+import api from "../../api/axios";
 
 const { Header } = Layout;
 const { Text } = Typography;
@@ -31,21 +32,11 @@ const Topbar: React.FC<TopbarProps> = ({
 
   const fetchNotifCount = async () => {
     try {
-      const res = await fetch(
-        "http://127.0.0.1:8000/api/notifications/unread-count/",
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-          },
-        }
-      );
-
-      if (!res.ok) return;
-
-      const data = await res.json();
-      setNotifCount(data.count ?? 0);
-    } catch {
-      console.log("Failed to load notification count");
+      const res = await api.get("/notifications/unread-count/");
+      setNotifCount(res.data.count || 0); // assuming your API returns { count: number }
+    } catch (error) {
+      console.error("Error fetching unread notifications:", error);
+      setNotifCount(0); // fallback
     }
   };
 
@@ -80,8 +71,9 @@ const Topbar: React.FC<TopbarProps> = ({
       </div>
 
       <div className="topbar-right">
-        <NotificationBell count={notifCount} />
-
+        <div>
+          <NotificationBell count={notifCount} />
+        </div>
         <Dropdown menu={{ items }} placement="bottomRight" trigger={["click"]}>
           <Avatar className="topbar-avatar" style={{ cursor: "pointer" }}>
             U

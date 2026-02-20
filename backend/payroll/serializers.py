@@ -96,6 +96,33 @@ class DeductionTypeSerializer(serializers.ModelSerializer):
             })
 
         return data
+    
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
+        # DO NOT use objects.create()
+        instance = Deduction_Type(**validated_data)
+
+        # Attach BEFORE save
+        if user:
+            instance._current_user = user
+
+        instance.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        if user:
+            instance._current_user = user
+
+        instance.save()
+        return instance
 
 #==================================PAYROLL PERIOD=================================
 # Used to create and return payroll period data (date range, code, status)
@@ -338,6 +365,34 @@ class PayRuleSerializer(serializers.ModelSerializer):
                 )
 
         return attrs
+    
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
+        # DO NOT use objects.create()
+        instance = Pay_Rule(**validated_data)
+
+        # Attach BEFORE save
+        if user:
+            instance._current_user = user
+
+        instance.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        # Attach BEFORE save
+        if user:
+            instance._current_user = user
+
+        instance.save()
+        return instance
 
     def get_employee_name(self, obj):
         if obj.employee:

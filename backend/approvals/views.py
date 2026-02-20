@@ -134,20 +134,28 @@ class LeaveTypeListView(generics.ListAPIView):
     queryset = Leave_Type.objects.all().order_by('-created_at')
     serializer_class = LeaveTypeSerializer
 
-#undone logs
+#done logs
+# views.py
 class LeaveTypeCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Leave_Type.objects.all()
     serializer_class = LeaveTypeSerializer
 
-    def perform_create(self, serializer):
-        serializer.save(is_active=True)
-
-#undone logs
+#done logs
 class LeaveTypeUpdateView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Leave_Type.objects.all()
     serializer_class = LeaveTypeSerializer
+
+    def perform_update(self, serializer):
+        # Get the instance before update for signals
+        instance = serializer.instance
+
+        # Attach the current user so signals.py can pick it up
+        instance._current_user = self.request.user
+
+        # Perform the update (post_save will handle audit logs)
+        serializer.save()
 
 #undone logs
 #Leave Request
@@ -182,18 +190,35 @@ class LeaveRequestListCreateView(generics.ListCreateAPIView):
 
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(employee=employee)
+        leave_request = serializer.save(employee=employee)
+
+        # --- Manual AuditLog for "Pending Leave Request" ---
+        AuditLog.objects.create(
+            user=request.user,
+            action="Pending Leave Request",  # your custom action
+            model_name="Leave_Request",
+            object_id=str(leave_request.id),
+            old_data=None,
+            new_data={
+                "id": leave_request.id,
+                "employee": f"{employee.fname} {employee.lname}",
+                "date_from": leave_request.date_from.isoformat(),
+                "date_to": leave_request.date_to.isoformat(),
+                "reason": leave_request.reason,
+                "status": leave_request.status,
+                "requested_at": leave_request.requested_at.isoformat(),
+            },
+        )
 
         # Notify Admins
         admins = User.objects.filter(role="ADMIN")
-
         for admin in admins:
             Notification.objects.create(
                 user=admin,
                 title="New Leave Request",
                 description=f"{employee.fname} {employee.lname} submitted a leave request.",
                 category="leave",
-                redirect_url="/admin/requests"   # ✅ UPDATED HERE
+                redirect_url="/admin/requests"
             )
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -218,6 +243,7 @@ class AdminLeaveRequestListView(generics.ListAPIView):
 
         return queryset
 
+#done logs
 # -----------------------------
 # Admin action to approve or decline leave
 # -----------------------------
@@ -241,11 +267,33 @@ def admin_update_leave_status(request, pk):
     if new_status not in ["Approved", "Declined"]:
         return Response({"detail": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Update request status first (audit)
+    # Save previous status for audit logging
+    old_status = leave_request.status
+
+    # Update request status
     leave_request.status = new_status
     leave_request.approved_by = user
     leave_request.approved_at = timezone.now()
+    # Prevent signals from creating duplicate AuditLog
+    leave_request._skip_audit_log = True
     leave_request.save(update_fields=["status", "approved_by", "approved_at"])
+
+    # --- Manual AuditLog ---
+    action_label = (
+        "Approved Leave Request" if new_status == "Approved" else "Declined Leave Request"
+    )
+    AuditLog.objects.create(
+        user=user,
+        action=action_label,
+        model_name="Leave_Request",
+        object_id=str(leave_request.id),
+        old_data={"status": old_status},
+        new_data={
+            "status": leave_request.status,
+            "approved_by": f"{user.fname} {user.lname}" if hasattr(user, "fname") else str(user),
+            "approved_at": leave_request.approved_at.isoformat(),
+        },
+    )
 
     employee = leave_request.employee
     leave_type = leave_request.leave_type
@@ -263,7 +311,7 @@ def admin_update_leave_status(request, pk):
         d += timedelta(days=1)
 
     if new_status == "Approved":
-        # 1) Prevent overlap with other approved leaves (conflict with unique constraint employee+date)
+        # 1) Prevent overlap with other approved leaves
         conflict = (
             Leave_Day.objects
             .filter(employee=employee, date__in=dates)
@@ -280,9 +328,6 @@ def admin_update_leave_status(request, pk):
         is_half = bool(leave_request.is_half_day)
         units = Decimal("0.50") if is_half else Decimal("1.00")
 
-        # Your simple rule for now:
-        # - paid leave: pay_rate = 1.00 (means 100% of daily rate in payroll)
-        # - unpaid leave: pay_rate = 0.00
         is_paid = bool(leave_type.is_paid)
         pay_rate = Decimal("1.00") if is_paid else Decimal("0.00")
 
@@ -301,7 +346,7 @@ def admin_update_leave_status(request, pk):
         Leave_Day.objects.bulk_create(bulk)
 
     elif new_status == "Declined":
-        # If declined (or changed from approved to declined), remove its leave days
+        # Remove leave days if declined
         Leave_Day.objects.filter(leave_request=leave_request).delete()
 
     # Notify Employee about leave status update
@@ -310,11 +355,11 @@ def admin_update_leave_status(request, pk):
         title="Leave Request Updated",
         description=f"Your leave request was {new_status}.",
         category="leave",
-        redirect_url="/employee/leave-history"
+        redirect_url="/employee/attendance"
     )
 
     serializer = LeaveRequestSerializer(leave_request)
-    return Response(serializer.data, status=status.HTTP_200_OK) 
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
     
 class LeaveRequestUpdateView(generics.UpdateAPIView):
@@ -404,6 +449,7 @@ class CommissionTypeListView(generics.ListAPIView):
 # CREATE
 # /superadmin/commission-types/create/
 # ----------------------------
+#done logs
 class CommissionTypeCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated, IsRole]
     allowed_roles = ["SUPER_ADMIN"]
@@ -415,6 +461,7 @@ class CommissionTypeCreateView(generics.CreateAPIView):
 # UPDATE
 # /superadmin/commission-types/<id>/
 # ----------------------------
+#done logs
 class CommissionTypeUpdateView(generics.UpdateAPIView):
     permission_classes = [IsAuthenticated, IsRole]
     allowed_roles = ["SUPER_ADMIN"]
@@ -422,17 +469,34 @@ class CommissionTypeUpdateView(generics.UpdateAPIView):
     queryset = Commission_Type.objects.all()
     serializer_class = CommissionTypeSerializer
 
+#done logs
 class AllowanceTypeCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Allowance_Type.objects.all()
     serializer_class = AllowanceTypeSerializer
+
+    def perform_create(self, serializer):
+        # Attach _current_user BEFORE saving so signals can pick it up
+        instance = serializer.Meta.model(**serializer.validated_data)
+        instance._current_user = self.request.user
+
+        # Now save the instance (post_save signal will handle CREATE audit log)
+        instance.save()
 
 class AllowanceTypeListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Allowance_Type.objects.all()
     serializer_class = AllowanceTypeSerializer
 
+#done logs
 class AllowanceTypeUpdateView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Allowance_Type.objects.all()
     serializer_class = AllowanceTypeSerializer
+
+    def perform_update(self, serializer):
+        # Attach _current_user to the serializer's instance
+        serializer.instance._current_user = self.request.user
+
+        # Perform the update normally; signals will pick up _current_user
+        serializer.save()

@@ -27,18 +27,31 @@ class HolidaySerializer(serializers.ModelSerializer):
 
         return attrs
 
+# serializers.py
 class LeaveTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Leave_Type
         fields = [
-            'id',
-            'name',
-            'is_paid',
-            
-            'requires_approval',
-            'is_active',
-            'created_at',
+            "id",
+            "name",
+            "is_paid",
+            "requires_approval",
+            "is_active",
+            "created_at",
         ]
+
+    def create(self, validated_data):
+        # Create instance in memory without saving _current_user as a field
+        instance = Leave_Type(**validated_data)
+
+        # Attach the _current_user for signals
+        request = self.context.get("request")
+        if request and hasattr(request, "user"):
+            instance._current_user = request.user
+
+        # Save the instance (triggers post_save signal)
+        instance.save()
+        return instance
 
 class LeaveRequestSerializer(serializers.ModelSerializer):
     employee_name = serializers.SerializerMethodField()
@@ -86,6 +99,34 @@ class  CommissionTypeSerializer(serializers.ModelSerializer):
             "is_active",
             "created_at",
         ]
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
+        # DO NOT use objects.create()
+        instance = Commission_Type(**validated_data)
+
+        # Attach BEFORE save so signal sees it
+        if user:
+            instance._current_user = user
+
+        instance.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        # Attach BEFORE save
+        if user:
+            instance._current_user = user
+
+        instance.save()
+        return instance
 
 class AllowanceTypeSerializer(serializers.ModelSerializer):
     class Meta:

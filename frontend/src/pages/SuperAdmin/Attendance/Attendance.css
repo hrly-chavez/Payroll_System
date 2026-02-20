@@ -61,3 +61,46 @@
     gap: 12px;
   }
 }
+/* Modern Stat Cards */
+.statCard {
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border-left: 6px solid transparent;
+}
+
+/* Present */
+.presentCard {
+  border-left-color: #2e7d32;
+}
+
+.presentCard .ant-statistic-content {
+  color: #2e7d32;
+}
+
+/* Late */
+.lateCard {
+  border-left-color: #f57c00;
+}
+
+.lateCard .ant-statistic-content {
+  color: #f57c00;
+}
+
+/* Absent */
+.absentCard {
+  border-left-color: #c62828;
+}
+
+.absentCard .ant-statistic-content {
+  color: #c62828;
+}
+
+/* Pending */
+.pendingCard {
+  border-left-color: #1976d2;
+}
+
+.pendingCard .ant-statistic-content {
+  color: #1976d2;
+}

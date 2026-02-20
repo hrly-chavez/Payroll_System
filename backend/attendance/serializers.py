@@ -89,7 +89,14 @@ class CEOandHRAttendanceLogSerializer(serializers.ModelSerializer):
         types = list(obj.events.values_list("type", flat=True))
         return ", ".join(types) if types else ""
   
+class ShiftWorkdaySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Shift_Workday
+        fields = ["day_of_week", "is_workday"]
+
 class ShiftSerializer(serializers.ModelSerializer):
+    workdays = ShiftWorkdaySerializer(many=True, required=False)
+
     class Meta:
         model = Shift
         fields = [
@@ -101,4 +108,38 @@ class ShiftSerializer(serializers.ModelSerializer):
             "grace_minutes",
             "is_overnight",
             "is_active",
+            "workdays",   # ✅ added
         ]
+
+    def create(self, validated_data):
+        workdays_data = validated_data.pop("workdays", [])
+
+        shift = Shift.objects.create(**validated_data)
+
+        # If UI didn't send anything, default all days as workday (optional)
+        if not workdays_data:
+            workdays_data = [
+                {"day_of_week": i, "is_workday": True} for i in range(1, 8)
+            ]
+
+        Shift_Workday.objects.bulk_create([
+            Shift_Workday(shift=shift, **wd) for wd in workdays_data
+        ])
+        return shift
+
+    def update(self, instance, validated_data):
+        workdays_data = validated_data.pop("workdays", None)
+
+        # update shift fields
+        for attr, val in validated_data.items():
+            setattr(instance, attr, val)
+        instance.save()
+
+        # if provided, replace workdays
+        if workdays_data is not None:
+            instance.workdays.all().delete()
+            Shift_Workday.objects.bulk_create([
+                Shift_Workday(shift=instance, **wd) for wd in workdays_data
+            ])
+
+        return instance

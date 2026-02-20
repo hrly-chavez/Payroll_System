@@ -10,6 +10,9 @@ import "../SystemConfiguration.css";
 import AddContribution from "./AddContribution";
 import { editContribution } from "./EditContribution";
 
+// ✅ ADD THIS IMPORT
+import { showBackendError } from "./utils/drfErrors";
+
 type Props = {
   active: boolean;
 };
@@ -26,6 +29,24 @@ export default function ContributionTab({ active }: Props) {
   const [search, setSearch] = useState("");
 
   const [form] = Form.useForm();
+
+  // ✅ Map backend field names -> form field names
+  const fieldMap: Record<string, string> = {
+    code: "name",                // backend "code" -> form "name"
+    name: "name",
+    category: "category",
+    salary_range_from: "salaryFrom",
+    salary_range_to: "salaryTo",
+    amount: "amount",
+  };
+
+  // ✅ helper: "1,234.50" -> 1234.50
+  const toNumber = (v: any) => {
+    if (v === null || v === undefined) return null;
+    const s = String(v).trim().replace(/,/g, "");
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  };
 
   // ✅ ALWAYS newest first (latest added on top)
   const fetchContributions = async () => {
@@ -50,6 +71,8 @@ export default function ContributionTab({ active }: Props) {
     setEditingId(null);
     setAmountType("manual");
     form.resetFields();
+    // clear any previous server errors
+    form.setFields([{ name: "nonFieldError", errors: [] }]);
     setIsModalOpen(true);
   };
 
@@ -58,6 +81,8 @@ export default function ContributionTab({ active }: Props) {
     setIsEditMode(false);
     setEditingId(null);
     setAmountType("manual");
+    // clear any previous server errors
+    form.setFields([{ name: "nonFieldError", errors: [] }]);
     setIsModalOpen(false);
   };
 
@@ -106,17 +131,38 @@ export default function ContributionTab({ active }: Props) {
 
   const handleSaveContribution = async () => {
     try {
+      // clear server errors before validating/saving
+      form.setFields([{ name: "nonFieldError", errors: [] }]);
+
       const values = await form.validateFields();
 
       const existing = contributions.find((c) => c.id === editingId);
 
+      const salaryFromNum = toNumber(values.salaryFrom);
+      const salaryToNum = toNumber(values.salaryTo);
+      const amountNum = toNumber(values.amount);
+
+      // extra safety: if somehow invalid format passes
+      if (salaryFromNum === null) {
+        form.setFields([{ name: "salaryFrom", errors: ["Invalid number format."] }]);
+        return;
+      }
+      if (salaryToNum === null) {
+        form.setFields([{ name: "salaryTo", errors: ["Invalid number format."] }]);
+        return;
+      }
+      if (amountNum === null) {
+        form.setFields([{ name: "amount", errors: ["Invalid number format."] }]);
+        return;
+      }
+
       const payload = {
         code: values.name,
         category: values.category,
-        salary_range_from: parseFloat(values.salaryFrom),
-        salary_range_to: parseFloat(values.salaryTo),
+        salary_range_from: salaryFromNum,
+        salary_range_to: salaryToNum,
         calculation_type: values.amountType === "manual" ? "Fixed" : "Percent",
-        amount: parseFloat(values.amount),
+        amount: amountNum,
 
         // 🔥 PRESERVE active state during edit
         is_active: isEditMode ? existing?.is_active : true,
@@ -140,11 +186,17 @@ export default function ContributionTab({ active }: Props) {
         closeContributionModal();
       }
     } catch (error: any) {
-      if (error.response?.data?.detail) {
-        message.error(error.response.data.detail);
-      } else {
-        message.error("Failed to save contribution.");
-      }
+      // ✅ AntD validation error: already shown on the form fields
+      if (error?.errorFields) return;
+
+      // ✅ Show backend real reason + highlight fields
+      const res = showBackendError(error, form, fieldMap);
+
+      // optional: if backend gave non_field_errors, store it too
+      // (ONLY if your showBackendError sets nonFieldError; if not, toast is enough)
+      // form.setFields([{ name: "nonFieldError", errors: [res.toast] }]);
+
+      message.error(res.toast);
     }
   };
 
@@ -250,7 +302,6 @@ export default function ContributionTab({ active }: Props) {
               </tr>
             ))}
 
-            {/* Optional: show empty state row */}
             {filteredContributions.length === 0 && (
               <tr>
                 <td colSpan={7} style={{ textAlign: "center", padding: 16 }}>

@@ -19,6 +19,7 @@ const AddEmployeeFlow: React.FC<Props> = ({
 }) => {
   const [step, setStep] = useState(1);
   const [employeeId, setEmployeeId] = useState<number | null>(null);
+  const [selectedRole, setSelectedRole] = useState<string | null>(null);
 
   const currentUserRole = localStorage.getItem("role");
 
@@ -38,6 +39,7 @@ const AddEmployeeFlow: React.FC<Props> = ({
     if (open) {
       setStep(1);
       setEmployeeId(null);
+      setSelectedRole(null);
       setCredentials({ username: "", password: "" });
     }
   }, [open]);
@@ -50,9 +52,10 @@ const AddEmployeeFlow: React.FC<Props> = ({
           open={open}
           departmentId={departmentId}
           allowedRoles={allowedRoles}
-          onNext={(id, creds) => {
+          onNext={(id, creds, role) => {
             setEmployeeId(id);
             setCredentials(creds);
+            setSelectedRole(role); 
             setStep(2);
           }}
           onClose={onClose}
@@ -64,8 +67,25 @@ const AddEmployeeFlow: React.FC<Props> = ({
         <EmployeeCredentialsModal
           open
           credentials={credentials}
-          onNext={() => setStep(3)}
-          onClose={onClose}
+          onNext={() => {
+            if (selectedRole === "SUPER_ADMIN") {
+              // ✅ Reset everything first
+              setStep(1);
+              setEmployeeId(null);
+              setSelectedRole(null);
+              setCredentials({ username: "", password: "" });
+
+              onClose(); // then close modal
+              return;
+            }
+
+            setStep(3);
+          }}
+          onClose={() => {
+            // also handle manual cancel
+            setStep(1);
+            onClose();
+          }}
         />
       )}
 

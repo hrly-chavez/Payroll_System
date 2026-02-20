@@ -57,6 +57,7 @@ interface EmployeeData {
   email: string;
   contact_no: string;
   address: AddressData;
+  role: "EMPLOYEE" | "ADMIN" | "SUPER_ADMIN";
 }
 
 interface DeductionRow {
@@ -101,6 +102,8 @@ const EmployeeDetailsPage: React.FC = () => {
 
     fetchEmployee();
   }, [employeeId]);
+
+  const isSuperAdminEmployee = employee?.role === "SUPER_ADMIN";
 
   /* =========================
      SALARY RETRIEVE DATA
@@ -229,6 +232,30 @@ const EmployeeDetailsPage: React.FC = () => {
     fetchAllowances(empIdNum);
     fetchSalaries(empIdNum);
     fetchDeductions(empIdNum); // ADD THIS
+  }, [employeeId]);
+
+  // ======================
+  // USER ACCOUNT READ-ONLY FOR SUPER_ADMIN
+  // ======================
+  const [userAccount, setUserAccount] = useState<any>(null);
+  const [loadingUserAccount, setLoadingUserAccount] = useState(false);
+
+  const fetchUserAccount = async () => {
+    if (!employeeId) return;
+    setLoadingUserAccount(true);
+    try {
+      const res = await api.get(`/employees/users/employee/${employeeId}/`);
+      setUserAccount(res.data);
+    } catch (err) {
+      console.error(err);
+      setUserAccount(null);
+    } finally {
+      setLoadingUserAccount(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserAccount();
   }, [employeeId]);
 
   /* =========================
@@ -426,88 +453,120 @@ const EmployeeDetailsPage: React.FC = () => {
             {/* RIGHT SIDE */}
             <Card className={styles.detailsCard}>
               <Tabs defaultActiveKey="1">
-                {/* BASE SALARY */}
-                <Tabs.TabPane tab="Base Salary" key="1">
-                  <div className={styles.salaryHeader}>
-                    <h3>Base Salary</h3>
-                  </div>
 
-                  <Table
-                    columns={salaryColumns}
-                    dataSource={salaries}
-                    loading={loadingSalaries}
-                    pagination={false}
-                  />
-                </Tabs.TabPane>
+                {/* BASE SALARY */}
+                {!isSuperAdminEmployee && (
+                  <Tabs.TabPane tab="Base Salary" key="1">
+                    <div className={styles.salaryHeader}>
+                      <h3>Base Salary</h3>
+                    </div>
+
+                    <Table
+                      columns={salaryColumns}
+                      dataSource={salaries}
+                      loading={loadingSalaries}
+                      pagination={false}
+                    />
+                  </Tabs.TabPane>
+                )}
 
                 {/* ALLOWANCE */}
-                <Tabs.TabPane tab="Allowance" key="2">
-                  <div className={styles.salaryHeader}>
-                    <h3>Allowance</h3>
-                  </div>
+                {!isSuperAdminEmployee && (
+                  <Tabs.TabPane tab="Allowance" key="2">
+                    <div className={styles.salaryHeader}>
+                      <h3>Allowance</h3>
+                    </div>
 
-                  <Table
-                    columns={[
-                      { title: "Allowance Name", dataIndex: "name", key: "name" },
-                      { title: "Amount", dataIndex: "amount", key: "amount" },
-                      { title: "Frequency", dataIndex: "frequency", key: "frequency" },
-                      { title: "Status", dataIndex: "status", key: "status" },
-                    ]}
-                    dataSource={allowances}
-                    loading={loadingAllowances}
-                    pagination={false}
-                  />
-                </Tabs.TabPane>
+                    <Table
+                      columns={[
+                        { title: "Allowance Name", dataIndex: "name", key: "name" },
+                        { title: "Amount", dataIndex: "amount", key: "amount" },
+                        { title: "Frequency", dataIndex: "frequency", key: "frequency" },
+                        { title: "Status", dataIndex: "status", key: "status" },
+                      ]}
+                      dataSource={allowances}
+                      loading={loadingAllowances}
+                      pagination={false}
+                    />
+                  </Tabs.TabPane>
+                )}
 
                 {/* TAX */}
-                <Tabs.TabPane tab="Tax" key="3">
-                  <div className={styles.salaryHeader}>
-                    <h3>Mandatory Government Contribution</h3>
-                  </div>
+                {!isSuperAdminEmployee && (
+                  <Tabs.TabPane tab="Tax" key="3">
+                    <div className={styles.salaryHeader}>
+                      <h3>Mandatory Government Contribution</h3>
+                    </div>
 
-                  <Table
-                    columns={[
-                      { title: "Deduction", dataIndex: "name", key: "name" },
-                      { title: "Frequency", dataIndex: "frequency", key: "frequency" },
-                      { title: "Effective From", dataIndex: "effective_from", key: "effective_from" },
-                      { title: "Amount", dataIndex: "amount", key: "amount" },
-                    ]}
-                    dataSource={deductions}
-                    loading={loadingDeductions}
-                    pagination={false}
-                  />
-
-                </Tabs.TabPane>
+                    <Table
+                      columns={[
+                        { title: "Deduction", dataIndex: "name", key: "name" },
+                        { title: "Frequency", dataIndex: "frequency", key: "frequency" },
+                        { title: "Effective From", dataIndex: "effective_from", key: "effective_from" },
+                        { title: "Amount", dataIndex: "amount", key: "amount" },
+                      ]}
+                      dataSource={deductions}
+                      loading={loadingDeductions}
+                      pagination={false}
+                    />
+                  </Tabs.TabPane>
+                )}
 
                 {/* PAYSLIPS */}
-                <Tabs.TabPane tab="Payslips" key="4">
-                  <div className={styles.salaryHeader}>
-                    <h3>Payslip</h3>
-                  </div>
+                {!isSuperAdminEmployee && (
+                  <Tabs.TabPane tab="Payslips" key="4">
+                    <div className={styles.salaryHeader}>
+                      <h3>Payslip</h3>
+                    </div>
 
-                  <Table
-                    bordered
-                    pagination={false}
-                    columns={[
-                      { title: "Earnings", dataIndex: "earningName", key: "earningName" },
-                      { title: "Amount", dataIndex: "earningAmount", key: "earningAmount" },
-                      { title: "Deductions", dataIndex: "deductionName", key: "deductionName" },
-                      { title: "Amount", dataIndex: "deductionAmount", key: "deductionAmount" },
-                    ]}
-                    dataSource={[
-                      {
-                        key: "1",
-                        earningName: "Basic Salary",
-                        earningAmount: "₱600.00",
-                        deductionName: "Absences",
-                        deductionAmount: "₱600.00 (1 day)",
-                      },
-                    ]}
-                  />
+                    <Table
+                      bordered
+                      pagination={false}
+                      columns={[
+                        { title: "Earnings", dataIndex: "earningName", key: "earningName" },
+                        { title: "Amount", dataIndex: "earningAmount", key: "earningAmount" },
+                        { title: "Deductions", dataIndex: "deductionName", key: "deductionName" },
+                        { title: "Amount", dataIndex: "deductionAmount", key: "deductionAmount" },
+                      ]}
+                      dataSource={[
+                        {
+                          key: "1",
+                          earningName: "Basic Salary",
+                          earningAmount: "₱600.00",
+                          deductionName: "Absences",
+                          deductionAmount: "₱600.00 (1 day)",
+                        },
+                      ]}
+                    />
+                  </Tabs.TabPane>
+                )}
+
+                {/* EMPLOYEE ACCOUNT — READ ONLY FOR SUPER_ADMIN */}
+                <Tabs.TabPane tab="Employee Account" key="5">
+                  {loadingUserAccount ? (
+                    <Spin tip="Loading user account..." />
+                  ) : userAccount ? (
+                    <Table
+                      columns={[
+                        { title: "Username", dataIndex: "user_name", key: "user_name" },
+                        { title: "Role", dataIndex: "role", key: "role" },
+                        {
+                          title: "Status",
+                          dataIndex: "is_active",
+                          key: "is_active",
+                          render: (val: boolean) => (val ? "Active" : "Inactive"),
+                        },
+                      ]}
+                      dataSource={[userAccount]}
+                      pagination={false}
+                    />
+                  ) : (
+                    <p>No user account linked to this employee.</p>
+                  )}
                 </Tabs.TabPane>
 
-                {/* AUDIT LOGS */}
-                <Tabs.TabPane tab="Audit Logs" key="5">
+                {/* AUDIT LOGS — ALWAYS VISIBLE */}
+                <Tabs.TabPane tab="Audit Logs" key="6">
                   <div className={styles.salaryHeader}>
                     <h3>Audit Logs</h3>
                   </div>
@@ -527,7 +586,6 @@ const EmployeeDetailsPage: React.FC = () => {
                     pagination={{ pageSize: 10 }}
                   />
                 </Tabs.TabPane>
-
 
               </Tabs>
             </Card>

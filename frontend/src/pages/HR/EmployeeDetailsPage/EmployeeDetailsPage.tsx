@@ -48,6 +48,7 @@ interface EmployeeData {
   email: string;
   contact_no: string;
   address: AddressData;
+  role: "EMPLOYEE" | "ADMIN" | "SUPER_ADMIN";
 }
 
 interface DeductionRow {
@@ -170,6 +171,8 @@ const EmployeeDetailsPage: React.FC = () => {
 
     fetchEmployee();
   }, [employeeId]);
+
+  const isSuperAdminEmployee = employee?.role === "SUPER_ADMIN";
 
   /* =========================
      EMPLOYEE MODAL STATE
@@ -391,37 +394,45 @@ const EmployeeDetailsPage: React.FC = () => {
             <Card className={styles.detailsCard}>
               <Tabs defaultActiveKey="1">
                 {/* BASE SALARY */}
-                <Tabs.TabPane tab="Base Salary" key="1">
-                  <BaseSalaryTab
-                    employeeId={Number(employeeId)}
-                    salaries={salaries}
-                    loading={loadingSalaries}
-                    onSuccess={() => {
-                      fetchSalaries(Number(employeeId));
-                      fetchDeductions(Number(employeeId));
-                    }}
-                  />
-                </Tabs.TabPane>
-
+                {!isSuperAdminEmployee && (
+                  <Tabs.TabPane tab="Base Salary" key="1">
+                    <BaseSalaryTab
+                      employeeId={Number(employeeId)}
+                      salaries={salaries}
+                      loading={loadingSalaries}
+                      onSuccess={() => {
+                        fetchSalaries(Number(employeeId));
+                        fetchDeductions(Number(employeeId));
+                      }}
+                    />
+                  </Tabs.TabPane>
+                )}
 
                 {/* ALLOWANCE */}
-                <Tabs.TabPane tab="Allowance" key="2">
-                  <AllowanceTab employeeId={Number(employeeId)} />
-                </Tabs.TabPane>
-
+                {!isSuperAdminEmployee && (
+                  <Tabs.TabPane tab="Allowance" key="2">
+                    <AllowanceTab employeeId={Number(employeeId)} />
+                  </Tabs.TabPane>
+                )}
 
                 {/* TAX */}
-                <Tabs.TabPane tab="Tax" key="3">
-                  <TaxTab
-                    deductions={deductions}
-                    loading={loadingDeductions}
-                  />
-                </Tabs.TabPane>
+                {!isSuperAdminEmployee && (
+                  <Tabs.TabPane tab="Tax" key="3">
+                    <TaxTab
+                      deductions={deductions}
+                      loading={loadingDeductions}
+                    />
+                  </Tabs.TabPane>
+                )}
 
-                <Tabs.TabPane tab="Payslips" key="4">
-                  <PayslipsTab />
-                </Tabs.TabPane>
-
+                {/* PAYSLIPS */}
+                {!isSuperAdminEmployee && (
+                  <Tabs.TabPane tab="Payslips" key="4">
+                    <PayslipsTab />
+                  </Tabs.TabPane>
+                )}
+                
+                {/* Always visible */}
                 <Tabs.TabPane tab="Employee Account" key="5">
                   <EmployeeAccountTab employeeId={Number(employeeId)} />
                 </Tabs.TabPane>

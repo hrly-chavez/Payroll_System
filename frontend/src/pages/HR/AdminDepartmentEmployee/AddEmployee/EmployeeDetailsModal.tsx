@@ -11,7 +11,8 @@ interface Props {
   allowedRoles: ("EMPLOYEE" | "ADMIN" | "SUPER_ADMIN")[];
   onNext: (
     employeeId: number,
-    credentials: { username: string; password: string }
+    credentials: { username: string; password: string },
+    selectedRole: "EMPLOYEE" | "ADMIN" | "SUPER_ADMIN"
   ) => void;
   onClose: () => void;
 }
@@ -121,7 +122,9 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
       onNext(res.data.employee_id, {
         username: res.data.username,
         password: res.data.password,
-      });
+      },
+        values.role || "EMPLOYEE"
+      );
 
     } catch (err: any) {
       console.error(err);

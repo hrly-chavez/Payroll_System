@@ -29,5 +29,6 @@ urlpatterns = [
     # Payroll Generation
     path("periods/<int:period_id>/generate/", GeneratePayrollForPeriodView.as_view(), name="payroll-generate-period"),
     path("periods/<int:period_id>/employees/<int:employee_id>/generate/", GeneratePayrollForEmployeeView.as_view(), name="payroll-generate-employee"),
+    path("periods/<int:period_id>/employees/<int:employee_id>/payroll-result/",PayrollEmployeeResultView.as_view(),name="payroll-employee-result",),
 ]
     

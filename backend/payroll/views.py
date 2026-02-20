@@ -69,17 +69,89 @@ class PayrollPeriodListCreateView(generics.ListCreateAPIView):
             status="Open",
         )
 
-#for clicking the payroll period (shows modal with employees) fetch
+# #for clicking the payroll period (shows modal with employees) fetch
+# class PayrollPeriodEligibleEmployeesView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request, period_id):
+#         period = get_object_or_404(Payroll_Period, id=period_id)
+
+#         # 1) employees who already have payroll in this period
+#         payroll_employee_ids = Payroll.objects.filter(
+#             payroll_period=period
+#         ).values_list("employee_id", flat=True)
+
+#         # attendance must exist within the payroll period date range
+#         attendance_in_period = Attendance.objects.filter(
+#             employee_id=OuterRef("pk"),
+#             date__gte=period.start_date,
+#             date__lte=period.end_date,
+#         )
+
+#         eligible_employees = (
+#             Employee.objects
+#             # exclude inactive employees
+#             .filter(is_active=True)
+
+#             # exclude employees that already have payroll in this period
+#             .exclude(id__in=payroll_employee_ids)
+
+#             # exclude CEO (position) and Super Admin users (role)
+#             .exclude(
+#                 Q(position__iexact="CEO") |
+#                 Q(user__role__iexact="SUPER_ADMIN")
+#             )
+
+#             # OPTIONAL (but matches your ask): exclude employees whose linked user is inactive
+#             # (keeps employees with no linked user)
+#             .exclude(Q(user__isnull=False) & Q(user__is_active=False))
+
+#             # must have at least 1 attendance within the period
+#             .annotate(has_attendance=Exists(attendance_in_period))
+#             .filter(has_attendance=True)
+
+#             .select_related("department", "user")
+#         )
+
+#         # 3) lazy-create PayrollPeriodEmployee rows for eligible employees
+#         existing_employee_ids = set(
+#             PayrollPeriodEmployee.objects.filter(period=period)
+#             .values_list("employee_id", flat=True)
+#         )
+
+#         to_create = [
+#             PayrollPeriodEmployee(period=period, employee=e)
+#             for e in eligible_employees
+#             if e.id not in existing_employee_ids
+#         ]
+
+#         if to_create:
+#             PayrollPeriodEmployee.objects.bulk_create(
+#                 to_create,
+#                 ignore_conflicts=True
+#             )
+
+#         # 4) return PayrollPeriodEmployee rows (so we can include status)
+#         ppe_qs = (
+#             PayrollPeriodEmployee.objects
+#             .filter(period=period, employee__in=eligible_employees)
+#             .exclude(employee_id__in=payroll_employee_ids)
+#             .select_related("employee", "employee__department")
+#             .order_by("employee__lname", "employee__fname")
+#         )
+
+#         return Response({
+#             "period": PayrollPeriodCreateSerializer(period).data,
+#             "eligible_employees": EligibleEmployeeSerializer(ppe_qs, many=True).data
+#         })
+# for clicking the payroll period (shows modal with employees) fetch
+
+
 class PayrollPeriodEligibleEmployeesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, period_id):
         period = get_object_or_404(Payroll_Period, id=period_id)
-
-        # 1) employees who already have payroll in this period
-        payroll_employee_ids = Payroll.objects.filter(
-            payroll_period=period
-        ).values_list("employee_id", flat=True)
 
         # attendance must exist within the payroll period date range
         attendance_in_period = Attendance.objects.filter(
@@ -88,32 +160,21 @@ class PayrollPeriodEligibleEmployeesView(APIView):
             date__lte=period.end_date,
         )
 
-        eligible_employees = (
+        # 1) define the employee population for this period (same rules as before)
+        period_employees = (
             Employee.objects
-            # exclude inactive employees
             .filter(is_active=True)
-
-            # exclude employees that already have payroll in this period
-            .exclude(id__in=payroll_employee_ids)
-
-            # exclude CEO (position) and Super Admin users (role)
             .exclude(
                 Q(position__iexact="CEO") |
                 Q(user__role__iexact="SUPER_ADMIN")
             )
-
-            # OPTIONAL (but matches your ask): exclude employees whose linked user is inactive
-            # (keeps employees with no linked user)
             .exclude(Q(user__isnull=False) & Q(user__is_active=False))
-
-            # must have at least 1 attendance within the period
             .annotate(has_attendance=Exists(attendance_in_period))
             .filter(has_attendance=True)
-
             .select_related("department", "user")
         )
 
-        # 3) lazy-create PayrollPeriodEmployee rows for eligible employees
+        # 2) lazy-create PayrollPeriodEmployee rows for these employees
         existing_employee_ids = set(
             PayrollPeriodEmployee.objects.filter(period=period)
             .values_list("employee_id", flat=True)
@@ -121,28 +182,24 @@ class PayrollPeriodEligibleEmployeesView(APIView):
 
         to_create = [
             PayrollPeriodEmployee(period=period, employee=e)
-            for e in eligible_employees
+            for e in period_employees
             if e.id not in existing_employee_ids
         ]
 
         if to_create:
-            PayrollPeriodEmployee.objects.bulk_create(
-                to_create,
-                ignore_conflicts=True
-            )
+            PayrollPeriodEmployee.objects.bulk_create(to_create, ignore_conflicts=True)
 
-        # 4) return PayrollPeriodEmployee rows (so we can include status)
+        # 3) return ALL PayrollPeriodEmployee rows for this period (including Processing/Approved/etc)
         ppe_qs = (
             PayrollPeriodEmployee.objects
-            .filter(period=period, employee__in=eligible_employees)
-            .exclude(employee_id__in=payroll_employee_ids)
+            .filter(period=period, employee__in=period_employees)
             .select_related("employee", "employee__department")
             .order_by("employee__lname", "employee__fname")
         )
 
         return Response({
             "period": PayrollPeriodCreateSerializer(period).data,
-            "eligible_employees": EligibleEmployeeSerializer(ppe_qs, many=True).data
+            "eligible_employees": EligibleEmployeeSerializer(ppe_qs, many=True).data,
         })
 
 
@@ -461,5 +518,61 @@ class GeneratePayrollForEmployeeView(APIView):
 
         serializer = GeneratePayrollEmployeeResponseSerializer(result)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+#==========================================PAYROLL PAYSLIP OUTPUT===========================
+
+class PayrollEmployeeResultView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, period_id: int, employee_id: int):
+        ppe = get_object_or_404(
+            PayrollPeriodEmployee.objects.select_related("employee", "employee__department"),
+            period_id=period_id,
+            employee_id=employee_id,
+        )
+
+        # Ensure payroll exists (generated)
+        payroll = (
+            Payroll.objects
+            .filter(payroll_period_id=period_id, employee_id=employee_id)
+            .select_related("payroll_period", "employee", "employee__department")
+            .prefetch_related("payslip_lines", "payslip_lines__rule")
+            .first()
+        )
+
+        if not payroll:
+            return Response(
+                {"detail": "Payroll has not been generated for this employee in this period."},
+                status=http_status.HTTP_404_NOT_FOUND
+            )
+
+        period = payroll.payroll_period  # use select_related result (no extra DB hit)
+        emp = payroll.employee
+        lines_qs = payroll.payslip_lines.all().order_by("id")
+
+        payload = {
+            "payroll_id": payroll.id,
+            "payroll_status": payroll.status,
+
+            "period_id": period.id,
+            "period_code": period.code,
+            "period_start_date": period.start_date,
+            "period_end_date": period.end_date,
+
+            "employee_id": emp.id,
+            "employee_full_name": f"{emp.fname} {emp.lname}".strip(),
+            "department_name": emp.department.name if emp.department else None,
+
+            "ppe_status": ppe.status,
+
+            "basic_pay": payroll.basic_pay,
+            "total_earnings": payroll.total_earnings,
+            "total_deductions": payroll.total_deductions,
+            "net_pay": payroll.net_pay,
+
+            "lines": lines_qs,
+        }
+
+        return Response(PayrollResultSerializer(payload).data, status=http_status.HTTP_200_OK)
 
 

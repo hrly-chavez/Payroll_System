@@ -301,3 +301,49 @@ class GeneratePayrollEmployeeResponseSerializer(serializers.Serializer):
     detail = serializers.CharField()
     employee_id = serializers.IntegerField()
 
+#==========================================PAYROLL PAYSLIP OUTPUT===========================
+
+class PayslipLineSerializer(serializers.ModelSerializer):
+    rule_name = serializers.CharField(source="rule.name", read_only=True)
+    rule_event_type = serializers.CharField(source="rule.event_type", read_only=True)
+    rule_category = serializers.CharField(source="rule.category", read_only=True)
+
+    class Meta:
+        model = Payslip
+        fields = [
+            "id",
+            "line_type",
+            "description",
+            "amount",
+            "source_type",
+            "source_id",
+            "quantity_min",
+            "rate_applied",
+            "created_at",
+            "rule",            # id (optional)
+            "rule_name",
+            "rule_event_type",
+            "rule_category",
+        ]
+
+class PayrollResultSerializer(serializers.Serializer):
+    payroll_id = serializers.IntegerField()
+    payroll_status = serializers.CharField()
+    period_id = serializers.IntegerField()
+    period_code = serializers.CharField()
+    period_start_date = serializers.DateField()
+    period_end_date = serializers.DateField()
+
+    employee_id = serializers.IntegerField()
+    employee_full_name = serializers.CharField()
+    department_name = serializers.CharField(allow_null=True)
+
+    ppe_status = serializers.CharField()
+    basic_pay = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_earnings = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_deductions = serializers.DecimalField(max_digits=12, decimal_places=2)
+    net_pay = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+    lines = PayslipLineSerializer(many=True)
+
+

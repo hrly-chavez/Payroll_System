@@ -45,6 +45,25 @@ class HolidayCreateView(generics.CreateAPIView):
             new_data="Pending"
         )
 
+        # Create notification for the relevant approvers
+        # Example: notify all SUPER_ADMINs
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        approvers = User.objects.filter(role__in=["SUPER_ADMIN"])  # adjust roles as needed
+
+        notifications = []
+        for approver in approvers:
+            notifications.append(
+                Notification(
+                    user=approver,
+                    title="New Holiday Request",
+                    description=f"{self.request.user.user_name} submitted a holiday request.",
+                    category="holiday",
+                    redirect_url=f"/super-admin/requests"
+                )
+            )
+        Notification.objects.bulk_create(notifications)
+
 #done logs
 class HolidayUpdateStatusView(APIView):
     permission_classes = [IsAuthenticated]
@@ -89,21 +108,25 @@ class HolidayUpdateStatusView(APIView):
         if request.user.role == "SUPER_ADMIN":
             admins = User.objects.filter(role="ADMIN")
             for admin in admins:
+                # Determine redirect_url based on status
+                redirect_url = "/admin/calendar" if new_status == "Approved" else None
+                description = f"Holiday '{holiday.name}' was {new_status}."
+
                 Notification.objects.create(
                     user=admin,
                     title="Holiday Status Updated",
-                    description=f"Holiday '{holiday.name}' was {new_status}.",
+                    description=description,
                     category="holiday",
-                    redirect_url="/admin/holiday-requests"
+                    redirect_url=redirect_url
                 )
                 # Notifications do NOT touch _current_user, so no audit log triggered
 
         serializer = HolidaySerializer(holiday)
         return Response({
-                'detail': 'Status updated',
-                'holiday': serializer.data
-            }, status=status.HTTP_200_OK)
-    
+            'detail': 'Status updated',
+            'holiday': serializer.data
+        }, status=status.HTTP_200_OK)
+
 
 #Leave Type    
 class LeaveTypeListView(generics.ListAPIView):
@@ -161,20 +184,20 @@ class LeaveRequestListCreateView(generics.ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save(employee=employee)
 
+        # Notify Admins
         admins = User.objects.filter(role="ADMIN")
 
-
-    
-# Notify Admins
         for admin in admins:
             Notification.objects.create(
                 user=admin,
                 title="New Leave Request",
                 description=f"{employee.fname} {employee.lname} submitted a leave request.",
                 category="leave",
-                redirect_url="/admin/leave-requests"
+                redirect_url="/admin/requests"   # ✅ UPDATED HERE
             )
+
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
     
 class AdminLeaveRequestListView(generics.ListAPIView):
     serializer_class = LeaveRequestSerializer
@@ -303,11 +326,24 @@ class LeaveRequestUpdateView(generics.UpdateAPIView):
     def perform_update(self, serializer):
         status_value = self.request.data.get("status")
 
+        # Save update
         if status_value in ["Approved", "Declined"]:
-            serializer.save(
+            leave = serializer.save(
                 approved_by=self.request.user,
                 approved_at=timezone.now()
             )
+
+            # ✅ Create notification for the employee
+            employee_user = leave.employee.user
+
+            Notification.objects.create(
+                user=employee_user,
+                title="Leave Request Update",
+                description=f"Your leave request was {status_value}.",
+                category="leave",
+                redirect_url="/employee/attendance"
+            )
+
         else:
             serializer.save()
 

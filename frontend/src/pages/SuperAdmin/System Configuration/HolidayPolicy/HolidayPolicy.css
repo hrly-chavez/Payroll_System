@@ -1,0 +1,45 @@
+.holiday-policy-wrapper {
+  margin-top: 12px;
+}
+
+/* Header */
+.holiday-policy-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #cfd8e3;
+  padding: 10px 16px;
+  border-radius: 6px 6px 0 0;
+}
+
+.holiday-policy-header h4 {
+  margin: 0;
+  font-weight: 600;
+  color: #2f3b52;
+}
+
+.add-policy-btn {
+  background-color: #3c6e9f !important;
+  border-color: #3c6e9f !important;
+}
+
+.add-policy-btn:hover {
+  background-color: #2f5c87 !important;
+  border-color: #2f5c87 !important;
+}
+
+/* Table Card */
+.holiday-policy-card {
+  border-radius: 0 0 6px 6px;
+  box-shadow: none;
+}
+
+/* Table styling */
+.holiday-policy-card .ant-table-thead > tr > th {
+  background: #f0f2f5;
+  font-weight: 600;
+}
+
+.holiday-policy-card .ant-table {
+  border-radius: 6px;
+}

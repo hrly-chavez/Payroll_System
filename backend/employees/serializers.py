@@ -66,10 +66,12 @@ class EmployeeSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source="department.name", read_only=True)
     shift_info = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
+    role = serializers.CharField(source="user.role", read_only=True)
     class Meta:
         model = Employee
         fields = [
             "id",
+            "role",
             "fname",
             "lname",
             "name",
@@ -216,7 +218,7 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
                 address._current_user = user
             address.save()
 
-         # ✅ IMPORTANT: RETURN THE INSTANCE
+         # IMPORTANT: RETURN THE INSTANCE
         return instance
   
 #for salary

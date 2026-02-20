@@ -473,7 +473,7 @@ const Dashboard: React.FC = () => {
 
             <Col xs={24} md={10}>
                <CompanyNote role={role} />
-            </Col>
+            </Col> 
           </Row>
 
           {/* ================= BOTTOM ROW ================= */}

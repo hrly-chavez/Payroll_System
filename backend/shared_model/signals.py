@@ -100,4 +100,11 @@ def log_delete(sender, instance, **kwargs):
     """Log DELETE actions: old/new data is None."""
     if sender == AuditLog:
         return
+    
+    if sender in [AuditLog, Notification]:
+        return
+
+    # Skip if manually set
+    if getattr(instance, "_skip_audit_log", False):
+        return
     create_audit_log(instance, action="DELETE", old_data=None, new_data=None)

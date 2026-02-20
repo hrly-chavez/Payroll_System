@@ -12,6 +12,8 @@ import LeaveTab from "./Leave/LeaveTab";
 import CommissionTypeTab from "./CommissionType/CommissionTypeTab";
 import ShiftTab from "./Workshifts/ShiftTab";
 import AllowanceTypeTab from "./AllowanceType/AllowanceType";
+import HolidayPolicy from "./HolidayPolicy/HolidayPolicy";
+
 
 const { Content } = Layout;
 
@@ -21,7 +23,8 @@ type TabType =
   | "leave"
   | "commission"
   | "workshifts"
-  | "allowance";
+  | "allowance"
+  | "holiday";
 
 const SystemConfiguration: React.FC = () => {
   // ✅ Load last saved tab from localStorage
@@ -85,6 +88,13 @@ const SystemConfiguration: React.FC = () => {
               >
                 Allowance Types
               </button>
+
+              <button
+                className={activeTab === "holiday" ? "active" : ""}
+                onClick={() => setActiveTab("holiday")}
+              >
+                Holiday Policy
+              </button>
             </div>
 
             {/* Section Header */}
@@ -96,6 +106,8 @@ const SystemConfiguration: React.FC = () => {
                   ? "Payroll Rules"
                   : activeTab === "leave"
                   ? "Leave Types"
+                  : activeTab === "holiday"
+                  ? "Holiday Policy"
                   : activeTab === "workshifts"
                   ? "Workshifts"
                   : activeTab === "allowance"
@@ -108,7 +120,7 @@ const SystemConfiguration: React.FC = () => {
             {activeTab === "contribution" && <ContributionTab active />}
             {activeTab === "payroll" && <PayRulesTab active />}
             {activeTab === "leave" && <LeaveTab active />}
-            {activeTab === "commission" && <CommissionTypeTab active />}
+            {activeTab === "holiday" && <HolidayPolicy active />}            {activeTab === "commission" && <CommissionTypeTab active />}
             {activeTab === "workshifts" && <ShiftTab active />}
             {activeTab === "allowance" && <AllowanceTypeTab active />}
           </div>

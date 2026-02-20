@@ -57,7 +57,6 @@
   color: #3e6f9e;
 }
 
-/* Circle Placeholder */
 .circle-placeholder {
   width: 120px;
   height: 120px;
@@ -65,4 +64,11 @@
   border: 10px solid #e6e6e6;
   border-top: 10px solid #3e6f9e;
   margin: 20px auto;
+}
+.wrapper {
+  margin: 0 16px 20px 16px; 
+}
+
+.card {
+  border-radius: 12px;
 }

@@ -235,7 +235,7 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
             <Form.Item name="department" label="Department" rules={[{ required: true }]}>
               <Select
                 options={departments.map(d => ({
-                  value: d.id,
+                  value: d.id,  
                   label: d.name,
                 }))}
                 onChange={(value) => {

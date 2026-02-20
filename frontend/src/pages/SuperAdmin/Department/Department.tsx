@@ -1,25 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { Layout, Table, Input, Button, message } from "antd";
+import { Layout, Table, Input, Button, message, Tooltip, Switch } from "antd";
 import type { TableProps } from "antd";
-import { PlusOutlined, SearchOutlined, SlidersOutlined } from "@ant-design/icons";
+import { PlusOutlined, SearchOutlined, SlidersOutlined, EditOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
-import AddDepartment from "../../HR/Department/AddDepartment"; // reuse import from admin side 
+import AddDepartment, { DepartmentType } from "../../HR/Department/AddDepartment";
 import styles from "../../HR/Department/Department.module.css";
 import api from "../../../api/axios";
-
-interface ShiftType {
-  id: number;
-  start_time: string;
-  end_time: string;
-}
-
-interface DepartmentType {
-  id: number;
-  name: string;
-  shift: ShiftType | number;
-}
 
 const Department: React.FC = () => {
   const navigate = useNavigate();
@@ -27,6 +15,7 @@ const Department: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [editingDept, setEditingDept] = useState<DepartmentType | null>(null);
 
   const fetchDepartments = async () => {
     setLoading(true);
@@ -49,30 +38,66 @@ const Department: React.FC = () => {
     dept.name.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleToggleActive = async (dept: DepartmentType) => {
+    try {
+      await api.patch(`/employees/departments/${dept.id}/`, {
+        is_active: !dept.is_active,
+      });
+      message.success(`${dept.name} is now ${!dept.is_active ? "active" : "inactive"}`);
+      fetchDepartments();
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to update status");
+    }
+  };
+
   const columns: TableProps<DepartmentType>["columns"] = [
-    {
-      title: "ID",
-      dataIndex: "id",
-      key: "id",
-      width: 80,
-    },
-    {
-      title: "Department",
-      dataIndex: "name",
-      key: "name",
-      render: (text) => <span className={styles.rowLink}>{text}</span>,
-    },
+    { title: "ID", dataIndex: "id", key: "id", width: 80 },
+    { title: "Department", dataIndex: "name", key: "name", render: (text) => <span className={styles.rowLink}>{text}</span> },
     {
       title: "Workshift",
       dataIndex: "shift",
       key: "shift",
       render: (shift) => {
         if (!shift) return "—";
-        if (typeof shift === "object") {
-          return `${shift.start_time} - ${shift.end_time}`;
-        }
+        if (typeof shift === "object") return `${shift.start_time} - ${shift.end_time}`;
         return shift;
       },
+    },
+    {
+      title: "Holiday Base",
+      dataIndex: "holiday_base",
+      key: "holiday_base",
+      render: (base) =>
+        base === "PH" ? "Philippines" : base === "US" ? "United States" : "Company",
+    },
+    {
+      title: "Actions",
+      key: "actions",
+      render: (_, record) => (
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <Tooltip title="Edit">
+            <Button
+              type="default"
+              icon={<EditOutlined />}
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingDept(record);
+                setOpen(true);
+              }}
+            />
+          </Tooltip>
+          <Tooltip title={record.is_active ? "Deactivate" : "Activate"}>
+            <Switch
+              checked={record.is_active}
+              onClick={(checked, e) => {
+                e.stopPropagation();
+                handleToggleActive(record);
+              }}
+            />
+          </Tooltip>
+        </div>
+      ),
     },
   ];
 
@@ -81,7 +106,6 @@ const Department: React.FC = () => {
       <Sidebar />
       <Layout>
         <Topbar title="Department" />
-
         <Layout.Content className={styles.content}>
           <div className={styles.topBar}>
             <div className={styles.leftControls}>
@@ -97,12 +121,14 @@ const Department: React.FC = () => {
               </Button>
             </div>
 
-            {/* ✅ ADD BUTTON */}
             <Button
               type="primary"
               icon={<PlusOutlined />}
               className={styles.addBtn}
-              onClick={() => setOpen(true)}
+              onClick={() => {
+                setEditingDept(null);
+                setOpen(true);
+              }}
             >
               Add Department
             </Button>
@@ -124,13 +150,14 @@ const Department: React.FC = () => {
             })}
           />
 
-          {/* ✅ MODAL */}
           <AddDepartment
             open={open}
             onClose={() => {
               setOpen(false);
-              fetchDepartments(); // refresh after adding
+              fetchDepartments();
+              setEditingDept(null);
             }}
+            initialValues={editingDept || undefined}
           />
         </Layout.Content>
       </Layout>

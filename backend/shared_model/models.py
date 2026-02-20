@@ -781,7 +781,7 @@ class AuditLog(models.Model):
         blank=True
     )
     action = models.CharField(
-        max_length=10,
+        max_length=50,
         choices=ACTION_CHOICES  # restrict to CREATE/UPDATE/DELETE
     )
     model_name = models.CharField(max_length=100)

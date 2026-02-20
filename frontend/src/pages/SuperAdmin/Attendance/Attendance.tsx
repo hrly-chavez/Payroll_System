@@ -174,24 +174,27 @@ const Attendance: React.FC = () => {
 
         <Content className="attendance-content">
           <Row gutter={16}>
-            <Col span={6}>
-              <Card>
+            <Col xs={24} sm={12} md={6}>
+              <Card className="statCard presentCard">
                 <Statistic title="Total Present" value={stats.present} />
               </Card>
             </Col>
-            <Col span={6}>
-              <Card>
+
+            <Col xs={24} sm={12} md={6}>
+              <Card className="statCard lateCard">
                 <Statistic title="Total Lates" value={stats.lates} />
               </Card>
             </Col>
-            <Col span={6}>
-              <Card>
+
+            <Col xs={24} sm={12} md={6}>
+              <Card className="statCard absentCard">
                 <Statistic title="Total Absences" value={stats.absent} />
               </Card>
             </Col>
-            <Col span={6}>
-              <Card>
-                <Statistic title="Leave request pending" value={0} />
+
+            <Col xs={24} sm={12} md={6}>
+              <Card className="statCard pendingCard">
+                <Statistic title="Leave Request Pending" value={0} />
               </Card>
             </Col>
           </Row>

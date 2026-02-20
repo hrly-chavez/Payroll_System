@@ -134,7 +134,7 @@ class Employee(models.Model):
     hired_date = models.DateField()
     position = models.CharField(max_length=20)
     bank_info = models.CharField(max_length=50)
-    email = models.CharField(max_length=50)
+    email = models.CharField(max_length=50, unique=True)
     created_at = models.DateField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
     shift = models.ForeignKey( Shift, on_delete=models.SET_NULL,related_name="employees",null=True,blank=True)

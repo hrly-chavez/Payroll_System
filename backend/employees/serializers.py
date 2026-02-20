@@ -216,7 +216,7 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
                 address._current_user = user
             address.save()
 
-         # ✅ IMPORTANT: RETURN THE INSTANCE
+         # IMPORTANT: RETURN THE INSTANCE
         return instance
   
 #for salary

@@ -243,7 +243,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     
     # -------------------
     # CREATE FIRST SUPER ADMIN EMPLOYEE
-    # -------------------
+    # ------------------- 
     @action(detail=False, methods=["post"], url_path="create-first-superadmin")
     def create_first_superadmin(self, request):
         # Check if SUPER_ADMIN exists
@@ -251,14 +251,16 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         if super_admin_exists:
             return Response({"error": "SUPER_ADMIN already exists."}, status=403)
 
-        # Proceed to create Employee + SUPER_ADMIN user
+        # Create Employee
         serializer = EmployeeCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         employee = serializer.save()
 
+        # Generate username & password
         username = f"{employee.fname.lower()}{employee.id}"
         password = "".join(random.choices(string.ascii_letters + string.digits, k=8))
 
+        # Create User
         user = User(
             user_name=username,
             role="SUPER_ADMIN",
@@ -267,12 +269,32 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         user.set_password(password)
         user.save()
 
+        # --------------------------
+        # MANUAL AUDIT LOG
+        # --------------------------
+        AuditLog.objects.create(
+            user=None,  # no signed-in user for first superadmin
+            action="CREATE FIRST SUPER ADMIN ACCOUNT",
+            model_name="User / Employee",
+            object_id=str(employee.id),
+            old_data=None,
+            new_data={
+                "employee": EmployeeSerializer(employee).data,
+                "user": {
+                    "user_name": username,
+                    "role": "SUPER_ADMIN",
+                },
+            },
+            # timestamp auto-added
+        )
+
         return Response({
             "message": "First SUPER_ADMIN created successfully",
             "employee_id": employee.id,
             "username": username,
             "password": password
         }, status=201)
+
     
     # -------------------
     # CREATE EMPLOYEE

@@ -6,8 +6,6 @@ import {
   Button,
   message,
   Checkbox,
-  Tag,
-  Popconfirm,
 } from "antd";
 import {
   DeleteOutlined,
@@ -19,6 +17,7 @@ import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/Sidebar/Sidebar";
 import Topbar from "../../components/Topbar/Topbar";
 import styles from "./Notification_styles.module.css";
+import api from "../../api/axios"; // <- import your axios instance
 
 const { Content } = Layout;
 
@@ -44,11 +43,8 @@ const NotificationPage: React.FC = () => {
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch("http://127.0.0.1:8000/api/notifications/", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
+      const res = await api.get("/notifications/");
+      const data = res.data;
       if (Array.isArray(data)) {
         setNotifications(data);
       } else if (data.results) {
@@ -56,46 +52,36 @@ const NotificationPage: React.FC = () => {
       } else {
         setNotifications([]);
       }
-      setLoading(false);
-    } catch {
+    } catch (err) {
       message.error("Failed to load notifications");
+    } finally {
+      setLoading(false);
     }
   };
 
   const markAsRead = async (id: number) => {
-    const token = localStorage.getItem("authToken");
-
-    await fetch(
-      `http://127.0.0.1:8000/api/notifications/${id}/mark-read/`,
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-
-    setNotifications(prev =>
-      prev.map(n =>
-        n.id === id ? { ...n, is_read: true } : n
-      )
-    );
+    try {
+      await api.post(`/notifications/${id}/mark-read/`);
+      setNotifications(prev =>
+        prev.map(n => (n.id === id ? { ...n, is_read: true } : n))
+      );
+    } catch {
+      message.error("Failed to mark notification as read");
+    }
   };
 
   const deleteSelected = async () => {
-    const token = localStorage.getItem("authToken");
-
-    await Promise.all(
-      selectedIds.map(id =>
-        fetch(`http://127.0.0.1:8000/api/notifications/${id}/`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        })
-      )
-    );
-
-    setNotifications(prev =>
-      prev.filter(n => !selectedIds.includes(n.id))
-    );
-    setSelectedIds([]);
+    try {
+      await Promise.all(
+        selectedIds.map(id => api.delete(`/notifications/${id}/`))
+      );
+      setNotifications(prev =>
+        prev.filter(n => !selectedIds.includes(n.id))
+      );
+      setSelectedIds([]);
+    } catch {
+      message.error("Failed to delete selected notifications");
+    }
   };
 
   const getIcon = (category: string) => {
@@ -118,7 +104,6 @@ const NotificationPage: React.FC = () => {
         <Topbar title="Notifications" />
         <Content className={styles.content}>
           <Card className={styles.notificationCard}>
-
             {selectedIds.length > 0 && (
               <Button danger onClick={deleteSelected}>
                 Delete Selected
@@ -128,7 +113,7 @@ const NotificationPage: React.FC = () => {
             <List
               loading={loading}
               dataSource={notifications}
-              renderItem={(item) => (
+              renderItem={item => (
                 <List.Item
                   className={`${styles.notificationItem} ${
                     !item.is_read ? styles.unread : ""

@@ -65,6 +65,21 @@ class DepartmentViewSet(viewsets.ModelViewSet):
         department.save()
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+
+        # Attach user BEFORE saving
+        instance._current_user = request.user
+
+        self.perform_update(serializer)
+
+        return Response(serializer.data)
+
 
 
 # para ni sa populate ang shifts sa drop down
@@ -672,14 +687,15 @@ class UserActivityLogViewSet(viewsets.ViewSet):
     triggered from DRF API requests (not Django admin).
     """
     def list(self, request):
+        #delete logs after a day
+        one_day_ago = timezone.now() - timedelta(days=1)
+        AuditLog.objects.filter(timestamp__lt=one_day_ago).delete()
+        
         # Only include logs where user is NOT None and NOT a superuser
-        logs = AuditLog.objects.filter(
-            action__in=["CREATE", "UPDATE", "DELETE"],
-        ).exclude(
+        logs = AuditLog.objects.exclude(
             user__isnull=True
-        ).exclude(
-            user__is_staff=True  # optional: exclude admin users if you want
         ).order_by("-timestamp")
+
 
         serializer = UserActivityAuditLogSerializer(logs, many=True)
         return Response(serializer.data)

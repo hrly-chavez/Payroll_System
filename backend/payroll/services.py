@@ -15,7 +15,7 @@ from shared_model.models import *
 
 DEC_0 = Decimal("0.00")
 
-
+#needs to be change or remove it should be able to make another payroll for the declined employee
 def _overlaps_period(eff_from, eff_to, period_start, period_end):
     if eff_from and eff_from > period_end:
         return False

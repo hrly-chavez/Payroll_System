@@ -5,7 +5,9 @@ import React, { useEffect, useState } from "react";
 import { Modal, Table, Button, message, Tag} from "antd";
 import api from "../../../../api/axios";
 import dayjs from "dayjs";
+
 import VerifyEmployeeModal from "./VerifyEmployeeModal";
+import PayrollResultModal from "./PayrollResultModal";
 
 type PayrollPeriod = {
   id: number;
@@ -36,6 +38,7 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
 
   
   const [openEmployeeModal, setOpenEmployeeModal] = useState(false);
+  const [openPayrollResultModal, setOpenPayrollResultModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<EligibleEmployee | null>(null);
   const [generating, setGenerating] = useState(false);
 
@@ -60,37 +63,37 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
       setLoading(false);
     }
   };
-  const handleGeneratePayroll = async () => {
-    if (!periodId) return;
-    if (!canGenerate) {
-      message.error("Payroll period must be Open to generate payroll.");
-      return;
-    }
-    if (verifiedCount === 0) {
-      message.error("No Verified employees to generate payroll for.");
-      return;
-    }
+  // const handleGeneratePayroll = async () => {
+  //   if (!periodId) return;
+  //   if (!canGenerate) {
+  //     message.error("Payroll period must be Open to generate payroll.");
+  //     return;
+  //   }
+  //   if (verifiedCount === 0) {
+  //     message.error("No Verified employees to generate payroll for.");
+  //     return;
+  //   }
 
-    setGenerating(true);
-    try {
-      const res = await api.post(`/payroll/payroll/periods/${periodId}/generate/`);
-      message.success(res?.data?.detail || "Payroll generated.");
+  //   setGenerating(true);
+  //   try {
+  //     const res = await api.post(`/payroll/payroll/periods/${periodId}/generate/`);
+  //     message.success(res?.data?.detail || "Payroll generated.");
 
-      // refresh list & statuses
-      await loadEligibleEmployees();
-    } catch (err: any) {
-      const msg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        "Payroll generation failed";
-      message.error(msg);
+  //     // refresh list & statuses
+  //     await loadEligibleEmployees();
+  //   } catch (err: any) {
+  //     const msg =
+  //       err?.response?.data?.detail ||
+  //       err?.response?.data?.message ||
+  //       "Payroll generation failed";
+  //     message.error(msg);
 
-      // refresh anyway (in case something partially changed, though your backend rolls back)
-      await loadEligibleEmployees();
-    } finally {
-      setGenerating(false);
-    }
-  };
+  //     // refresh anyway (in case something partially changed, though your backend rolls back)
+  //     await loadEligibleEmployees();
+  //   } finally {
+  //     setGenerating(false);
+  //   }
+  // };
 
   useEffect(() => {
     if (open && periodId) {
@@ -146,30 +149,36 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
         </div>
 
         <Button
-            type="primary"
-            disabled={employees.length === 0 || period?.status !== "Open"}
-            loading={loading}
-            onClick={async () => {
-              if (!periodId) return;
+          type="primary"
+          disabled={employees.length === 0 || period?.status !== "Open"}
+          loading={generating}
+          onClick={async () => {
+            if (!periodId) return;
 
-              setLoading(true);
-              try {
-                const res = await api.post(`/payroll/periods/${periodId}/generate/`);
-                message.success(res?.data?.detail || "Payroll generated.");
-                await loadEligibleEmployees(); // refresh statuses to Processing
-              } catch (err: any) {
-                const msg =
-                  err?.response?.data?.detail ||
-                  err?.response?.data?.message ||
-                  "Payroll generation failed";
-                message.error(msg);
-              } finally {
-                setLoading(false);
-              }
-            }}
-          >
-            Generate Payroll
-          </Button>
+            if (verifiedCount === 0) {
+              message.error("No Verified employees to generate payroll for.");
+              return;
+            }
+
+            setGenerating(true);
+            try {
+              const res = await api.post(`/payroll/periods/${periodId}/generate/`);
+              message.success(res?.data?.detail || "Payroll generated.");
+              await loadEligibleEmployees();
+            } catch (err: any) {
+              const msg =
+                err?.response?.data?.detail ||
+                err?.response?.data?.message ||
+                "Payroll generation failed";
+              message.error(msg);
+            } finally {
+              setGenerating(false);
+            }
+          }}
+        >
+          Generate Payroll
+        </Button>
+
       </div>
 
         <Table
@@ -182,10 +191,21 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
         onRow={(record) => ({
           onClick: () => {
             if (loading) return;
+
             setSelectedEmployee(record);
-            setOpenEmployeeModal(true);
+
+            if (
+              record.status === "Processing" ||
+              record.status === "Approved" ||
+              record.status === "Declined"
+            ) {
+              setOpenPayrollResultModal(true);
+            } else {
+              setOpenEmployeeModal(true);
+            }
           },
         })}
+
         rowClassName={() => "clickable-row"}
       />
       <VerifyEmployeeModal
@@ -200,6 +220,17 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
           loadEligibleEmployees(); // refresh table status after verify
         }}
       />
+      <PayrollResultModal
+          open={openPayrollResultModal}
+          employee={selectedEmployee}
+          period={period}
+          onClose={() => {
+            setOpenPayrollResultModal(false);
+            setSelectedEmployee(null);
+            loadEligibleEmployees(); // refresh in case approvals changed
+          }}
+        />
+
 
     </Modal>
   );

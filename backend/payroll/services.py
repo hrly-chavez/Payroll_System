@@ -15,7 +15,7 @@ from shared_model.models import *
 
 DEC_0 = Decimal("0.00")
 
-#needs to be change or remove it should be able to make another payroll for the declined employee
+#Helpers
 def _overlaps_period(eff_from, eff_to, period_start, period_end):
     if eff_from and eff_from > period_end:
         return False
@@ -111,15 +111,25 @@ class PayrollGenerationService:
 
         self._validate_period(period)
 
-        ppes = (
+        all_ppes = (
             PayrollPeriodEmployee.objects.select_for_update()
-            .filter(period_id=period_id, status="Verified")
+            .filter(period_id=period_id)
             .select_related("employee", "employee__department", "employee__shift")
             .order_by("employee__lname", "employee__fname")
         )
 
-        if not ppes.exists():
-            raise ValidationError({"detail": "No VERIFIED employees found for this payroll period."})
+        if not all_ppes.exists():
+            raise ValidationError({"detail": "No employees found for this payroll period."})
+
+        not_verified = all_ppes.exclude(status="Verified")
+        if not_verified.exists():
+            sample = not_verified.select_related("employee").first()
+            emp_name = f"{sample.employee.fname} {sample.employee.lname}".strip()
+            raise ValidationError({
+                "detail": f"All employees must be Verified before generating payroll. Example not verified: {emp_name} ({sample.status})."
+            })
+
+        ppes = all_ppes  # now safe: everyone is Verified
 
         # Optional: lock the period status early (still rolls back on error)
         period.status = "Processing"
@@ -148,6 +158,11 @@ class PayrollGenerationService:
             raise ValidationError({"detail": "Payroll period not found."})
 
         self._validate_period(period)
+
+        # Ensure the period reflects reality once any payroll is generated
+        if period.status == "Open":
+            period.status = "Processing"
+            period.save(update_fields=["status"])
 
         ppe = (
             PayrollPeriodEmployee.objects.select_for_update()

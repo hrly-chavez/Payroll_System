@@ -1,47 +1,101 @@
+import re
 from rest_framework import serializers
 from shared_model.models import *
 from django.utils import timezone
-from decimal import Decimal
+from decimal import Decimal,InvalidOperation
+
+NUMERIC_LIKE_REGEX = re.compile(r"^(?=.*\d)[0-9.,]+$")
+
+def parse_decimal_allow_comma_dot(value, field_name: str) -> Decimal:
+    if value is None:
+        raise serializers.ValidationError({field_name: "This field is required."})
+
+    if isinstance(value, (int, float, Decimal)):
+        return Decimal(str(value))
+
+    if not isinstance(value, str):
+        raise serializers.ValidationError({field_name: "Invalid value type."})
+
+    v = value.strip()
+    if not v:
+        raise serializers.ValidationError({field_name: "This field is required."})
+
+    if not NUMERIC_LIKE_REGEX.match(v):
+        raise serializers.ValidationError({
+            field_name: "Numbers only. Allowed characters: digits, comma (,), dot (.)."
+        })
+
+    v = v.replace(",", "")
+    try:
+        return Decimal(v)
+    except (InvalidOperation, ValueError):
+        raise serializers.ValidationError({field_name: "Invalid number format."})
+
 
 class DeductionTypeSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = Deduction_Type
         fields = "__all__"
 
     def validate(self, data):
-        code = data.get("code")
-        salary_from = data.get("salary_range_from")
-        salary_to = data.get("salary_range_to")
+        code = (data.get("code") or "").strip()
+        category = (data.get("category") or "").strip()
+        calc_type = (data.get("calculation_type") or "").strip()  # "Fixed" / "Percent"
 
+        salary_from = parse_decimal_allow_comma_dot(data.get("salary_range_from"), "salary_range_from")
+        salary_to = parse_decimal_allow_comma_dot(data.get("salary_range_to"), "salary_range_to")
+        data["salary_range_from"] = salary_from
+        data["salary_range_to"] = salary_to
+
+        if "amount" in data and data.get("amount") is not None:
+            data["amount"] = parse_decimal_allow_comma_dot(data.get("amount"), "amount")
+
+        # ✅ from <= to
         if salary_from > salary_to:
-            raise serializers.ValidationError(
-                "Salary range 'from' cannot be greater than 'to'."
-            )
+            raise serializers.ValidationError({
+                "salary_range_from": "Salary Range (From) cannot be greater than Salary Range (To).",
+                "salary_range_to": "Salary Range (To) cannot be less than Salary Range (From).",
+            })
 
-        # Get existing records with same code
-        queryset = Deduction_Type.objects.filter(code=code)
-
-        # Exclude self when updating
+        qs = Deduction_Type.objects.all()
         if self.instance:
-            queryset = queryset.exclude(id=self.instance.id)
+            qs = qs.exclude(id=self.instance.id)
 
-        for deduction in queryset:
-            existing_from = deduction.salary_range_from
-            existing_to = deduction.salary_range_to
+        # ✅ RULE 3: Overlap only within SAME code + SAME category + SAME calculation_type
+        conflict_same_group = qs.filter(
+            code=code,
+            category=category,
+            calculation_type=calc_type,
+            salary_range_from__lte=salary_to,
+            salary_range_to__gte=salary_from,
+        ).first()
 
-            # Check overlap condition
-            if (
-                salary_from <= existing_to and
-                salary_to >= existing_from
-            ):
-                raise serializers.ValidationError(
-                    f"Salary range overlaps with existing range "
-                    f"{existing_from} - {existing_to} for code {code}."
-                )
+        if conflict_same_group:
+            raise serializers.ValidationError({
+                "non_field_errors": [
+                    f"Cannot save. Salary range {salary_from} - {salary_to} overlaps with existing range "
+                    f"{conflict_same_group.salary_range_from} - {conflict_same_group.salary_range_to} "
+                    f"under the same Code '{code}', Category '{category}', and Type '{calc_type}'."
+                ]
+            })
+
+        # ✅ RULE 4: Different code, SAME category + SAME type cannot have EXACT same range
+        exact_range_conflict = qs.filter(
+            category=category,
+            calculation_type=calc_type,
+            salary_range_from=salary_from,
+            salary_range_to=salary_to,
+        ).exclude(code=code).first()
+
+        if exact_range_conflict:
+            raise serializers.ValidationError({
+                "non_field_errors": [
+                    f"Cannot save. The salary range {salary_from} - {salary_to} already exists in "
+                    f"Category '{category}' with Type '{calc_type}' under Code '{exact_range_conflict.code}'."
+                ]
+            })
 
         return data
-
 
 #==================================PAYROLL PERIOD=================================
 # Used to create and return payroll period data (date range, code, status)

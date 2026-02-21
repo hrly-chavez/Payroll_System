@@ -448,6 +448,8 @@ class PayrollResultSerializer(serializers.Serializer):
     department_name = serializers.CharField(allow_null=True)
 
     ppe_status = serializers.CharField()
+    declined_reason = serializers.CharField(allow_null=True, required=False)
+    
     basic_pay = serializers.DecimalField(max_digits=12, decimal_places=2)
     total_earnings = serializers.DecimalField(max_digits=12, decimal_places=2)
     total_deductions = serializers.DecimalField(max_digits=12, decimal_places=2)
@@ -455,4 +457,28 @@ class PayrollResultSerializer(serializers.Serializer):
 
     lines = PayslipLineSerializer(many=True)
 
+# ===================== CEO APPROVAL QUEUE =====================
 
+class PayrollApprovalEmployeeSerializer(serializers.Serializer):
+    employee_id = serializers.IntegerField()
+    full_name = serializers.CharField()
+    department_name = serializers.CharField(allow_null=True)
+
+    ppe_status = serializers.CharField()
+
+    payroll_id = serializers.IntegerField(allow_null=True)
+    payroll_status = serializers.CharField(allow_null=True)
+    run_no = serializers.IntegerField(allow_null=True)
+    net_pay = serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True)
+
+
+class PayrollDeclineInputSerializer(serializers.Serializer):
+    declined_reason = serializers.CharField()
+
+    def validate_declined_reason(self, v: str):
+        v = (v or "").strip()
+        if not v:
+            raise serializers.ValidationError("Decline reason is required.")
+        if len(v) < 3:
+            raise serializers.ValidationError("Decline reason is too short.")
+        return v

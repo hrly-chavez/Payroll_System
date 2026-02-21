@@ -508,7 +508,7 @@ class Leave_Request(models.Model):
     half_day_part = models.CharField(max_length=5, choices=half_day_choices, null=True, blank=True)
     reason = models.TextField()
     status = models.CharField(max_length=15,choices=STATUS_CHOICES,default="Pending")
-    requested_at = models.DateTimeField(auto_now_add=True)
+    requested_at = models.DateTimeField(default=timezone.now)
     approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_leave_requests")
     approved_at = models.DateTimeField(null=True, blank=True)
     employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="leave_requests")
@@ -626,27 +626,43 @@ class Payroll(models.Model):
         ("Paid","Paid"),
         ("Void","Void"),
     ]
-    
+
     id = models.AutoField(primary_key=True)
-    status = models.CharField(max_length=20 ,choices=status_choices, default="Draft")
+    payroll_period = models.ForeignKey(Payroll_Period, on_delete=models.CASCADE, related_name="payrolls")
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="payrolls")
+    #  version/run number (1 = initial, 2 = regenerated, etc.)
+    run_no = models.PositiveIntegerField(default=1)
+    status = models.CharField(max_length=20, choices=status_choices, default="Draft")
     basic_pay = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     total_earnings = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     total_deductions = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     net_pay = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     generated_at = models.DateField(auto_now_add=True)
-    approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_payrolls")
+    approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_payrolls",)
     approved_at = models.DateField(null=True, blank=True)
-    payroll_period = models.ForeignKey(Payroll_Period,on_delete=models.CASCADE,related_name="payrolls")
-    employee = models.ForeignKey(Employee,on_delete=models.PROTECT,related_name="payrolls")
+    #  void metadata (for audit + easier explanation to users)
+    voided_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="voided_payrolls",)
+    voided_at = models.DateTimeField(null=True, blank=True)
+    void_reason = models.TextField(null=True, blank=True)
+
+    #  link chain of regenerations (optional but very useful)
+    regenerated_from = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="regenerations",
+    )
 
     def __str__(self):
-        return f"{self.status} - {self.generated_at} to {self.payroll_period}"
+        return f"{self.status} - Run {self.run_no} - {self.generated_at} to {self.payroll_period}"
 
     class Meta:
         constraints = [
+            #  allows multiple payrolls per period/employee but prevents duplicate run_no
             models.UniqueConstraint(
-                fields=["payroll_period", "employee"],
-                name="unique_payroll_per_period_per_employee"
+                fields=["payroll_period", "employee", "run_no"],
+                name="unique_payroll_run_per_period_employee",
             )
         ]
 

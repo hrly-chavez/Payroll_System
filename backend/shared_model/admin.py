@@ -390,7 +390,7 @@ class LeaveRequestAdmin(admin.ModelAdmin):
     list_filter = ("status", "leave_type", "requested_at")
     search_fields = ("employee__user__username", "reason")
     ordering = ("-requested_at",)
-    readonly_fields = ("requested_at", "approved_at")
+    
 
 @admin.register(HolidayPolicy)
 class HolidayPolicyAdmin(admin.ModelAdmin):
@@ -425,3 +425,5 @@ class HolidayPolicyAdmin(admin.ModelAdmin):
 admin.site.register(AuditLog)
 admin.site.register(Company_Note)
 admin.site.register(Notification)
+admin.site.register(Leave_Day)
+admin.site.register(PayrollPeriodEmployee)

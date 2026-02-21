@@ -15,7 +15,7 @@ from shared_model.models import *
 
 DEC_0 = Decimal("0.00")
 
-#needs to be change or remove it should be able to make another payroll for the declined employee
+#Helpers
 def _overlaps_period(eff_from, eff_to, period_start, period_end):
     if eff_from and eff_from > period_end:
         return False
@@ -23,6 +23,19 @@ def _overlaps_period(eff_from, eff_to, period_start, period_end):
         return False
     return True
 
+
+def get_latest_active_payroll(period_id: int, employee_id: int) -> Payroll | None:
+    """
+    Latest active payroll = highest run_no where status != 'Void'.
+    Used for result viewing + CEO approval actions + regeneration.
+    """
+    return (
+        Payroll.objects
+        .filter(payroll_period_id=period_id, employee_id=employee_id)
+        .exclude(status="Void")
+        .order_by("-run_no", "-id")
+        .first()
+    )
 
 def _d2(x, places="0.01"):
     return (Decimal(x).quantize(Decimal(places), rounding=ROUND_HALF_UP))
@@ -111,15 +124,25 @@ class PayrollGenerationService:
 
         self._validate_period(period)
 
-        ppes = (
+        all_ppes = (
             PayrollPeriodEmployee.objects.select_for_update()
-            .filter(period_id=period_id, status="Verified")
+            .filter(period_id=period_id)
             .select_related("employee", "employee__department", "employee__shift")
             .order_by("employee__lname", "employee__fname")
         )
 
-        if not ppes.exists():
-            raise ValidationError({"detail": "No VERIFIED employees found for this payroll period."})
+        if not all_ppes.exists():
+            raise ValidationError({"detail": "No employees found for this payroll period."})
+
+        not_verified = all_ppes.exclude(status="Verified")
+        if not_verified.exists():
+            sample = not_verified.select_related("employee").first()
+            emp_name = f"{sample.employee.fname} {sample.employee.lname}".strip()
+            raise ValidationError({
+                "detail": f"All employees must be Verified before generating payroll. Example not verified: {emp_name} ({sample.status})."
+            })
+
+        ppes = all_ppes  # now safe: everyone is Verified
 
         # Optional: lock the period status early (still rolls back on error)
         period.status = "Processing"
@@ -148,6 +171,11 @@ class PayrollGenerationService:
             raise ValidationError({"detail": "Payroll period not found."})
 
         self._validate_period(period)
+
+        # Ensure the period reflects reality once any payroll is generated
+        if period.status == "Open":
+            period.status = "Processing"
+            period.save(update_fields=["status"])
 
         ppe = (
             PayrollPeriodEmployee.objects.select_for_update()
@@ -250,9 +278,16 @@ class PayrollGenerationService:
         # Holiday earnings (auto if worked on approved holiday)
         self._apply_worked_holidays(payroll, ctx, rates)    
 
+        
         # 7.4 absent deduction
         absent_rule = ctx["rule_map"].get(("Absent", "Deduction"))
-        self._apply_absent_deduction(payroll=payroll,absent_days=absent_days,absent_rule=absent_rule,rates=rates,)
+        self._apply_absent_deduction(
+            payroll=payroll,
+            absent_days=absent_days,
+            absent_dates=absent_dates,
+            absent_rule=absent_rule,
+            rates=rates,
+        )
 
         # 8 allowances / deductions / commissions
         self._apply_allowances(payroll=payroll,allowances=ctx["allowances"],period=period,employee=ctx["employee"],shift=ctx["shift"],leave_map=ctx["leave_map"],)
@@ -377,10 +412,11 @@ class PayrollGenerationService:
         because we create Leave_Day only when Approved.
         """
         rows = Leave_Day.objects.filter(
-            employee=employee,
-            date__gte=period.start_date,
-            date__lte=period.end_date,
-        ).select_related("leave_request", "leave_request__leave_type")
+        employee=employee,
+        date__gte=period.start_date,
+        date__lte=period.end_date,
+        leave_request__status="Approved",
+    ).select_related("leave_request", "leave_request__leave_type")
 
         # If somehow duplicates exist (shouldn't due to constraint), last one wins
         return {r.date: r for r in rows}
@@ -905,27 +941,46 @@ class PayrollGenerationService:
     # -------------------------
     # 7.4 Absent auto-detection
     # -------------------------
-    def _apply_absent_deduction(
-        self,
-        payroll: Payroll,
-        absent_days: int,
-        absent_rule: Pay_Rule | None,
-        rates: Rates,
-    ):
+    def _apply_absent_deduction(self,payroll: Payroll,absent_days: int,absent_dates: set[date],absent_rule: Pay_Rule | None,rates: Rates,):
         if not absent_rule:
             raise ValidationError({"detail": "Missing Pay Rule for Absent (Deduction)."})
 
-        if absent_days <= 0:
+        # Prefer dates (more accurate + shows the date), fallback to absent_days
+        dates = sorted(absent_dates) if absent_dates else []
+        if dates:
+            days_count = len(dates)
+        else:
+            days_count = int(absent_days or 0)
+
+        if days_count <= 0:
             return
 
         multiplier = _safe_decimal(absent_rule.rate_value, "rate_value")  # expected 1.0000
-        amount = _d2(Decimal(absent_days) * rates.daily_rate * multiplier)
+        per_day_amount = _d2(rates.daily_rate * multiplier)
 
+        # Create one line per absent date
+        if dates:
+            for d in dates:
+                self._create_line(
+                    payroll,
+                    "DEDUCTION",
+                    f"Absent ({d})",
+                    per_day_amount,
+                    rule=absent_rule,
+                    source_type="ATTENDANCE",
+                    source_id=None,
+                    quantity_min=None,
+                    rate_applied=multiplier,
+                )
+            return
+
+        # Fallback (if no dates were passed for some reason)
+        total_amount = _d2(Decimal(days_count) * per_day_amount)
         self._create_line(
             payroll,
             "DEDUCTION",
-            f"Absent ({absent_days} day(s))",
-            amount,
+            f"Absent ({days_count} day(s))",
+            total_amount,
             rule=absent_rule,
             source_type="ATTENDANCE",
             source_id=None,

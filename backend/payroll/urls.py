@@ -29,6 +29,12 @@ urlpatterns = [
     # Payroll Generation
     path("periods/<int:period_id>/generate/", GeneratePayrollForPeriodView.as_view(), name="payroll-generate-period"),
     path("periods/<int:period_id>/employees/<int:employee_id>/generate/", GeneratePayrollForEmployeeView.as_view(), name="payroll-generate-employee"),
+    #Payroll Result
     path("periods/<int:period_id>/employees/<int:employee_id>/payroll-result/",PayrollEmployeeResultView.as_view(),name="payroll-employee-result",),
+    # CEO / SuperAdmin Approval
+    path("periods/<int:period_id>/approval-queue/",PayrollPeriodApprovalQueueView.as_view(),name="payroll-period-approval-queue",),
+    path("periods/<int:period_id>/employees/<int:employee_id>/approve/",PayrollApproveEmployeeView.as_view(),name="payroll-approve-employee",),
+    path("periods/<int:period_id>/employees/<int:employee_id>/decline/",PayrollDeclineEmployeeView.as_view(),name="payroll-decline-employee",),
+
 ]
     

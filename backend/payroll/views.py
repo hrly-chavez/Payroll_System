@@ -11,8 +11,8 @@ from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q
 from datetime import date
-from .services import PayrollGenerationService
-
+from .services import PayrollGenerationService,get_latest_active_payroll
+from rest_framework.exceptions import PermissionDenied
 
 #helpers    
 def _overlaps_period(eff_from, eff_to, period_start, period_end):
@@ -22,7 +22,16 @@ def _overlaps_period(eff_from, eff_to, period_start, period_end):
     """
     eff_to = eff_to or date.max
     return eff_from <= period_end and eff_to >= period_start
+def _require_approver(user):
+    role = (getattr(user, "role", "") or "").strip().upper()
+    if role == "SUPER_ADMIN" or getattr(user, "is_superuser", False):
+        return
 
+    emp = getattr(user, "employee", None)
+    if emp and (getattr(emp, "position", "") or "").strip().upper() == "CEO":
+        return
+
+    raise PermissionDenied("You are not allowed to approve/decline payroll.")
 #==========================================DEDUCTIONS========================================
 # List and Create
 #done logs
@@ -550,15 +559,19 @@ class PayrollEmployeeResultView(APIView):
             period_id=period_id,
             employee_id=employee_id,
         )
-
-        # Ensure payroll exists (generated)
         payroll = (
-            Payroll.objects
-            .filter(payroll_period_id=period_id, employee_id=employee_id)
-            .select_related("payroll_period", "employee", "employee__department")
-            .prefetch_related("payslip_lines", "payslip_lines__rule")
-            .first()
+            get_latest_active_payroll(period_id=period_id, employee_id=employee_id)
         )
+
+        if payroll:
+            # Re-fetch with related/prefetch (so serializer payload stays the same, but correct payroll selected)
+            payroll = (
+                Payroll.objects
+                .filter(id=payroll.id)
+                .select_related("payroll_period", "employee", "employee__department")
+                .prefetch_related("payslip_lines", "payslip_lines__rule")
+                .first()
+            )
 
         if not payroll:
             return Response(
@@ -584,6 +597,7 @@ class PayrollEmployeeResultView(APIView):
             "department_name": emp.department.name if emp.department else None,
 
             "ppe_status": ppe.status,
+            "declined_reason": ppe.declined_reason,
 
             "basic_pay": payroll.basic_pay,
             "total_earnings": payroll.total_earnings,
@@ -594,5 +608,204 @@ class PayrollEmployeeResultView(APIView):
         }
 
         return Response(PayrollResultSerializer(payload).data, status=http_status.HTTP_200_OK)
+
+#==========================================CEO / SUPERADMIN APPROVAL===========================
+
+class PayrollPeriodApprovalQueueView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, period_id: int):
+        _require_approver(request.user)
+
+        period = get_object_or_404(Payroll_Period, id=period_id)
+
+        # filter: Processing (default), Approved, Declined, All
+        status_filter = (request.query_params.get("status") or "Processing").strip()
+        allowed = {"Processing", "Approved", "Declined", "All"}
+        if status_filter not in allowed:
+            return Response(
+                {"detail": f"Invalid status filter. Allowed: {sorted(list(allowed))}"},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        ppe_qs = PayrollPeriodEmployee.objects.filter(period=period).select_related(
+            "employee", "employee__department"
+        )
+
+        if status_filter != "All":
+            ppe_qs = ppe_qs.filter(status=status_filter)
+
+        ppe_qs = ppe_qs.order_by("employee__lname", "employee__fname")
+
+        # Collect latest active payroll per employee (non-Void)
+        # Efficient approach: fetch all payrolls for the period (non-Void), order by run_no desc, pick first per employee
+        payroll_rows = (
+            Payroll.objects
+            .filter(payroll_period=period)
+            .exclude(status="Void")
+            .select_related("employee")
+            .order_by("employee_id", "-run_no", "-id")
+        )
+
+        latest_by_employee = {}
+        for pr in payroll_rows:
+            if pr.employee_id not in latest_by_employee:
+                latest_by_employee[pr.employee_id] = pr
+
+        data = []
+        for ppe in ppe_qs:
+            emp = ppe.employee
+            pr = latest_by_employee.get(emp.id)
+
+            full_name = f"{emp.fname} {emp.lname}".strip()
+
+            data.append({
+                "employee_id": emp.id,
+                "full_name": full_name,
+                "department_name": emp.department.name if emp.department else None,
+                "ppe_status": ppe.status,
+                "payroll_id": pr.id if pr else None,
+                "payroll_status": pr.status if pr else None,
+                "run_no": pr.run_no if pr else None,
+                "net_pay": pr.net_pay if pr else None,
+            })
+
+        return Response({
+            "period": PayrollPeriodCreateSerializer(period).data,
+            "employees": PayrollApprovalEmployeeSerializer(data, many=True).data,
+        })
+    
+class PayrollApproveEmployeeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, period_id: int, employee_id: int):
+        _require_approver(request.user)
+
+        period = get_object_or_404(Payroll_Period, id=period_id)
+
+        ppe = get_object_or_404(
+            PayrollPeriodEmployee.objects.select_for_update(),
+            period=period,
+            employee_id=employee_id,
+        )
+
+        if ppe.status != "Processing":
+            return Response(
+                {"detail": f"Cannot approve. Employee status must be Processing. Current: {ppe.status}."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        payroll = get_latest_active_payroll(period_id=period_id, employee_id=employee_id)
+        if not payroll:
+            return Response(
+                {"detail": "No generated payroll found to approve."},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+
+        if payroll.status != "Generated":
+            return Response(
+                {"detail": f"Cannot approve. Payroll status must be Generated. Current: {payroll.status}."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        now = timezone.now()
+
+        # Update payroll record
+        payroll.status = "Approved"
+        payroll.approved_by = request.user
+        payroll.approved_at = now.date()
+        payroll.save(update_fields=["status", "approved_by", "approved_at"])
+
+        # Update PPE (approve only)
+        ppe.status = "Approved"
+        ppe.approved_by = request.user
+        ppe.approved_at = now
+        ppe.save(update_fields=["status", "approved_by", "approved_at", "updated_at"])
+
+        self._recompute_period_status(period)
+
+        return Response({"detail": "Payroll approved."}, status=http_status.HTTP_200_OK)
+
+    def _recompute_period_status(self, period: Payroll_Period):
+        qs = PayrollPeriodEmployee.objects.filter(period=period)
+        if qs.filter(status="Processing").exists():
+            if period.status != "Processing":
+                period.status = "Processing"
+                period.save(update_fields=["status"])
+            return
+
+        if qs.exists() and not qs.exclude(status__in=["Approved", "Declined"]).exists():
+            if period.status != "Closed":
+                period.status = "Closed"
+                period.save(update_fields=["status"])
+
+class PayrollDeclineEmployeeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, period_id: int, employee_id: int):
+        _require_approver(request.user)
+
+        period = get_object_or_404(Payroll_Period, id=period_id)
+
+        ppe = get_object_or_404(
+            PayrollPeriodEmployee.objects.select_for_update(),
+            period=period,
+            employee_id=employee_id,
+        )
+
+        if ppe.status != "Processing":
+            return Response(
+                {"detail": f"Cannot decline. Employee status must be Processing. Current: {ppe.status}."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        ser = PayrollDeclineInputSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        reason = ser.validated_data["declined_reason"]
+
+        payroll = get_latest_active_payroll(period_id=period_id, employee_id=employee_id)
+        if not payroll:
+            return Response(
+                {"detail": "No generated payroll found to decline."},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+
+        if payroll.status != "Generated":
+            return Response(
+                {"detail": f"Cannot decline. Payroll status must be Generated. Current: {payroll.status}."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        now = timezone.now()
+
+        # Update payroll
+        payroll.status = "Disapproved"
+        payroll.save(update_fields=["status"])
+
+        # Update PPE with reason
+        ppe.status = "Declined"
+        ppe.declined_reason = reason
+        ppe.save(update_fields=["status", "declined_reason", "updated_at"])
+        # Period recompute (temporary copy; will centralize in Step 4)
+        self._recompute_period_status(period)
+
+        return Response({"detail": "Payroll declined."}, status=http_status.HTTP_200_OK)
+
+    def _recompute_period_status(self, period: Payroll_Period):
+        qs = PayrollPeriodEmployee.objects.filter(period=period)
+        if qs.filter(status="Processing").exists():
+            if period.status != "Processing":
+                period.status = "Processing"
+                period.save(update_fields=["status"])
+            return
+
+        if qs.exists() and not qs.exclude(status__in=["Approved", "Declined"]).exists():
+            if period.status != "Closed":
+                period.status = "Closed"
+                period.save(update_fields=["status"])
+
+
 
 

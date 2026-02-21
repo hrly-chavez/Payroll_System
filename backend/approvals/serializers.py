@@ -147,3 +147,38 @@ class AllowanceTypeSerializer(serializers.ModelSerializer):
             )
 
         return value.strip()
+
+#holiday policy
+class HolidayPolicySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HolidayPolicy  # replace with your actual model
+        fields = "__all__"
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
+        # DO NOT use objects.create()
+        instance = HolidayPolicy(**validated_data)
+
+        # Attach _current_user BEFORE saving
+        if user:
+            instance._current_user = user
+
+        instance.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
+        # Update fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        # Attach _current_user BEFORE saving
+        if user:
+            instance._current_user = user
+
+        instance.save()
+        return instance

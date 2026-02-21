@@ -500,3 +500,16 @@ class AllowanceTypeUpdateView(generics.RetrieveUpdateAPIView):
 
         # Perform the update normally; signals will pick up _current_user
         serializer.save()
+
+#holiday policy
+#done logs
+class HolidayPolicyListCreateView(generics.ListCreateAPIView):
+    queryset = HolidayPolicy.objects.all().order_by("-created_at")  # adjust ordering
+    serializer_class = HolidayPolicySerializer
+    permission_classes = [IsAuthenticated]
+
+#done logs
+class HolidayPolicyRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = HolidayPolicy.objects.all()
+    serializer_class = HolidayPolicySerializer
+    permission_classes = [IsAuthenticated]

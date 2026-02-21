@@ -23,7 +23,7 @@ const HolidayPolicy = ({ active }: Props) => {
   const fetchPolicies = async () => {
     setLoading(true);
     try {
-      const res = await api.get("holiday-policy/");
+      const res = await api.get("approvals/holiday-policy/");
       setPolicies(res.data || []);
       hasFetched.current = true;
     } catch (err) {

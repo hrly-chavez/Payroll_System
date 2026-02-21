@@ -30,5 +30,7 @@ urlpatterns = [
     path("allowance-type/", AllowanceTypeListView.as_view()),
     path("allowance-type/<int:pk>/", AllowanceTypeUpdateView.as_view()),
     
-
+    #Holiday Policy
+    path("holiday-policy/", HolidayPolicyListCreateView.as_view(), name="holiday-policy-list-create"),
+    path("holiday-policy/<int:pk>/", HolidayPolicyRetrieveUpdateDestroyView.as_view(), name="holiday-policy-detail"),
 ]

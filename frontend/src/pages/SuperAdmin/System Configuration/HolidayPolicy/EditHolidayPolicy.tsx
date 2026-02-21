@@ -1,4 +1,4 @@
-import { Modal, Form, Input, Select, Switch, message } from "antd";
+import { Modal, Form, Input, Select, Switch, message, Spin, Radio } from "antd";
 import { useEffect, useState } from "react";
 import api from "../../../../api/axios";
 
@@ -14,19 +14,48 @@ type Props = {
 const EditHolidayPolicy = ({ open, onClose, policy, refresh }: Props) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
+
+  // Fetch departments from backend
+  const fetchDepartments = async () => {
+    setDepartmentsLoading(true);
+    try {
+      const res = await api.get("employees/departments/");
+      setDepartments(res.data || []);
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to fetch departments");
+    } finally {
+      setDepartmentsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (policy) {
-      form.setFieldsValue(policy);
+    fetchDepartments();
+  }, []);
+
+  // Populate form when policy changes
+  useEffect(() => {
+    if (policy && departments.length) {
+      // Find the department object that matches the policy.department id
+      const selectedDept = departments.find(
+        (dept) => dept.id === policy.department
+      );
+
+      form.setFieldsValue({
+        ...policy,
+        department: selectedDept?.id || undefined, // set the ID
+      });
     }
-  }, [policy, form]);
+  }, [policy, departments, form]);
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
       setLoading(true);
 
-      await api.put(`holiday-policy/${policy.id}/`, values);
+      await api.put(`approvals/holiday-policy/${policy.id}/`, values);
 
       message.success("Holiday policy updated successfully");
       refresh();
@@ -53,9 +82,19 @@ const EditHolidayPolicy = ({ open, onClose, policy, refresh }: Props) => {
         <Form.Item
           name="department"
           label="Department"
-          rules={[{ required: true, message: "Please enter department" }]}
+          rules={[{ required: true, message: "Please select a department" }]}
         >
-          <Input />
+          {departmentsLoading ? (
+            <Spin />
+          ) : (
+            <Select placeholder="Select department">
+              {departments.map((dept) => (
+                <Option key={dept.id} value={dept.id}>
+                  {dept.name}
+                </Option>
+              ))}
+            </Select>
+          )}
         </Form.Item>
 
         <Form.Item
@@ -73,13 +112,12 @@ const EditHolidayPolicy = ({ open, onClose, policy, refresh }: Props) => {
         <Form.Item
           name="requires_work"
           label="Requires Work"
-          rules={[{ required: true, message: "Select option" }]}
+          rules={[{ required: true, message: "Select an option" }]}
         >
-          <Select>
-            <Option value="All">All</Option>
-            <Option value="Required">Required</Option>
-            <Option value="Not Required">Not Required</Option>
-          </Select>
+          <Radio.Group>
+            <Radio value={true}>Required</Radio>
+            <Radio value={false}>Not Required</Radio>
+          </Radio.Group>
         </Form.Item>
 
         <Form.Item

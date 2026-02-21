@@ -508,7 +508,7 @@ class Leave_Request(models.Model):
     half_day_part = models.CharField(max_length=5, choices=half_day_choices, null=True, blank=True)
     reason = models.TextField()
     status = models.CharField(max_length=15,choices=STATUS_CHOICES,default="Pending")
-    requested_at = models.DateTimeField(auto_now_add=True)
+    requested_at = models.DateTimeField(default=timezone.now)
     approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_leave_requests")
     approved_at = models.DateTimeField(null=True, blank=True)
     employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="leave_requests")

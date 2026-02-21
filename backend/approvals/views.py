@@ -193,7 +193,7 @@ class LeaveRequestListCreateView(generics.ListCreateAPIView):
                 title="New Leave Request",
                 description=f"{employee.fname} {employee.lname} submitted a leave request.",
                 category="leave",
-                redirect_url="/admin/requests"   # ✅ UPDATED HERE
+                redirect_url="/admin/requests"   #  UPDATED HERE
             )
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)

@@ -53,6 +53,7 @@ type PayrollResult = {
   department_name?: string | null;
 
   ppe_status: string;
+  declined_reason?: string | null;
 
   basic_pay: string;
   total_earnings: string;
@@ -128,7 +129,39 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, employee?.id, period?.id]);
 
-  const lines = result?.lines || [];
+  const lines = useMemo(() => {
+    const raw = result?.lines || [];
+
+    const typeOrder: Record<PayslipLine["line_type"], number> = {
+      EARNING: 1,
+      DEDUCTION: 2,
+      INFORMATION: 3,
+    };
+
+    const extractDate = (desc?: string) => {
+      if (!desc) return null;
+      // matches YYYY-MM-DD anywhere in the description
+      const m = desc.match(/\b\d{4}-\d{2}-\d{2}\b/);
+      return m ? m[0] : null;
+    };
+
+    return [...raw].sort((a, b) => {
+      // 1) type grouping
+      const ta = typeOrder[a.line_type] ?? 99;
+      const tb = typeOrder[b.line_type] ?? 99;
+      if (ta !== tb) return ta - tb;
+
+      // 2) within same type, sort by embedded date if present
+      const da = extractDate(a.description);
+      const db = extractDate(b.description);
+      if (da && db) return da.localeCompare(db);
+      if (da && !db) return -1;
+      if (!da && db) return 1;
+
+      // 3) otherwise keep stable-ish
+      return (a.id ?? 0) - (b.id ?? 0);
+    });
+  }, [result]);
 
   const grouped = useMemo(() => {
     const earnings = lines.filter((l) => l.line_type === "EARNING");
@@ -165,6 +198,7 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
         return (
           <div>
             <div>{v || "-"}</div>
+            
             {row.source_type ? (
               <div style={{ fontSize: 12, opacity: 0.7 }}>
                 Source: {row.source_type}
@@ -266,6 +300,16 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
             />
             ) : (
             <>
+             {/* Decline Reason (only if declined) */}
+            {result && (result.ppe_status === "Declined" || (result.payroll_status || "").toLowerCase() === "disapproved") ? (
+            <Alert
+              type="error"
+              showIcon
+              style={{ marginBottom: 12 }}
+              message="Declined Reason"
+              description={result.declined_reason ? result.declined_reason : "No reason provided."}
+            />
+          ) : null}
               <div style={{ marginBottom: 12 }}>
                 <div style={{ fontWeight: 600, marginBottom: 6 }}>Payslip Lines</div>
                 <Table

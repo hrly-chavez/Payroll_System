@@ -1,8 +1,9 @@
 import React from "react";
 import { Card } from "antd";
 import CalendarPage from "pages/HR/Calendar/Calendar";
-import PayrollPeriod from "pages/SuperAdmin/Calendar/PayrollPeriod/PayrollPeriod";
+import PayrollPeriod from "pages/SuperAdmin/Calendar/PayrollPeriod/PayrollPeriodTab";
 import "./Calendar.css";
+import PayrollPeriodTab from "pages/SuperAdmin/Calendar/PayrollPeriod/PayrollPeriodTab";
 
 const Calendar: React.FC = () => {
   return (
@@ -12,8 +13,8 @@ const Calendar: React.FC = () => {
 
       {/* Add PayrollPeriod INSIDE same visual context */}
       <div className="wrapper">
-      <Card className="card">
-          <PayrollPeriod />
+        <Card className="card">
+          <PayrollPeriodTab active={true} searchText="" />
         </Card>
       </div>
     </>

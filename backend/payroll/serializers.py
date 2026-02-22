@@ -410,6 +410,7 @@ class PayrollApprovalEmployeeSerializer(serializers.Serializer):
     department_name = serializers.CharField(allow_null=True)
 
     ppe_status = serializers.CharField()
+    declined_reason = serializers.CharField(allow_null=True, required=False)
 
     payroll_id = serializers.IntegerField(allow_null=True)
     payroll_status = serializers.CharField(allow_null=True)
@@ -427,3 +428,7 @@ class PayrollDeclineInputSerializer(serializers.Serializer):
         if len(v) < 3:
             raise serializers.ValidationError("Decline reason is too short.")
         return v
+
+#Void Reason(nullable)
+class PayrollResetAfterDeclineSerializer(serializers.Serializer):
+    void_reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)

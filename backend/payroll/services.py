@@ -122,7 +122,7 @@ class PayrollGenerationService:
         if not period:
             raise ValidationError({"detail": "Payroll period not found."})
 
-        self._validate_period(period)
+        self._validate_period_for_period_generation(period)
 
         all_ppes = (
             PayrollPeriodEmployee.objects.select_for_update()
@@ -170,7 +170,8 @@ class PayrollGenerationService:
         if not period:
             raise ValidationError({"detail": "Payroll period not found."})
 
-        self._validate_period(period)
+        # Allow per-employee generation when period is already Processing (needed for reset/regenerate flows)
+        self._validate_period_for_employee_generation(period)
 
         # Ensure the period reflects reality once any payroll is generated
         if period.status == "Open":
@@ -194,9 +195,16 @@ class PayrollGenerationService:
     # -------------------------
     # 2) Validation Guards
     # -------------------------
-    def _validate_period(self, period: Payroll_Period):
+    def _validate_period_for_period_generation(self, period: Payroll_Period):
         if period.status != "Open":
             raise ValidationError({"detail": f"Payroll period must be Open. Current status: {period.status}."})
+        if period.end_date < period.start_date:
+            raise ValidationError({"detail": "Invalid payroll period date range."})
+
+    def _validate_period_for_employee_generation(self, period: Payroll_Period):
+        # Allow per-employee generation while Processing (needed for regeneration)
+        if period.status not in {"Open", "Processing"}:
+            raise ValidationError({"detail": f"Payroll period must be Open or Processing. Current status: {period.status}."})
         if period.end_date < period.start_date:
             raise ValidationError({"detail": "Invalid payroll period date range."})
 
@@ -224,7 +232,7 @@ class PayrollGenerationService:
                 raise ValidationError({"detail": "Employee's user account is inactive."})
 
         # block if payroll already exists
-        if Payroll.objects.filter(payroll_period_id=ppe.period_id, employee_id=ppe.employee_id).exists():
+        if (Payroll.objects.filter(payroll_period_id=ppe.period_id, employee_id=ppe.employee_id).exclude(status="Void").exists()):
             raise ValidationError({"detail": "Payroll already exists for this employee in this period."})
 
         # block if no attendance within the period
@@ -597,11 +605,22 @@ class PayrollGenerationService:
     # -------------------------
     # 6) Create Payroll Header
     # -------------------------
-    def _create_payroll(self, employee: Employee, period: Payroll_Period) -> Payroll:
+    def _create_payroll(self, employee: Employee, period: Payroll_Period, regenerated_from: Payroll | None = None) -> Payroll:
+        # next run_no = max(existing run_no) + 1 (including Void runs)
+        last = (
+            Payroll.objects
+            .filter(payroll_period=period, employee=employee)
+            .order_by("-run_no", "-id")
+            .first()
+        )
+        next_run_no = (int(last.run_no) + 1) if last else 1
+
         return Payroll.objects.create(
             payroll_period=period,
             employee=employee,
+            run_no=next_run_no,
             status="Generated",
+            regenerated_from=regenerated_from,
             basic_pay=DEC_0,
             total_earnings=DEC_0,
             total_deductions=DEC_0,

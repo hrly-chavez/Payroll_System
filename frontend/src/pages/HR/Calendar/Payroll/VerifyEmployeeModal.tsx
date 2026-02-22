@@ -153,17 +153,21 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
     Declined: { text: "Declined", color: "red" },
   };
 
-  const [loading, setLoading] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [verifying, setVerifying] = useState(false);
+    const [generating, setGenerating] = useState(false);
+    const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
 
     // commissions
-  const [commissionLoading, setCommissionLoading] = useState(false);
-  const [commissions, setCommissions] = useState<Commission[]>([]);
-  const [openCommissionModal, setOpenCommissionModal] = useState(false);
+    const [commissionLoading, setCommissionLoading] = useState(false);
+    const [commissions, setCommissions] = useState<Commission[]>([]);
+    const [openCommissionModal, setOpenCommissionModal] = useState(false);
 
-  const canVerify = status === "Pending";
-  const canAddCommission = status === "Pending";
+    const canVerify = status === "Pending";
+    const canAddCommission = status === "Pending";
+
+    const canGenerateEmployee =
+      status === "Verified" && (period?.status === "Open" || period?.status === "Processing");
 
 
   const loadSnapshot = async () => {
@@ -228,6 +232,35 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
       setVerifying(false);
     }
   };
+
+  const handleGenerateEmployeePayroll = async () => {
+    if (!employee || !period) return;
+    if (!canGenerateEmployee) {
+      message.error("Generate is allowed only when employee is Verified and period is Open.");
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      const res = await api.post(
+        `/payroll/periods/${period.id}/employees/${employee.id}/generate/`
+      );
+      message.success(res?.data?.detail || "Payroll generated for this employee.");
+
+      // refresh parent table + close modal
+      onVerified();
+      onClose();
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Generate payroll failed";
+      message.error(msg);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
 
  useEffect(() => {
   if (open && employee?.id && period?.id) {
@@ -418,6 +451,17 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
                 disabled={!canAddCommission || !period}
               >
                 Add Commission
+              </Button>
+
+              <Button
+                style={{ marginTop: 8 }}
+                type="primary"
+                block
+                onClick={handleGenerateEmployeePayroll}
+                disabled={!canGenerateEmployee || verifying}
+                loading={generating}
+              >
+                Generate Payroll (Employee)
               </Button>
 
               {status !== "Pending" ? (

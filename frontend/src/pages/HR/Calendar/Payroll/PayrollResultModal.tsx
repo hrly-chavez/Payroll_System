@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Modal, Descriptions, Tag, Table, Spin, Alert, message } from "antd";
+import { Modal, Descriptions, Tag, Table, Spin, Alert, message, Button, Space, Input } from "antd";
 import api from "../../../../api/axios";
 import dayjs from "dayjs";
 
@@ -75,6 +75,46 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
   const [result, setResult] = useState<PayrollResult | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const status = (employee?.status || "Processing") as EligibleEmployee["status"];
+  // reset after decline
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetReason, setResetReason] = useState("");
+  const [resetting, setResetting] = useState(false);
+
+  const canReset =
+    !!period?.id &&
+    !!employee?.id &&
+    ((result?.ppe_status || status) === "Declined");
+
+  const handleResetAfterDecline = async () => {
+    if (!period?.id || !employee?.id) return;
+    if (!canReset) {
+      message.error("Reset is allowed only when employee status is Declined.");
+      return;
+    }
+
+    setResetting(true);
+    try {
+      const res = await api.post(
+        `/payroll/periods/${period.id}/employees/${employee.id}/reset-after-decline/`,
+        { void_reason: (resetReason || "").trim() || null }
+      );
+
+      message.success(res?.data?.detail || "Employee reset to Pending. Previous payroll voided.");
+      setResetOpen(false);
+      setResetReason("");
+
+      // Close modal so the parent table refresh can happen via onClose()
+      onClose();
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Reset failed";
+      message.error(msg);
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const statusMap: Record<EligibleEmployee["status"], { text: string; color: string }> = {
     Pending: { text: "Pending", color: "default" },
@@ -236,6 +276,7 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
   ];
 
   return (
+    <>
     <Modal
       open={open}
       onCancel={onClose}
@@ -285,6 +326,22 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
                   <span style={{ fontWeight: 700 }}>{money(result?.net_pay)}</span>
                 </Descriptions.Item>
               </Descriptions>
+               {/* Action Buttons */}
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+                  <Space>
+                    <Button onClick={loadPayrollResult} disabled={loading || resetting}>
+                      Refresh
+                    </Button>
+
+                    <Button
+                      danger
+                      onClick={() => setResetOpen(true)}
+                      disabled={!canReset || loading || resetting}
+                    >
+                      Reset After Decline
+                    </Button>
+                  </Space>
+                </div>
             </div>
           </div>
 
@@ -305,7 +362,7 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
             <Alert
               type="error"
               showIcon
-              style={{ marginBottom: 12 }}
+              style={{ marginBottom: 12 }}  
               message="Declined Reason"
               description={result.declined_reason ? result.declined_reason : "No reason provided."}
             />
@@ -333,5 +390,40 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
         </>
       )}
     </Modal>
+     {/* Reset After Decline Modal */}
+    <Modal
+      open={resetOpen}
+      onCancel={() => {
+        if (resetting) return;
+        setResetOpen(false);
+        setResetReason("");
+      }}
+      onOk={handleResetAfterDecline}
+      okText="Confirm Reset"
+      confirmLoading={resetting}
+      title="Reset After Decline"
+      destroyOnClose
+    >
+      <Alert
+        type="warning"
+        showIcon
+        message="This will void the latest active payroll run for this employee and reset the employee back to Pending."
+        style={{ marginBottom: 12 }}
+      />
+
+      <div style={{ marginBottom: 6, fontSize: 12, opacity: 0.8 }}>
+        Optional: add a void reason (for audit trail).
+      </div>
+
+      <Input.TextArea
+        value={resetReason}
+        onChange={(e) => setResetReason(e.target.value)}
+        rows={4}
+        placeholder="Void reason (optional)..."
+        maxLength={500}
+        showCount
+      />
+    </Modal>
+    </>
   );
 }

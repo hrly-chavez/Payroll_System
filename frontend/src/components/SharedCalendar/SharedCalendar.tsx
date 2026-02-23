@@ -158,46 +158,59 @@ export default function SharedCalendar({
       locale={customLocale}
 
 
-      headerRender={({ value, onChange }) => (
-        <div className={styles.calendarHeader}>
-          {/* Year Selector */}
-          <select
-            value={value.year()}
-            onChange={(e) =>
-              onChange(value.year(Number(e.target.value)))
-            }
-          >
-            {Array.from({ length: 10 }, (_, i) => {
-              const year = dayjs().year() - 5 + i;
-              return (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              );
-            })}
-          </select>
+      headerRender={({ value, onChange }) => {
+        const today = dayjs();
 
-          {/* Month Selector */}
-          <select
-            value={value.month()}
-            onChange={(e) =>
-              onChange(value.month(Number(e.target.value)))
-            }
-          >
-            {dayjs.months().map((month, index) => (
-              <option key={month} value={index}>
-                {month}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+        return (
+          <div className={styles.calendarHeader}>
+            {/* LEFT SIDE — TODAY DATE */}
+            <div className={styles.todayLabel}>
+              {today.format("MMMM D, YYYY")}
+            </div>
+
+            {/* RIGHT SIDE — CONTROLS */}
+            <div className={styles.headerControls}>
+              {/* Year Selector */}
+              <select
+                value={value.year()}
+                onChange={(e) =>
+                  onChange(value.year(Number(e.target.value)))
+                }
+              >
+                {Array.from({ length: 10 }, (_, i) => {
+                  const year = dayjs().year() - 5 + i;
+                  return (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  );
+                })}
+              </select>
+
+              {/* Month Selector */}
+              <select
+                value={value.month()}
+                onChange={(e) =>
+                  onChange(value.month(Number(e.target.value)))
+                }
+              >
+                {dayjs.months().map((month, index) => (
+                  <option key={month} value={index}>
+                    {month}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        );
+      }}
+
       cellRender={(current, info) => {
         if (info.type === "date") {
           return renderCell(current);
         }
         return info.originNode;
-       }}
+      }}
     />
   );
 }

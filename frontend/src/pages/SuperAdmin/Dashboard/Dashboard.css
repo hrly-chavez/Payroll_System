@@ -78,6 +78,7 @@
   font-size: 16px;
   font-weight: 700;
   text-align: center;
+  color: #3f6f9e;
 }
 
 .tile-body {
@@ -373,6 +374,7 @@
 
   .tile-title {
     font-size: 15px;
+    color: #3f6f9e;
   }
 
   .card-title {

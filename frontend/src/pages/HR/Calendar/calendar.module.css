@@ -3,6 +3,7 @@
   background: white;
   padding: 20px;
   border-radius: 12px;
+  flex: unset;
 }
 
 /* ACTION BUTTONS */
@@ -314,7 +315,7 @@
 }
 
 .calLeftTitle {
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 600;
 }
 

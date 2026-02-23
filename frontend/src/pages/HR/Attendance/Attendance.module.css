@@ -1,41 +1,11 @@
+/* ================= PAGE LAYOUT ================= */
+
 .content {
   margin: 16px;
 }
 
-.tableCard {
-  margin-top: 16px;
-  border-radius: 10px;
-}
+/* ================= STAT CARDS ================= */
 
-.tableHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.headerLeft {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.searchRight {
-  width: 280px;
-}
-
-.nameCell {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.rowStyle:hover {
-  background-color: #f5faff !important;
-}
 .statCard {
   border-radius: 12px;
   background: #ffffff;
@@ -68,4 +38,51 @@
 
 .absentCard :global(.ant-statistic-content) {
   color: #c62828;
+}
+
+/* ================= TABLE CARD ================= */
+
+.tableCard {
+  margin-top: 20px;
+  border-radius: 12px;
+}
+
+.tableHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.headerLeft {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.searchRight {
+  width: 280px;
+}
+
+/* ================= TABLE STYLING ================= */
+
+.nameCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rowStyle:hover {
+  background-color: #f5faff !important;
+}
+
+/* ================= RESPONSIVE ================= */
+
+@media (max-width: 768px) {
+  .searchRight {
+    width: 100%;
+  }
 }

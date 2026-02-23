@@ -1,40 +1,25 @@
+/* ================= PAGE LAYOUT ================= */
+
 .content {
   margin: 16px;
 }
 
+/* ================= MAIN CARD ================= */
+
+.mainCard {
+  border-radius: 12px;
+}
+
+/* ================= ACTION HEADER ================= */
+
 .headerRow {
-  margin-bottom: 20px;
-}
-
-.monthPicker {
-  display: flex;
-  gap: 12px;
-}
-
-.attendanceDot {
-  width: 8px;
-  height: 8px;
-  background: #1890ff;
-  border-radius: 50%;
-  margin-top: 4px;
-}
-
-.requestBtn {
-  background-color: #386fa4 !important;
-  border-color: #386fa4 !important;
-}
-
-.requestBtn:hover {
-  background-color: #2f5d8c !important;
-}
-
-.historyCard {
-  margin-top: 20px;
+  margin-bottom: 16px;
 }
 
 .actions {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
   margin-left: auto;
 }
 
@@ -50,49 +35,44 @@
   border-color: #2f5d8c !important;
 }
 
-.innerTabs :global(.ant-tabs-nav) {
-  margin-bottom: 12px;
-}
-
-.innerTabs :global(.ant-tabs-tab) {
-  font-weight: 500;
-}
-
-.innerTabs :global(.ant-tabs-tab-active .ant-tabs-tab-btn) {
-  color: #386fa4;
-}
-
-.innerTabs :global(.ant-tabs-ink-bar) {
-  background: #386fa4;
-}
-/* ===== Calendar Section ===== */
+/* ================= CALENDAR ================= */
 
 .calendarSection {
-  margin-top: 12px;
+  margin-top: 16px;
 }
 
-.calendarHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
+.calendarCard {
+  border-radius: 12px;
 }
 
-.calendarNav {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.calendarCard :global(.ant-card-body) {
+  padding: 16px;
 }
 
-.calendarTitle {
-  font-weight: 600;
-  font-size: 16px;
+/* UNIFIED CALENDAR SIZE */
+.calendarCard :global(.ant-picker-content) tbody tr {
+  height: 42px;
 }
 
-/* ================= PILLED TABS ================= */
+.calendarCard :global(.ant-picker-cell) {
+  padding: 4px 0 !important;
+}
+
+.calendarCard :global(.ant-picker-calendar-header) {
+  padding-bottom: 12px;
+}
+
+/* ================= HISTORY CARD ================= */
+
+.historyCard {
+  margin-top: 20px;
+  border-radius: 12px;
+}
+
+/* ================= TABS ================= */
 
 .pillTabs :global(.ant-tabs-nav) {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .pillTabs :global(.ant-tabs-nav-list) {
@@ -105,11 +85,6 @@
   border-radius: 25px !important;
   padding: 6px 18px !important;
   margin: 0 !important;
-  transition: all 0.2s ease;
-}
-
-.pillTabs :global(.ant-tabs-tab-btn) {
-  font-weight: 500;
 }
 
 .pillTabs :global(.ant-tabs-tab-active) {
@@ -124,14 +99,18 @@
   display: none;
 }
 
-.calHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
+/* ================= RESPONSIVE ================= */
 
-.calLeftTitle {
-  font-size: 16px;
-  font-weight: 600;
+@media (max-width: 768px) {
+  .actions {
+    width: 100%;
+  }
+
+  .requestBtn {
+    width: 100%;
+  }
+
+  .calendarCard :global(.ant-picker-content) tbody tr {
+    height: 34px;
+  }
 }

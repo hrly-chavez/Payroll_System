@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 from rest_framework import serializers
 from shared_model.models import *
 
@@ -27,8 +28,23 @@ class HolidaySerializer(serializers.ModelSerializer):
 
         return attrs
 
+
+#  allow letters, numbers, spaces, underscore, hyphen ONLY
+# (blocks special chars like @#$%^&*(){}[];:'" etc.)
+LEAVE_NAME_REGEX = re.compile(r"^[A-Za-z0-9 _-]+$")
+
+
 # serializers.py
 class LeaveTypeSerializer(serializers.ModelSerializer):
+    # Explicitly declare the field so we control messages
+    name = serializers.CharField(
+        max_length=20,
+        error_messages={
+            "blank": "Leave name is required.",
+            "required": "Leave name is required.",
+        },
+    )
+
     class Meta:
         model = Leave_Type
         fields = [
@@ -39,6 +55,36 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
             "is_active",
             "created_at",
         ]
+        read_only_fields = ["created_at"]
+
+    def validate_name(self, value):
+        name = (value or "").strip()
+
+        #  allow letters, numbers, spaces, underscore, hyphen only
+        if not name:
+            raise serializers.ValidationError("Leave name is required.")
+
+        if not LEAVE_NAME_REGEX.fullmatch(name):
+            raise serializers.ValidationError(
+                "Leave name can only contain letters, numbers, spaces, underscore (_) and hyphen (-)."
+            )
+
+        #  custom UNIQUE message (case-insensitive)
+        qs = Leave_Type.objects.filter(name__iexact=name)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+
+        if qs.exists():
+            raise serializers.ValidationError("A leave type with this name already exists.")
+
+        return name
+        #     "id",
+        #     "name",
+        #     "is_paid",
+        #     "requires_approval",
+        #     "is_active",
+        #     "created_at",
+        # ]
 
     def create(self, validated_data):
         # Create instance in memory without saving _current_user as a field
@@ -88,18 +134,25 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
             "requested_at",
         ]
 
-class  CommissionTypeSerializer(serializers.ModelSerializer):
+class CommissionTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Commission_Type
-        fields = [
-            "id",
-            "name",
-            "code",
-            "is_taxable",
-            "is_active",
-            "created_at",
-        ]
+        fields = ["id", "name", "is_taxable", "is_active", "created_at"]
+        read_only_fields = ["id", "created_at"]
 
+    def validate_name(self, value):
+        v = (value or "").strip()
+
+        qs = Commission_Type.objects.filter(name__iexact=v)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+
+        if qs.exists():
+            raise serializers.ValidationError(
+                "A commission type with this name already exists."
+            )
+
+        return v
     def create(self, validated_data):
         request = self.context.get("request")
         user = request.user if request and request.user.is_authenticated else None
@@ -129,15 +182,30 @@ class  CommissionTypeSerializer(serializers.ModelSerializer):
         return instance
 
 class AllowanceTypeSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(
+        max_length=50,
+        error_messages={
+            "blank": "Allowance type name is required.",
+            "required": "Allowance type name is required.",
+        },
+    )
+
     class Meta:
         model = Allowance_Type
         fields = "__all__"
         read_only_fields = ["id", "created_at"]
 
-    def validate_code(self, value):
-        qs = Allowance_Type.objects.filter(code__iexact=value.strip())
+    def validate_name(self, value):
+        name = (value or "").strip()
 
-        # ✅ If updating, exclude current instance
+        # ✅ Letters + spaces only
+        if not re.fullmatch(r"[A-Za-z ]+", name):
+            raise serializers.ValidationError(
+                "Allowance type name must contain letters and spaces only."
+            )
+
+        # ✅ Case-insensitive unique check (with custom message)
+        qs = Allowance_Type.objects.filter(name__iexact=name)
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
 
@@ -146,7 +214,7 @@ class AllowanceTypeSerializer(serializers.ModelSerializer):
                 "Allowance code already exists."
             )
 
-        return value.strip()
+        return name
 
 #holiday policy
 class HolidayPolicySerializer(serializers.ModelSerializer):

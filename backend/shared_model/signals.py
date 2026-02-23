@@ -41,12 +41,25 @@ def get_instance_user(instance):
     return None
 
 
+from django.apps import apps
+from django.db import connection
+
+def auditlog_table_exists():
+    try:
+        return "shared_model_auditlog" in connection.introspection.table_names()
+    except Exception:
+        return False
+
 def create_audit_log(instance, action, old_data=None, new_data=None):
-    """Helper to create audit logs with optional data."""
+    # ✅ Don’t log during migrate until table exists
+    if not auditlog_table_exists():
+        return
+
     user = get_instance_user(instance)
-    print(f"[DEBUG] Creating AuditLog for {instance} | Action: {action} | User: {user}")
+    AuditLog = apps.get_model("shared_model", "AuditLog")
+
     AuditLog.objects.create(
-        user=user,
+        user=user if getattr(user, "is_authenticated", False) else None,
         action=action,
         model_name=instance.__class__.__name__,
         object_id=str(instance.pk),

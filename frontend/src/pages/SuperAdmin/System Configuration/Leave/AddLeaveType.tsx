@@ -1,4 +1,3 @@
-// src/pages/SuperAdmin/System Configuration/Leave/AddLeaveType.tsx
 "use client";
 
 import React from "react";
@@ -12,7 +11,31 @@ type Props = {
   form: any;
 };
 
-export default function AddLeaveType({ open, title, onCancel, onOk, form }: Props) {
+// ✅ Allow only letters, numbers, space, hyphen
+const sanitizeLeaveName = (value: string) => {
+  return value.replace(/[^A-Za-z0-9\s-]/g, "");
+};
+
+const leaveNameValidator = (_: any, value: string) => {
+  if (!value) return Promise.resolve();
+
+  const ok = /^[A-Za-z0-9\s-]+$/.test(value);
+  if (!ok) {
+    return Promise.reject(
+      new Error("Leave name can only contain letters, numbers, spaces, and hyphen (-).")
+    );
+  }
+
+  return Promise.resolve();
+};
+
+export default function AddLeaveType({
+  open,
+  title,
+  onCancel,
+  onOk,
+  form,
+}: Props) {
   return (
     <Modal
       title={title}
@@ -23,7 +46,9 @@ export default function AddLeaveType({ open, title, onCancel, onOk, form }: Prop
       centered
       width={500}
       bodyStyle={{ padding: "20px 20px" }}
-      okButtonProps={{ style: { backgroundColor: "#1890ff", borderColor: "#1890ff" } }}
+      okButtonProps={{
+        style: { backgroundColor: "#1890ff", borderColor: "#1890ff" },
+      }}
     >
       <Form
         form={form}
@@ -31,28 +56,60 @@ export default function AddLeaveType({ open, title, onCancel, onOk, form }: Prop
         colon={false}
         labelAlign="left"
         wrapperCol={{ span: 24 }}
-        style={{ maxWidth: "100%" }}
       >
-        <Form.Item label="Leave Name" name="name" rules={[{ required: true, message: "Please enter leave name" }]}>
-          <Input placeholder="Enter leave name" />
+        <Form.Item
+          label="Leave Name"
+          name="name"
+          rules={[
+            { required: true, message: "Please enter leave name" },
+            { validator: leaveNameValidator },
+          ]}
+        >
+          <Input
+            placeholder="Enter leave name"
+            onChange={(e) => {
+              const cleaned = sanitizeLeaveName(e.target.value);
+              form.setFieldsValue({ name: cleaned });
+            }}
+            onPaste={(e) => {
+              e.preventDefault();
+              const pasted = e.clipboardData.getData("text");
+              const cleaned = sanitizeLeaveName(pasted);
+              const current = form.getFieldValue("name") || "";
+              form.setFieldsValue({ name: current + cleaned });
+            }}
+          />
         </Form.Item>
-
-        
 
         <Form.Item label="Options">
           <Row gutter={16}>
             <Col>
-              <Form.Item name="is_paid" valuePropName="checked" noStyle initialValue={true}>
+              <Form.Item
+                name="is_paid"
+                valuePropName="checked"
+                noStyle
+                initialValue={true}
+              >
                 <Checkbox>Paid Leave</Checkbox>
               </Form.Item>
             </Col>
             <Col>
-              <Form.Item name="requires_approval" valuePropName="checked" noStyle initialValue={true}>
+              <Form.Item
+                name="requires_approval"
+                valuePropName="checked"
+                noStyle
+                initialValue={true}
+              >
                 <Checkbox>Requires Approval</Checkbox>
               </Form.Item>
             </Col>
             <Col>
-              <Form.Item name="is_active" valuePropName="checked" noStyle initialValue={true}>
+              <Form.Item
+                name="is_active"
+                valuePropName="checked"
+                noStyle
+                initialValue={true}
+              >
                 <Checkbox>Active</Checkbox>
               </Form.Item>
             </Col>

@@ -301,18 +301,9 @@ class Employee_Deduction(models.Model):
 
 class Allowance_Type(models.Model):
     id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=50)
-    code = models.CharField(max_length=50)
+    name = models.CharField(max_length=50, unique=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateField(default=timezone.now)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["code"],
-                name="unique_allowance_code"
-            )
-        ]
 
     def __str__(self):
         return self.name
@@ -351,11 +342,9 @@ class Employee_Allowance(models.Model):
         ]
 
 class Commission_Type(models.Model):
-    
 
     id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=50)
-    code = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=50, unique=True)
     is_taxable = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=timezone.now)
@@ -480,7 +469,7 @@ class Attendance_Event(models.Model):
 
 class Leave_Type(models.Model):
     id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=20)
+    name = models.CharField(max_length=20, unique=True)
     is_paid = models.BooleanField(default=True)
     requires_approval = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True) 

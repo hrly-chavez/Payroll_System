@@ -74,13 +74,14 @@ export default function CommissionTypeTab({ active }: Props) {
     });
   };
 
+  // ✅ SAVE (with backend field error display for duplicate name)
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
 
       const payload = {
-        name: values.name,
-        code: values.code,
+        name: values.name?.trim(),
+        // ✅ user said they no longer use code, so remove it from payload
         is_taxable: values.is_taxable,
         is_active: values.is_active,
       };
@@ -101,9 +102,29 @@ export default function CommissionTypeTab({ active }: Props) {
 
       closeModal();
       fetchCommissionTypes();
-    } catch (err) {
-      console.error(err);
-      message.error("Failed to save commission type.");
+    } catch (err: any) {
+      // 1) AntD form validation error (already shown under fields)
+      if (err?.errorFields) return;
+
+      // 2) DRF/axios validation errors
+      const data = err?.response?.data;
+
+      // Expected DRF duplicate format:
+      // { name: ["A commission type with this name already exists."] }
+      if (data?.name?.length) {
+        form.setFields([{ name: "name", errors: [data.name[0]] }]);
+        return;
+      }
+
+      // Optional: handle other DRF error shapes
+      const fallback =
+        data?.detail ||
+        (Array.isArray(data?.non_field_errors)
+          ? data.non_field_errors[0]
+          : null) ||
+        "Failed to save commission type.";
+
+      message.error(fallback);
     }
   };
 
@@ -116,7 +137,7 @@ export default function CommissionTypeTab({ active }: Props) {
       .filter((c) => {
         const haystack = [
           c.name,
-          c.code,
+          // ✅ removed code from search as well, since not used
           c.is_taxable ? "yes" : "no",
           c.is_active ? "yes" : "no",
           c.created_at,
@@ -164,7 +185,6 @@ export default function CommissionTypeTab({ active }: Props) {
           <thead>
             <tr>
               <th>Name</th>
-              <th>Code</th>
               <th>Taxable?</th>
               <th>Active</th>
               <th>Created</th>
@@ -175,7 +195,6 @@ export default function CommissionTypeTab({ active }: Props) {
             {filteredCommissionTypes.map((c) => (
               <tr key={c.id}>
                 <td>{c.name}</td>
-                <td>{c.code}</td>
                 <td>{c.is_taxable ? "Yes" : "No"}</td>
                 <td>{c.is_active ? "Yes" : "No"}</td>
                 <td>{c.created_at}</td>

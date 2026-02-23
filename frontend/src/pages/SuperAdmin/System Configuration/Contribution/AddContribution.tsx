@@ -1,3 +1,4 @@
+// ============================== FRONTEND (React + AntD) ==============================
 "use client";
 
 import React from "react";
@@ -14,9 +15,14 @@ type Props = {
   onAmountTypeChange: (val: "manual" | "percent") => void;
 };
 
+// ✅ allow only digits, comma, dot for numeric inputs
 const sanitizeNumeric = (value: string) => {
-  // ✅ allow only digits, comma, dot
   return value.replace(/[^\d.,]/g, "");
+};
+
+// ✅ Deduction code sanitizer: allow only letters, numbers, underscore, hyphen
+const sanitizeCode = (value: string) => {
+  return value.replace(/[^A-Za-z0-9_-]/g, "");
 };
 
 const numericValidator = (_: any, value: string) => {
@@ -24,11 +30,53 @@ const numericValidator = (_: any, value: string) => {
     return Promise.resolve(); // required rule handles empties
   }
 
-  // ✅ must contain at least 1 digit, and only digits/comma/dot
   const ok = /^(?=.*\d)[0-9.,]+$/.test(value);
   if (!ok) {
     return Promise.reject(
       new Error("Numbers only. Allowed: digits, comma (,), dot (.)")
+    );
+  }
+
+  return Promise.resolve();
+};
+
+// ✅ Salary Range (To) must be > 0
+const numericGreaterThanZeroValidator = (_: any, value: string) => {
+  if (value === undefined || value === null || value === "") {
+    return Promise.resolve(); // required handles empties
+  }
+
+  const ok = /^(?=.*\d)[0-9.,]+$/.test(value);
+  if (!ok) {
+    return Promise.reject(
+      new Error("Numbers only. Allowed: digits, comma (,), dot (.)")
+    );
+  }
+
+  const cleaned = value.replace(/,/g, "");
+  const num = Number(cleaned);
+
+  if (!Number.isFinite(num)) {
+    return Promise.reject(new Error("Invalid number format."));
+  }
+
+  if (num <= 0) {
+    return Promise.reject(new Error("Salary Range (To) must be greater than 0."));
+  }
+
+  return Promise.resolve();
+};
+
+// ✅ Deduction code validator (blocks special characters)
+const codeValidator = (_: any, value: string) => {
+  if (value === undefined || value === null || value === "") {
+    return Promise.resolve(); // required handles empties
+  }
+
+  const ok = /^[A-Za-z0-9_-]+$/.test(value);
+  if (!ok) {
+    return Promise.reject(
+      new Error("Invalid code. Use letters, numbers, underscore (_) or hyphen (-) only.")
     );
   }
 
@@ -60,6 +108,20 @@ export default function AddContribution({
     },
   });
 
+  const bindCodeInput = (fieldName: string) => ({
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      const cleaned = sanitizeCode(e.target.value);
+      form.setFieldsValue({ [fieldName]: cleaned });
+    },
+    onPaste: (e: React.ClipboardEvent<HTMLInputElement>) => {
+      e.preventDefault();
+      const pasted = e.clipboardData.getData("text");
+      const cleaned = sanitizeCode(pasted);
+      const current = form.getFieldValue(fieldName) || "";
+      form.setFieldsValue({ [fieldName]: current + cleaned });
+    },
+  });
+
   return (
     <Modal
       title={title}
@@ -70,12 +132,16 @@ export default function AddContribution({
       centered
     >
       <Form form={form} layout="vertical">
+        {/* ✅ NOTE: Use "code" here if backend expects "code" */}
         <Form.Item
           label="Deductions (Code)"
-          name="name"
-          rules={[{ required: true, message: "Required" }]}
+          name="code"
+          rules={[
+            { required: true, message: "Required" },
+            { validator: codeValidator },
+          ]}
         >
-          <Input disabled={isEditMode} />
+          <Input disabled={isEditMode} {...bindCodeInput("code")} />
         </Form.Item>
 
         <Form.Item
@@ -105,7 +171,7 @@ export default function AddContribution({
           name="salaryTo"
           rules={[
             { required: true, message: "Required" },
-            { validator: numericValidator },
+            { validator: numericGreaterThanZeroValidator },
           ]}
         >
           <Input {...bindNumericInput("salaryTo")} />

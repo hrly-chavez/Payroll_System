@@ -17,7 +17,7 @@ export function editPayRule({
   payrollForm,
 }: EditArgs) {
   setPayRuleEditMode(true);
-  setEditingPayRuleId(rule.id);
+  setEditingPayRuleId(rule.id); 
 
   payrollForm.setFieldsValue({
     name: rule.name,

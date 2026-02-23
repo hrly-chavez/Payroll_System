@@ -174,7 +174,6 @@ class AllowanceTypeAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",
-        "code",
         "is_active",
         "created_at",
     )
@@ -186,14 +185,12 @@ class AllowanceTypeAdmin(admin.ModelAdmin):
 
     search_fields = (
         "name",
-        "code",
     )
 
     ordering = ("-created_at",)
 
     fields = (
         "name",
-        "code",
         "is_active",
         "created_at",
     )
@@ -308,7 +305,6 @@ class CommissionTypeAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",
-        "code",
         "is_taxable",
         "is_active",
         "created_at",

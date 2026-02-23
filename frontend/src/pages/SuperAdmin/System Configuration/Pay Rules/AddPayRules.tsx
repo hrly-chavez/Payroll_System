@@ -14,6 +14,7 @@ import {
   InputNumber,
 } from "antd";
 import api from "../../../../api/axios";
+import dayjs, { Dayjs } from "dayjs";
 
 type Props = {
   open: boolean;
@@ -55,6 +56,27 @@ export default function AddPayRules({
   // ✅ detect edit mode based on modal title (simple + no prop changes)
   const isEditMode = title.toLowerCase().includes("edit");
 
+  // ✅ Date disabling logic
+  const today = dayjs().startOf("day");
+
+  // Disable past dates (already done)
+  const disablePastDates = (current: Dayjs) => {
+    // Optional: allow any dates when editing existing records
+    // if (isEditMode) return false;
+    return current && current.startOf("day").isBefore(today);
+  };
+
+  // Disable effective_to past dates AND dates before effective_from
+  const disableEffectiveTo = (current: Dayjs) => {
+    const from = form.getFieldValue("effective_from") as Dayjs | null;
+
+    if (current && current.startOf("day").isBefore(today)) return true;
+
+    if (from) return current.isBefore(from.startOf("day"));
+
+    return false;
+  };
+
   useEffect(() => {
     const fetchChoices = async () => {
       try {
@@ -83,13 +105,38 @@ export default function AddPayRules({
       width={650}
     >
       <Form form={form} layout="vertical">
-        <Form.Item
-          label="Rule Name"
-          name="name"
-          rules={[{ required: true, message: "Rule name is required" }]}
-        >
-          <Input placeholder="Enter rule name" />
-        </Form.Item>
+      <Form.Item
+        label="Rule Name"
+        name="name"
+        rules={[
+          { required: true, message: "Rule name is required" },
+          {
+            validator: (_, value) => {
+              if (!value) return Promise.resolve();
+
+              // ✅ allow letters and spaces only
+              const valid = /^[A-Za-z\s]+$/.test(value);
+
+              if (!valid) {
+                return Promise.reject(
+                  new Error("Only alphabetical characters are allowed.")
+                );
+              }
+
+              return Promise.resolve();
+            },
+          },
+        ]}
+      >
+        <Input
+          placeholder="Enter rule name"
+          onChange={(e) => {
+            // ✅ auto-clean invalid characters while typing
+            const cleaned = e.target.value.replace(/[^A-Za-z\s]/g, "");
+            form.setFieldsValue({ name: cleaned });
+          }}
+        />
+      </Form.Item>
 
         <Row gutter={12}>
           <Col span={12}>
@@ -140,28 +187,85 @@ export default function AddPayRules({
           </Col>
 
           <Col span={12}>
-            <Form.Item
-              label={rateLabel}
-              name="rate_value"
-              help={rateHelp}
-              rules={[
-                {
-                  required: true,
-                  message: isMultiplier
-                    ? "Multiplier is required"
-                    : "Rate value is required",
-                },
-              ]}
-            >
-              <InputNumber
-                style={{ width: "100%" }}
-                min={0}
-                step={isMultiplier ? 0.0001 : 0.01}
-                stringMode
-                addonBefore={isMultiplier ? "x" : "₱"}
-                placeholder={isMultiplier ? "e.g. 1, 1.5, 2" : "Enter amount"}
-              />
-            </Form.Item>
+<Form.Item
+  label={rateLabel}
+  name="rate_value"
+  help={rateHelp}
+  rules={[
+    {
+      required: true,
+      message: isMultiplier
+        ? "Multiplier is required"
+        : "Rate value is required",
+    },
+    {
+      validator: (_, value) => {
+        if (!value) return Promise.resolve();
+
+        const valid = /^\d+(\.\d+)?$/.test(value);
+
+        if (!valid) {
+          return Promise.reject(
+            new Error("Only numbers and one decimal point are allowed.")
+          );
+        }
+
+        return Promise.resolve();
+      },
+    },
+  ]}
+>
+  <InputNumber<string>
+    style={{ width: "100%" }}
+    stringMode
+    min="0"
+    step={isMultiplier ? "0.0001" : "0.01"}
+    addonBefore={isMultiplier ? "x" : "₱"}
+    placeholder={isMultiplier ? "e.g. 1, 1.5, 2" : "Enter amount"}
+
+    // 🔒 HARD BLOCK letters from keyboard
+    onKeyDown={(e) => {
+      const allowedKeys = [
+        "Backspace",
+        "Delete",
+        "ArrowLeft",
+        "ArrowRight",
+        "Tab",
+      ];
+
+      if (
+        !/[0-9.]/.test(e.key) &&
+        !allowedKeys.includes(e.key)
+      ) {
+        e.preventDefault();
+      }
+    }}
+
+    // 🔒 Clean paste input
+    onPaste={(e) => {
+      const paste = e.clipboardData.getData("text");
+      if (!/^\d+(\.\d+)?$/.test(paste)) {
+        e.preventDefault();
+      }
+    }}
+
+    parser={(value) => {
+      if (!value) return "";
+
+      let cleaned = value.replace(/[^0-9.]/g, "");
+
+      // allow only ONE dot
+      const parts = cleaned.split(".");
+      if (parts.length > 2) {
+        cleaned = parts[0] + "." + parts.slice(1).join("");
+      }
+
+      return cleaned;
+    }}
+
+    formatter={(value) => value ?? ""}
+  />
+</Form.Item>
           </Col>
         </Row>
 
@@ -236,13 +340,29 @@ export default function AddPayRules({
               name="effective_from"
               rules={[{ required: true, message: "Effective from is required" }]}
             >
-              <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
+              <DatePicker
+                style={{ width: "100%" }}
+                format="YYYY-MM-DD"
+                disabledDate={disablePastDates}
+                onChange={() => {
+                  // if effective_from changes and effective_to becomes invalid, clear it
+                  const from = form.getFieldValue("effective_from");
+                  const to = form.getFieldValue("effective_to");
+                  if (from && to && dayjs(to).isBefore(dayjs(from), "day")) {
+                    form.setFieldsValue({ effective_to: null });
+                  }
+                }}
+              />
             </Form.Item>
           </Col>
 
           <Col span={12}>
             <Form.Item label="Effective To (Optional)" name="effective_to">
-              <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
+              <DatePicker
+                style={{ width: "100%" }}
+                format="YYYY-MM-DD"
+                disabledDate={disableEffectiveTo}
+              />
             </Form.Item>
           </Col>
         </Row>
@@ -251,7 +371,6 @@ export default function AddPayRules({
         {!isEditMode && (
           <Form.Item name="is_active" valuePropName="checked" initialValue={true}>
             {/* keep default active on add (but invisible on edit) */}
-            {/* If you want it always true on add without UI, tell me and I’ll remove UI too */}
           </Form.Item>
         )}
       </Form>

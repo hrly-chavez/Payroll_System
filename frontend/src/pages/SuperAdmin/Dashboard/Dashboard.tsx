@@ -472,7 +472,7 @@ const Dashboard: React.FC = () => {
 
 
             <Col xs={24} md={10}>
-               <CompanyNote role={role} />
+               <CompanyNote role="SUPER_ADMIN" />
             </Col>  
           </Row>
 

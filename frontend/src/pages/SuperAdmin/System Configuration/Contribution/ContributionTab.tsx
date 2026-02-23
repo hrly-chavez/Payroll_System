@@ -157,7 +157,7 @@ export default function ContributionTab({ active }: Props) {
       }
 
       const payload = {
-        code: values.name,
+        code: values.code,
         category: values.category,
         salary_range_from: salaryFromNum,
         salary_range_to: salaryToNum,

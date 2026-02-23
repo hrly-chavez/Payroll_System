@@ -23,15 +23,18 @@ export function editContribution({
   setAmountType(type);
 
   form.setFieldsValue({
-    name: record.code,
+    // ✅ put the code into the actual "code" field
+    code: record.code,
+
+    // optional: only keep this if you truly have a separate "name" input
+    name: record.name,
+
     category: record.category || "OTHER",
     salaryFrom: record.salary_range_from,
     salaryTo: record.salary_range_to,
-    amountType:
-      record.calculation_type === "Percent" ? "percent" : "manual",
+    amountType: type,
     amount: record.amount,
   });
 
   setIsModalOpen(true);
 }
- 

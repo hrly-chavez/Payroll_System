@@ -311,12 +311,6 @@ const Attendance: React.FC = () => {
 
             {/* ===== Calendar ===== */}
             <div className={styles.calendarSection}>
-              <div className={styles.calendarHeader}>
-                <div className={styles.calLeftTitle}>
-                    {calendarValue.format("MMMM YYYY")}
-                  </div>
-              </div>
-
               <SharedCalendar
                 events={events}
                 value={calendarValue}

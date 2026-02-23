@@ -121,7 +121,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
     },
     {
       key: 'calendar',
-      label: 'Calendar',
+      label: 'Payroll Management',
       icon: <CalendarOutlined />,
       roles: ['ADMIN', 'SUPER_ADMIN'],
       hrefs: {

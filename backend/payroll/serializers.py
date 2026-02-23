@@ -104,6 +104,33 @@ class DeductionTypeSerializer(serializers.ModelSerializer):
             })
 
         return data
+    
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
+        # DO NOT use objects.create()
+        instance = Deduction_Type(**validated_data)
+
+        # Attach BEFORE save
+        if user:
+            instance._current_user = user
+
+        instance.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        if user:
+            instance._current_user = user
+
+        instance.save()
+        return instance
 
 #==================================PAYROLL PERIOD=================================
 # Used to create and return payroll period data (date range, code, status)
@@ -347,6 +374,34 @@ class PayRuleSerializer(serializers.ModelSerializer):
                 raise ValidationError({"rate_value": ["Invalid rate value."]})
 
         return attrs
+    
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
+        # DO NOT use objects.create()
+        instance = Pay_Rule(**validated_data)
+
+        # Attach BEFORE save
+        if user:
+            instance._current_user = user
+
+        instance.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        # Attach BEFORE save
+        if user:
+            instance._current_user = user
+
+        instance.save()
+        return instance
 
     def get_employee_name(self, obj):
         if obj.employee:
@@ -419,6 +474,7 @@ class PayrollApprovalEmployeeSerializer(serializers.Serializer):
     department_name = serializers.CharField(allow_null=True)
 
     ppe_status = serializers.CharField()
+    declined_reason = serializers.CharField(allow_null=True, required=False)
 
     payroll_id = serializers.IntegerField(allow_null=True)
     payroll_status = serializers.CharField(allow_null=True)
@@ -436,3 +492,7 @@ class PayrollDeclineInputSerializer(serializers.Serializer):
         if len(v) < 3:
             raise serializers.ValidationError("Decline reason is too short.")
         return v
+
+#Void Reason(nullable)
+class PayrollResetAfterDeclineSerializer(serializers.Serializer):
+    void_reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)

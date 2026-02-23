@@ -34,6 +34,7 @@ class HolidaySerializer(serializers.ModelSerializer):
 LEAVE_NAME_REGEX = re.compile(r"^[A-Za-z0-9 _-]+$")
 
 
+# serializers.py
 class LeaveTypeSerializer(serializers.ModelSerializer):
     # Explicitly declare the field so we control messages
     name = serializers.CharField(
@@ -77,6 +78,26 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("A leave type with this name already exists.")
 
         return name
+        #     "id",
+        #     "name",
+        #     "is_paid",
+        #     "requires_approval",
+        #     "is_active",
+        #     "created_at",
+        # ]
+
+    def create(self, validated_data):
+        # Create instance in memory without saving _current_user as a field
+        instance = Leave_Type(**validated_data)
+
+        # Attach the _current_user for signals
+        request = self.context.get("request")
+        if request and hasattr(request, "user"):
+            instance._current_user = request.user
+
+        # Save the instance (triggers post_save signal)
+        instance.save()
+        return instance
 
 class LeaveRequestSerializer(serializers.ModelSerializer):
     employee_name = serializers.SerializerMethodField()
@@ -132,6 +153,34 @@ class CommissionTypeSerializer(serializers.ModelSerializer):
             )
 
         return v
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
+        # DO NOT use objects.create()
+        instance = Commission_Type(**validated_data)
+
+        # Attach BEFORE save so signal sees it
+        if user:
+            instance._current_user = user
+
+        instance.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        # Attach BEFORE save
+        if user:
+            instance._current_user = user
+
+        instance.save()
+        return instance
+
 class AllowanceTypeSerializer(serializers.ModelSerializer):
     name = serializers.CharField(
         max_length=50,
@@ -162,7 +211,42 @@ class AllowanceTypeSerializer(serializers.ModelSerializer):
 
         if qs.exists():
             raise serializers.ValidationError(
-                "An allowance type with this name already exists."
+                "Allowance code already exists."
             )
 
         return name
+
+#holiday policy
+class HolidayPolicySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HolidayPolicy  # replace with your actual model
+        fields = "__all__"
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
+        # DO NOT use objects.create()
+        instance = HolidayPolicy(**validated_data)
+
+        # Attach _current_user BEFORE saving
+        if user:
+            instance._current_user = user
+
+        instance.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
+        # Update fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        # Attach _current_user BEFORE saving
+        if user:
+            instance._current_user = user
+
+        instance.save()
+        return instance

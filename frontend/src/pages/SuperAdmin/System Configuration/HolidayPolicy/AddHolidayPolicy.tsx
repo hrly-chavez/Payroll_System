@@ -25,7 +25,7 @@ const AddHolidayPolicy = ({ open, onClose, refresh }: Props) => {
   ========================= */
   const fetchDepartments = async () => {
     try {
-      const res = await api.get("departments/"); // adjust endpoint if needed
+      const res = await api.get("employees/departments/"); // adjust endpoint if needed
       setDepartments(res.data || []);
     } catch (err) {
       message.error("Failed to load departments");
@@ -46,7 +46,7 @@ const AddHolidayPolicy = ({ open, onClose, refresh }: Props) => {
       const values = await form.validateFields();
       setLoading(true);
 
-      await api.post("holiday-policy/", values);
+      await api.post("approvals/holiday-policy/", values);
 
       message.success("Holiday policy added successfully");
       form.resetFields();

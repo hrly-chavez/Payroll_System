@@ -13,8 +13,10 @@ from django.db.models import Exists, OuterRef, Q
 from datetime import date
 from .services import PayrollGenerationService,get_latest_active_payroll
 from rest_framework.exceptions import PermissionDenied
+from django.db.models.fields import DateField, DateTimeField
 
-#helpers    
+
+# helpers
 def _overlaps_period(eff_from, eff_to, period_start, period_end):
     """
     Returns True if [eff_from, eff_to] overlaps with [period_start, period_end].
@@ -22,6 +24,8 @@ def _overlaps_period(eff_from, eff_to, period_start, period_end):
     """
     eff_to = eff_to or date.max
     return eff_from <= period_end and eff_to >= period_start
+
+
 def _require_approver(user):
     role = (getattr(user, "role", "") or "").strip().upper()
     if role == "SUPER_ADMIN" or getattr(user, "is_superuser", False):
@@ -32,29 +36,94 @@ def _require_approver(user):
         return
 
     raise PermissionDenied("You are not allowed to approve/decline payroll.")
+
+
+
+def _recompute_period_status(period: Payroll_Period):
+    """
+    Single source of truth for Payroll_Period.status.
+    - If any PPE is Processing -> period Processing
+    - Else if all PPE are Approved/Declined (and at least 1 exists) -> period Closed
+    - Else -> period Processing (because there are Pending/Verified remaining)
+    """
+    qs = PayrollPeriodEmployee.objects.filter(period=period)
+
+    if qs.filter(status="Processing").exists():
+        if period.status != "Processing":
+            period.status = "Processing"
+            period.save(update_fields=["status"])
+        return
+
+    if qs.exists() and not qs.exclude(status__in=["Approved", "Declined"]).exists():
+        if period.status != "Closed":
+            period.status = "Closed"
+            period.save(update_fields=["status"])
+        return
+
+    # If there are still Pending/Verified (or anything else), it should remain Processing for approvals to continue.
+    if period.status != "Processing":
+        period.status = "Processing"
+        period.save(update_fields=["status"])
+
+
+def _set_payroll_approved_at(payroll: Payroll, now_dt):
+    """
+    Avoid mismatches: if Payroll.approved_at is DateTimeField -> save datetime
+    if DateField -> save date
+    """
+    try:
+        f = payroll._meta.get_field("approved_at")
+        if isinstance(f, DateTimeField):
+            payroll.approved_at = now_dt
+        elif isinstance(f, DateField):
+            payroll.approved_at = now_dt.date()
+        else:
+            # fallback
+            payroll.approved_at = now_dt
+    except Exception:
+        # fallback (keeps current behavior safe)
+        payroll.approved_at = now_dt.date()
 #==========================================DEDUCTIONS========================================
 # List and Create
+#done logs
 class DeductionListCreateView(generics.ListCreateAPIView):
     queryset = Deduction_Type.objects.all().order_by('-create_at')
     serializer_class = DeductionTypeSerializer
+    permission_classes = [IsAuthenticated]
 
 # Retrieve, Update, Delete
+#done logs
 class DeductionDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Deduction_Type.objects.all()
     serializer_class = DeductionTypeSerializer
 
 # Optional: Update only 'is_active' status
+#done logs
 class DeductionUpdateStatusView(APIView):
     def patch(self, request, pk):
         try:
             deduction = Deduction_Type.objects.get(pk=pk)
         except Deduction_Type.DoesNotExist:
-            return Response({"error": "Deduction not found"}, status=status.HTTP_404_NOT_FOUND)
-        
+            return Response(
+                {"error": "Deduction not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
         # Update only is_active
-        deduction.is_active = request.data.get('is_active', deduction.is_active)
+        deduction.is_active = request.data.get(
+            "is_active",
+            deduction.is_active
+        )
+
+        # Attach user BEFORE save
+        deduction._current_user = request.user
+
         deduction.save()
-        serializer = DeductionTypeSerializer(deduction)
+
+        serializer = DeductionTypeSerializer(
+            deduction,
+            context={"request": request}  # good practice
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -78,84 +147,8 @@ class PayrollPeriodListCreateView(generics.ListCreateAPIView):
             status="Open",
         )
 
-# #for clicking the payroll period (shows modal with employees) fetch
-# class PayrollPeriodEligibleEmployeesView(APIView):
-#     permission_classes = [IsAuthenticated]
 
-#     def get(self, request, period_id):
-#         period = get_object_or_404(Payroll_Period, id=period_id)
-
-#         # 1) employees who already have payroll in this period
-#         payroll_employee_ids = Payroll.objects.filter(
-#             payroll_period=period
-#         ).values_list("employee_id", flat=True)
-
-#         # attendance must exist within the payroll period date range
-#         attendance_in_period = Attendance.objects.filter(
-#             employee_id=OuterRef("pk"),
-#             date__gte=period.start_date,
-#             date__lte=period.end_date,
-#         )
-
-#         eligible_employees = (
-#             Employee.objects
-#             # exclude inactive employees
-#             .filter(is_active=True)
-
-#             # exclude employees that already have payroll in this period
-#             .exclude(id__in=payroll_employee_ids)
-
-#             # exclude CEO (position) and Super Admin users (role)
-#             .exclude(
-#                 Q(position__iexact="CEO") |
-#                 Q(user__role__iexact="SUPER_ADMIN")
-#             )
-
-#             # OPTIONAL (but matches your ask): exclude employees whose linked user is inactive
-#             # (keeps employees with no linked user)
-#             .exclude(Q(user__isnull=False) & Q(user__is_active=False))
-
-#             # must have at least 1 attendance within the period
-#             .annotate(has_attendance=Exists(attendance_in_period))
-#             .filter(has_attendance=True)
-
-#             .select_related("department", "user")
-#         )
-
-#         # 3) lazy-create PayrollPeriodEmployee rows for eligible employees
-#         existing_employee_ids = set(
-#             PayrollPeriodEmployee.objects.filter(period=period)
-#             .values_list("employee_id", flat=True)
-#         )
-
-#         to_create = [
-#             PayrollPeriodEmployee(period=period, employee=e)
-#             for e in eligible_employees
-#             if e.id not in existing_employee_ids
-#         ]
-
-#         if to_create:
-#             PayrollPeriodEmployee.objects.bulk_create(
-#                 to_create,
-#                 ignore_conflicts=True
-#             )
-
-#         # 4) return PayrollPeriodEmployee rows (so we can include status)
-#         ppe_qs = (
-#             PayrollPeriodEmployee.objects
-#             .filter(period=period, employee__in=eligible_employees)
-#             .exclude(employee_id__in=payroll_employee_ids)
-#             .select_related("employee", "employee__department")
-#             .order_by("employee__lname", "employee__fname")
-#         )
-
-#         return Response({
-#             "period": PayrollPeriodCreateSerializer(period).data,
-#             "eligible_employees": EligibleEmployeeSerializer(ppe_qs, many=True).data
-#         })
 # for clicking the payroll period (shows modal with employees) fetch
-
-
 class PayrollPeriodEligibleEmployeesView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -375,7 +368,7 @@ class PayrollPeriodEmployeeCommissionListCreateView(APIView):
 
     def _guard_locked(self, period, employee):
         # block when payroll already exists
-        if Payroll.objects.filter(payroll_period=period, employee=employee).exists():
+        if (Payroll.objects.filter(payroll_period=period, employee=employee).exclude(status="Void").exists()):
             return Response(
                 {"detail": "Payroll already generated. Commissions are locked for this employee in this period."},
                 status=http_status.HTTP_400_BAD_REQUEST
@@ -441,6 +434,7 @@ class PayrollPeriodEmployeeCommissionListCreateView(APIView):
 
 
 #==========================================PAYRULE========================================
+#done logs
 class SuperAdminPayRuleListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = PayRuleSerializer
@@ -459,6 +453,7 @@ class SuperAdminPayRuleListCreateView(generics.ListCreateAPIView):
 
         serializer.save()
 
+#done logs
 class SuperAdminPayRuleRetrieveUpdateView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = PayRuleSerializer
@@ -644,6 +639,7 @@ class PayrollPeriodApprovalQueueView(APIView):
                 "full_name": full_name,
                 "department_name": emp.department.name if emp.department else None,
                 "ppe_status": ppe.status,
+                "declined_reason": ppe.declined_reason,
                 "payroll_id": pr.id if pr else None,
                 "payroll_status": pr.status if pr else None,
                 "run_no": pr.run_no if pr else None,
@@ -694,7 +690,7 @@ class PayrollApproveEmployeeView(APIView):
         # Update payroll record
         payroll.status = "Approved"
         payroll.approved_by = request.user
-        payroll.approved_at = now.date()
+        _set_payroll_approved_at(payroll, now)
         payroll.save(update_fields=["status", "approved_by", "approved_at"])
 
         # Update PPE (approve only)
@@ -703,22 +699,9 @@ class PayrollApproveEmployeeView(APIView):
         ppe.approved_at = now
         ppe.save(update_fields=["status", "approved_by", "approved_at", "updated_at"])
 
-        self._recompute_period_status(period)
+        _recompute_period_status(period)
 
         return Response({"detail": "Payroll approved."}, status=http_status.HTTP_200_OK)
-
-    def _recompute_period_status(self, period: Payroll_Period):
-        qs = PayrollPeriodEmployee.objects.filter(period=period)
-        if qs.filter(status="Processing").exists():
-            if period.status != "Processing":
-                period.status = "Processing"
-                period.save(update_fields=["status"])
-            return
-
-        if qs.exists() and not qs.exclude(status__in=["Approved", "Declined"]).exists():
-            if period.status != "Closed":
-                period.status = "Closed"
-                period.save(update_fields=["status"])
 
 class PayrollDeclineEmployeeView(APIView):
     permission_classes = [IsAuthenticated]
@@ -767,25 +750,87 @@ class PayrollDeclineEmployeeView(APIView):
         # Update PPE with reason
         ppe.status = "Declined"
         ppe.declined_reason = reason
-        ppe.save(update_fields=["status", "declined_reason", "updated_at"])
-        # Period recompute (temporary copy; will centralize in Step 4)
-        self._recompute_period_status(period)
+
+        # Optional: set audit fields if your model already has them (won't crash if missing)
+        if hasattr(ppe, "declined_by"):
+            ppe.declined_by = request.user
+        if hasattr(ppe, "declined_at"):
+            ppe.declined_at = timezone.now()
+
+        update_fields = ["status", "declined_reason", "updated_at"]
+        if hasattr(ppe, "declined_by"):
+            update_fields.append("declined_by")
+        if hasattr(ppe, "declined_at"):
+            update_fields.append("declined_at")
+
+        ppe.save(update_fields=update_fields)
+
+        _recompute_period_status(period)
 
         return Response({"detail": "Payroll declined."}, status=http_status.HTTP_200_OK)
 
-    def _recompute_period_status(self, period: Payroll_Period):
-        qs = PayrollPeriodEmployee.objects.filter(period=period)
-        if qs.filter(status="Processing").exists():
-            if period.status != "Processing":
-                period.status = "Processing"
-                period.save(update_fields=["status"])
-            return
+#==========================================RESETING PAYROLL===========================
+class PayrollResetAfterDeclineView(APIView):
+    permission_classes = [IsAuthenticated]
 
-        if qs.exists() and not qs.exclude(status__in=["Approved", "Declined"]).exists():
-            if period.status != "Closed":
-                period.status = "Closed"
-                period.save(update_fields=["status"])
+    @transaction.atomic
+    def post(self, request, period_id: int, employee_id: int):
+        
+        period = get_object_or_404(Payroll_Period.objects.select_for_update(), id=period_id)
 
+        ppe = get_object_or_404(
+            PayrollPeriodEmployee.objects.select_for_update(),
+            period_id=period_id,
+            employee_id=employee_id,
+        )
 
+        if ppe.status != "Declined":
+            return Response(
+                {"detail": f"Reset allowed only when status is Declined. Current: {ppe.status}."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
 
+        ser = PayrollResetAfterDeclineSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        void_reason = (ser.validated_data.get("void_reason") or "").strip()
+
+        # find latest active payroll (non-Void)
+        payroll = get_latest_active_payroll(period_id=period_id, employee_id=employee_id)
+        if not payroll:
+            return Response(
+                {"detail": "No active payroll found to void for this employee in this period."},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+
+        # void it
+        payroll.status = "Void"
+        payroll.voided_by = request.user
+        payroll.voided_at = timezone.now()
+        payroll.void_reason = void_reason or "Reset after decline"
+        payroll.save(update_fields=["status", "voided_by", "voided_at", "void_reason"])
+
+         # reset PPE back to Pending 
+        ppe.status = "Pending"
+        ppe.declined_reason = None
+        ppe.approved_by = None
+        ppe.approved_at = None
+
+        # Optional: clear decline audit fields if present
+        if hasattr(ppe, "declined_by"):
+            ppe.declined_by = None
+        if hasattr(ppe, "declined_at"):
+            ppe.declined_at = None
+
+        update_fields = ["status", "declined_reason", "approved_by", "approved_at", "updated_at"]
+        if hasattr(ppe, "declined_by"):
+            update_fields.append("declined_by")
+        if hasattr(ppe, "declined_at"):
+            update_fields.append("declined_at")
+
+        ppe.save(update_fields=update_fields)
+
+        # After reset, period should reflect reality (often back to Processing)
+        _recompute_period_status(period)
+
+        return Response({"detail": "Employee reset to Pending. Previous payroll voided."}, status=http_status.HTTP_200_OK)
 

@@ -112,11 +112,21 @@ class ShiftSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
         workdays_data = validated_data.pop("workdays", [])
 
-        shift = Shift.objects.create(**validated_data)
+        # ✅ DO NOT use objects.create()
+        shift = Shift(**validated_data)
 
-        # If UI didn't send anything, default all days as workday (optional)
+        # ✅ Attach user BEFORE save
+        if user:
+            shift._current_user = user
+
+        shift.save()
+
+        # If UI didn't send anything, default all days
         if not workdays_data:
             workdays_data = [
                 {"day_of_week": i, "is_workday": True} for i in range(1, 8)
@@ -125,17 +135,26 @@ class ShiftSerializer(serializers.ModelSerializer):
         Shift_Workday.objects.bulk_create([
             Shift_Workday(shift=shift, **wd) for wd in workdays_data
         ])
+
         return shift
 
     def update(self, instance, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
         workdays_data = validated_data.pop("workdays", None)
 
-        # update shift fields
+        # Update shift fields
         for attr, val in validated_data.items():
             setattr(instance, attr, val)
+
+        # ✅ Attach user BEFORE save
+        if user:
+            instance._current_user = user
+
         instance.save()
 
-        # if provided, replace workdays
+        # Replace workdays if provided
         if workdays_data is not None:
             instance.workdays.all().delete()
             Shift_Workday.objects.bulk_create([

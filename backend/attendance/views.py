@@ -137,11 +137,13 @@ class CEOandHRAttendanceLogsView(APIView):
             "results": CEOandHRAttendanceLogSerializer(qs, many=True).data,
         })
 
+#done logs
 class ShiftListCreateView(generics.ListCreateAPIView):
     queryset = Shift.objects.all().order_by("start_time")
     serializer_class = ShiftSerializer
     permission_classes = [IsAuthenticated]
 
+#done logs
 class ShiftRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Shift.objects.all()
     serializer_class = ShiftSerializer

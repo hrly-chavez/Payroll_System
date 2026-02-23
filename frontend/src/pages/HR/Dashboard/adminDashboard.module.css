@@ -55,16 +55,17 @@
 .timeRow {
   display: flex;
   justify-content: center;
-  gap: 12px;
-  margin-bottom: 12px;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 0; /* remove extra space since we now use gap on parent */
 }
 
 .timeBox {
   text-align: center;
   border: 1px solid #cdcdcd;
-  padding: 10px 16px;
-  border-radius: 10px;
-  min-width: 120px;
+  padding: 14px 22px;      /* bigger so it “fills” the card */
+  border-radius: 12px;
+  min-width: 160px;        /* wider like your 2nd screenshot */
 }
 
 .timeBox span {
@@ -72,16 +73,17 @@
   color: #777;
 }
 
+
 .timeBox h2 {
-  font-size: 20px;
+  font-size: 22px;         /* slightly bigger */
   margin: 6px 0 0;
 }
 
-/* BUTTONS */
 .buttonRow {
   display: flex;
   justify-content: center;
-  gap: 12px;
+  align-items: center;
+  gap: 14px;
 }
 
 .punchInBtn {
@@ -234,10 +236,24 @@
   height: 360px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
 }
-
+.attendanceCard :global(.ant-card-body) {
+  flex: 1;                 /* make body take remaining height */
+  display: flex;
+  align-items: center;      /* vertical center */
+  justify-content: center;  /* horizontal center */
+}
+.attendanceCenter {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
 .attendanceCard {
   height: 360px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
 }
 
 .companyNoteCard {
@@ -293,7 +309,7 @@
 
 .pendingTabs :global(.ant-tabs-tab) {
   font-size: 13px;
-  padding: 6px 10px !important;
+  padding: 6px 10px !important; 
 }
 
 .pendingTabs :global(.ant-tabs-tab-active .ant-tabs-tab-btn) {
@@ -318,4 +334,17 @@
 
 .calendarCard :global(.ant-card-body) {
   padding-top: 8px;
+}
+
+
+
+
+.punchInHint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+  line-height: 1.4;
+  word-break: normal;
+  white-space: normal;
 }

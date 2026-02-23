@@ -364,8 +364,8 @@ class Attendance(models.Model):
     id = models.AutoField(primary_key=True)
     date = models.DateField()
     status = models.CharField(max_length=20,choices=STATUS_CHOICES,default="PRESENT")
-    time_in = models.TimeField(null=True, blank=True)
-    time_out = models.TimeField(null=True, blank=True)
+    time_in = models.DateTimeField(null=True, blank=True)
+    time_out = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="attendances")
 

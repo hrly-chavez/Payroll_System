@@ -1,4 +1,5 @@
 import axios from "axios";
+import { message } from "antd";
 
 // const api = axios.create({
 //   baseURL: "http://127.0.0.1:8000/api",
@@ -33,11 +34,18 @@ api.interceptors.request.use(
  */
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
+  (error) => {
     if (error.response?.status === 401) {
-      localStorage.clear();
-      window.location.href = "/";
+      // Clear auth
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("role");
+      localStorage.removeItem("user_name");
+
+      // Show message only
+      message.error("Your session has expired. Please login again.");
     }
+
     return Promise.reject(error);
   }
 );

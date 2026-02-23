@@ -38,31 +38,92 @@ export default function Login() {
     checkSuperAdmin();
   }, []);
 
+  const sanitizeInput = (value: string) => {
+    if (!value) return "";
+
+    // Remove leading/trailing spaces
+    let sanitized = value.trim();
+
+    // Remove all HTML tags
+    sanitized = sanitized.replace(/<[^>]*>/g, "");
+
+    // Escape special characters
+    sanitized = sanitized
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#x27;")
+      .replace(/`/g, "&#x60;");
+
+    // Normalize spaces
+    sanitized = sanitized.replace(/\s+/g, " ");
+
+    return sanitized;
+  };
+
   const onFinish = async (values: LoginFormValues) => {
     setLoading(true);
+
     try {
+      const sanitizedUsername = sanitizeInput(values.username);
+      const sanitizedPassword = sanitizeInput(values.password);
+
+      if (!sanitizedUsername || !sanitizedPassword) {
+        message.error("Username or password cannot be empty or contain HTML.");
+        setLoading(false);
+        return;
+      }
+
       const tokenRes = await api.post("/auth/token/", {
-        user_name: values.username,
-        password: values.password,
+        user_name: sanitizedUsername,
+        password: sanitizedPassword,
       });
 
       const { access, refresh } = tokenRes.data;
+
       localStorage.setItem("access_token", access);
       localStorage.setItem("refresh_token", refresh);
 
       const meRes = await api.get("/accounts/me/");
-      localStorage.setItem("user_name", meRes.data.user_name);
-      localStorage.setItem("role", meRes.data.role);
 
+      const userName = meRes.data.user_name;
       const role = meRes.data.role;
-      if (role === "EMPLOYEE") navigate("/employee_dashboard");
-      else if (role === "ADMIN") navigate("/admin/dashboard");
-      else if (role === "SUPER_ADMIN") navigate("/super-admin/dashboard");
-      else navigate("/");
 
-      message.success("Login successful");
+      localStorage.setItem("user_name", userName);
+      localStorage.setItem("role", role);
+
+      // 🎉 Welcome message
+      message.success(`Welcome back, ${userName}!`);
+
+      // Navigate based on role
+      if (role === "EMPLOYEE") {
+        navigate("/employee_dashboard", { replace: true });
+      } else if (role === "ADMIN") {
+        navigate("/admin/dashboard", { replace: true });
+      } else if (role === "SUPER_ADMIN") {
+        navigate("/super-admin/dashboard", { replace: true });
+      } else {
+        message.error("Invalid user role. Please contact administrator.");
+      }
+
     } catch (err: any) {
-      message.error(err?.response?.data?.detail || "Login failed");
+      // 🔥 Proper error trapping
+      if (err.response) {
+        const status = err.response.status;
+
+        if (status === 401) {
+          message.error("User does not exist or invalid credentials.");
+        } else if (status === 400) {
+          message.error("Invalid login request.");
+        } else if (status >= 500) {
+          message.error("Server error. Please try again later.");
+        } else {
+          message.error("Login failed. Please try again.");
+        }
+      } else {
+        message.error("Network error. Please check your connection.");
+      }
     } finally {
       setLoading(false);
     }

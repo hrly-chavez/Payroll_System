@@ -401,7 +401,7 @@ class EmployeeAllowanceCreateSerializer(serializers.ModelSerializer):
 class AllowanceTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Allowance_Type
-        fields = ["id", "name", "code", "is_active"]
+        fields = ["id", "name", "is_active"]
 
 #this is the read or get for allowance
 class EmployeeAllowanceSerializer(serializers.ModelSerializer):

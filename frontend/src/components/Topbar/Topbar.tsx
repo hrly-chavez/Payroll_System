@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Layout, Typography, Avatar, Button, Dropdown } from "antd";
+import { Layout, Typography, Avatar, Button, Dropdown, message } from "antd";
 import { ArrowLeftOutlined, LogoutOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import "./Topbar.css";
@@ -24,9 +24,15 @@ const Topbar: React.FC<TopbarProps> = ({
   const [notifCount, setNotifCount] = useState<number>(0);
 
   const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("user");
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("user_name");
+    localStorage.removeItem("role");
     if (onLogout) onLogout();
+
+    // Show logout message
+    message.success("You have been logged out successfully");
+
     navigate("/", { replace: true });
   };
 

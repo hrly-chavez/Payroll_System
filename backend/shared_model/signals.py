@@ -2,7 +2,7 @@ from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
 from django.forms.models import model_to_dict
 from django.core.serializers.json import DjangoJSONEncoder
-from .models import AuditLog, Notification
+from .models import AuditLog, Notification, Province, City, Barangay, Holiday
 from accounts.current_user import get_current_user
 import json
 
@@ -73,7 +73,7 @@ def log_save(sender, instance, created, **kwargs):
     if sender == AuditLog:
         return
     
-    if sender in [AuditLog, Notification]:
+    if sender in [AuditLog, Notification, Province, City, Barangay, Holiday]:
         return
 
     # Skip if manually set
@@ -114,7 +114,7 @@ def log_delete(sender, instance, **kwargs):
     if sender == AuditLog:
         return
     
-    if sender in [AuditLog, Notification]:
+    if sender in [AuditLog, Notification, Province, City, Barangay, Holiday]:
         return
 
     # Skip if manually set

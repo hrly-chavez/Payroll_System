@@ -175,3 +175,51 @@ class ShiftSerializer(serializers.ModelSerializer):
             ])
 
         return instance
+
+
+
+class PendingOvertimeQueueSerializer(serializers.ModelSerializer):
+    attendance_id = serializers.IntegerField(source="attendance.id", read_only=True)
+    attendance_date = serializers.DateField(source="attendance.date", read_only=True)
+    time_in = serializers.DateTimeField(source="attendance.time_in", read_only=True)
+    time_out = serializers.DateTimeField(source="attendance.time_out", read_only=True)
+
+    employee_id = serializers.IntegerField(source="attendance.employee.id", read_only=True)
+    full_name = serializers.SerializerMethodField()
+    department_name = serializers.SerializerMethodField()
+    shift_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Attendance_Event
+        fields = [
+            "id",
+            "type",
+            "minutes",
+            "start_time",
+            "end_time",
+            "approval_status",
+            "event_remarks",
+            "created_at",
+            "attendance_id",
+            "attendance_date",
+            "time_in",
+            "time_out",
+            "employee_id",
+            "full_name",
+            "department_name",
+            "shift_name",
+        ]
+
+    def get_full_name(self, obj):
+        emp = obj.attendance.employee
+        return f"{emp.fname} {emp.lname}"
+
+    def get_department_name(self, obj):
+        dept = getattr(obj.attendance.employee, "department", None)
+        return getattr(dept, "name", None)
+
+    def get_shift_name(self, obj):
+        shift = getattr(obj.attendance.employee, "shift", None)
+        return getattr(shift, "name", None)
+
+        

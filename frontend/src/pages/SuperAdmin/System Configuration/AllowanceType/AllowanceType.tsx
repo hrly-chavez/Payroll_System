@@ -22,7 +22,6 @@ type Props = {
 export type AllowanceType = {
   id: number;
   name: string;
-  code: string;
   is_active: boolean;
   created_at: string;
 };
@@ -90,7 +89,7 @@ const Allowance = ({ active }: Props) => {
 
     return allowances
       .filter((a) => {
-        const haystack = [a.name, a.code]
+        const haystack = [a.name]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -101,7 +100,6 @@ const Allowance = ({ active }: Props) => {
 
   const columns = [
     { title: "Name", dataIndex: "name" },
-    { title: "Code", dataIndex: "code" },
     {
       title: "Status",
       dataIndex: "is_active",

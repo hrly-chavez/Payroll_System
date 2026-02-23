@@ -44,7 +44,7 @@ class DeductionTypeSerializer(serializers.ModelSerializer):
         model = Deduction_Type
         fields = "__all__"
 
-    def validate(self, data):
+    def validate(self, data): 
         # ✅ NOTE: make sure your model field is really named "code"
         code = (data.get("code") or "").strip()
         category = (data.get("category") or "").strip()

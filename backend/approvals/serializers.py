@@ -211,7 +211,7 @@ class AllowanceTypeSerializer(serializers.ModelSerializer):
 
         if qs.exists():
             raise serializers.ValidationError(
-                "Allowance code already exists."
+                "An allowance type with this name already exists."
             )
 
         return name

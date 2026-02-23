@@ -136,12 +136,9 @@ export default function AddContribution({
         <Form.Item
           label="Deductions (Code)"
           name="code"
-          rules={[
-            { required: true, message: "Required" },
-            { validator: codeValidator },
-          ]}
+          rules={[{ required: true, message: "Deduction code is required." }]}
         >
-          <Input disabled={isEditMode} {...bindCodeInput("code")} />
+          <Input placeholder="Enter deduction code" />
         </Form.Item>
 
         <Form.Item

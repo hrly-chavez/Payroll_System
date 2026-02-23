@@ -25,7 +25,6 @@ const AddAllowanceType = ({ open, onClose, refresh }: Props) => {
       const data = err?.response?.data;
 
       const backendMsg =
-        (Array.isArray(data?.code) && data.code[0]) ||
         (Array.isArray(data?.name) && data.name[0]) ||
         data?.detail ||
         "Failed to add allowance type";
@@ -51,14 +50,6 @@ const AddAllowanceType = ({ open, onClose, refresh }: Props) => {
           label="Name"
           name="name"
           rules={[{ required: true, message: "Name required" }]}
-        >
-          <Input />
-        </Form.Item>
-
-        <Form.Item
-          label="Code"
-          name="code"
-          rules={[{ required: true, message: "Code required" }]}
         >
           <Input />
         </Form.Item>

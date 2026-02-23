@@ -9,6 +9,11 @@ type Props = {
   form: any;
 };
 
+const NAME_MAX = 50;
+
+// allow letters, numbers, spaces, and common punctuation: . , & - ( )
+const NAME_PATTERN = /^[a-zA-Z0-9\s.,&()\-]+$/;
+
 const AddCommissionType: React.FC<Props> = ({
   open,
   title,
@@ -21,7 +26,7 @@ const AddCommissionType: React.FC<Props> = ({
   }, [open, form]);
 
   const confirmToggle = (fieldName: "is_taxable" | "is_active") => {
-    const currentValue = !!form.getFieldValue(fieldName); // BLUE=true, GRAY=false
+    const currentValue = !!form.getFieldValue(fieldName);
     const nextValue = !currentValue;
 
     const message =
@@ -50,28 +55,56 @@ const AddCommissionType: React.FC<Props> = ({
       open={open}
       title={title}
       onCancel={onCancel}
-      onOk={onOk}
+      onOk={() => form.submit()} // submit form to ensure validators run
       okText="Save"
       destroyOnClose
     >
-      <Form form={form} layout="vertical">
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={(values) => {
+          // normalize before sending
+          const payload = {
+            ...values,
+            name: values.name?.trim(),
+          };
+
+          // set normalized values back (optional)
+          form.setFieldsValue(payload);
+
+          // call parent onOk (your parent should read form values / submit via axios)
+          onOk();
+        }}
+      >
         <Form.Item
           label="Commission Name"
           name="name"
-          rules={[{ required: true, message: "Name is required" }]}
+          normalize={(val: string) => (typeof val === "string" ? val.replace(/\s+/g, " ") : val)} // collapse multiple spaces
+          rules={[
+            { required: true, message: "Name is required" },
+            { max: NAME_MAX, message: `Name must be at most ${NAME_MAX} characters.` },
+            {
+            validator: async (_, value) => {
+              const v = (value ?? "").trim();
+              if (!v) return;
+
+              if (!NAME_PATTERN.test(v)) {
+                throw new Error(
+                  "Name must contain letters only. Numbers and special characters are not allowed."
+                );
+              }
+            },
+          }
+          ]}
         >
-          <Input />
+          <Input
+            maxLength={NAME_MAX}
+            placeholder="e.g. Sales Commission"
+            autoComplete="off"
+          />
         </Form.Item>
 
-        <Form.Item
-          label="Code"
-          name="code"
-          rules={[{ required: true, message: "Code is required" }]}
-        >
-          <Input />
-        </Form.Item>
-
-        {/* ✅ keep these values in the form, but hidden (so Switch won't auto-toggle) */}
+        {/* hidden fields */}
         <Form.Item name="is_taxable" initialValue={false} hidden>
           <Input />
         </Form.Item>

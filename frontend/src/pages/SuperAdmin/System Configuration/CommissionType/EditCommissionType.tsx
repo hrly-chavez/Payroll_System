@@ -22,6 +22,6 @@ export const editCommissionType = ({
     is_taxable: commission.is_taxable,
     is_active: commission.is_active,
   });
-
+ 
   setModalOpen(true);
 };

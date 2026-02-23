@@ -18,7 +18,7 @@ export function editLeaveType({
   setEditingLeaveId(leave.id);
 
   leaveForm.setFieldsValue({
-    name: leave.name,
+    name: leave.name, 
     is_paid: leave.is_paid,
     requires_approval: leave.requires_approval,
     is_active: leave.is_active,

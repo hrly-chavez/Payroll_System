@@ -30,9 +30,9 @@ export default function ContributionTab({ active }: Props) {
 
   const [form] = Form.useForm();
 
-  // ✅ Map backend field names -> form field names
+  //  Map backend field names -> form field names
   const fieldMap: Record<string, string> = {
-    code: "name",                // backend "code" -> form "name"
+    code: "name",             
     name: "name",
     category: "category",
     salary_range_from: "salaryFrom",
@@ -40,7 +40,7 @@ export default function ContributionTab({ active }: Props) {
     amount: "amount",
   };
 
-  // ✅ helper: "1,234.50" -> 1234.50
+  //  helper: "1,234.50" -> 1234.50
   const toNumber = (v: any) => {
     if (v === null || v === undefined) return null;
     const s = String(v).trim().replace(/,/g, "");
@@ -48,7 +48,7 @@ export default function ContributionTab({ active }: Props) {
     return Number.isFinite(n) ? n : null;
   };
 
-  // ✅ ALWAYS newest first (latest added on top)
+  //  ALWAYS newest first (latest added on top)
   const fetchContributions = async () => {
     setLoading(true);
     try {
@@ -97,7 +97,7 @@ export default function ContributionTab({ active }: Props) {
     });
   };
 
-  // ✅ Confirm modal + status update
+  //Confirm modal + status update
   const confirmToggleStatus = (record: any, nextStatus: boolean) => {
     const actionText = nextStatus ? "activate" : "deactivate";
 
@@ -164,7 +164,7 @@ export default function ContributionTab({ active }: Props) {
         calculation_type: values.amountType === "manual" ? "Fixed" : "Percent",
         amount: amountNum,
 
-        // 🔥 PRESERVE active state during edit
+        //  PRESERVE active state during edit
         is_active: isEditMode ? existing?.is_active : true,
       };
 
@@ -186,21 +186,16 @@ export default function ContributionTab({ active }: Props) {
         closeContributionModal();
       }
     } catch (error: any) {
-      // ✅ AntD validation error: already shown on the form fields
+      //  AntD validation error: already shown on the form fields
       if (error?.errorFields) return;
 
-      // ✅ Show backend real reason + highlight fields
+      //  Show backend real reason + highlight fields
       const res = showBackendError(error, form, fieldMap);
-
-      // optional: if backend gave non_field_errors, store it too
-      // (ONLY if your showBackendError sets nonFieldError; if not, toast is enough)
-      // form.setFields([{ name: "nonFieldError", errors: [res.toast] }]);
 
       message.error(res.toast);
     }
   };
 
-  // ✅ Filtered list (search by code/category/type/amount/salary range)
   const filteredContributions = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return contributions;
@@ -313,7 +308,7 @@ export default function ContributionTab({ active }: Props) {
         </table>
       )}
 
-      <AddContribution
+      <AddContribution 
         open={isModalOpen}
         title={isEditMode ? "Edit Contribution" : "Add Contribution"}
         onCancel={closeContributionModal}

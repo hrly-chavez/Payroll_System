@@ -3,8 +3,15 @@ from rest_framework import serializers
 from shared_model.models import *
 from django.utils import timezone
 from decimal import Decimal,InvalidOperation
+from rest_framework.validators import UniqueValidator
 
+# ✅ salary/amount numeric-like: must contain at least 1 digit, and only digits/comma/dot
 NUMERIC_LIKE_REGEX = re.compile(r"^(?=.*\d)[0-9.,]+$")
+
+# ✅ Deduction code safe chars only (prevents special characters like ; ' " = ( ) etc.)
+# allowed: letters, digits, underscore, hyphen
+CODE_SAFE_REGEX = re.compile(r"^[A-Za-z0-9_-]+$")
+
 
 def parse_decimal_allow_comma_dot(value, field_name: str) -> Decimal:
     if value is None:
@@ -38,9 +45,19 @@ class DeductionTypeSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
     def validate(self, data):
+        # ✅ NOTE: make sure your model field is really named "code"
         code = (data.get("code") or "").strip()
         category = (data.get("category") or "").strip()
         calc_type = (data.get("calculation_type") or "").strip()  # "Fixed" / "Percent"
+
+        # ✅ Deduction code: block special characters
+        if not code:
+            raise serializers.ValidationError({"code": "This field is required."})
+
+        if not CODE_SAFE_REGEX.match(code):
+            raise serializers.ValidationError({
+                "code": "Invalid code. Use letters, numbers, underscore (_) or hyphen (-) only."
+            })
 
         salary_from = parse_decimal_allow_comma_dot(data.get("salary_range_from"), "salary_range_from")
         salary_to = parse_decimal_allow_comma_dot(data.get("salary_range_to"), "salary_range_to")
@@ -49,6 +66,12 @@ class DeductionTypeSerializer(serializers.ModelSerializer):
 
         if "amount" in data and data.get("amount") is not None:
             data["amount"] = parse_decimal_allow_comma_dot(data.get("amount"), "amount")
+
+        # ✅ Salary Range (To) must be > 0
+        if salary_to <= Decimal("0"):
+            raise serializers.ValidationError({
+                "salary_range_to": "Salary Range (To) must be greater than 0."
+            })
 
         # ✅ from <= to
         if salary_from > salary_to:
@@ -61,37 +84,22 @@ class DeductionTypeSerializer(serializers.ModelSerializer):
         if self.instance:
             qs = qs.exclude(id=self.instance.id)
 
-        # ✅ RULE 3: Overlap only within SAME code + SAME category + SAME calculation_type
-        conflict_same_group = qs.filter(
+        # ✅ ONLY BLOCK EXACT DUPLICATE:
+        # same code + same category + same type + same salary range (from/to)
+        exact_duplicate = qs.filter(
             code=code,
-            category=category,
-            calculation_type=calc_type,
-            salary_range_from__lte=salary_to,
-            salary_range_to__gte=salary_from,
-        ).first()
-
-        if conflict_same_group:
-            raise serializers.ValidationError({
-                "non_field_errors": [
-                    f"Cannot save. Salary range {salary_from} - {salary_to} overlaps with existing range "
-                    f"{conflict_same_group.salary_range_from} - {conflict_same_group.salary_range_to} "
-                    f"under the same Code '{code}', Category '{category}', and Type '{calc_type}'."
-                ]
-            })
-
-        # ✅ RULE 4: Different code, SAME category + SAME type cannot have EXACT same range
-        exact_range_conflict = qs.filter(
             category=category,
             calculation_type=calc_type,
             salary_range_from=salary_from,
             salary_range_to=salary_to,
-        ).exclude(code=code).first()
+        ).first()
 
-        if exact_range_conflict:
+        if exact_duplicate:
             raise serializers.ValidationError({
                 "non_field_errors": [
-                    f"Cannot save. The salary range {salary_from} - {salary_to} already exists in "
-                    f"Category '{category}' with Type '{calc_type}' under Code '{exact_range_conflict.code}'."
+                    f"Duplicate not allowed. The exact entry already exists for "
+                    f"Code '{code}', Category '{category}', Type '{calc_type}', "
+                    f"Range {salary_from} - {salary_to}."
                 ]
             })
 
@@ -259,6 +267,17 @@ class CommissionTypeSerializer(serializers.ModelSerializer):
         model = Commission_Type
         fields = ["id", "name", "code", "is_taxable", "is_active"]
 
+    def validate_name(self, value):
+        v = (value or "").strip()
+
+        qs = Commission_Type.objects.filter(name__iexact=v)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+
+        if qs.exists():
+            raise serializers.ValidationError("A commission type with this name already exists.")
+        return v
+
 # List commissions in the modal
 class PayrollPeriodEmployeeCommissionListSerializer(serializers.ModelSerializer):
     commission_type = CommissionTypeSerializer(read_only=True)
@@ -279,8 +298,21 @@ class PayrollPeriodEmployeeCommissionCreateSerializer(serializers.ModelSerialize
         return value
 
 #==========================================PAYRULE ========================================
+from rest_framework.exceptions import ValidationError
+from decimal import Decimal
 
 class PayRuleSerializer(serializers.ModelSerializer):
+    # ✅ override name field validator + message here
+    name = serializers.CharField(
+        max_length=100,
+        validators=[
+            UniqueValidator(
+                queryset=Pay_Rule.objects.all(),
+                message="A pay rule with this name already exists. Please choose a different name."
+            )
+        ],
+    )
+
     applies_to_name = serializers.CharField(source="applies_to.name", read_only=True)
     employee_name = serializers.SerializerMethodField()
 
@@ -289,53 +321,30 @@ class PayRuleSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
     def validate(self, attrs):
-        """
-        Enforce:
-        - Either applies_to OR employee OR none (global)
-        - Not both at the same time
-        - effective_to >= effective_from
-        - rate_value >= 0
-        """
-
-        # Handle updates properly
         applies_to = attrs.get("applies_to", getattr(self.instance, "applies_to", None))
         employee = attrs.get("employee", getattr(self.instance, "employee", None))
 
-        effective_from = attrs.get(
-            "effective_from",
-            getattr(self.instance, "effective_from", None)
-        )
-        effective_to = attrs.get(
-            "effective_to",
-            getattr(self.instance, "effective_to", None)
-        )
+        effective_from = attrs.get("effective_from", getattr(self.instance, "effective_from", None))
+        effective_to = attrs.get("effective_to", getattr(self.instance, "effective_to", None))
+        rate_value = attrs.get("rate_value", getattr(self.instance, "rate_value", None))
 
-        rate_value = attrs.get(
-            "rate_value",
-            getattr(self.instance, "rate_value", None)
-        )
-
-        #  Scope validation
         if applies_to and employee:
-            raise serializers.ValidationError({"detail": "Choose only one scope: either Department (applies_to) or Employee, not both."})
+            raise ValidationError({
+                "applies_to": ["Choose either Department or Employee, not both."],
+                "employee": ["Choose either Department or Employee, not both."],
+            })
 
-        #  Date validation
         if effective_to and effective_from and effective_to < effective_from:
-            raise ValidationError(
-                {"detail": "effective_to cannot be earlier than effective_from."}
-            )
+            raise ValidationError({
+                "effective_to": ["effective_to cannot be earlier than effective_from."],
+            })
 
-        #  Rate value validation
         if rate_value is not None:
             try:
-                if Decimal(rate_value) < 0:
-                    raise ValidationError(
-                        {"rate_value": "Rate value cannot be negative."}
-                    )
+                if Decimal(str(rate_value)) < 0:
+                    raise ValidationError({"rate_value": ["Rate value cannot be negative."]})
             except Exception:
-                raise ValidationError(
-                    {"rate_value": "Invalid rate value."}
-                )
+                raise ValidationError({"rate_value": ["Invalid rate value."]})
 
         return attrs
 

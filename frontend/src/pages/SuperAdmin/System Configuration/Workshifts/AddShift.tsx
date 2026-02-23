@@ -1,3 +1,4 @@
+import React from "react";
 import {
   Modal,
   Form,
@@ -12,6 +13,7 @@ import {
   Tag,
 } from "antd";
 import api from "../../../../api/axios";
+import dayjs from "dayjs";
 
 const { CheckableTag } = Tag;
 
@@ -25,25 +27,59 @@ const DAYS = [
   { label: "Sun", value: 7 },
 ];
 
+// ✅ Shift name: letters + spaces only (no numbers, no special chars)
+const SHIFT_NAME_REGEX = /^[A-Za-z]+(?:\s[A-Za-z]+)*$/;
+
+// ✅ Block letters/special chars for InputNumber (v6-safe)
+const allowOnlyDigitsKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const navKeys = [
+    "Backspace",
+    "Delete",
+    "Tab",
+    "Enter",
+    "Escape",
+    "ArrowLeft",
+    "ArrowRight",
+    "Home",
+    "End",
+  ];
+
+  // allow ctrl/cmd shortcuts (copy/paste/select all)
+  if (e.ctrlKey || e.metaKey) return;
+
+  if (navKeys.includes(e.key)) return;
+
+  // allow only 0-9
+  if (!/^\d$/.test(e.key)) {
+    e.preventDefault();
+  }
+};
+
+const allowOnlyDigitsPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+  const text = e.clipboardData.getData("text");
+  if (!/^\d+$/.test(text)) e.preventDefault();
+};
+
 const AddShift = ({ open, onClose, refresh }: any) => {
   const [form] = Form.useForm();
 
   const onFinish = async (values: any) => {
     const selectedDays: number[] = values.workdays_selected || [];
 
-    const payload = {
+    const payload: any = {
       ...values,
+      // UI is 12h AM/PM, backend receives 24h HH:mm
       start_time: values.start_time.format("HH:mm"),
       end_time: values.end_time.format("HH:mm"),
-      // create nested workdays
+      // nested workdays
       workdays: DAYS.map((d) => ({
         day_of_week: d.value,
         is_workday: selectedDays.includes(d.value),
       })),
     };
 
-    // remove helper field (not needed by backend)
-    delete (payload as any).workdays_selected;
+    // remove helper field
+    delete payload.workdays_selected;
 
     await api.post("attendance/shifts/", payload);
 
@@ -66,7 +102,6 @@ const AddShift = ({ open, onClose, refresh }: any) => {
         layout="vertical"
         onFinish={onFinish}
         initialValues={{
-          // default: Mon–Fri selected (change if you want all 7 default)
           workdays_selected: [1, 2, 3, 4, 5],
           break_minutes: 0,
           grace_minutes: 0,
@@ -76,9 +111,26 @@ const AddShift = ({ open, onClose, refresh }: any) => {
         <Form.Item
           name="name"
           label="Shift Name"
-          rules={[{ required: true, message: "Shift name is required" }]}
+          normalize={(val) =>
+            typeof val === "string" ? val.replace(/\s+/g, " ").trimStart() : val
+          }
+          rules={[
+            { required: true, message: "Shift name is required" },
+            {
+              validator: (_, value) => {
+                const v = (value ?? "").trim();
+                if (!v) return Promise.resolve(); // required handles empty
+                if (!SHIFT_NAME_REGEX.test(v)) {
+                  return Promise.reject(
+                    new Error("Shift name must contain letters and spaces only.")
+                  );
+                }
+                return Promise.resolve();
+              },
+            },
+          ]}
         >
-          <Input />
+          <Input placeholder="e.g. Morning Shift" />
         </Form.Item>
 
         <Row gutter={16}>
@@ -88,7 +140,16 @@ const AddShift = ({ open, onClose, refresh }: any) => {
               label="Start Time"
               rules={[{ required: true, message: "Start time is required" }]}
             >
-              <TimePicker format="HH:mm" style={{ width: "100%" }} />
+              {/* ✅ More user-friendly time picker */}
+              <TimePicker
+                style={{ width: "100%" }}
+                use12Hours
+                format="hh:mm A"
+                minuteStep={5}
+                inputReadOnly
+                placeholder="Select start time"
+                defaultOpenValue={dayjs("08:00", "HH:mm")}
+              />
             </Form.Item>
           </Col>
 
@@ -98,21 +159,58 @@ const AddShift = ({ open, onClose, refresh }: any) => {
               label="End Time"
               rules={[{ required: true, message: "End time is required" }]}
             >
-              <TimePicker format="HH:mm" style={{ width: "100%" }} />
+              <TimePicker
+                style={{ width: "100%" }}
+                use12Hours
+                format="hh:mm A"
+                minuteStep={5}
+                inputReadOnly
+                placeholder="Select end time"
+                defaultOpenValue={dayjs("17:00", "HH:mm")}
+              />
             </Form.Item>
           </Col>
         </Row>
 
         <Row gutter={16}>
           <Col xs={24} md={12}>
-            <Form.Item name="break_minutes" label="Break Minutes">
-              <InputNumber min={0} style={{ width: "100%" }} />
+            <Form.Item
+              name="break_minutes"
+              label="Break Minutes"
+              rules={[
+                { type: "number", min: 0, message: "Break minutes must be 0 or higher." },
+              ]}
+            >
+              {/* ✅ integers only, blocks alphabets + special chars */}
+              <InputNumber
+                min={0}
+                precision={0}
+                style={{ width: "100%" }}
+                placeholder="e.g. 60"
+                controls
+                onKeyDown={allowOnlyDigitsKeyDown}
+                onPaste={allowOnlyDigitsPaste}
+              />
             </Form.Item>
           </Col>
 
           <Col xs={24} md={12}>
-            <Form.Item name="grace_minutes" label="Grace Minutes">
-              <InputNumber min={0} style={{ width: "100%" }} />
+            <Form.Item
+              name="grace_minutes"
+              label="Grace Minutes"
+              rules={[
+                { type: "number", min: 0, message: "Grace minutes must be 0 or higher." },
+              ]}
+            >
+              <InputNumber
+                min={0}
+                precision={0}
+                style={{ width: "100%" }}
+                placeholder="e.g. 15"
+                controls
+                onKeyDown={allowOnlyDigitsKeyDown}
+                onPaste={allowOnlyDigitsPaste}
+              />
             </Form.Item>
           </Col>
         </Row>
@@ -128,10 +226,13 @@ const AddShift = ({ open, onClose, refresh }: any) => {
           name="workdays_selected"
           label="Workdays (click to toggle)"
           rules={[
-            { type: "array" as any, required: true, message: "Select at least 1 workday" },
+            {
+              type: "array" as any,
+              required: true,
+              message: "Select at least 1 workday",
+            },
           ]}
         >
-          {/* We manually render tags and update the array value */}
           <WorkdayTags form={form} />
         </Form.Item>
       </Form>

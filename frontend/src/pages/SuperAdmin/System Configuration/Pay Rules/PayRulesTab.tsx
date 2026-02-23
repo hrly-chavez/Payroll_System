@@ -23,6 +23,58 @@ type Props = {
   active: boolean;
 };
 
+// ✅ Extract exact DRF error message (and field errors)
+const extractDRFError = (
+  err: any
+): { text: string; fieldErrors?: Record<string, string[]> } => {
+  const data = err?.response?.data;
+
+  // Network/unknown error
+  if (!data) {
+    return { text: err?.message || "Unknown error" };
+  }
+
+  // Backend returns string
+  if (typeof data === "string") {
+    return { text: data };
+  }
+
+  // Backend returns array
+  if (Array.isArray(data)) {
+    return { text: data.map(String).join(" ") };
+  }
+
+  // Common DRF shape: { detail: "..." }
+  if (typeof data?.detail === "string") {
+    return { text: data.detail };
+  }
+
+  // DRF field errors: { field: ["msg"], other: ["msg"] }
+  if (typeof data === "object") {
+    const fieldErrors: Record<string, string[]> = {};
+    const parts: string[] = [];
+
+    for (const [key, val] of Object.entries(data)) {
+      if (Array.isArray(val)) {
+        fieldErrors[key] = val.map(String);
+        parts.push(`${key}: ${val.map(String).join(" ")}`);
+      } else if (typeof val === "string") {
+        fieldErrors[key] = [val];
+        parts.push(`${key}: ${val}`);
+      } else {
+        parts.push(`${key}: ${JSON.stringify(val)}`);
+      }
+    }
+
+    return {
+      text: parts.join(" | ") || "Validation error",
+      fieldErrors: Object.keys(fieldErrors).length ? fieldErrors : undefined,
+    };
+  }
+
+  return { text: "Unknown error format" };
+};
+
 export default function PayRulesTab({ active }: Props) {
   const [loading, setLoading] = useState(false);
 
@@ -43,9 +95,10 @@ export default function PayRulesTab({ active }: Props) {
     try {
       const res = await API.get("/employees/departments/");
       setDepartments(res.data);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      message.error("Failed to fetch departments.");
+      const parsed = extractDRFError(error);
+      message.error(parsed.text);
     }
   };
 
@@ -53,9 +106,10 @@ export default function PayRulesTab({ active }: Props) {
     try {
       const res = await API.get("/employees/employees/");
       setEmployees(res.data);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      message.error("Failed to fetch employees.");
+      const parsed = extractDRFError(error);
+      message.error(parsed.text);
     }
   };
 
@@ -66,9 +120,10 @@ export default function PayRulesTab({ active }: Props) {
       const res = await API.get("/payroll/superadmin/pay-rules/");
       const sorted = [...(res.data || [])].sort((a: any, b: any) => b.id - a.id);
       setPayRules(sorted);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      message.error("Failed to fetch payroll rules.");
+      const parsed = extractDRFError(error);
+      message.error(parsed.text);
     }
     setLoading(false);
   };
@@ -133,9 +188,10 @@ export default function PayRulesTab({ active }: Props) {
             );
             return updated.sort((a: any, b: any) => b.id - a.id);
           });
-        } catch (error) {
+        } catch (error: any) {
           console.error(error);
-          message.error("Failed to update status");
+          const parsed = extractDRFError(error);
+          message.error(parsed.text); // ✅ exact error
         }
       },
     });
@@ -192,9 +248,21 @@ export default function PayRulesTab({ active }: Props) {
         message.success("Payroll rule added successfully");
         closePayrollModal();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      message.error("Failed to save payroll rule.");
+
+      // ✅ show exact backend error message
+      const parsed = extractDRFError(error);
+      message.error(parsed.text);
+
+      // ✅ show errors under fields (EXACT from backend)
+      if (parsed.fieldErrors) {
+        const fields = Object.entries(parsed.fieldErrors).map(([name, errors]) => ({
+          name,
+          errors,
+        }));
+        payrollForm.setFields(fields);
+      }
     }
   };
 
@@ -282,6 +350,7 @@ export default function PayRulesTab({ active }: Props) {
         <table className="config-table">
           <thead>
             <tr>
+              <th>Rule Name</th>
               <th>Event Type</th>
               <th>Category</th>
               <th>Rate Type</th>
@@ -295,6 +364,7 @@ export default function PayRulesTab({ active }: Props) {
           <tbody>
             {filteredPayRules.map((rule) => (
               <tr key={rule.id}>
+                <td>{rule.name}</td>
                 <td>{rule.event_type}</td>
                 <td>{rule.category}</td>
                 <td>{formatRateType(rule.rate_type)}</td>

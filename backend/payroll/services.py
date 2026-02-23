@@ -13,21 +13,44 @@ from rest_framework.exceptions import ValidationError
 from shared_model.models import *
 
 
+# -------------------------------------------------------------------
+# Constants
+# -------------------------------------------------------------------
 DEC_0 = Decimal("0.00")
 
-#Helpers
+# -------------------------------------------------------------------
+# Helpers 
+# -------------------------------------------------------------------
 def _overlaps_period(eff_from, eff_to, period_start, period_end):
+    """
+    Returns True if an effective range overlaps a payroll period range.
+
+    Used by allowance/deduction filters that have effective_from/effective_to.
+    - eff_from can be None (treated as "no lower bound")
+    - eff_to can be None (treated as "no upper bound")
+
+    Overlap logic:
+    - If eff_from starts AFTER period_end -> no overlap
+    - If eff_to ends BEFORE period_start -> no overlap
+    - Otherwise -> overlap
+    """
     if eff_from and eff_from > period_end:
         return False
     if eff_to and eff_to < period_start:
         return False
     return True
 
-
 def get_latest_active_payroll(period_id: int, employee_id: int) -> Payroll | None:
     """
-    Latest active payroll = highest run_no where status != 'Void'.
-    Used for result viewing + CEO approval actions + regeneration.
+    Return the latest *non-void* payroll record for one employee in one payroll period.
+
+    Definition of "latest active payroll":
+    - Highest run_no (and then highest id) where status != 'Void'
+
+    Where used:
+    - Payslip/result viewing (always show current active run)
+    - CEO approval flow (approve the active one)
+    - Regeneration/reset flows (void old runs; create new run_no)
     """
     return (
         Payroll.objects
@@ -38,18 +61,36 @@ def get_latest_active_payroll(period_id: int, employee_id: int) -> Payroll | Non
     )
 
 def _d2(x, places="0.01"):
+    """
+    Quantize/round decimals consistently across payroll computations.
+
+    Default places="0.01" -> 2 decimal places (money).
+    Uses ROUND_HALF_UP for standard financial rounding.
+    """
     return (Decimal(x).quantize(Decimal(places), rounding=ROUND_HALF_UP))
 
 
 def _safe_decimal(x, field_name="value"):
+    """
+    Convert a value into Decimal safely.
+    """
     try:
         return Decimal(str(x))
     except Exception:
         raise ValidationError({field_name: f"Invalid decimal value: {x}"})
 
-
+# -------------------------------------------------------------------
+# Data containers
+# -------------------------------------------------------------------
 @dataclass
 class Rates:
+    """
+    Computed pay rates used throughout the generation.
+    - daily_rate: base daily pay
+    - hourly_rate: daily_rate converted based on shift_work_minutes
+    - per_minute_rate: daily_rate / shift_work_minutes (high precision)
+    - shift_work_minutes: how many payable minutes exist in a normal shift (minus breaks)
+    """
     daily_rate: Decimal
     hourly_rate: Decimal
     per_minute_rate: Decimal
@@ -58,16 +99,26 @@ class Rates:
 
 class PayrollGenerationService:
     """
-    All-or-nothing payroll generation.
-    If any employee fails, raise ValidationError and rollback everything.
+    All-or-nothing payroll generation service.
+
+    Important behavior:
+    - Uses database transactions (atomic). If any employee fails, ALL changes rollback.
+    - Generates Payroll + Payslip lines per employee.
+    - Moves PayrollPeriodEmployee status to "Processing" at the end.
     """
     # -------------------------
     #  HELPERS
     # -------------------------
     def _month_ends_within(self, start_date: date, end_date: date) -> list[tuple[date, date]]:
         """
-        Returns [(month_start, month_end)] for each month whose month_end is within the period.
-        Example: Jan22-Feb4 returns [(Jan1, Jan31)] because Jan31 is inside the range.
+        Return [(month_start, month_end)] for each month whose *month_end* falls inside [start_date, end_date].
+
+        Why this exists:
+        - Your Per Day allowances are paid monthly, but payroll periods are semi-monthly.
+        - So you only pay the month's total allowance on the payroll period that contains month-end.
+
+        Example:
+        - start_date=Jan22, end_date=Feb04 -> returns [(Jan1, Jan31)]
         """
         out: list[tuple[date, date]] = []
 
@@ -90,8 +141,17 @@ class PayrollGenerationService:
 
     def _is_late_beyond_grace(self, att: Attendance, shift: Shift) -> bool:
         """
-        Late if time_in_dt > (shift_start_dt + grace_minutes).
-        Attendance.time_in is a DateTimeField (timezone-aware).
+        Returns True if the employee is late beyond the shift grace period.
+
+        Rule:
+        - Late if time_in_dt > (shift_start_dt + grace_minutes)
+
+        Notes:
+        - Attendance.time_in is a DateTimeField (timezone-aware in your models).
+        - We convert shift start into a timezone-aware datetime using attendance date.
+
+        Used by:
+        - Allowance eligibility checks (Per Day allowances are voided if late beyond grace)
         """
         if att.time_in is None:
             return False
@@ -116,6 +176,20 @@ class PayrollGenerationService:
     # -------------------------
     @transaction.atomic
     def generate_for_period(self, period_id: int, generated_by_user):
+        """
+        Generate payroll for ALL employees within a payroll period.
+
+        Guards enforced:
+        - period exists
+        - period.status must be Open
+        - all PayrollPeriodEmployee must be Verified
+        - if any single employee fails -> rollback everything (atomic)
+
+        Side effects:
+        - Sets Payroll_Period.status = "Processing"
+        - Creates Payroll + Payslip lines for each employee
+        - Sets each PayrollPeriodEmployee status to "Processing"
+        """
         period = (
             Payroll_Period.objects.select_for_update()
             .filter(id=period_id)
@@ -164,6 +238,20 @@ class PayrollGenerationService:
 
     @transaction.atomic
     def generate_for_employee(self, period_id: int, employee_id: int, generated_by_user):
+        """
+        Generate payroll for ONE employee in a payroll period.
+
+        Differences from generate_for_period:
+        - Allows period.status to be Open OR Processing
+          (needed for reset/regenerate/partial generation workflows)
+        - Still requires PPE Verified and employee eligible
+        - Still atomic (this single employee generation commits/rolls back safely)
+
+        Side effects:
+        - May set Payroll_Period.status from Open -> Processing
+        - Creates Payroll + Payslip lines
+        - Sets PPE status to Processing
+        """
         period = (
             Payroll_Period.objects.select_for_update()
             .filter(id=period_id)
@@ -198,19 +286,47 @@ class PayrollGenerationService:
     # 2) Validation Guards
     # -------------------------
     def _validate_period_for_period_generation(self, period: Payroll_Period):
+        """
+        Validation for FULL period generation.
+
+        Rules:
+        - Period must be Open
+        - end_date must be >= start_date
+        """
         if period.status != "Open":
             raise ValidationError({"detail": f"Payroll period must be Open. Current status: {period.status}."})
         if period.end_date < period.start_date:
             raise ValidationError({"detail": "Invalid payroll period date range."})
 
     def _validate_period_for_employee_generation(self, period: Payroll_Period):
-        # Allow per-employee generation while Processing (needed for regeneration)
+        """
+        Validation for PER-EMPLOYEE generation.
+
+        Rules:
+        - Period may be Open or Processing (supports partial generation and regeneration)
+        - end_date must be >= start_date
+        """
         if period.status not in {"Open", "Processing"}:
             raise ValidationError({"detail": f"Payroll period must be Open or Processing. Current status: {period.status}."})
         if period.end_date < period.start_date:
             raise ValidationError({"detail": "Invalid payroll period date range."})
 
     def _validate_ppe(self, ppe: PayrollPeriodEmployee, period: Payroll_Period):
+        """
+        Validate a PayrollPeriodEmployee is eligible for payroll generation.
+
+        Guards enforced:
+        - PPE status must be Verified
+        - Employee must be active
+        - CEO cannot be generated
+        - SUPER_ADMIN cannot be generated
+        - Linked user (if exists) must be active
+        - No existing non-void payroll already exists for this period/employee
+        - Employee must have at least one attendance inside the period
+
+        Raises:
+        - ValidationError with a human-readable reason if any rule fails
+        """
         employee = ppe.employee
 
         # must be verified
@@ -251,6 +367,23 @@ class PayrollGenerationService:
     # internal runner
     # -------------------------
     def _generate_single_locked(self, period: Payroll_Period, ppe: PayrollPeriodEmployee, generated_by_user):
+        """
+        Core pipeline to generate payroll for a single PPE (employee in a period).
+
+        Steps (high-level):
+        1) validate PPE again (safety)
+        2) build all needed context (salary/shift/attendance/holiday/rules)
+        3) compute rates
+        4) compute expected workdays
+        5) create Payroll header (run_no increments)
+        6) apply earnings/deductions components
+        7) finalize totals
+        8) update PPE lifecycle status to Processing
+
+        Important:
+        - This function assumes you are inside a transaction.atomic scope.
+        - If anything raises ValidationError, everything rolls back.
+        """
         self._validate_ppe(ppe,period)
 
         ctx = self._build_context(period, ppe)
@@ -314,6 +447,24 @@ class PayrollGenerationService:
     # 3) Build Context
     # -------------------------
     def _build_context(self, period: Payroll_Period, ppe: PayrollPeriodEmployee):
+        """
+        Gather all payroll inputs for a single employee/period into one dict ("ctx").
+
+        Why this exists:
+        - Keeps _generate_single_locked clean
+        - Central place to enforce "hard stops" before money computation
+
+        Includes:
+        - employee, department, shift
+        - effective salary as of period end
+        - payroll settings (divisor)
+        - attendance map (date -> Attendance)
+        - approved attendance events
+        - leave map (date -> Leave_Day)
+        - holiday map + policy map
+        - allowances/deductions/commissions
+        - pay rules resolved by priority
+        """
         employee = ppe.employee
         department = employee.department
         shift = self._get_employee_shift(employee)
@@ -369,6 +520,7 @@ class PayrollGenerationService:
         }
 
     def _get_employee_shift(self, employee: Employee) -> Shift | None:
+       
         if employee.shift:
             return employee.shift
         if employee.department and employee.department.shift_id:
@@ -384,12 +536,24 @@ class PayrollGenerationService:
         )
 
     def _get_payroll_setting(self) -> Payroll_Setting:
+        """
+        Fetch global payroll settings (e.g., daily rate divisor).
+
+        If no Payroll_Setting exists:
+        - Create a default setting (divisor=22, is_semi_monthly=True)
+        """
         obj = Payroll_Setting.objects.order_by("id").first()
         if not obj:
             obj = Payroll_Setting.objects.create(daily_rate_divisor=22, is_semi_monthly=True)
         return obj
 
     def _get_attendance_map(self, employee: Employee, period: Payroll_Period):
+        """
+        Load attendance rows in [period.start_date, period.end_date] and return a dict:
+            { attendance.date: Attendance }
+
+        Prefetches events to avoid N+1 queries later in _get_approved_events.
+        """
         rows = Attendance.objects.filter(
             employee=employee,
             date__gte=period.start_date,
@@ -398,6 +562,11 @@ class PayrollGenerationService:
         return {r.date: r for r in rows}
 
     def _get_approved_events(self, attendance_map):
+        """
+        Extract ALL Approved Attendance_Event objects from the attendance_map.
+
+        Output is a flat list of events across all days.
+        """
         approved = []
         for att in attendance_map.values():
             for ev in att.events.all():
@@ -406,6 +575,12 @@ class PayrollGenerationService:
         return approved
 
     def _get_late_dates(self, approved_events) -> set[date]:
+        """
+        Build a set of dates where the employee has an approved "Late" event with minutes > 0.
+
+        Used by:
+        - _apply_night_differential: void per-day night diff if late on that day.
+        """
         late_dates: set[date] = set()
         for ev in approved_events:
             normalized = self._normalize_event_type(ev.type)
@@ -417,9 +592,14 @@ class PayrollGenerationService:
 
     def _get_leave_map(self, employee: Employee, period: Payroll_Period) -> dict[date, Leave_Day]:
         """
-        Map of leave days within this payroll period.
-        Only leave days created from Approved requests should exist,
-        because we create Leave_Day only when Approved.
+        Return leave days within the payroll period as:
+            { leave_day.date: Leave_Day }
+
+        Filter rules:
+        - Only Leave_Day tied to leave_request.status="Approved"
+
+        Note:
+        - If duplicates exist (shouldn't with constraints), last record wins.
         """
         rows = Leave_Day.objects.filter(
         employee=employee,
@@ -432,6 +612,13 @@ class PayrollGenerationService:
         return {r.date: r for r in rows}
 
     def _get_holiday_map(self, period: Payroll_Period, department: Department):
+        """
+        Return holiday policy as:
+            { holiday_type: requires_work_boolean }
+
+        Used by:
+        - absence computation (if holiday requires work and employee absent -> absent)
+        """
         rows = Holiday.objects.filter(
             date__gte=period.start_date,
             date__lte=period.end_date,
@@ -442,10 +629,18 @@ class PayrollGenerationService:
         return {h.date: h for h in rows}
 
     def _get_holiday_policy_map(self, department):
+        """
+        Return holiday policy as:
+            { holiday_type: requires_work_boolean }
+
+        Used by:
+        - absence computation (if holiday requires work and employee absent -> absent)
+        """
         rows = HolidayPolicy.objects.filter(department=department)
         return {r.holiday_type: bool(r.requires_work) for r in rows}
 
     def _get_allowances(self, employee: Employee, period: Payroll_Period):
+        # Return all ACTIVE employee allowances that overlap the payroll period.
         qs = (
             Employee_Allowance.objects
             .filter(employee=employee, status="Active")
@@ -459,6 +654,7 @@ class PayrollGenerationService:
         return rows
 
     def _get_deductions(self, employee: Employee, period: Payroll_Period):
+        #Return all ACTIVE employee deductions that overlap the payroll period.
         qs = (
             Employee_Deduction.objects
             .filter(employee=employee, status="Active")
@@ -472,17 +668,32 @@ class PayrollGenerationService:
         return rows
     
     def _get_commissions(self, employee: Employee, period: Payroll_Period):
+        """
+        Return commissions stored specifically for:
+        - this employee
+        - this payroll period
+
+        These are per-period manual entries (modal-based).
+        """
         return list(
             PayrollPeriodEmployeeCommission.objects.filter(period=period, employee=employee).select_related("commission_type")
         )
 
     def _get_pay_rules(self, employee: Employee, department, period: Payroll_Period):
         """
-        Priority:
-        1) employee-specific
-        2) department-specific
-        3) global (no applies_to and no employee)
-        Pick latest effective_from if multiple overlap.
+        Resolve the correct Pay_Rule per (event_type, category) using priority rules.
+
+        Priority order:
+        1) employee-specific rule (rule.employee_id == employee.id)
+        2) department-specific rule (rule.applies_to_id == department.id)
+        3) global rule (rule.employee_id is None and rule.applies_to_id is None)
+
+        Extra tie-break:
+        - If same priority, choose the rule with the latest effective_from.
+
+        Also filters to only rules that overlap the payroll period:
+        - effective_from <= period.end_date
+        - effective_to is null OR effective_to >= period.start_date
         """
         rules = Pay_Rule.objects.filter(is_active=True)
 
@@ -525,6 +736,16 @@ class PayrollGenerationService:
     # 4) Rate Computation
     # -------------------------
     def _compute_rates(self, salary: Employee_Salary, shift: Shift, payroll_setting: Payroll_Setting) -> Rates:
+        """
+        Compute daily/hourly/per-minute rates based on:
+        - salary.base_rate (usually monthly base)
+        - payroll_setting.daily_rate_divisor (e.g., 22)
+        - shift work minutes (shift duration minus breaks)
+
+        Raises:
+        - ValidationError if shift work minutes is computed as 0
+          (prevents divide-by-zero and wrong payroll)
+        """
         divisor = Decimal(str(payroll_setting.daily_rate_divisor or 22))
         base = _safe_decimal(salary.base_rate, "base_rate")
 
@@ -545,6 +766,27 @@ class PayrollGenerationService:
         )
     
     def _compute_absences(self,expected_days,attendance_map,leave_map,holiday_map,holiday_policy_map,) -> tuple[int, set[date]]:
+        """
+        Compute absences for the payroll period.
+
+        Inputs:
+        - expected_days: list of dates employee is expected to work (shift workdays)
+        - attendance_map: {date: Attendance}
+        - leave_map: {date: Leave_Day} (approved leaves)
+        - holiday_map: {date: Holiday} (approved/active holidays)
+        - holiday_policy_map: {holiday_type: requires_work_bool}
+
+        Rules:
+        A) If leave exists for the day -> NOT absent
+        B) If holiday exists:
+           - if requires_work is False -> NOT absent
+           - if requires_work is True -> absent if no attendance
+        C) Normal day:
+           - absent if no attendance record exists
+
+        Output:
+        - (absent_count, absent_dates_set)
+        """
         absent_dates: set[date] = set()
 
         for d in expected_days:
@@ -571,6 +813,17 @@ class PayrollGenerationService:
         return len(absent_dates), absent_dates
     
     def _shift_work_minutes(self, shift: Shift) -> int:
+        """
+        Compute how many payable work minutes exist in a standard shift.
+
+        Handles:
+        - Non-overnight shifts (start -> end same day)
+        - Cross-midnight shifts (end next day)
+        - Deducts shift.break_minutes once
+
+        Output:
+        - Non-negative integer minutes
+        """
         start = shift.start_time
         end = shift.end_time
 
@@ -591,7 +844,15 @@ class PayrollGenerationService:
     # 5) Expected Workdays
     # -------------------------
     def _expected_workdays(self, shift: Shift, start_date: date, end_date: date):
-        # Shift_Workday uses Monday=1 ... Sunday=7, Python weekday: Mon=0 ... Sun=6
+        """
+        Build a list of dates the employee is expected to work in the range.
+
+        Source of truth:
+        - Shift_Workday rows (Monday=1 ... Sunday=7)
+
+        Output:
+        - List[date] of expected workdays inside [start_date, end_date]
+        """
         workdays = Shift_Workday.objects.filter(shift=shift, is_workday=True).values_list("day_of_week", flat=True)
         workdays = set(workdays)
 
@@ -608,7 +869,15 @@ class PayrollGenerationService:
     # 6) Create Payroll Header
     # -------------------------
     def _create_payroll(self, employee: Employee, period: Payroll_Period, regenerated_from: Payroll | None = None) -> Payroll:
-        # next run_no = max(existing run_no) + 1 (including Void runs)
+        """
+        Create a Payroll header row.
+
+        Important:
+        - run_no increments per (period, employee), including Void runs
+          (so regeneration creates run_no=2,3,...)
+
+        Initializes totals to 0; payslip lines will be created afterwards.
+        """
         last = (
             Payroll.objects
             .filter(payroll_period=period, employee=employee)
@@ -633,6 +902,15 @@ class PayrollGenerationService:
     # 7.1 Basic Pay
     # -------------------------
     def _apply_basic_pay(self, payroll: Payroll, ctx, rates: Rates) -> Decimal:
+        """
+        Create a Payroll header row.
+
+        Important:
+        - run_no increments per (period, employee), including Void runs
+          (so regeneration creates run_no=2,3,...)
+
+        Initializes totals to 0; payslip lines will be created afterwards.
+        """
         salary = ctx["salary"]
         pay_type = salary.pay_type
         base_rate = _safe_decimal(salary.base_rate, "base_rate")
@@ -719,8 +997,12 @@ class PayrollGenerationService:
     # -------------------------
     def _apply_paid_leaves(self, payroll: Payroll, leave_map: dict[date, Leave_Day], rates: Rates):
         """
-        - Paid leave money is integrated into Basic Pay computation
-        - Payslip lines here are INFORMATION only (audit trail)
+        Create INFORMATION payslip lines for leave days (audit trail only).
+
+        Important:
+        - Paid leave MONEY is already included in _apply_basic_pay.
+        - This function only logs leave details as INFORMATION lines
+          so payroll users can see leave dates/units/rates.
         """
         if not leave_map:
             return
@@ -756,6 +1038,21 @@ class PayrollGenerationService:
     # 7.3 Attendance Events
     # -------------------------
     def _apply_attendance_events(self, payroll, approved_events, rule_map, rates: Rates):
+        """
+        Apply approved attendance events (Late/Undertime/Overtime/etc.) into payslip lines.
+
+        Logic:
+        - Normalize event type naming (OverTime -> Overtime, UnderTime -> Undertime)
+        - Decide category:
+            Late/Undertime => Deduction
+            everything else => Earning
+        - Find Pay_Rule for (event_type, category)
+        - Compute amount based on rule.rate_type and minutes
+        - Create a payslip line
+
+        Raises:
+        - ValidationError if required Pay_Rule is missing (audit correctness)
+        """
         for ev in approved_events:
             # Normalize event naming mismatch (your Attendance_Event choices differ)
             normalized = self._normalize_event_type(ev.type)
@@ -793,7 +1090,16 @@ class PayrollGenerationService:
             )
 
     def _normalize_event_type(self, s: str) -> str:
-        # Attendance_Event: "OverTime", "UnderTime" but Pay_Rule: "Overtime", "Undertime"
+        """
+        Normalize event type strings to match Pay_Rule event_type choices.
+
+        Why:
+        - Some attendance event strings may not exactly match Pay_Rule names.
+
+        Example mapping:
+        - "OverTime" -> "Overtime"
+        - "UnderTime" -> "Undertime"
+        """
         m = {
             "OverTime": "Overtime",
             "UnderTime": "Undertime",
@@ -803,6 +1109,21 @@ class PayrollGenerationService:
         return m.get(s, s)
 
     def _compute_rule_amount(self, rule: Pay_Rule, minutes: int, rates: Rates):
+        """
+        Compute amount based on Pay_Rule.rate_type.
+
+        Supported rate types:
+        - MULTIPLIER: minutes * per_minute_rate * rate_value
+        - PER_MINUTE: minutes * rate_value
+        - PER_DAY: rate_value (not typical for minute events but supported)
+        - FIXED: rate_value
+
+        Returns:
+        - (amount_decimal_2dp, rate_applied_decimal)
+
+        Raises:
+        - ValidationError if rate_type is unknown
+        """
         rv = _safe_decimal(rule.rate_value, "rate_value")
 
         if rule.rate_type == "MULTIPLIER":
@@ -829,6 +1150,17 @@ class PayrollGenerationService:
     # Night differential (time overlap 22:00–06:00)
     # -------------------------
     def _apply_night_differential(self, payroll, attendance_map, rule_map, rates: Rates, late_dates: set[date]):
+        """
+        Apply night differential earnings for PRESENT attendance days.
+
+        Rule:
+        - Uses Pay_Rule ("Night Differential", "Earning")
+        - Computes overlap minutes with night window (22:00–06:00)
+        - If rule is PER_DAY or FIXED:
+            - Voids night diff for that date if the employee was late (late_dates)
+        - Otherwise:
+            - Uses _compute_rule_amount with minutes as quantity
+        """
         rule = rule_map.get(("Night Differential", "Earning"))
         if not rule:
             return
@@ -875,13 +1207,17 @@ class PayrollGenerationService:
                 )
 
     def _night_diff_minutes(self, att: Attendance) -> int:
-
         """
-        Compute overlap of the employee's actual worked interval with the night window 22:00–06:00.
+        Compute overlap minutes between actual work interval and night window 22:00–06:00.
 
-        We check TWO windows because a shift can start after midnight:
-        - Window A: (prev day 22:00) -> (today 06:00)
-        - Window B: (today 22:00) -> (next day 06:00)
+        Why two windows:
+        - A shift could overlap night hours before midnight OR after midnight.
+        - We compute overlap with:
+          A) (previous day 22:00) -> (work day 06:00)
+          B) (work day 22:00) -> (next day 06:00)
+
+        Returns:
+        - Total overlap minutes (non-negative)
         """
         if att.time_in is None or att.time_out is None:
             return 0
@@ -908,6 +1244,20 @@ class PayrollGenerationService:
     # Holiday earnings (worked on approved holiday)
     # -------------------------
     def _apply_worked_holidays(self, payroll, ctx, rates: Rates):
+        """
+        Apply holiday earnings for days where:
+        - Attendance is PRESENT
+        - The date is an approved holiday for the department base
+
+        Behavior:
+        - Determine holiday rule name from holiday type
+        - Fetch Pay_Rule(event_type, "Earning")
+        - Compute amount using minutes worked (bounded by shift window)
+        - Create earning payslip line
+
+        Raises:
+        - ValidationError if required holiday Pay_Rule is missing
+        """
         holiday_map = ctx["holiday_map"]
         policy_map = ctx["holiday_policy_map"]
         rule_map = ctx["rule_map"]
@@ -948,7 +1298,15 @@ class PayrollGenerationService:
                 )
 
     def _holiday_type_to_rule_event(self, holiday_type: str) -> str:
-        # your Pay_Rule event_type choices include "Regular Holiday", "Special Holiday", "Special Non Working Holiday", "Company Holiday"
+        """
+        Convert Holiday.type into Pay_Rule.event_type.
+
+        Pay_Rule expects:
+        - "Regular Holiday"
+        - "Special Holiday"
+        - "Special Non Working Holiday"
+        - "Company Holiday"
+        """
         if holiday_type == "Regular":
             return "Regular Holiday"
         if holiday_type == "Special Working":
@@ -963,6 +1321,18 @@ class PayrollGenerationService:
     # 7.4 Absent auto-detection
     # -------------------------
     def _apply_absent_deduction(self,payroll: Payroll,absent_days: int,absent_dates: set[date],absent_rule: Pay_Rule | None,rates: Rates,):
+        """
+        Create deduction lines for absences.
+
+        Preferred behavior:
+        - Create one line per absent date for transparency.
+
+        Fallback:
+        - If dates are missing, create one aggregated line using absent_days.
+
+        Requires:
+        - Pay_Rule("Absent", "Deduction") to exist; otherwise hard-stop.
+        """
         if not absent_rule:
             raise ValidationError({"detail": "Missing Pay Rule for Absent (Deduction)."})
 
@@ -1013,7 +1383,17 @@ class PayrollGenerationService:
     # 8) Allowances, Commissions, Deductions
     # -------------------------
     def _compute_allowance_eligible_days_for_month(self,employee: Employee,shift: Shift,month_start: date,month_end: date,leave_map: dict[date, Leave_Day],) -> int:
+        """
+        Compute how many days in a month are eligible for a PER-DAY allowance.
 
+        Eligibility rules (per expected workday):
+        - If leave exists on that day -> NOT eligible
+        - Must have attendance PRESENT
+        - Must not be late beyond grace
+
+        Returns:
+        - eligible_day_count (int)
+        """
         expected_days = self._expected_workdays(shift, month_start, month_end)
 
         rows = Attendance.objects.filter(
@@ -1047,6 +1427,18 @@ class PayrollGenerationService:
         return eligible
 
     def _apply_allowances(self,payroll: Payroll,allowances,period: Payroll_Period,employee: Employee,shift: Shift,leave_map: dict[date, Leave_Day],):
+        """
+        Apply allowances into payslip lines.
+
+        Special behavior for frequency="Per Day":
+        - Compute totals per MONTH
+        - Pay only on payroll period that contains that month-end
+        - Eligibility is computed by _compute_allowance_eligible_days_for_month()
+
+        For other frequencies:
+        - Uses _resolve_frequency_amount (Per Period / Monthly / One Time)
+        - Creates one EARNING line per allowance row
+        """
         for a in allowances:
             at = a.allowance_type
             name = at.name if at else "Allowance"
@@ -1100,6 +1492,13 @@ class PayrollGenerationService:
             )
 
     def _apply_commissions(self, payroll: Payroll, commissions):
+        """
+        Apply per-period commissions into EARNING payslip lines.
+
+        Commissions are assumed:
+        - already attached to the period+employee (PayrollPeriodEmployeeCommission)
+        - validated elsewhere (e.g., amount > 0)
+        """
         for c in commissions:
             amt = _d2(c.amount)
             if amt <= 0:
@@ -1108,6 +1507,15 @@ class PayrollGenerationService:
             self._create_line(payroll, "EARNING", desc, amt, source_type="MANUAL", source_id=c.id)
 
     def _apply_deductions(self, payroll: Payroll, deductions, period: Payroll_Period):
+        """
+        Apply employee deductions into DEDUCTION payslip lines.
+
+        Special handling:
+        - If a deduction row represents a loan, use amortization_per_period when available.
+          Otherwise, use d.amount.
+
+        Amount is then resolved by frequency (Per Period / Monthly / One Time).
+        """
         for d in deductions:
             # If this deduction is a loan row, prefer amortization_per_period (per payroll period)
             base_amount = d.amortization_per_period if d.amortization_per_period is not None else d.amount
@@ -1128,6 +1536,15 @@ class PayrollGenerationService:
             )
 
     def _resolve_frequency_amount(self, amount, frequency, eff_from, eff_to, period: Payroll_Period) -> Decimal:
+        """
+        Apply employee deductions into DEDUCTION payslip lines.
+
+        Special handling:
+        - If a deduction row represents a loan, use amortization_per_period when available.
+          Otherwise, use d.amount.
+
+        Amount is then resolved by frequency (Per Period / Monthly / One Time).
+        """
         amt = _d2(amount)
 
         if frequency == "Per Day":
@@ -1152,6 +1569,17 @@ class PayrollGenerationService:
     # 9) Totals
     # -------------------------
     def _finalize_totals(self, payroll: Payroll):
+        """
+        Compute payroll totals from payslip lines and save them on the Payroll header.
+
+        Totals:
+        - total_earnings = sum(line.amount where line_type == EARNING)
+        - total_deductions = sum(line.amount where line_type == DEDUCTION)
+        - net_pay = earnings - deductions
+        - basic_pay = sum(EARNING lines containing "Basic Pay" in description)
+
+        INFORMATION lines are ignored for totals.
+        """
         lines = payroll.payslip_lines.all()
 
         earnings = DEC_0
@@ -1178,6 +1606,16 @@ class PayrollGenerationService:
     # 10) Lifecycle Updates
     # -------------------------
     def _update_ppe_status(self, ppe: PayrollPeriodEmployee, user):
+        """
+        Move PayrollPeriodEmployee status forward after successful generation.
+
+        Current behavior:
+        - Sets status to "Processing"
+        - Updates updated_at automatically (model auto_now)
+
+        Note:
+        - 'user' is currently unused here, but kept for future audit fields if you add them.
+        """
         ppe.status = "Processing"
         ppe.save(update_fields=["status", "updated_at"])
 
@@ -1186,8 +1624,15 @@ class PayrollGenerationService:
     # -------------------------
     def _attendance_interval(self, att: Attendance):
         """
-        Attendance.time_in/time_out are DateTimeFields.
-        Return timezone-aware datetimes (start_dt, end_dt).
+        Return (start_dt, end_dt) as timezone-aware datetimes from Attendance.time_in/time_out.
+
+        Safety behavior:
+        - If time_in or time_out is missing -> returns (None, None)
+        - If end_dt < start_dt (bad device time) -> clamp end_dt to start_dt
+
+        Used by:
+        - night diff computation
+        - work minute computation
         """
         if att.time_in is None or att.time_out is None:
             return None, None
@@ -1209,10 +1654,16 @@ class PayrollGenerationService:
 
     def _attendance_work_minutes(self, att: Attendance, shift: Shift) -> int:
         """
-        Basic work minutes should be counted ONLY within the shift window:
-        - If employee punches in early (up to 60 mins), basic minutes start at shift start.
-        - If employee punches out late, basic minutes stop at shift end.
-        Overtime is handled separately later (Approval flow).
+        Compute payable work minutes for the day, clamped to the shift window.
+
+        Rule:
+        - Only minutes within [shift_start, shift_end] count as regular work minutes.
+        - Punching in early doesn't increase regular time (overtime handled via events).
+        - Punching out late doesn't increase regular time (overtime handled via events).
+        - Deduct break_minutes once.
+
+        Handles:
+        - Overnight shifts via shift.crosses_midnight (shift_end next day)
         """
         start_dt, end_dt = self._attendance_interval(att)
         if not start_dt or not end_dt:
@@ -1249,18 +1700,19 @@ class PayrollGenerationService:
     # -------------------------
     # payslip line creator
     # -------------------------
-    def _create_line(
-        self,
-        payroll: Payroll,
-        line_type: str,
-        description: str,
-        amount: Decimal,
-        rule: Pay_Rule | None = None,
-        source_type: str | None = None,
-        source_id: int | None = None,
-        quantity_min: int | None = None,
-        rate_applied: Decimal | None = None,
-    ):
+    def _create_line(self,payroll: Payroll,line_type: str,description: str,amount: Decimal,rule: Pay_Rule | None = None,source_type: str | None = None,source_id: int | None = None,quantity_min: int | None = None,rate_applied: Decimal | None = None,):
+        """
+        Compute payable work minutes for the day, clamped to the shift window.
+
+        Rule:
+        - Only minutes within [shift_start, shift_end] count as regular work minutes.
+        - Punching in early doesn't increase regular time (overtime handled via events).
+        - Punching out late doesn't increase regular time (overtime handled via events).
+        - Deduct break_minutes once.
+
+        Handles:
+        - Overnight shifts via shift.crosses_midnight (shift_end next day)
+        """
         Payslip.objects.create(
             payroll=payroll,
             rule=rule,
@@ -1274,6 +1726,13 @@ class PayrollGenerationService:
         )
 
     def _stringify_error(self, e: ValidationError) -> str:
+        """
+        Convert a DRF ValidationError into a readable string.
+
+        Why:
+        - DRF ValidationError.detail can be dict/list/string
+        - We want a clean message to show on the UI or include in a wrapper error.
+        """
         detail = getattr(e, "detail", None)
         if isinstance(detail, dict):
             # pick something readable

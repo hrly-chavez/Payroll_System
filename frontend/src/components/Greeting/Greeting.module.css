@@ -1,48 +1,66 @@
 .card {
   padding: 16px 20px;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.05);
+  background: linear-gradient(
+    135deg,
+    rgba(56,111,164,0.08),
+    rgba(56,111,164,0.02)
+  );
+  border-radius: 12px;
+  border: 1px solid rgba(56,111,164,0.15);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06),
+              0 8px 20px rgba(15, 23, 42, 0.06);
   margin-bottom: 16px;
 
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 
 .left {
   font-weight: 600;
   font-size: 16px;
-  color: #222;
+  color: #0f172a;
 }
 
 .name {
-  color: #1890ff;
+  color: #386fa4;
 }
 
-/* STATUS BADGE */
 .status {
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
-/* Color Variants */
 .IN {
-  background: #e6f7ee;
-  color: #1f9d55;
+  background: rgba(34,197,94,0.12);
+  color: #15803d;
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.08);
 }
 
 .OUT {
-  background: #e6f0ff;
-  color: #2f54eb;
+  background: rgba(59,130,246,0.12);
+  color: #1d4ed8;
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.08);
 }
 
 .NOT_IN {
-  background: #fff7e6;
-  color: #d48806;
+  background: rgba(245, 158, 11, 0.15);
+  color: #b45309;
+}
+
+/* Responsive */
+
+@media (max-width: 640px) {
+  .card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .status {
+    align-self: flex-start;
+  }
 }

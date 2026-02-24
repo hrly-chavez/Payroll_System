@@ -13,11 +13,7 @@ import SharedCalendar from "./../../../components/SharedCalendar/SharedCalendar"
 import { Pie } from "@ant-design/plots";
 import { Tabs } from "antd";
 import CompanyNote from "../../../components/CompanyNote/CompanyNote";
-import {
-  HOLIDAY_LEGEND,
-  HolidayBase,
-  HolidayType,
-} from "../../../components/SharedCalendar/CalendarLegend";
+import { HOLIDAY_LEGEND, HolidayBase, HolidayType } from "../../../components/SharedCalendar/CalendarLegend";
 import { PAYROLL_COLOR } from "../../../components/SharedCalendar/CalendarLegend";
 import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
 
@@ -79,7 +75,7 @@ const Dashboard: React.FC = () => {
   const [loadingPunchIn, setLoadingPunchIn] = useState(false);
   const [loadingPunchOut, setLoadingPunchOut] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(false);
-  const [stats, setStats] = useState({ present: 0, lates: 0, absent: 0 });
+  const [stats, setStats] = useState({ present: 0, late: 0, absent: 0, leave: 0, undertime: 0, overtime: 0, });
   const [loadingStats, setLoadingStats] = useState(false);
 
   const [punchInEligibility, setPunchInEligibility] = useState<PunchInEligibilityResponse | null>(null);
@@ -87,49 +83,115 @@ const Dashboard: React.FC = () => {
 
   const [selectedMonth, setSelectedMonth] = useState(dayjs().month() + 1); // 1–12
   const [selectedFilter, setSelectedFilter] = useState<
-    "ALL" | "PRESENT" | "LATE" | "LEAVE" | "ABSENT"
-  >("ALL");
-  // pie for the attendance stats
-  const baseChartData = [
-  { type: "none", value: 1 },
-  { type: "Present", value: stats.present },
-  { type: "Late", value: stats.lates },
-  { type: "Leave", value: 0 },
-  { type: "Absent", value: stats.absent },
-  { type: "Undertime", value: 0 },
-];
+  "ALL" | "PRESENT" | "LATE" | "LEAVE" | "ABSENT" | "UNDERTIME" | "OVERTIME" >("ALL");
 
-const attendanceChartData =
-  selectedFilter === "ALL"
-    ? baseChartData
-    : baseChartData.filter(
-        (item) =>
-          item.type.toUpperCase() === selectedFilter ||
-          item.type === "none"
-      );
+  // ===== Attendance Pie Data (6 categories + filter + safe fallback) =====
+  type PieRow = { type: string; value: number };
+
+  const rawChartData: PieRow[] = [
+    { type: "Present", value: stats.present },
+    { type: "Late", value: stats.late },
+    { type: "Leave", value: stats.leave },
+    { type: "Absent", value: stats.absent },
+    { type: "Undertime", value: stats.undertime },
+    { type: "Overtime", value: stats.overtime },
+  ];
+
+  const total = rawChartData.reduce((sum, d) => sum + d.value, 0);
+
+  const filtered =
+    selectedFilter === "ALL"
+      ? rawChartData
+      : rawChartData.filter((d) => d.type.toUpperCase() === selectedFilter);
+
+  const nonZero = filtered.filter((d) => d.value > 0);
+
+  const finalChartData: PieRow[] =
+    total === 0 || nonZero.length === 0
+      ? [{ type: "No data", value: 1 }]
+      : nonZero;
+
+  const getPercent = (value: number) =>
+    total === 0 ? 0 : Math.round((value / total) * 100);
 
   const attendanceConfig = {
-  data: attendanceChartData,
-  angleField: "value",
-  colorField: "type",
-  radius: 1,
-  innerRadius: 0.7,
-  legend: false,
-  label: false,
-  padding: 0,
-  color: ({ type }: { type: string }) => {
+    data: finalChartData,
+    angleField: "value",
+    colorField: "type",
+
+    // donut shape (like your 2nd pic)
+    radius: 0,
+    innerRadius: 0.92,
+
+    // smooth animation + hover
+    animation: {
+      appear: {
+        animation: "wave-in",
+        duration: 800,
+      },
+    },
+    interactions: [{ type: "element-active" }],
+
+    // slice styling (crisp separators)
+    pieStyle: {
+      lineWidth: 2,
+      stroke: "#ffffff",
+    },
+
+    // percent labels inside slices
+    label:
+      total === 0
+        ? false
+        : {
+            type: "inner",
+            offset: "-50%",
+            content: ({ percent }: any) => `${Math.round(percent * 100)}%`,
+            style: {
+              fontSize: 14,
+              fontWeight: 700,
+              fill: "#ffffff",
+              textAlign: "center",
+            },
+          },
+
+    legend: false,
+
+    // center content (total)
+    statistic: {
+      title: false,
+      content: {
+        style: {
+          whiteSpace: "pre-wrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          fontWeight: 800,
+          fontSize: "18px",
+          lineHeight: "22px",
+        },
+        content:
+          total === 0
+            ? "No data"
+            : `${total}\nlogs`,
+      },
+    },
+
+    color: ({ type }: { type: string }) => {
     switch (type) {
-      case "Present": return "#2e7d32";   // green
-      case "Late": return "#f0ad4e";      // yellow
-      case "Leave": return "#1890ff";     // blue
-      case "Absent": return "#c62828";    // red
-      case "Undertime": return "#7b1fa2"; // purple
-      default: return "#e0e0e0";          // gray (none)
+      case "Present": return "#22c55e";
+      case "Late": return "#f59e0b";
+      case "Leave": return "#3b82f6";
+      case "Absent": return "#ef4444";
+      case "Undertime": return "#a855f7";
+      case "Overtime": return "#14b8a6";
+      case "No data": return "#e5e7eb";
+      default: return "#e5e7eb";
     }
   },
-};  
-    
 
+    // no padding weirdness
+    appendPadding: 10,
+  };
+    
     const fetchTodayAttendance = async () => {
       setLoadingStatus(true);
       try {
@@ -212,21 +274,30 @@ const attendanceChartData =
         const params = { year: now.year(), month: selectedMonth };
 
         const res = await api.get<AttendanceLogsResponse>("/attendance/logs/", { params });
-
         const rows = res.data.results || [];
 
         const present = rows.filter((r) => r.status === "PRESENT").length;
         const absent = rows.filter((r) => r.status === "ABSENT").length;
+        const leave = rows.filter((r) => r.status === "LEAVE").length;
 
-        const lates = rows.filter((r) => {
+        // event_types example: "Late, UnderTime"
+        const hasEvent = (r: AttendanceLogRow, key: string) => {
           const types = (r.event_types || "")
             .split(",")
-            .map((x) => x.trim())
+            .map((x) => x.trim().toLowerCase())
             .filter(Boolean);
-          return types.includes("Late");
-        }).length;
+          return types.includes(key.toLowerCase());
+        };
 
-        setStats({ present, lates, absent });
+        const late = rows.filter((r) => hasEvent(r, "late")).length;
+        const undertime = rows.filter((r) => hasEvent(r, "undertime")).length;
+
+        // IMPORTANT: your backend might spell it "Overtime" or "OverTime"
+        const overtime = rows.filter(
+          (r) => hasEvent(r, "overtime") || hasEvent(r, "over time") || hasEvent(r, "overTime")
+        ).length;
+
+        setStats({ present, late, absent, leave, undertime, overtime });
       } catch (err: any) {
         const backendMsg =
           err?.response?.data?.detail ||
@@ -321,10 +392,6 @@ const attendanceChartData =
     type StatusType = "NOT_IN" | "IN" | "OUT";
 
       const name = localStorage.getItem("user_name") || "User";
-
-      
-  
-    
   
 
   const { key: statusKey, label: statusLabel } = getAttendanceStatusLabel(
@@ -428,12 +495,14 @@ const attendanceChartData =
           >            <Card
               title={
                 <div className={styles.attendanceHeader}>
-                  <span>Attendance</span>
+                <span className={styles.attendanceTitle}>Attendance</span>
+
+                <div className={styles.attendanceControls}>
                   <Select
                     size="small"
                     value={selectedMonth}
                     onChange={(value) => setSelectedMonth(value)}
-                    style={{ width: 110 }}
+                    className={styles.headerSelect}
                   >
                     {monthOptions.map((m) => (
                       <Option key={m.value} value={m.value}>
@@ -446,15 +515,18 @@ const attendanceChartData =
                     size="small"
                     value={selectedFilter}
                     onChange={(value) => setSelectedFilter(value)}
-                    style={{ width: 120 }}
+                    className={styles.headerSelect}
                   >
                     <Option value="ALL">All</Option>
                     <Option value="PRESENT">Present</Option>
                     <Option value="LATE">Late</Option>
                     <Option value="LEAVE">Leave</Option>
                     <Option value="ABSENT">Absent</Option>
+                    <Option value="UNDERTIME">Undertime</Option>
+                    <Option value="OVERTIME">Overtime</Option>
                   </Select>
                 </div>
+              </div>
               }
               className={styles.sectionCard}
             >
@@ -462,13 +534,22 @@ const attendanceChartData =
                 <Pie {...attendanceConfig} />
               </div>
 
-              <div className={styles.chartLegend}>
-                <span><i className={styles.grayDot} /> none</span>
-                <span><i className={styles.greenDot} /> Present</span>
-                <span><i className={styles.yellowDot} /> Late</span>
-                <span><i className={styles.blueDot} /> Leave</span>
-                <span><i className={styles.redDot} /> Absent</span>
-                <span><i className={styles.purpleDot} /> Undertime</span>
+              <div className={styles.chartLegendPro}>
+                {rawChartData.map((item) => (
+                  <div key={item.type} className={styles.legendItem}>
+                    <span
+                      className={styles.legendDot}
+                      data-type={item.type}
+                      aria-hidden="true"
+                    />
+                    <div className={styles.legendText}>
+                      <div className={styles.legendLabel}>{item.type}</div>
+                      <div className={styles.legendMeta}>
+                        {item.value} • {getPercent(item.value)}%
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </Card>
 

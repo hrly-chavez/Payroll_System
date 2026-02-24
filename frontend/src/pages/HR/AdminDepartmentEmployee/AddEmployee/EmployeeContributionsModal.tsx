@@ -10,6 +10,7 @@ import {
 } from "antd";
 import { useEffect, useState } from "react";
 import api from "api/axios";
+import dayjs from "dayjs";
 
 const { Option } = Select;
 
@@ -175,12 +176,11 @@ const EmployeeContributionsModal: React.FC<Props> = ({
         })}
 
         {/* Effective Date */}
-        <Form.Item
-          name="effective_from"
-          label="Effective From"
-          rules={[{ required: true }]}
-        >
-          <DatePicker style={{ width: "100%" }} />
+        <Form.Item name="effective_from" label="Effective From" rules={[{ required: true }]}>
+          <DatePicker
+            style={{ width: "100%" }}
+            disabledDate={(current) => current && current < dayjs().startOf("day")}
+          />
         </Form.Item>
 
         <Button type="primary" block onClick={submit}>

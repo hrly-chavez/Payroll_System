@@ -13,12 +13,12 @@ urlpatterns = [
 
     # for employee
     path("leaves/", LeaveRequestListCreateView.as_view(), name="leave-requests"),
-    path("approvals/leaves/<int:pk>/", LeaveRequestUpdateView.as_view()),
+    path("approvals/leaves/<int:pk>/", LeaveRequestUpdateView.as_view()), 
 
     #admin
-    path("all-requests/", AllRequestsListCreateView.as_view()),
-    path("admin/leaves/", AdminLeaveRequestListView.as_view(), name="admin-leave-requests"),
-    path("admin/leaves/<int:pk>/status/", admin_update_leave_status, name="admin-leave-update-status"),
+    path("all-requests/", AllRequestsListCreateView.as_view()), #all req tab
+    path("admin/leaves/", AdminLeaveRequestListView.as_view(), name="admin-leave-requests"), 
+    path("admin/leaves/<int:pk>/status/", admin_update_leave_status, name="admin-leave-update-status"),#req tab 
     
     # Commission Types
     path("superadmin/commission-types/", CommissionTypeListView.as_view(), name="commission-type-list",),

@@ -198,13 +198,13 @@ class AllowanceTypeSerializer(serializers.ModelSerializer):
     def validate_name(self, value):
         name = (value or "").strip()
 
-        # ✅ Letters + spaces only
+        #  Letters + spaces only
         if not re.fullmatch(r"[A-Za-z ]+", name):
             raise serializers.ValidationError(
                 "Allowance type name must contain letters and spaces only."
             )
 
-        # ✅ Case-insensitive unique check (with custom message)
+        #  Case-insensitive unique check (with custom message)
         qs = Allowance_Type.objects.filter(name__iexact=name)
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)

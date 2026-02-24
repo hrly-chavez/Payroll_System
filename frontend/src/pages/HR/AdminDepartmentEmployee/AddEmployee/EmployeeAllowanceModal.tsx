@@ -1,6 +1,7 @@
 import { Modal, Form, Select, InputNumber, DatePicker, Button, message, Divider, List } from "antd";
 import { useEffect, useState } from "react";
 import api from "api/axios";
+import dayjs from "dayjs";
 
 interface Props {
   open: boolean;
@@ -88,10 +89,30 @@ const EmployeeAllowanceModal: React.FC<Props> = ({ open, employeeId, onNext, onC
               .map(a => ({ label: a.name, value: a.id }))}
           />
         </Form.Item>
-
-
-        <Form.Item name="amount" label="Amount" rules={[{ required: true }]}>
-          <InputNumber style={{ width: "100%" }} />
+        <Form.Item
+          name="amount"
+          label="Amount"
+          rules={[
+            { required: true, message: "Amount is required" },
+            {
+              validator: (_, value) => {
+                if (value === undefined || value === null) {
+                  return Promise.resolve();
+                }
+                if (value <= 0) {
+                  return Promise.reject("Amount must be greater than 0");
+                }
+                return Promise.resolve();
+              },
+            },
+          ]}
+        >
+          <InputNumber
+            style={{ width: "100%" }}
+            min={0}
+            precision={2}   // allows 2 decimal places
+            inputMode="decimal"
+          />
         </Form.Item>
 
         <Form.Item name="frequency" label="Frequency" rules={[{ required: true }]}>
@@ -104,7 +125,10 @@ const EmployeeAllowanceModal: React.FC<Props> = ({ open, employeeId, onNext, onC
         </Form.Item>
 
         <Form.Item name="effective_from" label="Effective From" rules={[{ required: true }]}>
-          <DatePicker style={{ width: "100%" }} />
+          <DatePicker
+            style={{ width: "100%" }}
+            disabledDate={(current) => current && current < dayjs().startOf("day")}
+          />
         </Form.Item>
 
         <Button

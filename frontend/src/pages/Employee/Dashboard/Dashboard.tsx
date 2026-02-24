@@ -148,8 +148,7 @@ const Dashboard: React.FC = () => {
     colorField: "type",
 
     // donut shape (like your 2nd pic)
-    radius: 0,
-    innerRadius: 0.92,
+    radius: 0.82,
 
     // smooth animation + hover
     animation: {

@@ -13,7 +13,7 @@
 
   interface RequestItem {
     id: number;
-    type: 'Holiday' | 'Leave' | 'Payroll';
+    type: 'Holiday' | 'Leave';
     name: string;
     date: string;
     status: string;
@@ -25,7 +25,7 @@
   const Request: React.FC = () => {
     const [requests, setRequests] = useState<RequestItem[]>([]);
     const [loading, setLoading] = useState(false);
-    const [filterType, setFilterType] = useState<'All' | 'Holiday' | 'Leave' | 'Payroll'>('All');
+    const [filterType, setFilterType] = useState<'All' | 'Holiday' | 'Leave'>('All');
     const [filterStatus, setFilterStatus] = useState<'All' | 'Pending' | 'Approved' | 'Declined'>('All');
 
     useEffect(() => {
@@ -163,7 +163,6 @@
                   <Option value="All">All Types</Option>
                   <Option value="Holiday">Holiday</Option>
                   <Option value="Leave">Leave</Option>
-                  <Option value="Payroll">Payroll</Option>
                 </Select>
 
                 <Select value={filterStatus} onChange={value => setFilterStatus(value)} style={{ width: 200 }}>

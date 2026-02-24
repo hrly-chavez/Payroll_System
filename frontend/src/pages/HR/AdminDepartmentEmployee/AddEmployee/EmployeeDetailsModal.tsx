@@ -152,9 +152,16 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
         <Row gutter={16}>
           {/* Employee Basic Info */}
           <Col xs={24} md={12}>
-            <Form.Item name="id_no" label="Employee Number" rules={[{ required: true }]}>
-              <Input />
-            </Form.Item>
+          <Form.Item
+            name="id_no"
+            label="Employee Number"
+            rules={[
+              { required: true, message: "Employee number is required" },
+              { pattern: /^[0-9]+$/, message: "Numbers only" }
+            ]}
+          >
+            <Input inputMode="numeric" />
+          </Form.Item>
           </Col>
 
           <Col xs={24} md={12}>
@@ -169,21 +176,39 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
           </Col>
 
           <Col xs={24} md={12}>
-            <Form.Item name="fname" label="First Name" rules={[{ required: true }]}>
-              <Input />
-            </Form.Item>
+          <Form.Item
+            name="fname"
+            label="First Name"
+            rules={[
+              { required: true, message: "First name is required" },
+              { pattern: /^[A-Za-z]+$/, message: "Alphabet letters only" }
+            ]}
+          >
+            <Input />
+          </Form.Item>
           </Col>
 
           <Col xs={24} md={12}>
-            <Form.Item name="initial" label="Middle Initial">
+            <Form.Item name="initial" label="Middle Initial"
+            rules={[
+              { required: true, message: "Middle initial is required" },
+              { pattern: /^[A-Za-z]+$/, message: "Alphabet letters only" }
+            ]}>
               <Input maxLength={1} />
             </Form.Item>
           </Col>
 
           <Col xs={24} md={12}>
-            <Form.Item name="lname" label="Last Name" rules={[{ required: true }]}>
-              <Input />
-            </Form.Item>
+          <Form.Item
+            name="lname"
+            label="Last Name"
+            rules={[
+              { required: true, message: "Last name is required" },
+              { pattern: /^[A-Za-z]+$/, message: "Alphabet letters only" }
+            ]}
+          >
+            <Input />
+          </Form.Item>
           </Col>
 
           <Col xs={24} md={12}>
@@ -193,9 +218,15 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
           </Col>
 
           <Col xs={24} md={12}>
-            <Form.Item name="contact_no" label="Contact Number">
-              <Input />
-            </Form.Item>
+          <Form.Item
+            name="contact_no"
+            label="Contact Number"
+            rules={[
+              { pattern: /^[0-9]+$/, message: "Numbers only" }
+            ]}
+          >
+            <Input inputMode="numeric" />
+          </Form.Item>
           </Col>
 
           <Col xs={24} md={12}>
@@ -211,7 +242,7 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
           </Col>
 
           <Col xs={24} md={12}>
-            <Form.Item name="position" label="Position" rules={[{ required: true }]}>
+            <Form.Item name="position" label="Position" rules={[{ required: true,pattern: /^[A-Za-z\s]+$/, message: "Alphabet letters only" }]}>
               <Input />
             </Form.Item>
           </Col>
@@ -303,13 +334,13 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
           </Col>
 
           <Col xs={24} md={12}>
-            <Form.Item name={["address", "street"]} label="Street" rules={[{ required: true }]}>
+            <Form.Item name={["address", "street"]} label="Street" rules={[{ required: true, pattern: /^[A-Za-z0-9\s]+$/, message: "No special characters allowed" }]}>
               <Input />
             </Form.Item>
           </Col>
 
           <Col xs={24} md={12}>
-            <Form.Item name={["address", "zip_code"]} label="Zip Code" rules={[{ required: true }]}>
+            <Form.Item name={["address", "zip_code"]} label="Zip Code" rules={[{ required: true, pattern: /^[0-9]+$/, message: "Numbers only" }]}>
               <Input maxLength={4} />
             </Form.Item>
           </Col>

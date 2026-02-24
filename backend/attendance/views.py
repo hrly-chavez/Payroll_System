@@ -44,7 +44,93 @@ class PunchOutView(APIView):
             "message": "Punch out successful.",
             "attendance": AttendanceSerializer(attendance).data,
         })
+#Overtime
+class SuperAdminPendingOvertimeView(APIView):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN"]
 
+    def get(self, request):
+        year = request.query_params.get("year")
+        month = request.query_params.get("month")
+        search = request.query_params.get("search", "").strip()
+
+        today = timezone.localdate()
+        year = int(year) if year else today.year
+        month = int(month) if month else today.month
+
+        if month < 1 or month > 12:
+            raise ValidationError({"detail": "Invalid month. Must be 1-12."})
+
+        date_from, date_to = _month_date_range(year, month)
+
+        qs = (
+            Attendance_Event.objects
+            .filter(
+                type="Overtime",
+                approval_status="Pending",
+                attendance__date__range=[date_from, date_to],
+            )
+            .select_related(
+                "attendance",
+                "attendance__employee",
+                "attendance__employee__department",
+                "attendance__employee__shift",
+            )
+            .order_by("-attendance__date", "-created_at")
+        )
+
+        if search:
+            qs = qs.filter(
+                Q(attendance__employee__fname__icontains=search) |
+                Q(attendance__employee__lname__icontains=search) |
+                Q(attendance__employee__department__name__icontains=search)
+            )
+
+        return Response({
+            "year": year,
+            "month": month,
+            "count": qs.count(),
+            "results": PendingOvertimeQueueSerializer(qs, many=True).data,
+        })
+
+class SuperAdminOvertimeStatusView(APIView):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN"]
+
+    def post(self, request, pk):
+        status = request.data.get("status")
+        reason = (request.data.get("reason") or "").strip()
+
+        if status not in ["Approved", "Declined"]:
+            raise ValidationError({"detail": "Invalid status."})
+
+        try:
+            event = Attendance_Event.objects.select_related(
+                "attendance__employee"
+            ).get(pk=pk, type="Overtime")
+        except Attendance_Event.DoesNotExist:
+            raise ValidationError({"detail": "Overtime event not found."})
+
+        if event.approval_status != "Pending":
+            raise ValidationError({"detail": "This request is already processed."})
+
+        if status == "Declined" and not reason:
+            raise ValidationError({"detail": "Decline reason is required."})
+
+        event.approval_status = status
+        event.approved_by = request.user
+
+        #  Use event_remarks as decline reason
+        if status == "Declined":
+            event.event_remarks = reason
+        else:
+            event.event_remarks = event.event_remarks or "Approved by SuperAdmin."
+
+        event.save(update_fields=["approval_status", "approved_by", "event_remarks"])
+
+        return Response({"detail": f"Overtime {status} successfully."})
+
+#Attendance Status
 class TodayAttendanceView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -155,3 +241,5 @@ class ShiftRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Shift.objects.all()
     serializer_class = ShiftSerializer
     permission_classes = [IsAuthenticated]
+
+

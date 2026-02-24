@@ -6,6 +6,7 @@ import { Table, message } from "antd";
 import dayjs from "dayjs";
 import api from "../../../../api/axios";
 import PayrollApprovalEmployeesModal from "./PayrollApprovalEmployeesModal";
+import "./PayrollPeriod.module.css";
 
 export type PayrollPeriodTab = {
   id: number;
@@ -34,6 +35,10 @@ export default function PayrollPeriodTab({
   const [payrollPeriods, setPayrollPeriods] = useState<PayrollPeriodTab[]>([]);
   const [loading, setLoading] = useState(false);
 
+  //pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const [openApprovalModal, setOpenApprovalModal] = useState(false);
   const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null);
 
@@ -57,6 +62,7 @@ export default function PayrollPeriodTab({
   useEffect(() => {
     if (active) {
       loadPayrollPeriods();
+      setCurrentPage(1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, refreshKey]);
@@ -110,14 +116,21 @@ export default function PayrollPeriodTab({
   return (
     <>
       <Table
+        className="superadmin-table"
         columns={payrollColumns as any}
         dataSource={filtered}
         rowKey="id"
         pagination={{
-          pageSize: 10,
+          current: currentPage,
+          pageSize: pageSize,
+          total: filtered.length,
           showSizeChanger: true,
           pageSizeOptions: ["5", "10", "20", "50"],
           showTotal: (total) => `Total ${total} items`,
+        }}
+        onChange={(pagination) => {
+          setCurrentPage(pagination.current || 1);
+          setPageSize(pagination.pageSize || 10);
         }}
         loading={loading}
         onRow={(record) => ({

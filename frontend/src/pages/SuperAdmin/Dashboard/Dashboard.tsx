@@ -1,3 +1,4 @@
+//src/pages/SuperAdmin/Dashboard/Dashboard.tsx
 import React, { useEffect, useState } from "react";
 import { Layout, Row, Col, Spin, message, DatePicker, Segmented, Card } from "antd";
 import Chart from "../../../components/Chart";
@@ -17,31 +18,22 @@ import { useNavigate } from "react-router-dom";
 import api from "../../../api/axios";
 import "./Dashboard.css";
 
-import HolidayModal from "./HolidayModal";
-import HolidayDetailModal from "./HolidayDetailModal";
+import OverTimeModal  from "./OverTimeModal";
+import OverTimeDetailModal  from "./OverTimeDetailModal";
 import DeclineReasonModal from "./DeclineReasonModal";
 import PendingPayrollModal from "./PendingPayrollModal";
 import { HourglassOutlined } from "@ant-design/icons";
 
-import {
-  HOLIDAY_LEGEND,
-  HolidayBase,
-  HolidayType,
-} from "../../../components/SharedCalendar/CalendarLegend";
+import {HOLIDAY_LEGEND,HolidayBase,HolidayType,} from "../../../components/SharedCalendar/CalendarLegend";
 import { PAYROLL_COLOR } from "../../../components/SharedCalendar/CalendarLegend";
+import type { OverTimeRequest, PendingOTResponse } from "./types";
 
 const role = localStorage.getItem("role") || "";
 
 const { Content } = Layout;
 
-interface HolidayRequest {
-  id: number;
-  name: string;
-  date: string;
-  type: string;
-  base: string;
-  status: "Pending" | "Approved" | "Declined";
-}
+
+
 
 interface Payroll {
   id: number;
@@ -121,9 +113,9 @@ const Dashboard: React.FC = () => {
     useState<echarts.ComposeOption<echarts.BarSeriesOption>>();
   const [chartHeight, setChartHeight] = useState<number>(280);
 
-  /* ================= HOLIDAY STATE ================= */
-  const [holidayData, setHolidayData] = useState<HolidayRequest[]>([]);
-  const [holidayLoading, setHolidayLoading] = useState(false);
+/* ================= OVERTIME STATE ================= */
+const [overtimeData, setOvertimeData] = useState<OverTimeRequest[]>([]);
+const [overtimeLoading, setOvertimeLoading] = useState(false);
 
   /* ================= PAYROLL STATE ================= */
   const [pendingPayrolls, setPendingPayrolls] = useState<Payroll[]>([]);
@@ -142,30 +134,63 @@ const Dashboard: React.FC = () => {
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [rangeMode, setRangeMode] = useState<RangeMode>("Day");
 
-  /* ================= MODAL STATE ================= */
-  const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
-  const [isHolidayDetailModalOpen, setIsHolidayDetailModalOpen] =
+
+/* ================= MODAL STATE ================= */
+  const [isOverTimeModalOpen, setIsOverTimeModalOpen] = useState(false);
+  const [isOverTimeDetailModalOpen, setIsOverTimeDetailModalOpen] =
     useState(false);
-  const [selectedHoliday, setSelectedHoliday] =
-    useState<HolidayRequest | null>(null);
+  const [selectedOverTime, setSelectedOverTime] =
+    useState<OverTimeRequest | null>(null);
   const [isDeclineModalOpen, setIsDeclineModalOpen] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
   const [isPayrollModalOpen, setIsPayrollModalOpen] = useState(false);
 
   /* ================= FETCH FUNCTIONS ================= */
-  const fetchHolidayRequests = async () => {
-    setHolidayLoading(true);
+  const fetchOverTimeRequests = async () => {
+    setOvertimeLoading(true);
     try {
-      const res = await api.get<HolidayRequest[]>(
-        "/approvals/superadmin/holidays/"
+      const now = dayjs();
+
+      const params = {
+        year: now.year(),
+        month: now.month() + 1,
+      };
+
+      const res = await api.get<PendingOTResponse>(
+        "/attendance/super_admin/overtime/pending/",
+        { params }
       );
-      setHolidayData(res.data);
-      return res.data;
+
+      const mapped: OverTimeRequest[] = (res.data.results || []).map((r) => ({
+        id: r.id,
+        employee_id: r.employee_id,
+        name: r.full_name,
+
+        attendance_id: r.attendance_id,
+        attendance_date: r.attendance_date,
+
+        type: r.type, 
+
+        minutes: r.minutes,
+        start_time: r.start_time,
+        end_time: r.end_time,
+
+        time_in: r.time_in,
+        time_out: r.time_out,
+
+        status: r.approval_status,
+        event_remarks: r.event_remarks,
+        department_name: r.department_name,
+        shift_name: r.shift_name,
+      }));
+
+      setOvertimeData(mapped);
+      return mapped;
     } catch {
-      message.error("Failed to fetch holidays");
+      message.error("Failed to fetch overtime requests");
       return [];
     } finally {
-      setHolidayLoading(false);
+      setOvertimeLoading(false);
     }
   };
 
@@ -196,8 +221,8 @@ const Dashboard: React.FC = () => {
         .filter(Boolean);
 
       if (types.includes("Late")) late++;
-      if (types.includes("OverTime")) overtime++;
-      if (types.includes("UnderTime")) undertime++;
+      if (types.includes("Overtime")) overtime++;
+      if (types.includes("Undertime")) undertime++;
     });
 
     const absent = totalEmployees - present;
@@ -237,6 +262,7 @@ const Dashboard: React.FC = () => {
     return rows;
   };
 
+  
   const fetchAttendanceAnalytics = async (d?: Dayjs, mode?: RangeMode) => {
     setAttendanceLoading(true);
     try {
@@ -270,7 +296,7 @@ const Dashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchHolidayRequests();
+    fetchOverTimeRequests();
     loadCalendarEvents();
     fetchPendingPayrolls();
     fetchAttendanceAnalytics(selectedDate, rangeMode);
@@ -316,30 +342,37 @@ const Dashboard: React.FC = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, [attendanceData]);
 
-  /* ================= HOLIDAY STATUS ================= */
-  const updateHolidayStatus = async (status: "Approved" | "Declined") => {
-    if (!selectedHoliday) return;
+  const updateOverTimeStatus = async (status: "Approved" | "Declined") => {
+    if (!selectedOverTime) return;
     try {
-      await api.post(`/approvals/superadmin/holidays/${selectedHoliday.id}/status/`, {
-        status,
-        reason: status === "Declined" ? declineReason : null,
-      });
-      setHolidayData(prev =>
-        prev.map(h => (h.id === selectedHoliday.id ? { ...h, status } : h))
+      const payload: any = { status };
+        if (status === "Declined") payload.reason = declineReason;
+
+        await api.post(
+          `/attendance/super_admin/overtime/${selectedOverTime.id}/status/`,
+          payload
+        );
+
+      setOvertimeData((prev) =>
+        prev.map((r) => (r.id === selectedOverTime.id ? { ...r, status } : r))
       );
-      message.success(`Holiday request ${status}`);
-      setIsHolidayDetailModalOpen(false);
+
+      message.success(`Overtime request ${status}`);
+      setIsOverTimeDetailModalOpen(false);
       setIsDeclineModalOpen(false);
       setDeclineReason("");
-      setSelectedHoliday(null);
-      await fetchHolidayRequests();
+      setSelectedOverTime(null);
+
+      await fetchOverTimeRequests();
     } catch {
       message.error("Failed to update status");
     }
   };
 
-  const handleApprove = async () => updateHolidayStatus("Approved");
-  const handleDecline = async () => updateHolidayStatus("Declined");
+  const handleApprove = async () => updateOverTimeStatus("Approved");
+  const handleDecline = async () => updateOverTimeStatus("Declined");
+
+  
 
   /* ================= RENDER ================= */
   return (
@@ -362,29 +395,45 @@ const Dashboard: React.FC = () => {
                     justifyContent: "center",
                   }}
                 >
-                  {/* 🟢 DONUT CHART */}
+                  {/*DONUT CHART */}
                   <Pie
-                    data={[
-                      { type: "Reported", value: attendanceData.PRESENT || 0 },
-                      { type: "Not Reported", value: attendanceData.ABSENT || 0 },
-                    ]}
-                    angleField="value"
-                    colorField="type"
-                    radius={1}
-                    innerRadius={0.75}
-                    legend={false}
-                    label={false}
-                    tooltip={false}
-                    height={170}
-                    scale={{
-                      color: {
-                        domain: ["Reported", "Not Reported"],
-                        range: ["#1677ff", "#6BE0E0"],
+                  data={[
+                    { type: "Reported", value: attendanceData.PRESENT || 0 },
+                    { type: "Not Reported", value: attendanceData.ABSENT || 0 },
+                  ]}
+                  angleField="value"
+                  colorField="type"
+                  radius={1}
+                  innerRadius={0.75}
+                  legend={false}
+                  label={false}
+                  tooltip={false}
+                  height={170}
+                  scale={{
+                    color: {
+                      domain: ["Reported", "Not Reported"],
+                      range: ["#386FA4", "#D9D9D9"],
+                    },
+                  }}
+                  statistic={{
+                    title: false,
+                    content: {
+                      style: {
+                        fontSize: "16px",
+                        fontWeight: 600,
                       },
-                    }}
-                  />
+                      formatter: () => {
+                        const reported = attendanceData.PRESENT || 0;
+                        const total =
+                          (attendanceData.PRESENT || 0) +
+                          (attendanceData.ABSENT || 0);
 
-                  {/* 🟢 CUSTOM LEGEND */}
+                        return `${reported} / ${total}`;
+                      },
+                    },
+                  }}
+                />
+                  {/* CUSTOM LEGEND */}
                   <div
                     style={{
                       textAlign: "center",
@@ -400,7 +449,7 @@ const Dashboard: React.FC = () => {
                         style={{
                           width: 10,
                           height: 10,
-                          background: "#6BE0E0",
+                          background: "#D9D9D9",
                           borderRadius: "50%",
                           marginRight: 6,
                           display: "inline-block",
@@ -413,7 +462,7 @@ const Dashboard: React.FC = () => {
                         style={{
                           width: 10,
                           height: 10,
-                          background: "#1677ff",
+                          background: "#386FA4",
                           borderRadius: "50%",
                           marginRight: 6,
                           display: "inline-block",
@@ -445,26 +494,23 @@ const Dashboard: React.FC = () => {
               <div
                 className="card stat-card stat-tile clickable"
                 onClick={async () => {
-                  const latestHolidays = await fetchHolidayRequests();
-                  const pendingHolidays = latestHolidays.filter(
-                    (h) => h.status === "Pending"
-                  );
+                    const latest = await fetchOverTimeRequests();
+                    const pending = latest.filter((r) => r.status === "Pending");
 
-                  if (pendingHolidays.length === 1) {
-                    setSelectedHoliday(pendingHolidays[0]);
-                    setIsHolidayDetailModalOpen(true);
-                  } else {
-                    setIsHolidayModalOpen(true);
-                  }
-                }}
+                    if (pending.length === 1) {
+                      setSelectedOverTime(pending[0]);
+                      setIsOverTimeDetailModalOpen(true);
+                    } else {
+                      setIsOverTimeModalOpen(true);
+                    }
+                  }}
               >
-                <div className="tile-title">Holiday Request(s)</div>
+                <div className="tile-title">OverTime Pending(s)</div>
 
                 <div className="tile-body">
                   <HourglassOutlined className="tile-icon" />
                   <div className="tile-value">
-                    {holidayData.filter((h) => h.status === "Pending").length}
-                    
+                    {overtimeData.filter((r) => r.status === "Pending").length}
                   </div>
                 </div>
               </div>
@@ -514,22 +560,23 @@ const Dashboard: React.FC = () => {
           </Row>
 
           {/* ================= MODALS ================= */}
-          <HolidayModal
-            visible={isHolidayModalOpen}
-            onClose={() => setIsHolidayModalOpen(false)}
-            data={holidayData}
-            loading={holidayLoading}
+          <OverTimeModal
+            visible={isOverTimeModalOpen}
+            onClose={() => setIsOverTimeModalOpen(false)}
+            data={overtimeData}
+            loading={overtimeLoading}
             navigateToAll={() => navigate("/super-admin/requests/")}
-            onRowClick={(holiday) => {
-              setSelectedHoliday(holiday);
-              setIsHolidayDetailModalOpen(true);
+            onRowClick={(row) => {
+              setIsOverTimeModalOpen(false);      // close list modal
+              setSelectedOverTime(row);
+              setIsOverTimeDetailModalOpen(true); // open detail modal
             }}
           />
 
-          <HolidayDetailModal
-            visible={isHolidayDetailModalOpen}
-            holiday={selectedHoliday}
-            onClose={() => setIsHolidayDetailModalOpen(false)}
+          <OverTimeDetailModal
+            visible={isOverTimeDetailModalOpen}
+            overtime={selectedOverTime}
+            onClose={() => setIsOverTimeDetailModalOpen(false)} 
             onApprove={handleApprove}
             onDecline={() => setIsDeclineModalOpen(true)}
           />

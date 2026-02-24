@@ -1,5 +1,4 @@
 .dashboard-layout {
-  min-height: 100vh;
   background-color: #f5f7fa;
 }
 
@@ -71,4 +70,19 @@
 
 .card {
   border-radius: 12px;
+}
+.payrollCard {
+  margin-top: 20px;
+  border-radius: 12px;
+}
+.ant-table-tbody > tr.ant-table-placeholder > td {
+  padding: 40px 0 !important;
+}
+
+.ant-table-placeholder {
+  height: auto !important;
+}
+
+.ant-table {
+  height: auto !important;
 }

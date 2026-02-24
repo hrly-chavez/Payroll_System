@@ -1,12 +1,5 @@
 import React, { useEffect, useState } from "react";
-import {
-  Layout,
-  Card,
-  List,
-  Button,
-  message,
-  Checkbox,
-} from "antd";
+import { Layout, Card, List, message, Checkbox, Popconfirm, Modal } from "antd";
 import {
   DeleteOutlined,
   CalendarOutlined,
@@ -17,7 +10,7 @@ import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/Sidebar/Sidebar";
 import Topbar from "../../components/Topbar/Topbar";
 import styles from "./Notification_styles.module.css";
-import api from "../../api/axios"; // <- import your axios instance
+import api from "../../api/axios";
 
 const { Content } = Layout;
 
@@ -36,6 +29,8 @@ const NotificationPage: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   useEffect(() => {
     fetchNotifications();
@@ -45,14 +40,8 @@ const NotificationPage: React.FC = () => {
     try {
       const res = await api.get("/notifications/");
       const data = res.data;
-      if (Array.isArray(data)) {
-        setNotifications(data);
-      } else if (data.results) {
-        setNotifications(data.results);
-      } else {
-        setNotifications([]);
-      }
-    } catch (err) {
+      setNotifications(Array.isArray(data) ? data : data.results || []);
+    } catch {
       message.error("Failed to load notifications");
     } finally {
       setLoading(false);
@@ -73,12 +62,18 @@ const NotificationPage: React.FC = () => {
   const deleteSelected = async () => {
     try {
       await Promise.all(
-        selectedIds.map(id => api.delete(`/notifications/${id}/`))
+        selectedIds.map(id =>
+          api.delete(`/notifications/${id}/`)
+        )
       );
+
       setNotifications(prev =>
         prev.filter(n => !selectedIds.includes(n.id))
       );
+
       setSelectedIds([]);
+      setSelectionMode(false);
+      message.success("Deleted successfully");
     } catch {
       message.error("Failed to delete selected notifications");
     }
@@ -104,39 +99,92 @@ const NotificationPage: React.FC = () => {
         <Topbar title="Notifications" />
         <Content className={styles.content}>
           <Card className={styles.notificationCard}>
-            {selectedIds.length > 0 && (
-              <Button danger onClick={deleteSelected}>
-                Delete Selected
-              </Button>
-            )}
+
+            {/* ===== TOP BAR ===== */}
+            <div className={styles.actionBar}>
+              {!selectionMode ? (
+                <DeleteOutlined
+                  className={styles.topTrash}
+                  onClick={() => setSelectionMode(true)}
+                />
+              ) : (
+                <>
+                  <Checkbox
+                    checked={
+                      notifications.length > 0 &&
+                      selectedIds.length === notifications.length
+                    }
+                    indeterminate={
+                      selectedIds.length > 0 &&
+                      selectedIds.length < notifications.length
+                    }
+                    onChange={(e) =>
+                      setSelectedIds(
+                        e.target.checked
+                          ? notifications.map(n => n.id)
+                          : []
+                      )
+                    }
+                  >
+                    Select All
+                  </Checkbox>
+
+                  <DeleteOutlined
+                    className={styles.topTrashActive}
+                    onClick={() => setDeleteModalOpen(true)}
+                  />
+                </>
+              )}
+            </div>
 
             <List
               loading={loading}
               dataSource={notifications}
-              renderItem={item => (
+              renderItem={(item) => (
                 <List.Item
                   className={`${styles.notificationItem} ${
                     !item.is_read ? styles.unread : ""
                   }`}
                 >
-                  <div className={styles.leftSection}>
-                    <Checkbox
-                      checked={selectedIds.includes(item.id)}
-                      onChange={() =>
-                        setSelectedIds(prev =>
-                          prev.includes(item.id)
-                            ? prev.filter(i => i !== item.id)
-                            : [...prev, item.id]
-                        )
-                      }
-                    />
+                  <div className={styles.itemRow}>
+
+                    {/* Checkbox only in selection mode */}
+                    {selectionMode && (
+                      <Checkbox
+                        checked={selectedIds.includes(item.id)}
+                        onChange={() =>
+                          setSelectedIds(prev =>
+                            prev.includes(item.id)
+                              ? prev.filter(i => i !== item.id)
+                              : [...prev, item.id]
+                          )
+                        }
+                      />
+                    )}
+
+                    <Modal
+                      title="Delete Selected Notifications"
+                      open={deleteModalOpen}
+                      onOk={() => {
+                        deleteSelected();
+                        setDeleteModalOpen(false);
+                      }}
+                      onCancel={() => setDeleteModalOpen(false)}
+                      centered
+                      okText="Delete"
+                      okButtonProps={{ danger: true }}
+                    >
+                      Are you sure you want to delete the selected notifications?
+                    </Modal>
 
                     <div
                       className={styles.textBlock}
                       onClick={() => {
-                        markAsRead(item.id);
-                        if (item.redirect_url) {
-                          navigate(item.redirect_url);
+                        if (!selectionMode) {
+                          markAsRead(item.id);
+                          if (item.redirect_url) {
+                            navigate(item.redirect_url);
+                          }
                         }
                       }}
                     >
@@ -149,13 +197,8 @@ const NotificationPage: React.FC = () => {
                         {new Date(item.created_at).toLocaleString()}
                       </small>
                     </div>
-                  </div>
 
-                  <DeleteOutlined
-                    onClick={() =>
-                      setSelectedIds(prev => [...prev, item.id])
-                    }
-                  />
+                  </div>
                 </List.Item>
               )}
             />

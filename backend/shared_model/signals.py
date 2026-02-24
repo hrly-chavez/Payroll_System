@@ -51,7 +51,7 @@ def auditlog_table_exists():
         return False
 
 def create_audit_log(instance, action, old_data=None, new_data=None):
-    # ✅ Don’t log during migrate until table exists
+    #  Don’t log during migrate until table exists
     if not auditlog_table_exists():
         return
 

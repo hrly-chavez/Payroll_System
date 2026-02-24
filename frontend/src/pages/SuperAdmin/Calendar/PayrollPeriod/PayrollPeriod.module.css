@@ -1,0 +1,15 @@
+.superadmin-table .ant-table {
+  height: auto !important;
+}
+
+.superadmin-table .ant-table-container {
+  min-height: auto !important;
+}
+
+.superadmin-table .ant-table-placeholder {
+  height: auto !important;
+}
+
+.superadmin-table .ant-table-tbody > tr.ant-table-placeholder > td {
+  padding: 40px 0 !important;
+}

@@ -1,24 +1,127 @@
-.notificationItem {
-  transition: all 0.3s ease;
-  animation: fadeIn 0.4s ease;
+/* ===== LAYOUT ===== */
+.layout {
+  min-height: 100vh;
 }
 
+.content {
+  padding: 16px;
+}
+
+.notificationCard {
+  border-radius: 12px;
+}
+
+/* ===== ACTION BAR (Top Controls) ===== */
+.actionBar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.topTrash {
+  font-size: 20px;
+  cursor: pointer;
+  color: #888;
+  transition: 0.2s ease;
+}
+
+.topTrash:hover {
+  color: #ff4d4f;
+}
+
+.topTrashActive {
+  font-size: 20px;
+  cursor: pointer;
+  color: #ff4d4f;
+}
+
+/* ===== LIST ITEM ===== */
+.notificationItem {
+  transition: all 0.3s ease;
+  animation: fadeIn 0.3s ease;
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+
+.notificationItem:hover {
+  background: #f5f7fa;
+}
+
+/* Smooth collapse animation */
+.removing {
+  opacity: 0;
+  transform: translateX(20px);
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+/* ===== UNREAD STATE ===== */
 .unread {
   background: #eef4ff;
   border-left: 4px solid #386fa4;
 }
 
-.leftSection {
+/* ===== ITEM LAYOUT ===== */
+.itemRow {
   display: flex;
-  gap: 14px;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+}
+
+.textBlock {
+  flex: 1;
+  cursor: pointer;
 }
 
 .titleRow {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-bottom: 4px;
 }
 
+.titleRow h4 {
+  margin: 0;
+  font-weight: 600;
+}
+
+.textBlock p {
+  margin: 0 0 4px 0;
+  color: #555;
+}
+
+.textBlock small {
+  color: #888;
+}
+
+/* ===== ICON STYLES (if used later) ===== */
+.trashIcon {
+  color: #888;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.trashIcon:hover {
+  color: #ff4d4f;
+}
+
+.checkIcon {
+  color: #aaa;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.checkIcon:hover {
+  color: #52c41a;
+}
+
+/* ===== ANIMATION ===== */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -27,5 +130,58 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 1024px) {
+  .content {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .content {
+    padding: 8px;
+  }
+
+  .notificationCard {
+    border-radius: 8px;
+  }
+
+  .notificationItem {
+    padding: 10px 12px;
+  }
+
+  .titleRow h4 {
+    font-size: 14px;
+  }
+
+  .textBlock p {
+    font-size: 13px;
+  }
+
+  .textBlock small {
+    font-size: 12px;
+  }
+
+  .actionBar {
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 480px) {
+  .itemRow {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .actionBar {
+    gap: 10px;
+  }
+
+  .topTrash,
+  .topTrashActive {
+    font-size: 18px;
   }
 }

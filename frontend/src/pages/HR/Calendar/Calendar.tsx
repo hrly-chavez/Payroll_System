@@ -22,11 +22,12 @@ import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLe
 
 interface CalendarPageProps {
   showRequests?: boolean;
+  children?: React.ReactNode;
 }
 
 const { Content } = Layout;
 
-const CalendarPage: React.FC<CalendarPageProps> = ({ showRequests = true }) => {
+const CalendarPage: React.FC<CalendarPageProps> = ({ showRequests = true, children }) => {
   type PayrollPeriod = {
     id: number;
     code?: string;
@@ -119,9 +120,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ showRequests = true }) => {
       <Layout>
         <Topbar title="Calendar" />
 
-        <Content className={styles.content}>
+        <Content className={styles.content}>        
           {/* ACTION BUTTONS */}
-          {showRequests && (
             <div className={styles.actions}>
               <Button
                 className={styles.payrollBtn}
@@ -137,16 +137,10 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ showRequests = true }) => {
                 + Add Holiday
               </Button>
             </div>
-          )}
-
 
           {/* ================= CALENDAR CARD ================= */}
           <Card className={styles.card}>
-            {/* Header Controls */}
-             <div className={styles.calLeftTitle}>
-              {calendarValue.format("MMMM YYYY")}
-            </div>
-
+            
             {/* Calendar */}
             <div className={styles.calendarWrap}>
               <SharedCalendar
@@ -158,14 +152,12 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ showRequests = true }) => {
               />
             </div>
 
-            
             <div style={{ marginTop: 16 }}>
               <CalendarLegendDisplay />
             </div>
           </Card>
 
           {/* ================= REQUESTS CARD ================= */}
-          {showRequests && (
             <Card className={styles.card}>
               <div className={styles.requestHeader}>
                 <div className={styles.tabSwitch}>
@@ -187,9 +179,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ showRequests = true }) => {
                 </div>
               </div>
 
-              {activeTab === "holiday" && (
-                <HolidayTab
-                  active
+              {activeTab === "holiday" && ( <HolidayTab active
                   searchText={searchText}
                   refreshKey={holidayRefreshKey}
                 />
@@ -203,8 +193,6 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ showRequests = true }) => {
                 />
               )}
             </Card>
-          )}
-
         </Content>
       </Layout>
 

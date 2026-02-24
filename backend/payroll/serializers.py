@@ -5,10 +5,10 @@ from django.utils import timezone
 from decimal import Decimal,InvalidOperation
 from rest_framework.validators import UniqueValidator
 
-# ✅ salary/amount numeric-like: must contain at least 1 digit, and only digits/comma/dot
+#  salary/amount numeric-like: must contain at least 1 digit, and only digits/comma/dot
 NUMERIC_LIKE_REGEX = re.compile(r"^(?=.*\d)[0-9.,]+$")
 
-# ✅ Deduction code safe chars only (prevents special characters like ; ' " = ( ) etc.)
+#  Deduction code safe chars only (prevents special characters like ; ' " = ( ) etc.)
 # allowed: letters, digits, underscore, hyphen
 CODE_SAFE_REGEX = re.compile(r"^[A-Za-z0-9_-]+$")
 
@@ -45,12 +45,12 @@ class DeductionTypeSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
     def validate(self, data): 
-        # ✅ NOTE: make sure your model field is really named "code"
+        #  NOTE: make sure your model field is really named "code"
         code = (data.get("code") or "").strip()
         category = (data.get("category") or "").strip()
         calc_type = (data.get("calculation_type") or "").strip()  # "Fixed" / "Percent"
 
-        # ✅ Deduction code: block special characters
+        #  Deduction code: block special characters
         if not code:
             raise serializers.ValidationError({"code": "This field is required."})
 
@@ -67,13 +67,13 @@ class DeductionTypeSerializer(serializers.ModelSerializer):
         if "amount" in data and data.get("amount") is not None:
             data["amount"] = parse_decimal_allow_comma_dot(data.get("amount"), "amount")
 
-        # ✅ Salary Range (To) must be > 0
+        #  Salary Range (To) must be > 0
         if salary_to <= Decimal("0"):
             raise serializers.ValidationError({
                 "salary_range_to": "Salary Range (To) must be greater than 0."
             })
 
-        # ✅ from <= to
+        #  from <= to
         if salary_from > salary_to:
             raise serializers.ValidationError({
                 "salary_range_from": "Salary Range (From) cannot be greater than Salary Range (To).",
@@ -84,7 +84,7 @@ class DeductionTypeSerializer(serializers.ModelSerializer):
         if self.instance:
             qs = qs.exclude(id=self.instance.id)
 
-        # ✅ ONLY BLOCK EXACT DUPLICATE:
+        #  ONLY BLOCK EXACT DUPLICATE:
         # same code + same category + same type + same salary range (from/to)
         exact_duplicate = qs.filter(
             code=code,
@@ -229,7 +229,7 @@ class EmployeeDeductionMiniSerializer(serializers.ModelSerializer):
 class AllowanceTypeMiniSerializer(serializers.ModelSerializer):
     class Meta:
         model = Allowance_Type
-        fields = ["id", "code", "name"]
+        fields = ["id", "name"]
 
 # Returns employee allowances active during the payroll period (verification preview only)
 class EmployeeAllowanceMiniSerializer(serializers.ModelSerializer):
@@ -292,7 +292,7 @@ class PayrollVerifySnapshotSerializer(serializers.Serializer):
 class CommissionTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Commission_Type
-        fields = ["id", "name", "code", "is_taxable", "is_active"]
+        fields = ["id", "name", "is_taxable", "is_active"]
 
     def validate_name(self, value):
         v = (value or "").strip()

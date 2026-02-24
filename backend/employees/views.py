@@ -434,72 +434,71 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(new_salary).data, status=status.HTTP_201_CREATED)
 
     def _recompute_percentage_deductions(self, employee_id, salary_amount, effective_from, user):
+        """
+        Recompute employee deductions after salary change, respecting salary ranges and soft deletes.
+        """
+        from shared_model.models import Employee_Deduction, Deduction_Type
 
-        active_deductions = Employee_Deduction.objects.filter(
-            employee_id=employee_id,
-            status="Active"
-        ).select_related("deduction_type")
+        # Get all deductions for active deduction types
+        deduction_types = Deduction_Type.objects.filter(is_active=True)
 
-        for old_ded in active_deductions:
-
-            code = old_ded.deduction_type.code
-
-            # Find correct bracket for new salary
-            new_deduction_type = Deduction_Type.objects.filter(
-                code=code,
-                is_active=True,
-                salary_range_from__lte=salary_amount,
-                salary_range_to__gte=salary_amount,
-            ).order_by("-salary_range_from").first()
-
-            if not new_deduction_type:
-                continue
-
-            # Compute new amount
-            if new_deduction_type.calculation_type == "Fixed":
-                new_amount = new_deduction_type.amount
-            else:  # Percent
-                new_amount = salary_amount * (new_deduction_type.amount / Decimal("100"))
-
-            new_amount = round(new_amount, 2)
-
-            # Check if anything changed
-            bracket_changed = old_ded.deduction_type_id != new_deduction_type.id
-            amount_changed = old_ded.amount != new_amount
-
-            if not bracket_changed and not amount_changed:
-                continue  # Nothing to update
-
-            # Deactivate old deduction
-            old_ded.status = "Inactive"
-            old_ded.effective_to = effective_from - timedelta(days=1)
-            old_ded._current_user = user
-            old_ded.save()
-
-            # Create new deduction
-            new_ded = Employee_Deduction.objects.create(
-                employee_id=employee_id,
-                deduction_type=new_deduction_type,
-                amount=new_amount,
-                frequency = old_ded.frequency,
-                status="Active",
-                effective_from=effective_from,
-                effective_to=None,
+        for deduction_type in deduction_types:
+            # Check if the new salary falls within this deduction's range
+            in_range = (
+                Decimal(deduction_type.salary_range_from) <= salary_amount <= Decimal(deduction_type.salary_range_to)
             )
 
-            # Attach user for audit tracking
-            new_ded._current_user = user
-            new_ded.save()
+            # Try to find existing active deduction for this type
+            employee_deduction = Employee_Deduction.objects.filter(
+                employee_id=employee_id,
+                deduction_type=deduction_type
+            ).first()
+
+            if in_range:
+                # Compute deduction amount
+                if deduction_type.calculation_type == "Fixed":
+                    computed_amount = deduction_type.amount
+                else:  # Percent
+                    computed_amount = round(salary_amount * (deduction_type.amount / Decimal("100")), 2)
+
+                if employee_deduction:
+                    # Update existing deduction
+                    employee_deduction.amount = computed_amount
+                    employee_deduction.status = "Active"
+                    employee_deduction.effective_to = None
+                    employee_deduction._current_user = user
+                    employee_deduction.save(update_fields=["amount", "status", "effective_to"])
+                    print(f"[DEBUG] Updated deduction {deduction_type.code} for employee {employee_id}")
+                else:
+                    # Create new deduction
+                    Employee_Deduction.objects.create(
+                        employee_id=employee_id,
+                        deduction_type=deduction_type,
+                        amount=computed_amount,
+                        frequency="Per Period",
+                        status="Active",
+                        effective_from=effective_from,
+                        effective_to=None,
+                    )
+                    print(f"[DEBUG] Created deduction {deduction_type.code} for employee {employee_id}")
+            else:
+                # Salary out of range → soft delete
+                if employee_deduction and employee_deduction.status == "Active":
+                    employee_deduction.status = "Inactive"
+                    employee_deduction.effective_to = effective_from - timedelta(days=1)
+                    employee_deduction._current_user = user
+                    employee_deduction.save(update_fields=["status", "effective_to"])
+                    print(f"[DEBUG] Soft-deleted deduction {deduction_type.code} for employee {employee_id}")
 
 #done logs
 #employee deduction
 class EmployeeDeductionViewSet(viewsets.ModelViewSet):
-    queryset = Employee_Deduction.objects.all()
+    queryset = Employee_Deduction.objects.filter(status="Active")
     permission_classes = [IsAuthenticated, IsRole]
     allowed_roles = ["ADMIN", "SUPER_ADMIN"]
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().filter(status="Active")
         employee_id = self.request.query_params.get("employee")
         if employee_id:
             queryset = queryset.filter(employee_id=employee_id)

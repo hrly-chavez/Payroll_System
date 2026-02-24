@@ -6,6 +6,7 @@ from shared_model.models import *
 from .serializers import *
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
+from django.utils.timezone import now
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
 from django.db import transaction
@@ -96,6 +97,117 @@ class DeductionListCreateView(generics.ListCreateAPIView):
 class DeductionDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Deduction_Type.objects.all()
     serializer_class = DeductionTypeSerializer
+
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+
+        # Save updated Deduction_Type
+        updated_instance = serializer.save()
+
+        # Only recompute AFTER transaction commits
+        if any(field in request.data for field in [
+            "salary_range_from",
+            "salary_range_to",
+            "is_active",
+            "amount",
+            "calculation_type"
+        ]):
+            print(f"[DEBUG] Scheduling recompute for Deduction_Type id={updated_instance.id}")
+
+            transaction.on_commit(
+                lambda: self._recompute_employee_deductions(updated_instance)
+            )
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    # -----------------------------
+    # Helper: compute deduction amount
+    # -----------------------------
+    def _compute_deduction_amount(self, employee_salary, deduction_type):
+        if deduction_type.calculation_type == "Fixed":
+            return deduction_type.amount
+        elif deduction_type.calculation_type == "Percent":
+            amount = round(employee_salary * (deduction_type.amount / Decimal("100")), 2)
+            print(f"[DEBUG] Computing {deduction_type.code} for salary {employee_salary}: {amount}")
+            return amount
+        return Decimal("0.00")
+
+    # -----------------------------
+    # Helper: recompute Employee_Deductions
+    # -----------------------------
+    def _recompute_employee_deductions(self, deduction_type):
+
+        print(f"[DEBUG] Recomputing deductions for {deduction_type.code}")
+
+        from shared_model.models import Employee, Employee_Deduction
+
+        employees = Employee.objects.filter(is_active=True)
+
+        for employee in employees:
+            today = timezone.localdate()
+
+            latest_salary = employee.salaries.filter(
+                effective_from__lte=today
+            ).order_by("-effective_from").first()
+
+            if not latest_salary:
+                print(f"[DEBUG] No salary found for {employee}")
+                continue
+
+            salary = latest_salary.base_rate
+
+            print(f"[DEBUG] Employee {employee.id} salary: {salary}")
+
+            # Check if within range
+            in_range = (
+                Decimal(deduction_type.salary_range_from)
+                <= salary
+                <= Decimal(deduction_type.salary_range_to)
+            )
+
+            # Try to get existing deduction
+            employee_deduction = Employee_Deduction.objects.filter(
+                employee=employee,
+                deduction_type=deduction_type
+            ).first()
+
+            if in_range:
+                # Compute amount
+                if deduction_type.calculation_type == "Percent":
+                    computed_amount = (
+                        salary * Decimal(deduction_type.amount) / Decimal("100")
+                    )
+                else:  # Fixed
+                    computed_amount = Decimal(deduction_type.amount)
+
+                if employee_deduction:
+                    # UPDATE existing
+                    employee_deduction.amount = computed_amount
+                    employee_deduction.status = "Active"
+                    employee_deduction.save()
+                    print(f"[DEBUG] Updated deduction for {employee.fname}")
+                else:
+                    # CREATE new deduction
+                    Employee_Deduction.objects.create(
+                        employee=employee,
+                        deduction_type=deduction_type,
+                        amount=computed_amount,
+                        frequency="Per Period",
+                        effective_from=now().date(),
+                        status="Active",
+                    )
+                    print(f"[DEBUG] Created deduction for {employee.fname}")
+
+            else:
+                # OUTSIDE RANGE → deactivate if exists
+                if employee_deduction:
+                    employee_deduction.status = "Inactive"
+                    employee_deduction.save()
+                    print(f"[DEBUG] Deactivated deduction for {employee.fname}")
 
 # Optional: Update only 'is_active' status
 #done logs
@@ -509,6 +621,7 @@ class GeneratePayrollForPeriodView(APIView):
         serializer = GeneratePayrollPeriodResponseSerializer(result)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+#per employee butang notif para sa mga na decline
 class GeneratePayrollForEmployeeView(APIView):
     permission_classes = [IsAuthenticated]
 

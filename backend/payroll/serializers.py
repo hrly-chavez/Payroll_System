@@ -329,7 +329,7 @@ from rest_framework.exceptions import ValidationError
 from decimal import Decimal
 
 class PayRuleSerializer(serializers.ModelSerializer):
-    # ✅ override name field validator + message here
+    #  override name field validator + message here
     name = serializers.CharField(
         max_length=100,
         validators=[
@@ -466,6 +466,31 @@ class PayrollResultSerializer(serializers.Serializer):
 
     lines = PayslipLineSerializer(many=True)
 
+#For employee dashboard payroll(rows & columns)
+class EmployeePayrollRowSerializer(serializers.Serializer):
+    # Employee identity (for frontend modal)
+    employee_id = serializers.IntegerField()
+    employee_full_name = serializers.CharField()
+    department_name = serializers.CharField(allow_null=True)
+
+    # Period
+    period_id = serializers.IntegerField()
+    period_code = serializers.CharField()
+    period_start_date = serializers.DateField()
+    period_end_date = serializers.DateField()
+    pay_date = serializers.DateField(allow_null=True)
+    period_status = serializers.CharField()
+
+    # Status
+    ppe_status = serializers.CharField()
+    declined_reason = serializers.CharField(allow_null=True, required=False)
+
+    # Payroll summary (latest active)
+    payroll_id = serializers.IntegerField(allow_null=True)
+    payroll_status = serializers.CharField(allow_null=True)
+    run_no = serializers.IntegerField(allow_null=True)
+    net_pay = serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True)
+
 # ===================== CEO APPROVAL QUEUE =====================
 
 class PayrollApprovalEmployeeSerializer(serializers.Serializer):
@@ -495,4 +520,4 @@ class PayrollDeclineInputSerializer(serializers.Serializer):
 
 #Void Reason(nullable)
 class PayrollResetAfterDeclineSerializer(serializers.Serializer):
-    void_reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    void_reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)  

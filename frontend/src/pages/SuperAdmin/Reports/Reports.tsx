@@ -164,7 +164,7 @@ const Reports: React.FC = () => {
               <TabPane tab="User Activity Logs" key="1" />
               <TabPane tab="Attendance Correction Logs" key="2" />
               <TabPane tab="Payroll Release Logs" key="3" />
-              <TabPane tab="Payroll Approval and Release Logs" key="4" />
+              
             </Tabs>
 
             <div className="reports-filters">

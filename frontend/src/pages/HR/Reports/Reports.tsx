@@ -87,10 +87,6 @@ const Reports: React.FC = () => {
           <div className={styles.card}>
             <Tabs defaultActiveKey="1" className={styles.tabs}>
               <TabPane tab="Attendance Summary" key="1" />
-              <TabPane tab="Late & Absences" key="2" />
-              <TabPane tab="Overtime" key="3" />
-              <TabPane tab="Payroll Register" key="4" />
-              <TabPane tab="Payslip Summary" key="5" />
             </Tabs>
 
             <div className={styles.headerActions}>

@@ -361,7 +361,7 @@ def admin_update_leave_status(request, pk):
     serializer = LeaveRequestSerializer(leave_request)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
-    
+#THIS IS WRONG
 class LeaveRequestUpdateView(generics.UpdateAPIView):
     queryset = Leave_Request.objects.all()
     serializer_class = LeaveRequestSerializer
@@ -378,7 +378,7 @@ class LeaveRequestUpdateView(generics.UpdateAPIView):
                 approved_at=timezone.now()
             )
 
-            # ✅ Create notification for the employee
+            #  Create notification for the employee
             employee_user = leave.employee.user
 
             Notification.objects.create(

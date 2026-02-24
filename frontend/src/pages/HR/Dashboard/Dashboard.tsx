@@ -629,7 +629,7 @@ const Dashboard: React.FC = () => {
       >
         {/* PENDING REQUESTS */}
         <Col xs={24} md={16}>
-          <Card title="Pending Requests" className={styles.pendingCard}>
+          <Card title="Pending Request(s)" className={styles.pendingCard}>
             <Tabs
               defaultActiveKey="holiday"
               size="small"
@@ -644,11 +644,6 @@ const Dashboard: React.FC = () => {
                   key: "leave",
                   label: "Leave",
                   children: <div>Leave requests here</div>,
-                },
-                {
-                  key: "payroll",
-                  label: "Payroll",
-                  children: <div>Payroll requests here</div>,
                 },
                 {
                 key: "attendance correction",

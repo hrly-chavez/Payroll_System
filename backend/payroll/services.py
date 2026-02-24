@@ -1235,16 +1235,44 @@ class PayrollGenerationService:
         start_dt, end_dt = self._attendance_interval(att)
 
         # Two possible night windows around the work interval
+        tz = timezone.get_current_timezone()
+
+        # Ensure start/end are in the same tz (defensive)
+        if timezone.is_naive(start_dt):
+            start_dt = timezone.make_aware(start_dt, tz)
+        else:
+            start_dt = start_dt.astimezone(tz)
+
+        if timezone.is_naive(end_dt):
+            end_dt = timezone.make_aware(end_dt, tz)
+        else:
+            end_dt = end_dt.astimezone(tz)
+
         # Window A: prev day 22:00 -> work day 06:00
-        a_start = datetime.combine(start_dt.date() - timedelta(days=1), time(22, 0))
-        a_end   = datetime.combine(start_dt.date(), time(6, 0))
+        a_start = timezone.make_aware(
+            datetime.combine(start_dt.date() - timedelta(days=1), time(22, 0)),
+            tz,
+        )
+        a_end = timezone.make_aware(
+            datetime.combine(start_dt.date(), time(6, 0)),
+            tz,
+        )
 
         # Window B: work day 22:00 -> next day 06:00
-        b_start = datetime.combine(start_dt.date(), time(22, 0))
-        b_end   = datetime.combine(start_dt.date() + timedelta(days=1), time(6, 0))
+        b_start = timezone.make_aware(
+            datetime.combine(start_dt.date(), time(22, 0)),
+            tz,
+        )
+        b_end = timezone.make_aware(
+            datetime.combine(start_dt.date() + timedelta(days=1), time(6, 0)),
+            tz,
+        )
 
         def overlap_minutes(win_start: datetime, win_end: datetime) -> int:
-            overlap = max(timedelta(0), min(end_dt, win_end) - max(start_dt, win_start))
+            overlap = max(
+                timedelta(0),
+                min(end_dt, win_end) - max(start_dt, win_start),
+            )
             return int(overlap.total_seconds() // 60)
 
         minutes = overlap_minutes(a_start, a_end) + overlap_minutes(b_start, b_end)
@@ -1513,7 +1541,9 @@ class PayrollGenerationService:
             amt = _d2(c.amount)
             if amt <= 0:
                 continue
-            desc = f"Commission: {c.commission_type.code}"
+            ct = getattr(c, "commission_type", None)
+            label = getattr(ct, "name", None) or "Commission"
+            desc = f"Commission: {label}"
             self._create_line(payroll, "EARNING", desc, amt, source_type="MANUAL", source_id=c.id)
 
     def _apply_deductions(self, payroll: Payroll, deductions, period: Payroll_Period):
@@ -1656,9 +1686,9 @@ class PayrollGenerationService:
         if timezone.is_naive(end_dt):
             end_dt = timezone.make_aware(end_dt, tz)
 
-        # Safety: if time_out is somehow earlier (bad device time), clamp it to start_dt
+        # If time_out is earlier than time_in, assume it crossed midnight (next day)
         if end_dt < start_dt:
-            end_dt = start_dt
+            end_dt = end_dt + timedelta(days=1)
 
         return start_dt, end_dt
 

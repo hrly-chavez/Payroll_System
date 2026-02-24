@@ -769,7 +769,7 @@ class PayrollPeriodEmployeeCommission(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.employee} - {self.commission_type.code} ({self.amount}) [{self.period.code}]"
+        return f"{self.employee} -({self.amount}) [{self.period.code}]"
 
 #TODO: PAYROLL_RUN_LOG 
 

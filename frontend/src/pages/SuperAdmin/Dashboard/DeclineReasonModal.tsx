@@ -17,7 +17,15 @@ const DeclineReasonModal: React.FC<Props> = ({ visible, reason, setReason, onCan
       open={visible}
       onCancel={onCancel}
       footer={[
-        <Button key="save" type="primary" onClick={onSave}>
+        <Button
+          key="save"
+          type="primary"
+          onClick={() => {
+            if (!reason.trim()) return;
+            onSave();
+          }}
+          disabled={!reason.trim()}
+        >
           Save
         </Button>,
         <Button key="cancel" onClick={onCancel}>

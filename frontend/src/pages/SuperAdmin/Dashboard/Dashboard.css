@@ -156,28 +156,29 @@
   min-width: 180px;
 }
 
-/* ================= Holiday Modal ================= */
 
-.holiday-detail {
+/* ================= Detail Modal (Overtime / Requests) ================= */
+
+.detail-form {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.holiday-field {
+.detail-field {
   display: flex;
   flex-direction: column;
 }
 
-.holiday-field label {
+.detail-field label {
   font-size: 13px;
   font-weight: 600;
   margin-bottom: 6px;
   color: #000;
 }
 
-.holiday-field input {
-  height: 40px;
+.detail-field input,
+.detail-field textarea {
   padding: 8px 12px;
   border-radius: 6px;
   border: 1px solid #d9d9d9;
@@ -186,7 +187,15 @@
   font-size: 14px;
 }
 
-.holiday-modal-footer {
+.detail-field input {
+  height: 40px;
+}
+
+.detail-field textarea {
+  resize: vertical;
+}
+
+.detail-modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 8px;

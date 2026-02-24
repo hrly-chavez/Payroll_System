@@ -11,6 +11,8 @@ from shared_model.models import Attendance, Attendance_Event, Shift_Workday
 # ====================== HELPERS ======================
 EARLY_PUNCH_IN_MINUTES = 60
 
+OT_APPROVAL_THRESHOLD_MINUTES = 60  # only OT >= 60 mins requires approval
+
 def _get_employee_or_400(user):
     employee = getattr(user, "employee", None)
     if not employee:
@@ -220,14 +222,17 @@ def punch_out(user):
     attendance.time_out = now_dt
     attendance.save(update_fields=["time_out"])
 
-    # Compute undertime based on shift end datetime using attendance.date as shift start date
+    # Compute undertime / overtime based on shift end datetime using attendance.date as shift start date
     shift_start_dt, shift_end_dt = _get_shift_start_end_dt(shift, attendance.date)
 
+    # -------------------------
+    # Undertime
+    # -------------------------
     undertime_minutes = _compute_minutes_undertime_dt(shift, shift_end_dt, now_dt)
     if undertime_minutes > 0:
         Attendance_Event.objects.update_or_create(
             attendance=attendance,
-            type="Undertime",  # must match your model TYPE_CHOICES
+            type="Undertime",
             defaults={
                 "minutes": undertime_minutes,
                 "approval_status": "Approved",
@@ -239,6 +244,37 @@ def punch_out(user):
         )
     else:
         Attendance_Event.objects.filter(attendance=attendance, type="Undertime").delete()
+
+    # -------------------------
+    # Overtime (after shift end)
+    # - Only requires approval if >= 60 minutes
+    # - Store start_time/end_time:
+    #     start_time = shift.end_time
+    #     end_time   = actual punch-out time (local time)
+    # -------------------------
+    overtime_minutes = int((now_dt - shift_end_dt).total_seconds() // 60)
+    overtime_minutes = max(0, overtime_minutes)
+
+    if overtime_minutes > 0:
+        needs_approval = overtime_minutes >= OT_APPROVAL_THRESHOLD_MINUTES
+
+        Attendance_Event.objects.update_or_create(
+            attendance=attendance,
+            type="Overtime",
+            defaults={
+                "minutes": overtime_minutes,
+                "approval_status": "Pending" if needs_approval else "Approved",
+                "event_remarks": (
+                    f"System detected {overtime_minutes} minute(s) overtime."
+                    + (" Needs approval." if needs_approval else " Auto-approved (below 60 minutes).")
+                ),
+                "start_time": shift.end_time,     # OT starts at shift end (your requirement)
+                "end_time": timezone.localtime(now_dt).time(),
+                "approved_by": None,
+            },
+        )
+    else:
+        Attendance_Event.objects.filter(attendance=attendance, type="Overtime").delete()
 
     return attendance
 

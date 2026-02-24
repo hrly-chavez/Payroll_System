@@ -563,17 +563,24 @@ class PayrollGenerationService:
 
     def _get_approved_events(self, attendance_map):
         """
-        Extract ALL Approved Attendance_Event objects from the attendance_map.
+        Only Approved events affect payroll amounts.
 
-        Output is a flat list of events across all days.
+        This ensures:
+        - Pending Overtime is NOT paid yet
+        - Declined Overtime is NOT paid
+        - Only Approved events become payslip lines (earnings/deductions)
         """
-        approved = []
-        for att in attendance_map.values():
-            for ev in att.events.all():
-                if ev.approval_status == "Approved":
-                    approved.append(ev)
-        return approved
+        attendance_ids = [att.id for att in attendance_map.values() if att and att.id]
+        if not attendance_ids:
+            return []
 
+        return list(
+            Attendance_Event.objects.filter(
+                attendance_id__in=attendance_ids,
+                approval_status="Approved",
+            ).select_related("attendance")
+        )
+        
     def _get_late_dates(self, approved_events) -> set[date]:
         """
         Build a set of dates where the employee has an approved "Late" event with minutes > 0.
@@ -1054,11 +1061,14 @@ class PayrollGenerationService:
         - ValidationError if required Pay_Rule is missing (audit correctness)
         """
         for ev in approved_events:
-            # Normalize event naming mismatch (your Attendance_Event choices differ)
             normalized = self._normalize_event_type(ev.type)
 
-            # Determine category from Pay_Rule expectation:
-            # Late/Undertime -> Deduction, Overtime -> Earning
+            # Defensive rule: never pay Overtime unless explicitly approved.
+            # (Should already be true because approved_events are filtered,
+            # but this protects against future refactors.)
+            if normalized == "Overtime" and ev.approval_status != "Approved":
+                continue
+
             if normalized in ("Late", "Undertime"):
                 category = "Deduction"
             else:

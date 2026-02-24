@@ -815,6 +815,7 @@ class PayrollApproveEmployeeView(APIView):
         _recompute_period_status(period)
 
         return Response({"detail": "Payroll approved."}, status=http_status.HTTP_200_OK)
+
 #Ari nalang sad butang ang notif kung sa payroll period kay naay gi declined na employee para mo notif ditso sa HR
 class PayrollDeclineEmployeeView(APIView):
     permission_classes = [IsAuthenticated]
@@ -882,7 +883,7 @@ class PayrollDeclineEmployeeView(APIView):
 
         return Response({"detail": "Payroll declined."}, status=http_status.HTTP_200_OK)
 
-#==========================================RESETING PAYROLL===========================
+#============================RESETING PAYROLL===========================
 class PayrollResetAfterDeclineView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -947,7 +948,7 @@ class PayrollResetAfterDeclineView(APIView):
 
         return Response({"detail": "Employee reset to Pending. Previous payroll voided."}, status=http_status.HTTP_200_OK)
 
-#==========================================UPDATE STATUS OF EMPLOYEE===========================
+#========================UPDATE STATUS OF PAYROLL PERIOD TO PAID=====================
 class PayrollPeriodMarkPaidView(APIView):
     permission_classes = [IsAuthenticated]
 

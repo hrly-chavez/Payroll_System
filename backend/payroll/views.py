@@ -619,6 +619,26 @@ class GeneratePayrollForPeriodView(APIView):
             generated_by_user=request.user
         )
 
+        # Get the period (for title/description context)
+        period = Payroll_Period.objects.filter(id=period_id).first()
+
+        # Notify all SUPER_ADMIN users
+        super_admins = User.objects.filter(role="SUPER_ADMIN")
+
+        notifications = []
+        for admin in super_admins:
+            notifications.append(
+                Notification(
+                    user=admin,
+                    title="Payroll Period Generated",
+                    description=f"Payroll for period {period} has been successfully generated.",
+                    category="payroll",
+                    redirect_url="/super-admin/calendar",
+                )
+            )
+
+        Notification.objects.bulk_create(notifications)
+
         serializer = GeneratePayrollPeriodResponseSerializer(result)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -815,6 +835,39 @@ class PayrollApproveEmployeeView(APIView):
 
         _recompute_period_status(period)
 
+        # ----------------------------
+        # ✅ Create notifications
+        # ----------------------------
+
+        notifications = []
+
+        # 1️⃣ Notify SUPER_ADMIN
+        super_admins = User.objects.filter(role="ADMIN")
+        for admin in super_admins:
+            notifications.append(
+                Notification(
+                    user=admin,
+                    title="Payroll Approved",
+                    description=f"{ppe.employee} payroll for period {period} has been approved.",
+                    category="payroll",
+                    redirect_url="/admin/calendar",
+                )
+            )
+
+        # 2️⃣ Notify Employee without URL
+        if hasattr(ppe.employee, "user") and ppe.employee.user:
+            notifications.append(
+                Notification(
+                    user=ppe.employee.user,
+                    title="Payroll Approved",
+                    description=f"Your payroll for period {period} has been approved.",
+                    category="payroll",
+                    redirect_url="",  # No URL, just visible in their notifications
+                )
+            )
+
+        Notification.objects.bulk_create(notifications)
+
         return Response({"detail": "Payroll approved."}, status=http_status.HTTP_200_OK)
 #Ari nalang sad butang ang notif kung sa payroll period kay naay gi declined na employee para mo notif ditso sa HR
 class PayrollDeclineEmployeeView(APIView):
@@ -880,6 +933,20 @@ class PayrollDeclineEmployeeView(APIView):
         ppe.save(update_fields=update_fields)
 
         _recompute_period_status(period)
+
+        # Notify HR about declined payroll
+        hr_users = User.objects.filter(role="HR")
+        notifications = [
+            Notification(
+                user=hr,
+                title="Payroll Declined",
+                description=f"{ppe.employee} payroll for period {period} has been declined. Reason: {reason}",
+                category="payroll",
+                redirect_url="/hr/payrolls",
+            )
+            for hr in hr_users
+        ]
+        Notification.objects.bulk_create(notifications)
 
         return Response({"detail": "Payroll declined."}, status=http_status.HTTP_200_OK)
 

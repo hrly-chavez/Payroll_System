@@ -451,8 +451,9 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
             # Try to find existing active deduction for this type
             employee_deduction = Employee_Deduction.objects.filter(
                 employee_id=employee_id,
-                deduction_type=deduction_type
-            ).first()
+                deduction_type=deduction_type,
+                status="Active"
+            ).order_by("-effective_from").first()
 
             if in_range:
                 # Compute deduction amount

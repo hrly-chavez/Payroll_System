@@ -172,8 +172,9 @@ class DeductionDetailView(generics.RetrieveUpdateDestroyAPIView):
             # Try to get existing deduction
             employee_deduction = Employee_Deduction.objects.filter(
                 employee=employee,
-                deduction_type=deduction_type
-            ).first()
+                deduction_type=deduction_type,
+                status="Active"
+                ).order_by("-effective_from").first()
 
             if in_range:
                 # Compute amount
@@ -618,6 +619,26 @@ class GeneratePayrollForPeriodView(APIView):
             generated_by_user=request.user
         )
 
+        # Get the period (for title/description context)
+        period = Payroll_Period.objects.filter(id=period_id).first()
+
+        # Notify all SUPER_ADMIN users
+        super_admins = User.objects.filter(role="SUPER_ADMIN")
+
+        notifications = []
+        for admin in super_admins:
+            notifications.append(
+                Notification(
+                    user=admin,
+                    title="Payroll Period Generated",
+                    description=f"Payroll for period {period} has been successfully generated.",
+                    category="payroll",
+                    redirect_url="/super-admin/calendar",
+                )
+            )
+
+        Notification.objects.bulk_create(notifications)
+
         serializer = GeneratePayrollPeriodResponseSerializer(result)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -642,6 +663,13 @@ class PayrollEmployeeResultView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, period_id: int, employee_id: int):
+        # EMPLOYEE users can only view their own payroll
+        role = (getattr(request.user, "role", "") or "").strip().upper()
+        if role == "EMPLOYEE":
+            emp = getattr(request.user, "employee", None)
+            if not emp or emp.id != employee_id:
+                raise PermissionDenied("You are not allowed to view other employees' payroll results.")
+
         ppe = get_object_or_404(
             PayrollPeriodEmployee.objects.select_related("employee", "employee__department"),
             period_id=period_id,
@@ -696,6 +724,72 @@ class PayrollEmployeeResultView(APIView):
         }
 
         return Response(PayrollResultSerializer(payload).data, status=http_status.HTTP_200_OK)
+
+#For employee dashboard payroll(rows & columns)
+class EmployeePayrollListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Employee-only endpoint (HR/Admin can be allowed too if you want)
+        emp = getattr(request.user, "employee", None)
+        if not emp:
+            return Response({"detail": "No employee profile found for this user."}, status=http_status.HTTP_400_BAD_REQUEST)
+
+        # All PPE rows for this employee
+        ppe_qs = (
+            PayrollPeriodEmployee.objects
+            .filter(employee=emp)
+            .select_related("period")
+            .order_by("-period__start_date")
+        )
+
+        period_ids = list(ppe_qs.values_list("period_id", flat=True))
+
+        # Latest active payroll per period (exclude Void, pick highest run_no)
+        payroll_rows = (
+            Payroll.objects
+            .filter(employee=emp, payroll_period_id__in=period_ids)
+            .exclude(status="Void")
+            .select_related("payroll_period")
+            .order_by("payroll_period_id", "-run_no", "-id")
+        )
+
+        latest_by_period = {}
+        for pr in payroll_rows:
+            if pr.payroll_period_id not in latest_by_period:
+                latest_by_period[pr.payroll_period_id] = pr
+
+        data = []
+        for ppe in ppe_qs:
+            period = ppe.period
+            pr = latest_by_period.get(period.id)
+
+            data.append({
+                # employee identity for frontend display + modal
+                "employee_id": emp.id,
+                "employee_full_name": f"{emp.fname} {emp.lname}".strip(),
+                "department_name": emp.department.name if emp.department else None,
+
+                # period info
+                "period_id": period.id,
+                "period_code": period.code,
+                "period_start_date": period.start_date,
+                "period_end_date": period.end_date,
+                "pay_date": period.pay_date,
+                "period_status": period.status,
+
+                # ppe status
+                "ppe_status": ppe.status,
+                "declined_reason": ppe.declined_reason,
+
+                # latest active payroll summary
+                "payroll_id": pr.id if pr else None,
+                "payroll_status": pr.status if pr else None,
+                "run_no": pr.run_no if pr else None,
+                "net_pay": pr.net_pay if pr else None,
+            })
+
+        return Response(EmployeePayrollRowSerializer(data, many=True).data, status=http_status.HTTP_200_OK)
 
 #==========================================CEO / SUPERADMIN APPROVAL===========================
 
@@ -814,6 +908,39 @@ class PayrollApproveEmployeeView(APIView):
 
         _recompute_period_status(period)
 
+        # ----------------------------
+        # ✅ Create notifications
+        # ----------------------------
+
+        notifications = []
+
+        # 1️⃣ Notify SUPER_ADMIN
+        super_admins = User.objects.filter(role="ADMIN")
+        for admin in super_admins:
+            notifications.append(
+                Notification(
+                    user=admin,
+                    title="Payroll Approved",
+                    description=f"{ppe.employee} payroll for period {period} has been approved.",
+                    category="payroll",
+                    redirect_url="/admin/calendar",
+                )
+            )
+
+        # 2️⃣ Notify Employee without URL
+        if hasattr(ppe.employee, "user") and ppe.employee.user:
+            notifications.append(
+                Notification(
+                    user=ppe.employee.user,
+                    title="Payroll Approved",
+                    description=f"Your payroll for period {period} has been approved.",
+                    category="payroll",
+                    redirect_url="",  # No URL, just visible in their notifications
+                )
+            )
+
+        Notification.objects.bulk_create(notifications)
+
         return Response({"detail": "Payroll approved."}, status=http_status.HTTP_200_OK)
 
 #Ari nalang sad butang ang notif kung sa payroll period kay naay gi declined na employee para mo notif ditso sa HR
@@ -880,6 +1007,20 @@ class PayrollDeclineEmployeeView(APIView):
         ppe.save(update_fields=update_fields)
 
         _recompute_period_status(period)
+
+        # Notify HR about declined payroll
+        hr_users = User.objects.filter(role="HR")
+        notifications = [
+            Notification(
+                user=hr,
+                title="Payroll Declined",
+                description=f"{ppe.employee} payroll for period {period} has been declined. Reason: {reason}",
+                category="payroll",
+                redirect_url="/hr/payrolls",
+            )
+            for hr in hr_users
+        ]
+        Notification.objects.bulk_create(notifications)
 
         return Response({"detail": "Payroll declined."}, status=http_status.HTTP_200_OK)
 

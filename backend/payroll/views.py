@@ -947,3 +947,62 @@ class PayrollResetAfterDeclineView(APIView):
 
         return Response({"detail": "Employee reset to Pending. Previous payroll voided."}, status=http_status.HTTP_200_OK)
 
+#==========================================UPDATE STATUS OF EMPLOYEE===========================
+class PayrollPeriodMarkPaidView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _require_hr_or_admin(self, user):
+        # Adjust this if you have a better role policy.
+        # Current User model roles: EMPLOYEE / ADMIN / SUPER_ADMIN :contentReference[oaicite:3]{index=3}
+        role = (getattr(user, "role", "") or "").strip().upper()
+        if getattr(user, "is_superuser", False):
+            return
+        if role in {"ADMIN", "SUPER_ADMIN"}:
+            return
+        raise PermissionDenied("You are not allowed to mark payroll periods as Paid.")
+
+    @transaction.atomic
+    def patch(self, request, period_id: int):
+        self._require_hr_or_admin(request.user)
+
+        period = get_object_or_404(Payroll_Period.objects.select_for_update(), id=period_id)
+
+        # Only allow Closed -> Paid
+        if period.status != "Closed":
+            return Response(
+                {"detail": f"Only Closed payroll periods can be marked as Paid. Current: {period.status}."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Safety rule: "Paid" means all employees are paid.
+        # If any employee is Declined, block marking the period as Paid.
+        # (Your recompute can still set period Closed even with Declined.) :contentReference[oaicite:4]{index=4}
+        ppe_qs = PayrollPeriodEmployee.objects.filter(period=period)
+        if ppe_qs.filter(status="Declined").exists():
+            return Response(
+                {"detail": "Cannot mark as Paid because there are Declined employees in this period."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Also block if some are not yet Approved (extra guard)
+        if ppe_qs.exists() and ppe_qs.exclude(status="Approved").exists():
+            return Response(
+                {"detail": "Cannot mark as Paid unless all employees are Approved."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Mark period as Paid + set pay_date automatically (actual payment date)
+        today = timezone.localdate()
+
+        period.status = "Paid"
+        if not period.pay_date:
+            period.pay_date = today
+
+        period.save(update_fields=["status", "pay_date"])
+
+        # Optional but recommended: mark payroll rows as Paid too
+        # Only touch Approved payrolls in this period.
+        Payroll.objects.filter(payroll_period=period, status="Approved").update(status="Paid")
+
+        return Response({"detail": "Payroll period marked as Paid."}, status=http_status.HTTP_200_OK)
+

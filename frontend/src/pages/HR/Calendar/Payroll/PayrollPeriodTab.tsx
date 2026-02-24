@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Table, message } from "antd";
+import { Table, message, Select, Tag } from "antd";
 import PayrollPeriodEmployeesModal from "./PayrollPeriodEmployeesModal";
 import dayjs from "dayjs";
 import api from "../../../../api/axios";
@@ -49,6 +49,19 @@ export default function PayrollPeriodTab({
       setLoading(false);
     }
   };
+  const markPeriodAsPaid = async (periodId: number) => {
+    try {
+      await api.patch(`/payroll/periods/${periodId}/mark-paid/`);
+      message.success("Payroll period marked as Paid.");
+      loadPayrollPeriods();
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to update payroll period status.";
+      message.error(msg);
+    }
+  };
 
   // Load when tab becomes active or refreshKey changes
   useEffect(() => {
@@ -77,6 +90,37 @@ export default function PayrollPeriodTab({
     {
       title: "Status",
       dataIndex: "status",
+      render: (_: string, record: PayrollPeriod) => {
+        // Show dropdown only when Closed (allow only -> Paid)
+        if (record.status === "Closed") {
+          return (
+            <Select
+              value="Closed"
+              style={{ width: 150 }}
+              options={[
+                { value: "Closed", label: "Closed", disabled: true },
+                { value: "Paid", label: "Mark as Paid" },
+              ]}
+              onChange={(val) => {
+                if (val === "Paid") markPeriodAsPaid(record.id);
+              }}
+              onClick={(e) => e.stopPropagation()} // prevents opening the row modal
+            />
+          );
+        }
+
+        // Otherwise show a tag
+        const color =
+          record.status === "Open"
+            ? "blue"
+            : record.status === "Processing"
+            ? "orange"
+            : record.status === "Paid"
+            ? "green"
+            : "default";
+
+        return <Tag color={color}>{record.status}</Tag>;
+      },
     },
   ];
 

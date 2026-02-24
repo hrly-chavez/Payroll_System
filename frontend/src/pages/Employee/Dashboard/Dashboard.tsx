@@ -1,11 +1,11 @@
 //frontend/src/pages/Employee/Dashboard/Dashboard.tsx
-import React, { useEffect, useState } from "react";
-import { Layout, Card, Row, Col, Button, Tag, Calendar, Statistic, Divider, message,Select } from "antd";
+import React, { useEffect, useState, useMemo} from "react";
+import { Layout, Card, Row, Col, Button, Tag, message, Select, Table, Space } from "antd";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 import styles from "./Dashboard.module.css";
 import { LoginOutlined, LogoutOutlined } from "@ant-design/icons";
-import axios from "axios";
+
 import api from "../../../api/axios";
 import dayjs, { Dayjs } from "dayjs";
 import { formatBackendTime,formatTime, getAttendanceStatusLabel } from "../../helpers";
@@ -20,9 +20,32 @@ import {
 } from "../../../components/SharedCalendar/CalendarLegend";
 import { PAYROLL_COLOR } from "../../../components/SharedCalendar/CalendarLegend";
 import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
+import PayrollResultModal from "./PayrollResultModal";
+
 
 const { Content } = Layout;
 const { Option } = Select;
+
+type EmployeePayrollRow = {
+  employee_id: number;
+  employee_full_name: string;
+  department_name: string | null;
+
+  period_id: number;
+  period_code: string;
+  period_start_date: string;
+  period_end_date: string;
+  pay_date: string | null;
+  period_status: string;
+
+  ppe_status: "Pending" | "Verified" | "Processing" | "Approved" | "Declined";
+  declined_reason?: string | null;
+
+  payroll_id: number | null;
+  payroll_status: string | null;
+  run_no: number | null;
+  net_pay: string | null;
+};
 
 type TodayAttendanceResponse = {
   has_attendance: boolean;
@@ -84,6 +107,11 @@ const Dashboard: React.FC = () => {
 
   const [punchInEligibility, setPunchInEligibility] = useState<PunchInEligibilityResponse | null>(null);
   const [loadingPunchInEligibility, setLoadingPunchInEligibility] = useState(false);
+  const [payrollRows, setPayrollRows] = useState<EmployeePayrollRow[]>([]);
+  const [loadingPayrollRows, setLoadingPayrollRows] = useState(false);
+
+  const [payrollModalOpen, setPayrollModalOpen] = useState(false);
+  const [selectedPayrollRow, setSelectedPayrollRow] = useState<EmployeePayrollRow | null>(null);
 
   const [selectedMonth, setSelectedMonth] = useState(dayjs().month() + 1); // 1–12
   const [selectedFilter, setSelectedFilter] = useState<
@@ -237,7 +265,21 @@ const attendanceChartData =
         setLoadingStats(false);
       }
     };
-
+    const fetchMyPayrollRows = async () => {
+      setLoadingPayrollRows(true);
+      try {
+        const res = await api.get<EmployeePayrollRow[]>("/payroll/my-payrolls/");
+        setPayrollRows(res.data || []);
+      } catch (err: any) {
+        const msg =
+          err?.response?.data?.detail ||
+          err?.response?.data?.message ||
+          "Failed to load payroll records.";
+        message.error(msg);
+      } finally {
+        setLoadingPayrollRows(false);
+      }
+    };
     const loadCalendarEvents = async () => {
   try {
     const [holidayRes, payrollRes] = await Promise.all([
@@ -299,6 +341,7 @@ const attendanceChartData =
       fetchPunchInEligibility();
       fetchAttendanceStats();
       loadCalendarEvents();
+      fetchMyPayrollRows();
     }, []);
 
     useEffect(() => {
@@ -341,7 +384,64 @@ const attendanceChartData =
     loadingPunchIn ||
     !!attendance?.time_in ||
     !(punchInEligibility?.can_punch_in ?? false);
+  const payrollStatusColor = (s?: string | null) => {
+  const x = (s || "").toLowerCase();
+  if (x === "approved") return "green";
+  if (x === "disapproved") return "red";
+  if (x === "paid") return "blue";
+  if (x === "generated") return "gold";
+  if (x === "void") return "default";
+  return "default";
+};
 
+const ppeStatusColor = (s: EmployeePayrollRow["ppe_status"]) => {
+  if (s === "Approved") return "green";
+  if (s === "Declined") return "red";
+  if (s === "Processing") return "gold";
+  if (s === "Verified") return "blue";
+  return "default";
+};
+
+const payrollColumns = useMemo(() => {
+  return [
+    {
+      title: "Period",
+      key: "period",
+      // no width here = it will take remaining space
+      render: (_: any, row: EmployeePayrollRow) => (
+        <span style={{ whiteSpace: "nowrap" }}>
+          {dayjs(row.period_start_date).format("MMM D")} -{" "}
+          {dayjs(row.period_end_date).format("MMM D, YYYY")}
+        </span>
+      ),
+    },
+    {
+      title: "Pay Date",
+      dataIndex: "pay_date",
+      width: 110,
+      render: (v: string | null) => (v ? dayjs(v).format("MM/DD/YYYY") : "-"),
+    },
+    {
+      title: "Employee",
+      dataIndex: "ppe_status",
+      width: 110,
+      render: (v: EmployeePayrollRow["ppe_status"]) => <Tag color={ppeStatusColor(v)}>{v}</Tag>,
+    },
+    {
+      title: "Payroll",
+      dataIndex: "payroll_status",
+      width: 100,
+      render: (v: string | null) => (v ? <Tag color={payrollStatusColor(v)}>{v}</Tag> : "-"),
+    },
+    {
+      title: "Net Pay",
+      dataIndex: "net_pay",
+      width: 120,
+      align: "right" as const,
+      render: (v: string | null) => (v ? v : "-"),
+    },
+  ];
+}, []);
   return (
     <Layout style={{ minHeight: "100vh" }}>
       <Sidebar />
@@ -471,29 +571,72 @@ const attendanceChartData =
                 <span><i className={styles.purpleDot} /> Undertime</span>
               </div>
             </Card>
-
-            <Card title="Status" className={styles.statusCard}>
+              {/* PAYSLIP & ATTENDANCE CORRECTION STATUS */}
+            <Card title="Information" className={styles.statusCard}>
               <Tabs
                 defaultActiveKey="payslip"
                 items={[
                   {
                     key: "payslip",
-                    label: "Payslip",
+                    label: "Payroll",
                     children: (
-                      <div className={styles.payslipList}>
-                        <div className={styles.payslipRow}>
-                          <span className={styles.payslipStatus}>Pending</span>
-                          <span className={styles.payslipDate}>
-                            March 20, 2025 10:21
-                          </span>
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                          <div style={{ fontWeight: 600 }}>My Payroll</div>
+                          <Space>
+                            <Button size="small" onClick={fetchMyPayrollRows} loading={loadingPayrollRows}>
+                              Refresh
+                            </Button>
+                          </Space>
                         </div>
 
-                        <div className={styles.payslipRow}>
-                          <span className={styles.payslipStatus}>Pending</span>
-                          <span className={styles.payslipDate}>
-                            January 1, 2026 08:00
-                          </span>
-                        </div>
+                        <Table
+                            columns={payrollColumns as any}
+                            dataSource={payrollRows}
+                            rowKey={(row) => String(row.period_id)}
+                            size="small"
+                            loading={loadingPayrollRows}
+                            pagination={{ pageSize: 5 }}
+                            tableLayout="fixed"
+                            onRow={(row) => ({
+                              onClick: () => {
+                                setSelectedPayrollRow(row);
+                                setPayrollModalOpen(true);
+                              },
+                              style: { cursor: "pointer" },
+                            })}
+                            locale={{ emptyText: "No payroll records found." }}
+                          />
+
+                        <PayrollResultModal
+                          open={payrollModalOpen}
+                          onClose={() => {
+                            setPayrollModalOpen(false);
+                            setSelectedPayrollRow(null);
+                          }}
+                          employee={
+                            selectedPayrollRow
+                              ? {
+                                  id: selectedPayrollRow.employee_id,
+                                  full_name: selectedPayrollRow.employee_full_name,
+                                  department_name: selectedPayrollRow.department_name || "-",
+                                  status: selectedPayrollRow.ppe_status,
+                                }
+                              : null
+                          }
+                          period={
+                            selectedPayrollRow
+                              ? {
+                                  id: selectedPayrollRow.period_id,
+                                  code: selectedPayrollRow.period_code,
+                                  start_date: selectedPayrollRow.period_start_date,
+                                  end_date: selectedPayrollRow.period_end_date,
+                                  pay_date: selectedPayrollRow.pay_date,
+                                  status: selectedPayrollRow.period_status,
+                                }
+                              : null
+                          }
+                        />
                       </div>
                     ),
                   },
@@ -501,14 +644,9 @@ const attendanceChartData =
                     key: "attendance correction",
                     label: "Attendance Correction",
                     children: (
-                      <div className={styles.payslipList}>
-                        <div className={styles.payslipRow}>
-                          <span className={styles.payslipStatus}>Pending</span>
-                          <span className={styles.payslipDate}>
-                            March 20, 2025 10:21
-                          </span>
-                        </div>
-                      </div>
+                    <div className="App">
+                      <h1>Columns Here</h1>
+                    </div>
                     ),
                   },
                 ]}

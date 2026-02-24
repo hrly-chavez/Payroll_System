@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from shared_model.models import *
 from .serializers import *
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.utils import timezone
 from django.utils.timezone import now
 from django.shortcuts import get_object_or_404
@@ -727,7 +727,7 @@ class PayrollEmployeeResultView(APIView):
 
 #For employee dashboard payroll(rows & columns)
 class EmployeePayrollListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         # Employee-only endpoint (HR/Admin can be allowed too if you want)
@@ -791,6 +791,68 @@ class EmployeePayrollListView(APIView):
 
         return Response(EmployeePayrollRowSerializer(data, many=True).data, status=http_status.HTTP_200_OK)
 
+#this is for admin and superadmin viewing the result of Payslips
+class AdminEmployeePayrollListView(APIView):
+    """
+    Admin/SuperAdmin endpoint to fetch payrolls for any employee by ID.
+    """
+    permission_classes = [AllowAny]  # Adjust to IsAdminUser or custom role permission
+
+    def get(self, request):
+        employee_id = request.query_params.get("employee_id")
+        if not employee_id:
+            return Response({"detail": "employee_id is required."}, status=http_status.HTTP_400_BAD_REQUEST)
+
+        emp = get_object_or_404(Employee, pk=employee_id)
+
+        # Fetch all PPE rows for this employee
+        ppe_qs = (
+            PayrollPeriodEmployee.objects
+            .filter(employee=emp)
+            .select_related("period")
+            .order_by("-period__start_date")
+        )
+
+        period_ids = list(ppe_qs.values_list("period_id", flat=True))
+
+        payroll_rows = (
+            Payroll.objects
+            .filter(employee=emp, payroll_period_id__in=period_ids)
+            .exclude(status="Void")
+            .select_related("payroll_period")
+            .order_by("payroll_period_id", "-run_no", "-id")
+        )
+
+        latest_by_period = {}
+        for pr in payroll_rows:
+            if pr.payroll_period_id not in latest_by_period:
+                latest_by_period[pr.payroll_period_id] = pr
+
+        data = []
+        for ppe in ppe_qs:
+            period = ppe.period
+            pr = latest_by_period.get(period.id)
+
+            data.append({
+                "employee_id": emp.id,
+                "employee_full_name": f"{emp.fname} {emp.lname}".strip(),
+                "department_name": emp.department.name if emp.department else None,
+                "period_id": period.id,
+                "period_code": period.code,
+                "period_start_date": period.start_date,
+                "period_end_date": period.end_date,
+                "pay_date": period.pay_date,
+                "period_status": period.status,
+                "ppe_status": ppe.status,
+                "declined_reason": ppe.declined_reason,
+                "payroll_id": pr.id if pr else None,
+                "payroll_status": pr.status if pr else None,
+                "run_no": pr.run_no if pr else None,
+                "net_pay": pr.net_pay if pr else None,
+            })
+
+        return Response(EmployeePayrollRowSerializer(data, many=True).data, status=http_status.HTTP_200_OK)
+    
 #==========================================CEO / SUPERADMIN APPROVAL===========================
 
 class PayrollPeriodApprovalQueueView(APIView):

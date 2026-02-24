@@ -32,6 +32,7 @@ urlpatterns = [
     #Payroll Result
     path("periods/<int:period_id>/employees/<int:employee_id>/payroll-result/",PayrollEmployeeResultView.as_view(),name="payroll-employee-result",),
     path("my-payrolls/", EmployeePayrollListView.as_view(), name="employee-my-payrolls"),
+    path("employee-payrolls/", AdminEmployeePayrollListView.as_view(), name="employee-payroll"),
     # CEO / SuperAdmin Approval
     path("periods/<int:period_id>/approval-queue/",PayrollPeriodApprovalQueueView.as_view(),name="payroll-period-approval-queue",),
     path("periods/<int:period_id>/employees/<int:employee_id>/approve/",PayrollApproveEmployeeView.as_view(),name="payroll-approve-employee",),

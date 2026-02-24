@@ -30,6 +30,8 @@ import {
 } from "@ant-design/icons";
 import api from "api/axios";
 
+import PayslipsTab from "../../HR/EmployeeDetailsPage/Tabs/PayslipsTab";
+
 const { Content } = Layout;
 
 interface AddressData {
@@ -515,29 +517,9 @@ const EmployeeDetailsPage: React.FC = () => {
                 {/* PAYSLIPS */}
                 {!isSuperAdminEmployee && (
                   <Tabs.TabPane tab="Payslips" key="4">
-                    <div className={styles.salaryHeader}>
-                      <h3>Payslip</h3>
-                    </div>
-
-                    <Table
-                      bordered
-                      pagination={false}
-                      columns={[
-                        { title: "Earnings", dataIndex: "earningName", key: "earningName" },
-                        { title: "Amount", dataIndex: "earningAmount", key: "earningAmount" },
-                        { title: "Deductions", dataIndex: "deductionName", key: "deductionName" },
-                        { title: "Amount", dataIndex: "deductionAmount", key: "deductionAmount" },
-                      ]}
-                      dataSource={[
-                        {
-                          key: "1",
-                          earningName: "Basic Salary",
-                          earningAmount: "₱600.00",
-                          deductionName: "Absences",
-                          deductionAmount: "₱600.00 (1 day)",
-                        },
-                      ]}
-                    />
+                    {employeeId && !isNaN(Number(employeeId)) && (
+                      <PayslipsTab employeeId={Number(employeeId)} />
+                    )}
                   </Tabs.TabPane>
                 )}
 

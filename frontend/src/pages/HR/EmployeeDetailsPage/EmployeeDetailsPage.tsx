@@ -428,7 +428,9 @@ const EmployeeDetailsPage: React.FC = () => {
                 {/* PAYSLIPS */}
                 {!isSuperAdminEmployee && (
                   <Tabs.TabPane tab="Payslips" key="4">
-                    <PayslipsTab />
+                    {employeeId && !isNaN(Number(employeeId)) && (
+                      <PayslipsTab employeeId={Number(employeeId)} />
+                    )}
                   </Tabs.TabPane>
                 )}
                 

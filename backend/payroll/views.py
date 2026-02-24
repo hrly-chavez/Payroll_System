@@ -172,8 +172,9 @@ class DeductionDetailView(generics.RetrieveUpdateDestroyAPIView):
             # Try to get existing deduction
             employee_deduction = Employee_Deduction.objects.filter(
                 employee=employee,
-                deduction_type=deduction_type
-            ).first()
+                deduction_type=deduction_type,
+                status="Active"
+                ).order_by("-effective_from").first()
 
             if in_range:
                 # Compute amount

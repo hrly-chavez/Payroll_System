@@ -27,13 +27,13 @@ type TabType =
   | "holiday";
 
 const SystemConfiguration: React.FC = () => {
-  // ✅ Load last saved tab from localStorage
+  // Load last saved tab from localStorage
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     const savedTab = localStorage.getItem("systemConfigTab") as TabType;
     return savedTab || "contribution";
   });
 
-  // ✅ Save tab whenever it changes
+  // Save tab whenever it changes
   useEffect(() => {
     localStorage.setItem("systemConfigTab", activeTab);
   }, [activeTab]);

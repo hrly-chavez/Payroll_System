@@ -221,56 +221,6 @@ const Dashboard: React.FC = () => {
     }
   };
 
-/* =========================================================
-      PIE CONFIG FOR DATE CARD
-     ========================================================= */
-
-  const dailyPieConfig = {
-    data: dailyChartData,
-    angleField: "value",
-    colorField: "type",
-    radius: 1,
-    innerRadius: 0.75, 
-    legend: false,
-    label: false,
-    tooltip: false,
-    animation: {
-      appear: {
-        animation: "wave-in",
-        duration: 800,
-      },
-    },
-    color: ({ type }: { type: string }) => {
-  switch (type) {
-    case "Reported":
-      return "#2e7d32"; // green
-    case "Not Reported":
-      return "#c62828"; // red
-    default:
-      return "#e0e0e0";
-  }
-},
- // ================= CENTER PERCENTAGE =================
-  statistic: {
-    title: false,
-    content: {
-      style: {
-        fontSize: "18px",
-        fontWeight: 600,
-      },
-      formatter: () => {
-        const total = dailyChartData.reduce((a, b) => a + b.value, 0);
-        const reported =
-          dailyChartData.find(d => d.type === "Reported")?.value || 0;
-
-        if (total === 0) return "0%";
-
-        return `${Math.round((reported / total) * 100)}%`;
-      },
-    },
-  },
-  };
-
 
   const loadCalendarEvents = async () => {
   try {
@@ -546,8 +496,43 @@ const Dashboard: React.FC = () => {
             >
             <div style={{ padding: 20 }}>
               {/* DAILY DONUT CHART */}
-              <Pie {...dailyPieConfig} height={150} />
+              <Pie
+              data={[
+                { type: "Reported", value: dailySummary.present || 0 },
+                { type: "Not Reported", value: dailySummary.notReported || 0 },
+              ]}
+              angleField="value"
+              colorField="type"
+              radius={1}
+              innerRadius={0.75}
+              legend={false}
+              label={false}
+              tooltip={false}
+              height={170}
+              scale={{
+                color: {
+                  domain: ["Reported", "Not Reported"],
+                  range: ["#386FA4", "#D9D9D9"],
+                },
+              }}
+              statistic={{
+                title: false,
+                content: {
+                  style: {
+                    fontSize: "16px",
+                    fontWeight: 600,
+                  },
+                  formatter: () => {
+                    const reported = dailySummary.present || 0;
+                    const total =
+                      (dailySummary.present || 0) +
+                      (dailySummary.notReported || 0);
 
+                    return `${reported} / ${total}`;
+                  },
+                },
+              }}
+            />
               {/* LEGEND */}
               <div style={{ textAlign: "center", marginTop: 10 }}>
                 <span style={{ marginRight: 15 }}>
@@ -570,7 +555,7 @@ const Dashboard: React.FC = () => {
                       display: "inline-block",
                       width: 10,
                       height: 10,
-                      background: "#2f5e8e",
+                      background: "#386FA4",
                       borderRadius: "50%",
                       marginRight: 6,
                     }}

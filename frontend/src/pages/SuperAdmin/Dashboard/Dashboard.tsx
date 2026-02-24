@@ -169,7 +169,7 @@ const [overtimeLoading, setOvertimeLoading] = useState(false);
         attendance_id: r.attendance_id,
         attendance_date: r.attendance_date,
 
-        type: r.type, // <-- add this
+        type: r.type, 
 
         minutes: r.minutes,
         start_time: r.start_time,
@@ -262,6 +262,7 @@ const [overtimeLoading, setOvertimeLoading] = useState(false);
     return rows;
   };
 
+  
   const fetchAttendanceAnalytics = async (d?: Dayjs, mode?: RangeMode) => {
     setAttendanceLoading(true);
     try {
@@ -371,6 +372,8 @@ const [overtimeLoading, setOvertimeLoading] = useState(false);
   const handleApprove = async () => updateOverTimeStatus("Approved");
   const handleDecline = async () => updateOverTimeStatus("Declined");
 
+  
+
   /* ================= RENDER ================= */
   return (
     <Layout className="dashboard-layout">
@@ -392,28 +395,44 @@ const [overtimeLoading, setOvertimeLoading] = useState(false);
                     justifyContent: "center",
                   }}
                 >
-                  {/* 🟢 DONUT CHART */}
+                  {/*DONUT CHART */}
                   <Pie
-                    data={[
-                      { type: "Reported", value: attendanceData.PRESENT || 0 },
-                      { type: "Not Reported", value: attendanceData.ABSENT || 0 },
-                    ]}
-                    angleField="value"
-                    colorField="type"
-                    radius={1}
-                    innerRadius={0.75}
-                    legend={false}
-                    label={false}
-                    tooltip={false}
-                    height={170}
-                    scale={{
-                      color: {
-                        domain: ["Reported", "Not Reported"],
-                        range: ["#1677ff", "#6BE0E0"],
+                  data={[
+                    { type: "Reported", value: attendanceData.PRESENT || 0 },
+                    { type: "Not Reported", value: attendanceData.ABSENT || 0 },
+                  ]}
+                  angleField="value"
+                  colorField="type"
+                  radius={1}
+                  innerRadius={0.75}
+                  legend={false}
+                  label={false}
+                  tooltip={false}
+                  height={170}
+                  scale={{
+                    color: {
+                      domain: ["Reported", "Not Reported"],
+                      range: ["#386FA4", "#D9D9D9"],
+                    },
+                  }}
+                  statistic={{
+                    title: false,
+                    content: {
+                      style: {
+                        fontSize: "16px",
+                        fontWeight: 600,
                       },
-                    }}
-                  />
+                      formatter: () => {
+                        const reported = attendanceData.PRESENT || 0;
+                        const total =
+                          (attendanceData.PRESENT || 0) +
+                          (attendanceData.ABSENT || 0);
 
+                        return `${reported} / ${total}`;
+                      },
+                    },
+                  }}
+                />
                   {/* CUSTOM LEGEND */}
                   <div
                     style={{
@@ -430,7 +449,7 @@ const [overtimeLoading, setOvertimeLoading] = useState(false);
                         style={{
                           width: 10,
                           height: 10,
-                          background: "#6BE0E0",
+                          background: "#D9D9D9",
                           borderRadius: "50%",
                           marginRight: 6,
                           display: "inline-block",
@@ -443,7 +462,7 @@ const [overtimeLoading, setOvertimeLoading] = useState(false);
                         style={{
                           width: 10,
                           height: 10,
-                          background: "#1677ff",
+                          background: "#386FA4",
                           borderRadius: "50%",
                           marginRight: 6,
                           display: "inline-block",

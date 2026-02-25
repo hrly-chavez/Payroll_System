@@ -138,6 +138,7 @@
 .statusCard :global(.ant-card-head) {
   background: #386fa4 !important;
   border-bottom: none !important;
+  color: #fff;
 }
 
 /* Tabs inside Status card */
@@ -158,13 +159,24 @@
   background: #386fa4 !important;
 }
 
-
-
-/* Header title */
-.statusCard :global(.ant-card-head-title) {
-  color: #ffffff !important;
-  font-size: 15px;
+.informationCard {
+  border-radius: 16px;
+  overflow: hidden;
+  border: none;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
 }
+
+.informationCard :global(.ant-card-head) {
+  background: #386fa4 !important; 
+  border-bottom: none !important;
+}
+
+.informationCard :global(.ant-card-head-title) {
+  color: #ffffff !important;
+  font-weight: 500 !important;
+}
+
+
 
 /* Card body */
 .statusCard :global(.ant-card-body) {
@@ -176,10 +188,8 @@
   border-bottom: 1px solid rgba(15, 23, 42, 0.08) !important;
 }
 
-:global(.ant-card-head-title) {
-  font-size: 16px !important;
-  color: var(--text) !important;
-  padding: 14px 0 !important;
+:global(.ant-card .ant-card-head-title) {
+  font-weight: 500 !important;
 }
 
 /* ================= Time Section ================= */

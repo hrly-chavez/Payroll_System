@@ -472,7 +472,7 @@ const [overtimeLoading, setOvertimeLoading] = useState(false);
           </Col>
 
           {/* ANNOUNCEMENTS */}
-          <Col xs={24} md={10}>
+          <Col xs={15} md={10}>
             <CompanyNote role="SUPER_ADMIN" />
           </Col>
 

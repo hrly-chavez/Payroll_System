@@ -2,31 +2,15 @@
 "use client";
 
 import React, { useState, useEffect, useMemo} from "react";
-import {
-  Layout,
-  Card,
-  Calendar,
-  Tooltip,
-  Button,
-  Row,
-  Select,
-  Tabs,
-  Spin,
-  Table,
-  Tag,
-} from "antd";
+import {Layout,Card,Calendar,Tooltip,Button,Row,Select,Tabs,Spin,Table,Tag,} from "antd";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
-import {
-  CalendarOutlined,
-  LeftOutlined,
-  RightOutlined,
-} from "@ant-design/icons";
+import {CalendarOutlined,LeftOutlined,RightOutlined,} from "@ant-design/icons";
 
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
-import AttendanceCorrection from "./AttendanceCorrection";
-import LeaveRequest from "./LeaveRequest";
+import AttendanceCorrection from "./AttendanceCorrection/AttendanceCorrection";
+import LeaveRequest from "./LeaveRequests/LeaveRequest";
 import AttendaceLogs from "./AttendanceLogs";
 import api from "../../../api/axios";
 import styles from "./Attendance.module.css";

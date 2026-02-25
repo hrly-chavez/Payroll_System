@@ -437,7 +437,7 @@ class HolidayPolicy(models.Model):
             )
         ]
         
-class Attendance_Event(models.Model):
+class Attendance_Event(models.Model): 
     TYPE_CHOICES = [
         ("Night Differential","Night Differential"),
         ("Late","Late"),
@@ -469,8 +469,64 @@ class Attendance_Event(models.Model):
     def __str__(self):
         return self.type
 
-class Attendance_Correction_Request(models.Model):
-    pass
+class Attendance_Correction(models.Model):
+    issue_choices = [
+        ("Missing Time In", "Missing Time In"),
+        ("Missing Time Out", "Missing Time Out"),
+        ("Missing Both", "Missing Time In & Time Out"),
+        ("Wrong Time In", "Wrong Time In"),
+        ("Wrong Time Out", "Wrong Time Out"),
+        ("WRONG_BOTH", "Wrong Time In & Time Out"),
+        ("Wrong Status", "Wrong Status"),
+        ("Other", "Other"),
+    ]
+    status_choices = [
+        ("Pending","Pending"),
+        ("Verified","Verified"),
+        ("Declined","Declined"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    date = models.DateField()
+    issue_type = models.CharField(max_length=40, choices=issue_choices)
+    reason = models.TextField()
+    # Supports images + pdf + docs
+    file_attached = models.FileField(upload_to="attendance_corrections/%Y/%m/",null=True,blank=True,)
+    requested_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20,choices=status_choices, default="Pending")
+    attendance  = models.ForeignKey(Attendance,on_delete=models.CASCADE,related_name="corrections")
+    requested_by = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="attendance_correction_requests")
+    reviewed_by = models.ForeignKey("User",on_delete=models.SET_NULL,null=True,blank=True,related_name="reviewed_attendance_corrections")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    decline_reason = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.requested_by} | {self.date} | {self.issue_type} | {self.status}"
+    
+    
+        if not file:
+            return file
+
+        allowed_extensions = ["jpg", "jpeg", "png", "webp", "pdf"]
+        ext = file.name.split(".")[-1].lower()
+
+        if ext not in allowed_extensions:
+            raise serializers.ValidationError(
+                "Invalid file type. Only JPG, PNG, WEBP, and PDF are allowed."
+            )
+
+        # Optional: file size limit (5MB)
+        if file.size > 5 * 1024 * 1024:
+            raise serializers.ValidationError("File size must be under 5MB.")
+
+        return file
+    class Meta:
+        ordering = ["-requested_at"]
+        indexes = [
+            models.Index(fields=["date"]),
+            models.Index(fields=["status"]),
+        ]
+
 class Leave_Type(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=20, unique=True)

@@ -415,7 +415,39 @@ class HolidayPolicyAdmin(admin.ModelAdmin):
     )
 
     ordering = ("-created_at",)
+@admin.register(Attendance_Correction)
+class AttendanceCorrectionAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "requested_by",
+        "date",
+        "issue_type",
+        "status",
+        "requested_at",
+        "reviewed_by",
+        "reviewed_at",
+    )
 
+    list_filter = (
+        "status",
+        "issue_type",
+        "date",
+        "requested_at",
+    )
+
+    search_fields = (
+        "requested_by__first_name",
+        "requested_by__last_name",
+        "reason",
+        "decline_reason",
+    )
+
+    readonly_fields = (
+        "requested_at",
+        "reviewed_at",
+    )
+
+    ordering = ("-requested_at",)
 
 admin.site.register(AuditLog)
 admin.site.register(Company_Note)

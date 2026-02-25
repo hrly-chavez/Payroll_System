@@ -13,7 +13,6 @@ urlpatterns = [
 
     # for employee
     path("leaves/", LeaveRequestListCreateView.as_view(), name="leave-requests"),
-    path("approvals/leaves/<int:pk>/", LeaveRequestUpdateView.as_view()), 
 
     #admin
     path("all-requests/", AllRequestsListCreateView.as_view()), #all req tab

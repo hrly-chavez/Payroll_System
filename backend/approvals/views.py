@@ -157,7 +157,7 @@ class LeaveTypeUpdateView(generics.RetrieveUpdateAPIView):
         # Perform the update (post_save will handle audit logs)
         serializer.save()
 
-#undone logs
+#done logs
 #Leave Request
 class LeaveRequestListCreateView(generics.ListCreateAPIView):
     serializer_class = LeaveRequestSerializer
@@ -360,38 +360,6 @@ def admin_update_leave_status(request, pk):
 
     serializer = LeaveRequestSerializer(leave_request)
     return Response(serializer.data, status=status.HTTP_200_OK)
-
-#THIS IS WRONG
-class LeaveRequestUpdateView(generics.UpdateAPIView):
-    queryset = Leave_Request.objects.all()
-    serializer_class = LeaveRequestSerializer
-    permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["ADMIN", "HR"]
-
-    def perform_update(self, serializer):
-        status_value = self.request.data.get("status")
-
-        # Save update
-        if status_value in ["Approved", "Declined"]:
-            leave = serializer.save(
-                approved_by=self.request.user,
-                approved_at=timezone.now()
-            )
-
-            #  Create notification for the employee
-            employee_user = leave.employee.user
-
-            Notification.objects.create(
-                user=employee_user,
-                title="Leave Request Update",
-                description=f"Your leave request was {status_value}.",
-                category="leave",
-                redirect_url="/employee/attendance"
-            )
-
-        else:
-            serializer.save()
-
 
 class AllRequestsListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]

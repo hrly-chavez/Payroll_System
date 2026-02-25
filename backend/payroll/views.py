@@ -915,6 +915,8 @@ class PayrollPeriodApprovalQueueView(APIView):
             "employees": PayrollApprovalEmployeeSerializer(data, many=True).data,
         })
     
+#this is where the admin approve
+#undone logs
 class PayrollApproveEmployeeView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1000,6 +1002,7 @@ class PayrollApproveEmployeeView(APIView):
 
         return Response({"detail": "Payroll approved."}, status=http_status.HTTP_200_OK)
 
+#undone logs
 #Ari nalang sad butang ang notif kung sa payroll period kay naay gi declined na employee para mo notif ditso sa HR
 class PayrollDeclineEmployeeView(APIView):
     permission_classes = [IsAuthenticated]

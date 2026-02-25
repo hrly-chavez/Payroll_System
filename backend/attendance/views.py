@@ -246,7 +246,7 @@ class ShiftRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
 
 #==========================================ATTENDANCE REQUEST==============================
 
-  
+#done logs
 class EmployeeAttendanceCorrectionCreateView(APIView):
     """
     Employee creates a correction request (multipart for attachment).
@@ -262,7 +262,34 @@ class EmployeeAttendanceCorrectionCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         obj = serializer.save()
 
-        # Create a notification for SUPER_ADMIN users
+        # Get employee name safely
+        if hasattr(request.user, "employee") and request.user.employee:
+            employee_name = f"{request.user.employee.fname} {request.user.employee.lname}"
+        else:
+            employee_name = request.user.user_name  # fallback
+
+        # ----------------- AUDIT LOG -----------------
+        AuditLog.objects.create(
+            user=request.user,
+            action="Pending Attendance Correction Request",
+            model_name="EmployeeAttendanceCorrection",
+            object_id=str(obj.id),
+            old_data=None,
+            new_data={
+                "id": obj.id,
+                "employee": employee_name,
+                "date": obj.date.isoformat() if obj.date else None,
+                "issue_type": obj.issue_type,
+                "reason": obj.reason,
+                "status": obj.status,
+                "requested_at": obj.requested_at.isoformat() if obj.requested_at else None,  # fixed field name
+                "file_attached": obj.file_attached.url if obj.file_attached else None,
+                "attendance_id": obj.attendance.id if obj.attendance else None,
+            }
+        )
+        # ------------------------------------------------
+
+        # Create a notification for ADMIN users
         admins = User.objects.filter(role='ADMIN')
 
         employee_name = ""
@@ -333,7 +360,7 @@ class AdminPendingAttendanceCorrectionsView(APIView):
             }
         )
 
-
+#done logs
 class AdminReviewAttendanceCorrectionView(APIView):
     """
     HR/Admin or SuperAdmin verifies/declines a request.
@@ -355,6 +382,7 @@ class AdminReviewAttendanceCorrectionView(APIView):
         if obj.status != "Pending":
             raise ValidationError({"detail": "This request is already processed."})
 
+        old_status = obj.status
         new_status = data_ser.validated_data["status"]
         decline_reason = data_ser.validated_data.get("decline_reason", "")
 
@@ -368,6 +396,44 @@ class AdminReviewAttendanceCorrectionView(APIView):
             obj.decline_reason = None
 
         obj.save(update_fields=["status", "reviewed_by", "reviewed_at", "decline_reason"])
+
+        # ----------------- AUDIT LOG -----------------
+        if new_status == "Verified":
+            AuditLog.objects.create(
+                user=request.user,
+                action="Approved Attendance Correction Request",
+                model_name="EmployeeAttendanceCorrection",
+                object_id=str(obj.id),
+                old_data={"status": old_status},
+                new_data={"status": "Approved"}
+            )
+        else:  # Declined
+            AuditLog.objects.create(
+                user=request.user,
+                action="Declined Attendance Correction Request",
+                model_name="EmployeeAttendanceCorrection",
+                object_id=str(obj.id),
+                old_data={"status": old_status},
+                new_data={"status": "Declined"}
+            )
+        # ------------------------------------------------
+
+        if obj.requested_by and hasattr(obj.requested_by, "user"):
+            user = obj.requested_by.user
+            if new_status == "Verified":
+                Notification.objects.create(
+                    user=user,
+                    title="Attendance Correction Approved",
+                    description=f"Your attendance correction request for {obj.attendance.date} has been approved.",
+                    category="attendance"
+                )
+            else:  # Declined
+                Notification.objects.create(
+                    user=user,
+                    title="Attendance Correction Declined",
+                    description=f"Your attendance correction request for {obj.attendance.date} was declined. Reason: {decline_reason}",
+                    category="attendance"
+                )
 
         return Response({"detail": f"Request {new_status} successfully."})
 
@@ -417,6 +483,7 @@ class AdminAttendanceCorrectionDetailView(APIView):
 
         return Response(AttendanceCorrectionDetailSerializer(obj).data)
 
+#done logs
 class AdminApplyAttendanceCorrectionView(APIView):
     """
     HR/Admin applies the correction by editing the Attendance record,
@@ -502,11 +569,39 @@ class AdminApplyAttendanceCorrectionView(APIView):
                     created_events.append(ev)
 
             # Mark correction verified (applied)
+            old_status = obj.status
             obj.status = "Verified"
             obj.reviewed_by = request.user
             obj.reviewed_at = timezone.now()
             obj.decline_reason = None
             obj.save(update_fields=["status", "reviewed_by", "reviewed_at", "decline_reason"])
+
+            # --- AUDIT LOG ---
+            AuditLog.objects.create(
+                user=request.user,
+                action="Correction Edit For Attendance Request",
+                model_name="Attendance",
+                object_id=str(attendance.id),
+                old_data={
+                    "status": old_status,
+                    "time_in": attendance.time_in.isoformat() if attendance.time_in else None,
+                    "time_out": attendance.time_out.isoformat() if attendance.time_out else None,
+                },
+                new_data={
+                    "status": obj.status,
+                    "time_in": attendance.time_in.isoformat() if attendance.time_in else None,
+                    "time_out": attendance.time_out.isoformat() if attendance.time_out else None,
+                }
+            )
+
+            # --- Notification for the employee ---
+            if obj.requested_by and hasattr(obj.requested_by, "user"):
+                Notification.objects.create(
+                    user=obj.requested_by.user,
+                    title="Attendance Correction Approved",
+                    description=f"Your attendance correction request for {obj.attendance.date} has been applied and verified.",
+                    category="attendance"
+                )
 
         return Response(
             {

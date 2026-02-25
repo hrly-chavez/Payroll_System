@@ -12,11 +12,27 @@ const AllRequests: React.FC = () => {
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [declineReason, setDeclineReason] = useState("");
 
+  // FETCH all requests including attendance corrections
   const fetchAllRequests = async () => {
     setLoading(true);
     try {
-      const res = await api.get("/approvals/all-requests/");
-      setDataSource(res.data);
+      // Existing requests
+      const resRequests = await api.get("/approvals/all-requests/");
+      const requestsData = resRequests.data;
+
+      // Attendance corrections
+      const resAttendance = await api.get("/attendance/admin/corrections/pending/");
+      const attendanceData = resAttendance.data.results.map((r: any) => ({
+        ...r,
+        model: "attendance", // mark as attendance request
+        employee: r.requested_by_name || r.requested_by?.user?.user_name,
+        type: "Attendance Correction",
+        details: r.issue_type_display,
+        reason: r.reason || r.decline_reason || "",
+        status: r.status,
+      }));
+
+      setDataSource([...requestsData, ...attendanceData]);
     } catch (err) {
       message.error("Failed to fetch requests");
     } finally {
@@ -28,7 +44,7 @@ const AllRequests: React.FC = () => {
     fetchAllRequests();
   }, []);
 
-  //APPROVE
+  // APPROVE
   const handleApprove = async (record: any) => {
     Modal.confirm({
       title: "Approve Request",
@@ -36,8 +52,14 @@ const AllRequests: React.FC = () => {
       onOk: async () => {
         try {
           if (record.model === "leave") {
-            await api.patch(`/approvals/approvals/leaves/${record.id}/`, {
+            await api.post(`/approvals/admin/leaves/${record.id}/status/`, {
               status: "Approved",
+            });
+          }
+
+          if (record.model === "attendance") {
+            await api.post(`/attendance/admin/corrections/${record.id}/review/`, {
+              status: "Verified",
             });
           }
 
@@ -48,8 +70,6 @@ const AllRequests: React.FC = () => {
             );
           }
 
-          
-
           message.success("Approved successfully");
           fetchAllRequests();
         } catch {
@@ -59,7 +79,7 @@ const AllRequests: React.FC = () => {
     });
   };
 
-  //DECLINE
+  // DECLINE
   const handleDeclineClick = (record: any) => {
     setSelectedRecord(record);
     setDeclineModalOpen(true);
@@ -73,9 +93,16 @@ const AllRequests: React.FC = () => {
 
     try {
       if (selectedRecord.model === "leave") {
-        await api.patch(`/approvals/approvals/leaves/${selectedRecord.id}/`, {
+        await api.post(`/approvals/admin/leaves/${selectedRecord.id}/status/`, {
           status: "Declined",
           reason: declineReason,
+        });
+      }
+
+      if (selectedRecord.model === "attendance") {
+        await api.post(`/attendance/admin/corrections/${selectedRecord.id}/review/`, {
+          status: "Declined",
+          decline_reason: declineReason,
         });
       }
 
@@ -105,8 +132,8 @@ const AllRequests: React.FC = () => {
       dataIndex: "type",
       render: (type: string) => {
         let color = "blue";
-        if (type === "Holiday") color = "purple";
-        if (type === "Attendance") color = "orange";
+        if (type.includes("Holiday")) color = "purple";
+        if (type.includes("Attendance")) color = "orange";
         return <Tag color={color}>{type}</Tag>;
       },
     },
@@ -125,7 +152,7 @@ const AllRequests: React.FC = () => {
         const color =
           status === "Pending"
             ? "gold"
-            : status === "Approved"
+            : status === "Approved" || status === "Verified"
             ? "green"
             : "red";
         return <Tag color={color}>{status}</Tag>;
@@ -134,15 +161,8 @@ const AllRequests: React.FC = () => {
     {
       title: "Action",
       render: (_: any, record: any) => {
-        // No actions for Holiday (superadmin handles it)
-        if (record.model === "holiday") {
-          return null;
-        }
-
         // Only allow action if still Pending
-        if (record.status !== "Pending") {
-          return null;
-        }
+        if (record.status !== "Pending") return null;
 
         return (
           <Space>
@@ -163,12 +183,12 @@ const AllRequests: React.FC = () => {
           </Space>
         );
       },
-    }
+    },
   ];
 
-  const sortedData = [...dataSource].sort((a, b) => {
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
+  const sortedData = [...dataSource].sort(
+    (a, b) => new Date(b.created_at || b.requested_at).getTime() - new Date(a.created_at || a.requested_at).getTime()
+  );
 
   return (
     <div className={styles.wrapper}>
@@ -185,7 +205,7 @@ const AllRequests: React.FC = () => {
         }}
       />
 
-      {/*DECLINE MODAL */}
+      {/* DECLINE MODAL */}
       <Modal
         title="Decline Request"
         open={declineModalOpen}

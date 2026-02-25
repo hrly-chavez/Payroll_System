@@ -79,10 +79,25 @@
   background-color: #f5faff !important;
 }
 
-/* ================= RESPONSIVE ================= */
+/* ================= MOBILE IMPROVEMENTS ================= */
 
 @media (max-width: 768px) {
+
+  .tableHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .headerLeft {
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .searchRight {
     width: 100%;
+  }
+
+  .statCard {
+    margin-bottom: 12px;
   }
 }

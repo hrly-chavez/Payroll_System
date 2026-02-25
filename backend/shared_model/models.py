@@ -469,6 +469,8 @@ class Attendance_Event(models.Model):
     def __str__(self):
         return self.type
 
+class Attendance_Correction_Request(models.Model):
+    pass
 class Leave_Type(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=20, unique=True)
@@ -770,8 +772,6 @@ class PayrollPeriodEmployeeCommission(models.Model):
 
     def __str__(self):
         return f"{self.employee} -({self.amount}) [{self.period.code}]"
-
-#TODO: PAYROLL_RUN_LOG 
 
 #audit logs
 class AuditLog(models.Model):

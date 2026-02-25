@@ -40,6 +40,7 @@ urlpatterns = [
     path("periods/<int:period_id>/employees/<int:employee_id>/reset-after-decline/",PayrollResetAfterDeclineView.as_view(),name="payroll-reset-after-decline",),
     # Mark period as Paid (only Closed -> Paid)
     path("periods/<int:period_id>/mark-paid/", PayrollPeriodMarkPaidView.as_view(), name="payroll-period-mark-paid"),
-
+    #Download Payroll
+    path("my-payrolls/<int:period_id>/download/", EmployeePayrollDownloadPDFView.as_view(), name="employee-my-payrolls-download"),
 ]
         

@@ -13,14 +13,10 @@ import SharedCalendar from "./../../../components/SharedCalendar/SharedCalendar"
 import { Pie } from "@ant-design/plots";
 import { Tabs } from "antd";
 import CompanyNote from "../../../components/CompanyNote/CompanyNote";
-import {
-  HOLIDAY_LEGEND,
-  HolidayBase,
-  HolidayType,
-} from "../../../components/SharedCalendar/CalendarLegend";
+import {HOLIDAY_LEGEND,HolidayBase,HolidayType,} from "../../../components/SharedCalendar/CalendarLegend";
 import { PAYROLL_COLOR } from "../../../components/SharedCalendar/CalendarLegend";
 import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
-import PayrollResultModal from "./PayrollResultModal";
+import PayrollResultModal from "../Payslips/PayrollResultModal";
 
 
 const { Content } = Layout;
@@ -582,12 +578,12 @@ const payrollColumns = useMemo(() => {
                     children: (
                       <div>
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                          <div style={{ fontWeight: 600 }}>My Payroll</div>
-                          <Space>
+                          
+                          {/* <Space>
                             <Button size="small" onClick={fetchMyPayrollRows} loading={loadingPayrollRows}>
                               Refresh
                             </Button>
-                          </Space>
+                          </Space> */}
                         </div>
 
                         <Table

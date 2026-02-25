@@ -115,7 +115,27 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
       setResetting(false);
     }
   };
+  const formatNightDiffInfoDescription = (text: string) => {
+    // Expected format: "Night Differential days: 2026-02-01, 2026-02-03, ..."
+    const prefix = "Night Differential days:";
+    if (!text?.startsWith(prefix)) return null;
 
+    const raw = text.slice(prefix.length).trim(); // "2026-02-01, 2026-02-03"
+    if (!raw) return { title: prefix, formatted: [], rawDates: [] as string[] };
+
+    const rawDates = raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const formatted = rawDates
+      .map((d) => {
+        const parsed = dayjs(d, "YYYY-MM-DD", true);
+        return parsed.isValid() ? parsed.format("MMM DD, YYYY") : d;
+      });
+
+    return { title: prefix, formatted, rawDates };
+  };
   const statusMap: Record<EligibleEmployee["status"], { text: string; color: string }> = {
     Pending: { text: "Pending", color: "default" },
     Verified: { text: "Verified", color: "blue" },
@@ -235,10 +255,38 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
       dataIndex: "description",
       render: (v: string, row: PayslipLine) => {
         const ruleLabel = row.rule_name ? ` (${row.rule_name})` : "";
+
+        // Pretty format Night Differential INFO dates
+        if (row.line_type === "INFORMATION") {
+          const info = formatNightDiffInfoDescription(v || "");
+          if (info) {
+            return (
+              <div>
+                <div style={{ fontWeight: 600 }}>{info.title}</div>
+
+                {info.formatted.length > 0 ? (
+                  <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {info.formatted.map((label, idx) => (
+                      <Tag key={`${info.rawDates[idx]}-${idx}`}>{label}</Tag>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, opacity: 0.75 }}>-</div>
+                )}
+
+                {ruleLabel ? (
+                  <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>{ruleLabel}</div>
+                ) : null}
+              </div>
+            );
+          }
+        }
+
+        // Default rendering for all other lines
         return (
           <div>
             <div>{v || "-"}</div>
-            
+
             {row.source_type ? (
               <div style={{ fontSize: 12, opacity: 0.7 }}>
                 Source: {row.source_type}

@@ -166,20 +166,7 @@ const Dashboard: React.FC = () => {
     },
 
     // percent labels inside slices
-    label:
-      total === 0
-        ? false
-        : {
-            type: "inner",
-            offset: "-50%",
-            content: ({ percent }: any) => `${Math.round(percent * 100)}%`,
-            style: {
-              fontSize: 14,
-              fontWeight: 700,
-              fill: "#ffffff",
-              textAlign: "center",
-            },
-          },
+    label: false,
 
     legend: false,
 

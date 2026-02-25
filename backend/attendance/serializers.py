@@ -101,7 +101,9 @@ class CEOandHRAttendanceLogSerializer(serializers.ModelSerializer):
     def get_event_types(self, obj):
         types = list(obj.events.values_list("type", flat=True))
         return ", ".join(types) if types else ""
-  
+
+
+#========================SHIFT================
 class ShiftWorkdaySerializer(serializers.ModelSerializer):
     class Meta:
         model = Shift_Workday
@@ -176,8 +178,7 @@ class ShiftSerializer(serializers.ModelSerializer):
 
         return instance
 
-
-
+#===============OVERTIME============
 class PendingOvertimeQueueSerializer(serializers.ModelSerializer):
     attendance_id = serializers.IntegerField(source="attendance.id", read_only=True)
     attendance_date = serializers.DateField(source="attendance.date", read_only=True)
@@ -222,4 +223,163 @@ class PendingOvertimeQueueSerializer(serializers.ModelSerializer):
         shift = getattr(obj.attendance.employee, "shift", None)
         return getattr(shift, "name", None)
 
-        
+
+#==============Attendance Correction
+class AttendanceCorrectionCreateSerializer(serializers.ModelSerializer):
+    """
+    Employee creates a correction request.
+    Client sends: date, issue_type, reason, file_attached(optional)
+    Backend resolves attendance by (request.user.employee, date).
+    """
+
+    class Meta:
+        model = Attendance_Correction
+        fields = ["id", "date", "issue_type", "reason", "file_attached"]
+
+    def validate_file_attached(self, file):
+        if not file:
+            return file
+
+        allowed_extensions = ["jpg", "jpeg", "png", "webp", "pdf"]
+        ext = file.name.split(".")[-1].lower()
+
+        if ext not in allowed_extensions:
+            raise serializers.ValidationError(
+                "Invalid file type. Only JPG, PNG, WEBP, and PDF are allowed."
+            )
+
+        if file.size > 5 * 1024 * 1024:
+            raise serializers.ValidationError("File size must be under 5MB.")
+
+        return file
+
+    def create(self, validated_data):
+        request = self.context["request"]
+        emp = getattr(request.user, "employee", None)
+        if not emp:
+            raise serializers.ValidationError({"detail": "No employee profile found for this user."})
+
+        date = validated_data["date"]
+
+        # Ensure there is an Attendance row for this employee+date
+        attendance, _created = Attendance.objects.get_or_create(
+            employee=emp,
+            date=date,
+            defaults={"status": "PRESENT"},
+        )
+
+        correction = Attendance_Correction.objects.create(
+            attendance=attendance,
+            requested_by=emp,
+            **validated_data,
+        )
+        return correction
+
+
+class AttendanceCorrectionListSerializer(serializers.ModelSerializer):
+    attendance_id = serializers.IntegerField(source="attendance.id", read_only=True)
+    employee_name = serializers.SerializerMethodField()
+    department_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Attendance_Correction
+        fields = [
+            "id",
+            "attendance_id",
+            "employee_name",
+            "department_name",
+            "date",
+            "issue_type",
+            "reason",
+            "file_attached",
+            "requested_at",
+            "status",
+            "reviewed_at",
+            "decline_reason",
+        ]
+
+    def get_employee_name(self, obj):
+        return f"{obj.requested_by.fname} {obj.requested_by.lname}"
+
+    def get_department_name(self, obj):
+        if obj.requested_by.department:
+            return obj.requested_by.department.name
+        return None
+
+
+class AttendanceCorrectionReviewSerializer(serializers.Serializer):
+    """
+    HR/SuperAdmin action endpoint.
+    status: Verified | Declined
+    decline_reason: required when Declined
+    """
+    status = serializers.ChoiceField(choices=["Verified", "Declined"])
+    decline_reason = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        status = attrs.get("status")
+        decline_reason = (attrs.get("decline_reason") or "").strip()
+
+        if status == "Declined" and not decline_reason:
+            raise serializers.ValidationError({"decline_reason": "Decline reason is required."})
+
+        attrs["decline_reason"] = decline_reason
+        return attrs
+
+class AttendanceMiniSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Attendance
+        fields = ["id", "date", "status", "time_in", "time_out"]
+
+
+class AttendanceCorrectionDetailSerializer(serializers.ModelSerializer):
+    attendance = AttendanceMiniSerializer(read_only=True)
+    employee_name = serializers.SerializerMethodField()
+    department_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Attendance_Correction
+        fields = [
+            "id",
+            "date",
+            "issue_type",
+            "reason",
+            "file_attached",
+            "requested_at",
+            "status",
+            "decline_reason",
+            "employee_name",
+            "department_name",
+            "attendance",
+        ]
+
+    def get_employee_name(self, obj):
+        return f"{obj.requested_by.fname} {obj.requested_by.lname}"
+
+    def get_department_name(self, obj):
+        dept = getattr(obj.requested_by, "department", None)
+        return getattr(dept, "name", None)
+
+class AttendanceCorrectionApplySerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=["PRESENT", "ABSENT", "HALF_DAY", "REST_DAY", "HOLIDAY"],
+        required=False,
+    )
+    time_in = serializers.DateTimeField(required=False, allow_null=True)
+    time_out = serializers.DateTimeField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        time_in = attrs.get("time_in", None)
+        time_out = attrs.get("time_out", None)
+
+        # If both provided, ensure logical order
+        if time_in and time_out and time_out < time_in:
+            raise serializers.ValidationError(
+                {"time_out": "time_out must be later than or equal to time_in."}
+            )
+
+        # Require at least one change
+        if "status" not in attrs and "time_in" not in attrs and "time_out" not in attrs:
+            raise serializers.ValidationError({"detail": "No changes provided."})
+
+        return attrs

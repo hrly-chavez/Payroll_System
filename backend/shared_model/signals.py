@@ -5,13 +5,19 @@ from django.core.serializers.json import DjangoJSONEncoder
 from .models import AuditLog, Notification, Province, City, Barangay, Holiday
 from accounts.current_user import get_current_user
 import json
-
+from django.db.models.fields.files import FieldFile
 _old_values = {}
 
 def serialize_instance(instance):
-    """Serialize model instance to dict."""
+    """Serialize model instance to dict (FileField-safe)."""
     data = model_to_dict(instance)
     data["id"] = instance.pk
+
+    # Convert FileFields (FieldFile) into JSON-serializable values
+    for k, v in list(data.items()):
+        if isinstance(v, FieldFile):
+            data[k] = v.name if v else None  # store file path string
+
     return json.loads(json.dumps(data, cls=DjangoJSONEncoder))
 
 @receiver(pre_save)
@@ -86,7 +92,7 @@ def log_save(sender, instance, created, **kwargs):
 
     if created:
         # CREATE: old/new data is blank
-        create_audit_log(instance, action="CREATE", old_data="", new_data="")
+        create_audit_log(instance, action="CREATE", old_data={}, new_data=new_data)
     else:
         # UPDATE: log only changed fields
         changed_fields = {}

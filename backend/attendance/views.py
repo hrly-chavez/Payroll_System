@@ -5,9 +5,12 @@ from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
-
+from rest_framework import status as http_status
 from accounts.permissions import IsRole
-from shared_model.models import Attendance, Shift
+from django.db import transaction
+from rest_framework.parsers import MultiPartParser, FormParser,JSONParser
+from shared_model.models import *
+from rest_framework.exceptions import PermissionDenied, NotFound,ValidationError
 from .serializers import *
 from .services import (punch_in,punch_out,get_today_status,_get_employee_or_400,_month_date_range,punch_in_eligibility)
 
@@ -144,7 +147,7 @@ class TodayAttendanceView(APIView):
             "has_attendance": True,
             "attendance": AttendanceSerializer(attendance).data,
         })
-
+#Attendance Logs
 class AttendanceLogsView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -177,7 +180,7 @@ class AttendanceLogsView(APIView):
             "count": qs.count(),
             "results": AttendanceLogSerializer(qs, many=True).data,
         })
-
+#Attendance Logs for admin & superadmin
 class CEOandHRAttendanceLogsView(APIView):
     permission_classes = [IsAuthenticated, IsRole]
     allowed_roles = ["ADMIN", "SUPER_ADMIN"]
@@ -230,16 +233,228 @@ class CEOandHRAttendanceLogsView(APIView):
             "results": CEOandHRAttendanceLogSerializer(qs, many=True).data,
         })
 
-#done logs
+#=========================================SHIFTS
 class ShiftListCreateView(generics.ListCreateAPIView):
     queryset = Shift.objects.all().order_by("start_time")
     serializer_class = ShiftSerializer
     permission_classes = [IsAuthenticated]
 
-#done logs
 class ShiftRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Shift.objects.all()
     serializer_class = ShiftSerializer
     permission_classes = [IsAuthenticated]
 
+#==========================================ATTENDANCE REQUEST==============================
+
+  
+class EmployeeAttendanceCorrectionCreateView(APIView):
+    """
+    Employee creates a correction request (multipart for attachment).
+    POST /api/attendance/corrections/
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        serializer = AttendanceCorrectionCreateSerializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        obj = serializer.save()
+
+        return Response(
+            {
+                "detail": "Attendance correction request submitted.",
+                "correction": AttendanceCorrectionListSerializer(obj).data,
+            },
+            status=http_status.HTTP_201_CREATED,
+        )
+
+
+class EmployeeAttendanceCorrectionListView(APIView):
+    """
+    Employee lists their own correction requests.
+    GET /api/attendance/corrections/my/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        emp = getattr(request.user, "employee", None)
+        if not emp:
+            raise ValidationError({"detail": "No employee profile found for this user."})
+
+        qs = Attendance_Correction.objects.filter(requested_by=emp).order_by("-requested_at")
+        return Response(
+            {
+                "count": qs.count(),
+                "results": AttendanceCorrectionListSerializer(qs, many=True).data,
+            }
+        )
+
+
+class AdminPendingAttendanceCorrectionsView(APIView):
+    """
+    HR/Admin or SuperAdmin sees pending queue.
+    GET /api/attendance/admin/corrections/pending/
+    """
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["ADMIN", "SUPER_ADMIN"]
+
+    def get(self, request):
+        qs = (
+            Attendance_Correction.objects
+            .filter(status="Pending")
+            .select_related("attendance", "requested_by", "reviewed_by")
+            .order_by("-requested_at")
+        )
+        return Response(
+            {
+                "count": qs.count(),
+                "results": AttendanceCorrectionListSerializer(qs, many=True).data,
+            }
+        )
+
+
+class AdminReviewAttendanceCorrectionView(APIView):
+    """
+    HR/Admin or SuperAdmin verifies/declines a request.
+    POST /api/attendance/admin/corrections/<id>/review/
+    Body: { "status": "Verified" | "Declined", "decline_reason": "..." }
+    """
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["ADMIN", "SUPER_ADMIN"]
+
+    def post(self, request, pk: int):
+        data_ser = AttendanceCorrectionReviewSerializer(data=request.data)
+        data_ser.is_valid(raise_exception=True)
+
+        try:
+            obj = Attendance_Correction.objects.select_related("attendance").get(pk=pk)
+        except Attendance_Correction.DoesNotExist:
+            raise NotFound("Attendance correction request not found.")
+
+        if obj.status != "Pending":
+            raise ValidationError({"detail": "This request is already processed."})
+
+        new_status = data_ser.validated_data["status"]
+        decline_reason = data_ser.validated_data.get("decline_reason", "")
+
+        obj.status = new_status
+        obj.reviewed_by = request.user
+        obj.reviewed_at = timezone.now()
+
+        if new_status == "Declined":
+            obj.decline_reason = decline_reason
+        else:
+            obj.decline_reason = None
+
+        obj.save(update_fields=["status", "reviewed_by", "reviewed_at", "decline_reason"])
+
+        return Response({"detail": f"Request {new_status} successfully."})
+
+class AttendanceCorrectionMetaView(APIView):
+    """
+    Returns dropdown choices for Attendance_Correction.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        issue_types = [
+            {"value": value, "label": label}
+            for value, label in Attendance_Correction.issue_choices
+        ]
+
+        statuses = [
+            {"value": value, "label": label}
+            for value, label in Attendance_Correction.status_choices
+        ]
+
+        return Response({
+            "issue_types": issue_types,
+            "statuses": statuses,
+        })
+
+class AdminAttendanceCorrectionDetailView(APIView):
+    """
+    HR/Admin or SuperAdmin fetches a single correction + attendance details.
+    GET /api/attendance/admin/corrections/<id>/
+    """
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["ADMIN", "SUPER_ADMIN"]
+
+    def get(self, request, pk: int):
+        try:
+            obj = (
+                Attendance_Correction.objects
+                .select_related(
+                    "attendance",
+                    "requested_by",
+                    "requested_by__department",
+                )
+                .get(pk=pk)
+            )
+        except Attendance_Correction.DoesNotExist:
+            raise NotFound("Attendance correction request not found.")
+
+        return Response(AttendanceCorrectionDetailSerializer(obj).data)
+
+class AdminApplyAttendanceCorrectionView(APIView):
+    """
+    HR/Admin applies the correction by editing the Attendance record.
+    POST /api/attendance/admin/corrections/<id>/apply/
+    Body: { status?, time_in?, time_out? }
+
+    Behavior:
+    - updates Attendance fields
+    - sets correction status to Verified
+    - sets reviewed_by/reviewed_at
+    """
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["ADMIN", "SUPER_ADMIN"]
+
+    def post(self, request, pk: int):
+        data_ser = AttendanceCorrectionApplySerializer(data=request.data)
+        data_ser.is_valid(raise_exception=True)
+
+        try:
+            obj = Attendance_Correction.objects.select_related(
+                "attendance", "requested_by"
+            ).get(pk=pk)
+        except Attendance_Correction.DoesNotExist:
+            raise NotFound("Attendance correction request not found.")
+
+        if obj.status != "Pending":
+            raise ValidationError({"detail": "This request is already processed."})
+
+        attendance = obj.attendance
+        changes = data_ser.validated_data
+
+        with transaction.atomic():
+            # Apply Attendance edits
+            if "status" in changes:
+                attendance.status = changes["status"]
+
+            if "time_in" in changes:
+                attendance.time_in = changes["time_in"]
+
+            if "time_out" in changes:
+                attendance.time_out = changes["time_out"]
+
+            attendance.save(update_fields=["status", "time_in", "time_out"])
+
+            # Mark correction verified (applied)
+            obj.status = "Verified"
+            obj.reviewed_by = request.user
+            obj.reviewed_at = timezone.now()
+            obj.decline_reason = None
+            obj.save(update_fields=["status", "reviewed_by", "reviewed_at", "decline_reason"])
+
+        return Response(
+            {
+                "detail": "Attendance correction applied and verified.",
+                "correction": AttendanceCorrectionListSerializer(obj).data,
+                "attendance": AttendanceMiniSerializer(attendance).data,
+            }
+        )
+    
 

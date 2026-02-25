@@ -1,3 +1,43 @@
+/* ================= BUTTON OVERRIDES ================= */
+
+:global(.ant-btn-primary) {
+  background-color: #386FA4 !important;
+  border-color: #386FA4 !important;
+  color: #ffffff !important;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+:global(.ant-btn-primary:hover) {
+  background-color: #2f5d8c !important;
+  border-color: #2f5d8c !important;
+  color: #ffffff !important;
+}
+
+:global(.ant-btn-primary:active) {
+  background-color: #244a6f !important;
+  border-color: #244a6f !important;
+}
+
+/* ================= DANGER BUTTON ================= */
+
+:global(.ant-btn-primary.ant-btn-dangerous) {
+  background-color: #d32f2f !important;
+  border-color: #d32f2f !important;
+  color: #ffffff !important;
+}
+
+:global(.ant-btn-primary.ant-btn-dangerous:hover) {
+  background-color: #b71c1c !important;
+  border-color: #b71c1c !important;
+}
+
+:global(.ant-btn-primary.ant-btn-dangerous:active) {
+  background-color: #8e0000 !important;
+  border-color: #8e0000 !important;
+}
+
 /* ================= LAYOUT ================= */
 .layout {
   min-height: 100vh;
@@ -157,4 +197,32 @@
   margin-right: 8px;
   color: #386FA4;
   font-size: 14px;
+}
+
+/* ================= MOBILE RESPONSIVE ================= */
+
+@media (max-width: 768px) {
+
+  .container {
+    flex-direction: column;
+  }
+
+  .profileCard {
+    width: 100%;
+  }
+
+  .detailsCard {
+    width: 100%;
+  }
+
+  .content {
+    padding: 16px;
+  }
+
+  .salaryHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
 }

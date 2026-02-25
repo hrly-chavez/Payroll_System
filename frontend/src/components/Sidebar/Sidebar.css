@@ -59,7 +59,7 @@
 }
 
 .custom-sider .custom-menu .ant-menu-item-selected {
-  background: rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.22) !important;
 }
 
 .custom-sider .custom-menu .ant-menu-item-selected:hover {
@@ -75,12 +75,12 @@
 }
 
 .custom-sider.collapsed .logo-container {
-  width: 70px;
-  height: 70px;
+  width: 50px;
+  height: 50px;
 }
 
 .custom-sider.collapsed .logo-container img {
-  width: 70px;
+  width: 50px;
 }
 
 @media (max-width: 991px) {

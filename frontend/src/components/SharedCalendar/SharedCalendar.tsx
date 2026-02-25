@@ -90,17 +90,15 @@ export default function SharedCalendar({
 
     const content = (
       <div
-        className={styles.fullCellWrapper}
-        style={{ background: backgroundColor }}
+        className={`${styles.fullCellWrapper} ${
+          backgroundColor ? styles.coloredCell : ""
+        }`}
+        style={
+          backgroundColor
+            ? { background: backgroundColor, borderRadius: 0 }
+            : undefined
+        }
       >
-        <div
-          className={styles.dateNumber}
-          style={{
-            color: holidayEvent ? "#ffffff" : "#222222",
-          }}
-        >
-          {current.format("DD")}
-        </div>
 
       {/* ATTENDANCE DISPLAY */}
         {attendanceEvent && (
@@ -119,34 +117,59 @@ export default function SharedCalendar({
     );
 
     return (
-    <Popover
-      content={
-        attendanceEvent ? (
-          <div>
-            {attendanceEvent.time_in && (
-              <div>
-                Punched in at{" "}
-                {dayjs(attendanceEvent.time_in, "HH:mm:ss").format("h:mm A")}
-              </div>
-            )}
-            {attendanceEvent.time_out && (
-              <div>
-                Punched out at{" "}
-                {dayjs(attendanceEvent.time_out, "HH:mm:ss").format("h:mm A")}
-              </div>
-            )}
+      <Popover
+        content={
+          attendanceEvent ? (
+            <div>
+              {attendanceEvent.time_in && (
+                <div>
+                  Punched in at{" "}
+                  {dayjs(attendanceEvent.time_in, "HH:mm:ss").format("h:mm A")}
+                </div>
+              )}
+              {attendanceEvent.time_out && (
+                <div>
+                  Punched out at{" "}
+                  {dayjs(attendanceEvent.time_out, "HH:mm:ss").format("h:mm A")}
+                </div>
+              )}
+            </div>
+          ) : null
+        }
+        trigger="hover"
+        placement="top"
+      >
+        <div
+          className={styles.fullCellWrapper}
+          style={{
+            height: "100%",
+            width: "100%",
+            background: backgroundColor || undefined,
+          }}
+        >
+          <div
+            className={styles.dateNumber}
+            style={{
+              color: holidayEvent ? "#ffffff" : "#222222",
+            }}
+          >
+            {current.format("DD")}
           </div>
-        ) : null
+
+          {attendanceEvent && (
+            <div className={styles.attendanceSplit}>
+              {attendanceEvent.time_in && (
+                <div className={styles.timeInHalf}></div>
+              )}
+              {attendanceEvent.time_out && (
+                <div className={styles.timeOutHalf}></div>
+              )}
+            </div>
+          )}
+        </div>
+      </Popover>
+    );
       }
-      trigger="hover"
-      placement="top"
-    >
-      <div style={{ height: "100%", width: "100%" }}>
-        {content}
-      </div>
-    </Popover>
-  ); 
-};
 
   return (
     <Calendar

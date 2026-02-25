@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Modal, Form, Input, Select, Button, DatePicker, Row, Col, message } from "antd";
 import api from "api/axios";
 import styles from "../AddAdDeptEmployee.module.css";
+import dayjs from "dayjs";
 
 const { Option } = Select;
 
@@ -9,11 +10,8 @@ interface Props {
   open: boolean;
   departmentId: number;
   allowedRoles: ("EMPLOYEE" | "ADMIN" | "SUPER_ADMIN")[];
-  onNext: (
-    employeeId: number,
-    credentials: { username: string; password: string },
-    selectedRole: "EMPLOYEE" | "ADMIN" | "SUPER_ADMIN"
-  ) => void;
+  initialValues?: any;
+  onNext: (data: any) => void;   // ✅ now just send form data
   onClose: () => void;
 }
 
@@ -52,8 +50,21 @@ interface Barangay {
   name: string;
 }
 
-const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRoles, onNext, onClose }) => {
+const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRoles, initialValues, onNext, onClose }) => {
   const [form] = Form.useForm();
+
+  useEffect(() => {
+    if (open && initialValues) {
+      const formattedValues = { ...initialValues };
+
+      // Convert hired_date string to Dayjs if it exists
+      if (formattedValues.hired_date) {
+        formattedValues.hired_date = dayjs(formattedValues.hired_date);
+      }
+
+      form.setFieldsValue(formattedValues);
+    }
+  }, [open, initialValues]);
 
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -110,29 +121,15 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
     try {
       const values = await form.validateFields();
 
-      const payload = {
+      const formattedData = {
         ...values,
         hired_date: values.hired_date.format("YYYY-MM-DD"),
+        role: values.role || "EMPLOYEE",
       };
 
-      const res = await api.post("/employees/employees/", payload);
-
-      message.success("Employee created successfully!");
-
-      onNext(res.data.employee_id, {
-        username: res.data.username,
-        password: res.data.password,
-      },
-        values.role || "EMPLOYEE"
-      );
-
-    } catch (err: any) {
-      console.error(err);
-      message.error(
-        err.response?.data?.error ||
-        err.response?.data?.message ||
-        "Failed to create employee"
-      );
+      onNext(formattedData); // just send data upward
+    } catch (err) {
+      message.error("Please complete required fields");
     }
   };
 

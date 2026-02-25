@@ -16,18 +16,43 @@ const { Option } = Select;
 
 interface Props {
   open: boolean;
-  employeeId: number;
-  onNext: () => void;
+  salaryBase: number; // pass from salary step
+  onNext: (data: any[]) => void;
+  onBack: () => void;
   onClose: () => void;
+  initialValues?: any[];
 }
-
 const EmployeeContributionsModal: React.FC<Props> = ({
   open,
-  employeeId,
+  salaryBase,
+  onBack,
   onNext,
   onClose,
+  initialValues
 }) => {
   const [form] = Form.useForm();
+
+  useEffect(() => {
+    if (open && initialValues?.length) {
+      const systemDeductions = initialValues.map(d => ({
+        amount: d.amount,
+        frequency: d.frequency,
+      }));
+
+      // Optional: set effective_from as Dayjs
+      const effectiveFrom = initialValues[0]?.effective_from
+        ? dayjs(initialValues[0].effective_from)
+        : undefined;
+
+      form.setFieldsValue({
+        system_deductions: systemDeductions,
+        effective_from: effectiveFrom,
+      });
+
+      // enable all deductions that were previously added
+      setEnabledDeductions(initialValues.map(d => d.deduction_type));
+    }
+  }, [open, initialValues]);
 
   const [salary, setSalary] = useState<number>(0);
   const [deductionTypes, setDeductionTypes] = useState<any[]>([]);
@@ -40,16 +65,11 @@ const EmployeeContributionsModal: React.FC<Props> = ({
     const load = async () => {
       try {
         // Get latest salary first
-        const salaryRes = await api.get(
-          `/employees/salaries/latest/?employee=${employeeId}`
-        );
-
-        const baseSalary: number = Number(salaryRes.data.base_rate);
-        setSalary(baseSalary);
+        setSalary(salaryBase);
 
         // Now send salary to backend to get correct bracket
         const deductionRes = await api.get(
-          `/employees/deductions/deduction-types?salary=${baseSalary}`
+          `/employees/deductions/deduction-types?salary=${salaryBase}`
         );
 
         const computed = deductionRes.data.map((d: any) => ({
@@ -66,7 +86,7 @@ const EmployeeContributionsModal: React.FC<Props> = ({
     };
 
     load();
-  }, [open, employeeId]);
+  }, [open, salaryBase]);
 
   /* -------------------- SUBMIT -------------------- */
   const submit = async () => {
@@ -74,13 +94,13 @@ const EmployeeContributionsModal: React.FC<Props> = ({
       const values = await form.validateFields();
       const effectiveFrom = values.effective_from.format("YYYY-MM-DD");
 
-      const systemPayloads = deductionTypes
+      const deductions = deductionTypes
         .filter(d => enabledDeductions.includes(d.id))
         .map((d, index) => {
           const amount = form.getFieldValue(["system_deductions", index, "amount"]);
           const frequency = form.getFieldValue(["system_deductions", index, "frequency"]);
+
           return {
-            employee: employeeId,
             deduction_type: d.id,
             amount,
             frequency,
@@ -89,14 +109,9 @@ const EmployeeContributionsModal: React.FC<Props> = ({
           };
         });
 
-      await Promise.all(
-        systemPayloads.map(p => api.post("/employees/deductions/", p))
-      );
-
-      message.success("Employee contributions saved");
-      onNext();
+      onNext(deductions);
     } catch {
-      message.error("Failed to save contributions");
+      message.error("Please complete required fields");
     }
   };
 
@@ -183,9 +198,14 @@ const EmployeeContributionsModal: React.FC<Props> = ({
           />
         </Form.Item>
 
-        <Button type="primary" block onClick={submit}>
-          Save Contributions
-        </Button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button onClick={onBack} block>
+            Back
+          </Button>
+          <Button type="primary" block onClick={submit}>
+            Next
+          </Button>
+        </div>
       </Form>
     </Modal>
   );

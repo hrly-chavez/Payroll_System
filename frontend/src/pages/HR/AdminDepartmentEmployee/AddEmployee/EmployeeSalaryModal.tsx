@@ -1,38 +1,43 @@
 import { Modal, Form, Select, InputNumber, DatePicker, Button, message } from "antd";
 import api from "api/axios";
-import { useState } from "react";
+import { useState, useEffect} from "react";
 import dayjs from "dayjs";
 
 
 interface Props {
   open: boolean;
-  employeeId: number;
-  onNext: () => void;
+  onNext: (data: any) => void;
+  onBack: () => void;
   onClose: () => void;
+  initialValues?: any;
 }
 
-const EmployeeSalaryModal: React.FC<Props> = ({ open, employeeId, onNext, onClose }) => {
+const EmployeeSalaryModal: React.FC<Props> = ({ open, onBack, onNext, onClose, initialValues }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open && initialValues) {
+      form.setFieldsValue({
+        ...initialValues,
+        effective_from: initialValues.effective_from ? dayjs(initialValues.effective_from) : undefined
+      });
+    }
+  }, [open, initialValues]);
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      setLoading(true);
 
-      await api.post("/employees/salaries/", {
-        employee: employeeId,
+      const formatted = {
         pay_type: values.pay_type,
         base_rate: values.base_rate,
         effective_from: values.effective_from.format("YYYY-MM-DD"),
-      });
+      };
 
-      message.success("Salary saved");
-      onNext();
-    } catch (err: any) {
-      message.error(err.response?.data?.message || "Failed to save salary");
-    } finally {
-      setLoading(false);
+      onNext(formatted);
+    } catch {
+      message.error("Please complete required fields");
     }
   };
 
@@ -83,9 +88,14 @@ const EmployeeSalaryModal: React.FC<Props> = ({ open, employeeId, onNext, onClos
           />
         </Form.Item>
 
-        <Button type="primary" block loading={loading} onClick={handleSubmit}>
-          Next
-        </Button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button onClick={onBack} block>
+            Back
+          </Button>
+          <Button type="primary" block onClick={handleSubmit}>
+            Next
+          </Button>
+        </div>
       </Form>
     </Modal>
   );

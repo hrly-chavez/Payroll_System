@@ -1,167 +1,224 @@
-import { Modal, Form, Select, InputNumber, DatePicker, Button, message, Divider, List } from "antd";
 import { useEffect, useState } from "react";
-import api from "api/axios";
+import {
+  Modal,
+  Form,
+  Select,
+  InputNumber,
+  DatePicker,
+  Button,
+  List,
+  message,
+} from "antd";
 import dayjs from "dayjs";
+import api from "../../../../api/axios";
+
+// What parent might pass
+interface IncomingAllowanceItem {
+  allowance_type: number | { id: number };
+  amount: number;
+  frequency: string;
+  effective_from: string;
+  status: string;
+}
+
+// What we store internally (CLEAN)
+interface AllowanceItem {
+  allowance_type: number;
+  amount: number;
+  frequency: string;
+  effective_from: string;
+  status: string;
+}
 
 interface Props {
   open: boolean;
-  employeeId: number;
+  initialValues?: IncomingAllowanceItem[];
+  onBack: () => void;
+  onNext: (data: AllowanceItem[]) => void;
   onClose: () => void;
-  onNext: () => void; // NEW
 }
 
-
-const EmployeeAllowanceModal: React.FC<Props> = ({ open, employeeId, onNext, onClose }) => {
+export default function EmployeeAllowanceModal({
+  open,
+  initialValues = [],
+  onBack,
+  onNext,
+  onClose,
+}: Props) {
   const [form] = Form.useForm();
-  const [allowances, setAllowances] = useState<any[]>([]);
-  const [submittedAllowances, setSubmittedAllowances] = useState<any[]>([]);
+  const [allowanceTypes, setAllowanceTypes] = useState<any[]>([]);
+  const [submittedAllowances, setSubmittedAllowances] =
+    useState<AllowanceItem[]>([]);
 
+  // ✅ Single useEffect
   useEffect(() => {
     if (!open) return;
 
-    const loadAllowances = async () => {
+    const loadAllowanceTypes = async () => {
       try {
         const res = await api.get("/employees/allowance-types/");
-        setAllowances(res.data);
+        setAllowanceTypes(res.data);
+
+        // restore previous values when going back
+        if (initialValues?.length) {
+          setSubmittedAllowances(
+            initialValues.map((a) => ({
+              allowance_type:
+                typeof a.allowance_type === "object" && a.allowance_type !== null
+                  ? (a.allowance_type as { id: number }).id
+                  : a.allowance_type,
+              amount: a.amount,
+              frequency: a.frequency,
+              effective_from: a.effective_from,
+              status: a.status || "Active",
+            }))
+          );
+        } else {
+          setSubmittedAllowances([]);
+        }
       } catch {
         message.error("Failed to load allowance types");
       }
     };
 
-    loadAllowances();
+    loadAllowanceTypes();
   }, [open]);
 
-  const addAllowance = async () => {
-    try {
-      const v = await form.validateFields();
+  // ✅ Add allowance
+  const handleAdd = (values: any) => {
+    const exists = submittedAllowances.some(
+      (a) => a.allowance_type === values.allowance_type
+    );
 
-      const payload = {
-        employee: employeeId,
-        allowance_type: v.allowance_type,
-        amount: v.amount,
-        frequency: v.frequency,
-        effective_from: v.effective_from.format("YYYY-MM-DD"),
-        status: "Active",
-      };
-
-      await api.post("/employees/allowances/", payload);
-
-      message.success("Allowance added");
-
-      // Add to local list
-      setSubmittedAllowances((prev) => [...prev, payload]);
-
-      // Reset form for next entry
-      form.resetFields();
-    } catch (err: any) {
-      message.error(err.response?.data?.message || "Failed to add allowance");
-    }
-  };
-
-  const submitAll = () => {
-    if (submittedAllowances.length === 0) {
-      message.warning("Please add at least one allowance");
+    if (exists) {
+      message.warning("This allowance type is already added.");
       return;
     }
-    onClose();
-    onNext();
+
+    const newAllowance: AllowanceItem = {
+      allowance_type: values.allowance_type,
+      amount: values.amount,
+      frequency: values.frequency,
+      effective_from: values.effective_from.format("YYYY-MM-DD"),
+      status: "Active",
+    };
+
+    setSubmittedAllowances([...submittedAllowances, newAllowance]);
+    form.resetFields();
+  };
+
+  // ✅ Remove allowance
+  const handleRemove = (typeId: number) => {
+    setSubmittedAllowances(
+      submittedAllowances.filter((a) => a.allowance_type !== typeId)
+    );
+  };
+
+  // ✅ Next step
+  const handleNext = () => {
+    onNext(submittedAllowances);
   };
 
   return (
     <Modal
       open={open}
-      title="Employee Allowances"
-      footer={null}
       onCancel={onClose}
-      closable={false}
+      footer={null}
+      title="Add Allowances"
+      width={600}
     >
-      <Form layout="vertical" form={form}>
+      <Form form={form} layout="vertical" onFinish={handleAdd}>
         <Form.Item
           name="allowance_type"
           label="Allowance Type"
-          rules={[{ required: true, message: "Please select an allowance type" }]}
+          rules={[{ required: true }]}
         >
-          <Select
-            placeholder="Select allowance type"
-            options={allowances
-              // Filter out already added allowance types
-              .filter(a => !submittedAllowances.some(sa => sa.allowance_type === a.id))
-              .map(a => ({ label: a.name, value: a.id }))}
-          />
+          <Select placeholder="Select allowance">
+            {allowanceTypes.map((a) => (
+              <Select.Option key={a.id} value={a.id}>
+                {a.name}
+              </Select.Option>
+            ))}
+          </Select>
         </Form.Item>
+
         <Form.Item
           name="amount"
           label="Amount"
-          rules={[
-            { required: true, message: "Amount is required" },
-            {
-              validator: (_, value) => {
-                if (value === undefined || value === null) {
-                  return Promise.resolve();
-                }
-                if (value <= 0) {
-                  return Promise.reject("Amount must be greater than 0");
-                }
-                return Promise.resolve();
-              },
-            },
-          ]}
+          rules={[{ required: true }]}
         >
-          <InputNumber
-            style={{ width: "100%" }}
-            min={0}
-            precision={2}   // allows 2 decimal places
-            inputMode="decimal"
-          />
+          <InputNumber style={{ width: "100%" }} min={0} />
         </Form.Item>
 
-        <Form.Item name="frequency" label="Frequency" rules={[{ required: true }]}>
-          <Select options={[
-            { label: "Monthly", value: "Monthly" },
-            { label: "Per Period", value: "Per Period" },
-            { label: "One Time", value: "One Time" },
-            { label: "Per Day", value: "Per Day" },
-          ]} />
-        </Form.Item>
-
-        <Form.Item name="effective_from" label="Effective From" rules={[{ required: true }]}>
-          <DatePicker
-            style={{ width: "100%" }}
-            disabledDate={(current) => current && current < dayjs().startOf("day")}
-          />
-        </Form.Item>
-
-        <Button
-          type="default"
-          block
-          style={{ marginBottom: 8 }}
-          onClick={addAllowance}
-          disabled={submittedAllowances.length >= allowances.length}
+        <Form.Item
+          name="frequency"
+          label="Frequency"
+          rules={[{ required: true }]}
         >
+          <Select>
+            <Select.Option value="Monthly">Monthly</Select.Option>
+            <Select.Option value="Per Period">Per Period</Select.Option>
+            <Select.Option value="One Time">One Time</Select.Option>
+            <Select.Option value="Per Day">Per Day</Select.Option>
+          </Select>
+        </Form.Item>
+
+        <Form.Item
+          name="effective_from"
+          label="Effective From"
+          rules={[{ required: true }]}
+        >
+          <DatePicker style={{ width: "100%" }} />
+        </Form.Item>
+
+        <Button type="primary" htmlType="submit" block>
           Add Allowance
         </Button>
+      </Form>
 
-        <Button type="primary" block onClick={submitAll}>
+      <List
+        style={{ marginTop: 20 }}
+        bordered
+        dataSource={submittedAllowances}
+        renderItem={(item) => {
+          const type = allowanceTypes.find(
+            (t) => t.id === item.allowance_type
+          );
+
+          return (
+            <List.Item
+              actions={[
+                <Button
+                  danger
+                  type="link"
+                  onClick={() => handleRemove(item.allowance_type)}
+                >
+                  Remove
+                </Button>,
+              ]}
+            >
+              <div>
+                <strong>{type?.name}</strong> — {item.amount} (
+                {item.frequency}) <br />
+                Effective: {item.effective_from}
+              </div>
+            </List.Item>
+          );
+        }}
+      />
+
+      <div
+        style={{
+          marginTop: 24,
+          display: "flex",
+          justifyContent: "space-between",
+        }}
+      >
+        <Button onClick={onBack}>Back</Button>
+        <Button type="primary" onClick={handleNext}>
           Next
         </Button>
-
-        {submittedAllowances.length > 0 && (
-          <>
-            <Divider>Added Allowances</Divider>
-            <List
-              size="small"
-              dataSource={submittedAllowances}
-              renderItem={(item, idx) => (
-                <List.Item key={idx}>
-                  {`${item.allowance_type} - ${item.amount} (${item.frequency}) from ${item.effective_from}`}
-                </List.Item>
-              )}
-            />
-          </>
-        )}
-      </Form>
+      </div>
     </Modal>
   );
-};
-
-export default EmployeeAllowanceModal;
+}

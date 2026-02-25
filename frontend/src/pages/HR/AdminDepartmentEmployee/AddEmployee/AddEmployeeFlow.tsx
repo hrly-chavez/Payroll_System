@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import { message } from "antd";
+import api from "api/axios";
+
 import EmployeeDetailsModal from "./EmployeeDetailsModal";
 import EmployeeSalaryModal from "./EmployeeSalaryModal";
 import EmployeeContributionsModal from "./EmployeeContributionsModal";
@@ -12,37 +15,64 @@ interface Props {
   onClose: () => void;
 }
 
-const AddEmployeeFlow: React.FC<Props> = ({
-  open,
-  departmentId,
-  onClose,
-}) => {
+const AddEmployeeFlow: React.FC<Props> = ({ open, departmentId, onClose }) => {
   const [step, setStep] = useState(1);
-  const [employeeId, setEmployeeId] = useState<number | null>(null);
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
+
+  const [employeeDetails, setEmployeeDetails] = useState<any>(null);
+  const [salaryData, setSalaryData] = useState<any>(null);
+  const [contributionsData, setContributionsData] = useState<any[]>([]);
+  const [allowancesData, setAllowancesData] = useState<any[]>([]);
+  const [credentials, setCredentials] = useState({ username: "", password: "" });
 
   const currentUserRole = localStorage.getItem("role");
 
   const allowedRoles: ("EMPLOYEE" | "ADMIN" | "SUPER_ADMIN")[] =
     currentUserRole === "SUPER_ADMIN"
-      ? ["ADMIN", "SUPER_ADMIN"] // this is where you add the Roles value in EmployeeDetailsModal
+      ? ["ADMIN", "SUPER_ADMIN"]
       : ["EMPLOYEE"];
 
-
-
-  const [credentials, setCredentials] = useState({
-    username: "",
-    password: "",
-  });
-
+  // Reset flow when modal opens
   useEffect(() => {
     if (open) {
       setStep(1);
-      setEmployeeId(null);
       setSelectedRole(null);
+      setEmployeeDetails(null);
+      setSalaryData(null);
+      setContributionsData([]);
+      setAllowancesData([]);
       setCredentials({ username: "", password: "" });
     }
   }, [open]);
+
+  // -----------------------------
+  // FINAL SUBMIT AFTER ALLOWANCES
+  // -----------------------------
+  const handleFinalSubmit = async (finalAllowances: any[]) => {
+    try {
+      const payload = {
+        ...employeeDetails,
+        role: selectedRole,
+        salary: salaryData,
+        contributions: contributionsData,
+        allowances: finalAllowances, // use direct value
+      };
+
+      const res = await api.post(
+        "/employees/employees/create-full-employee/",
+        payload
+      );
+
+      setCredentials({
+        username: res.data.username,
+        password: res.data.password,
+      });
+
+      setStep(6);
+    } catch (err: any) {
+      message.error(err.response?.data?.message || "Failed to create employee");
+    }
+  };
 
   return (
     <>
@@ -52,70 +82,71 @@ const AddEmployeeFlow: React.FC<Props> = ({
           open={open}
           departmentId={departmentId}
           allowedRoles={allowedRoles}
-          onNext={(id, creds, role) => {
-            setEmployeeId(id);
-            setCredentials(creds);
-            setSelectedRole(role); 
+          initialValues={employeeDetails}
+          onNext={(data) => {
+            setEmployeeDetails(data);
+            setSelectedRole(data.role); // get role from data
             setStep(2);
           }}
           onClose={onClose}
         />
       )}
 
-      {/* Step 2: Credentials */}
+      {/* Step 2: Salary */}
       {step === 2 && (
-        <EmployeeCredentialsModal
+        <EmployeeSalaryModal
           open
-          credentials={credentials}
-          onNext={() => {
-            if (selectedRole === "SUPER_ADMIN") {
-              // ✅ Reset everything first
-              setStep(1);
-              setEmployeeId(null);
-              setSelectedRole(null);
-              setCredentials({ username: "", password: "" });
-
-              onClose(); // then close modal
-              return;
-            }
-
+          initialValues={salaryData}
+          onNext={(data) => {
+            setSalaryData(data);
             setStep(3);
           }}
-          onClose={() => {
-            // also handle manual cancel
+          onBack={() => setStep(1)}
+          onClose={onClose}
+        />
+      )}
+
+      {/* Step 3: Contributions */}
+      {step === 3 && (
+        <EmployeeContributionsModal
+          open
+          initialValues={contributionsData}
+          salaryBase={salaryData?.base_rate}
+          onBack={() => setStep(2)}
+          onNext={(data) => {
+            setContributionsData(data);
+            setStep(4);
+          }}
+          onClose={onClose}
+        />
+      )}
+
+      {/* Step 4: Allowances */}
+      {step === 4 && (
+        <EmployeeAllowanceModal
+          open
+          initialValues={allowancesData}   // previous data is passed
+          onNext={(data) => {
+            handleFinalSubmit(data);
+          }}
+          onBack={() => setStep(3)}
+          onClose={onClose}
+        />
+      )}
+
+      {/* Step 5: Credentials (DISPLAY ONLY AFTER FINAL SUBMIT) */}
+      {step === 6 && (
+        <EmployeeCredentialsModal
+          open
+          credentials={credentials} // show backend-generated username/password
+          onNext={() => {
             setStep(1);
             onClose();
           }}
-        />
-      )}
-
-      {/* Step 3: Salary */}
-      {step === 3 && employeeId && (
-        <EmployeeSalaryModal
-          open
-          employeeId={employeeId}
-          onNext={() => setStep(4)}
-          onClose={onClose}
-        />
-      )}
-
-      {/* Step 4: Contributions */}
-      {step === 4 && employeeId && (
-        <EmployeeContributionsModal
-          open
-          employeeId={employeeId}
-          onNext={() => setStep(5)}
-          onClose={onClose}
-        />
-      )}
-
-      {/* Step 5: Allowances */}
-      {step === 5 && employeeId && (
-        <EmployeeAllowanceModal
-          open
-          employeeId={employeeId}
-          onClose={onClose}
-          onNext={() => setStep(6)}
+          onClose={() => {
+            setStep(1);
+            onClose();
+          }}
         />
       )}
     </>

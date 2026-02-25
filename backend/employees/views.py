@@ -295,6 +295,92 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             "password": password
         }, status=201)
 
+    @action(detail=False, methods=["post"], url_path="create-full-employee")
+    @transaction.atomic
+    def create_full_employee(self, request):
+        """
+        Create employee + user + salary + contributions + allowances in one atomic transaction
+        """
+        data = request.data
+        salary_data = data.pop("salary", None)
+        contributions_data = data.pop("contributions", [])
+        allowances_data = data.pop("allowances", [])
+        requested_role = data.get("role", "EMPLOYEE")
+
+        # -----------------------------
+        # 1. Role checks
+        # -----------------------------
+        signed_in_user = request.user
+        if signed_in_user.role == "ADMIN" and requested_role != "EMPLOYEE":
+            return Response({"error": "ADMINs can only create EMPLOYEE users."}, status=403)
+        if signed_in_user.role == "SUPER_ADMIN" and requested_role not in ["ADMIN", "SUPER_ADMIN"]:
+            return Response({"error": "SUPER_ADMIN can only create ADMIN or SUPER_ADMIN users."}, status=403)
+        if signed_in_user.role not in ["ADMIN", "SUPER_ADMIN"]:
+            return Response({"error": "You do not have permission to create users."}, status=403)
+
+        # -----------------------------
+        # 2. Create Employee
+        # -----------------------------
+        employee_serializer = EmployeeCreateSerializer(data=data)
+        employee_serializer.is_valid(raise_exception=True)
+        employee = employee_serializer.save(_current_user=signed_in_user)
+
+        # -----------------------------
+        # 3. Create User (credentials)
+        # -----------------------------
+        username = f"{employee.fname.lower()}{employee.id}"
+        password = "".join(random.choices(string.ascii_letters + string.digits, k=8))
+
+        user = User(
+            user_name=username,
+            role=requested_role,
+            employee=employee
+        )
+        user.set_password(password)
+        user._current_user = signed_in_user
+        user.save()
+
+        # -----------------------------
+        # 4. Create Salary
+        # -----------------------------
+        if salary_data:
+            salary_data["employee"] = employee.id
+            salary_serializer = EmployeeSalarySerializer(data=salary_data, context={"_current_user": signed_in_user})
+            salary_serializer.is_valid(raise_exception=True)
+            salary_obj = salary_serializer.save()
+        else:
+            salary_obj = None
+
+        # -----------------------------
+        # 5. Create Contributions
+        # -----------------------------
+        for c in contributions_data:
+            c["employee"] = employee.id
+            serializer = EmployeeDeductionCreateSerializer(data=c)
+            serializer.is_valid(raise_exception=True)
+            serializer.save(_current_user=signed_in_user)
+
+        # -----------------------------
+        # 6. Create Allowances
+        # -----------------------------
+        print("ALLOWANCES RECEIVED:", allowances_data)
+
+        for a in allowances_data:
+            a["employee"] = employee.id
+            serializer = EmployeeAllowanceCreateSerializer(
+                data=a,
+                context={"_current_user": signed_in_user}
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            
+        return Response({
+            "message": "Employee created successfully",
+            "employee_id": employee.id,
+            "username": username,
+            "password": password
+        }, status=201)
+
     
     # -------------------
     # CREATE EMPLOYEE

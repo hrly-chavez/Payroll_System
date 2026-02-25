@@ -79,7 +79,7 @@
 /* ================= DATE CARD ================= */
 
 .stat-card {
-  min-height: 360px;
+  min-height: 210px;
 }
 
 .stat-card .ant-card-body {
@@ -126,19 +126,25 @@
 .legendDot[data-type="Not Reported"] { background: #E5E7EB; }
 
 .legendLabel {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 11px;
   color: var(--text);
 }
 
 /* ================= STAT TILES ================= */
 
 .stat-tile {
-  min-height: 360px;
+  min-height: 230px;
   padding: 24px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: center;
+}
+
+/* Top dashboard cards unified height */
+.stat-card,
+.stat-tile,
+.company-note-card {
+  height: 410px;
 }
 
 .stat-tile:hover {
@@ -150,13 +156,18 @@
   font-size: 15px;
   font-weight: 650;
   color: #386fa4;
-}
+  margin-bottom: auto;
+  text-align: center;
+  justify-content: flex-start;
+  }
 
 .tile-body {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 18px;
+  flex: 1;
+  margin-top: 10px;
 }
 
 .tile-icon {
@@ -166,7 +177,7 @@
 
 .tile-value {
   font-size: 46px;
-  font-weight: 800;
+  font-weight: 500;
   color: #386fa4;
 }
 
@@ -232,6 +243,8 @@
 
   .chartLegendAdmin {
     grid-template-columns: 1fr;
+    margin-top: 12px;
+    gap: 10px;
   }
 
   .filter-row {
@@ -243,6 +256,12 @@
   .filter-row .ant-picker {
     width: 100%;
 }
+.stat-card,
+  .stat-tile,
+  .company-note-card {
+    height: auto;
+    min-height: 220px;
+  }
 }
 
 @media (max-width: 480px) {

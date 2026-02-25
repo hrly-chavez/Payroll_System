@@ -21,6 +21,17 @@ const toBool = (v: any) => {
   return Boolean(v);
 };
 
+// ✅ allow letters + spaces only
+const NAME_PATTERN = /^[A-Za-z ]+$/;
+
+const cleanName = (value: string) => {
+  // remove non letters/spaces + collapse multiple spaces
+  return value
+    .replace(/[^A-Za-z ]/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/^\s+/g, ""); // optional: prevent leading spaces
+};
+
 const EditAllowanceType = ({ open, onClose, allowance, refresh }: Props) => {
   const [form] = Form.useForm();
   const [dirty, setDirty] = useState(false);
@@ -50,8 +61,8 @@ const EditAllowanceType = ({ open, onClose, allowance, refresh }: Props) => {
 
       const proceedUpdate = async () => {
         await api.patch(`/approvals/allowance-type/${allowance.id}/`, {
-          name: values.name,
-          code: values.code,
+          name: values.name?.trim(),
+          code: values.code, // keep as-is
           is_active: nextIsActive,
         });
 
@@ -60,7 +71,6 @@ const EditAllowanceType = ({ open, onClose, allowance, refresh }: Props) => {
         refresh();
       };
 
-      // ✅ confirm ONLY when deactivating (Active -> Inactive)
       const isDeactivating = prevIsActive === true && nextIsActive === false;
 
       if (isDeactivating) {
@@ -75,7 +85,6 @@ const EditAllowanceType = ({ open, onClose, allowance, refresh }: Props) => {
         return;
       }
 
-      // normal update (activate or edit fields)
       await proceedUpdate();
     } catch (err: any) {
       const data = err?.response?.data;
@@ -99,17 +108,30 @@ const EditAllowanceType = ({ open, onClose, allowance, refresh }: Props) => {
       okText="Update"
       destroyOnClose
     >
-      <Form
-        form={form}
-        layout="vertical"
-        onValuesChange={() => setDirty(true)}
-      >
-        <Form.Item label="Name" name="name" rules={[{ required: true }]}>
-          <Input />
-        </Form.Item>
-
-        <Form.Item label="Code" name="code" rules={[{ required: true }]}>
-          <Input />
+      <Form form={form} layout="vertical" onValuesChange={() => setDirty(true)}>
+        <Form.Item
+          label="Name"
+          name="name"
+          rules={[
+            { required: true, message: "Name required" },
+            { pattern: NAME_PATTERN, message: "Only letters and spaces are allowed" },
+          ]}
+        >
+          <Input
+            maxLength={50}
+            onChange={(e) => {
+              const cleaned = cleanName(e.target.value);
+              form.setFieldsValue({ name: cleaned });
+            }}
+            onPaste={(e) => {
+              e.preventDefault();
+              const pasted = e.clipboardData.getData("text");
+              const cleaned = cleanName(pasted);
+              const current = form.getFieldValue("name") || "";
+              form.setFieldsValue({ name: cleanName(current + cleaned) });
+              setDirty(true);
+            }}
+          />
         </Form.Item>
 
         <Form.Item

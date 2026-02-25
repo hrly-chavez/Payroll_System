@@ -18,20 +18,22 @@
 }
 
 .left {
-  font-weight: 600;
-  font-size: 16px;
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: 0.2px;
   color: #0f172a;
 }
 
 .name {
   color: #386fa4;
+  font-weight: 600;
 }
 
 .status {
   padding: 7px 14px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   border: 1px solid rgba(15, 23, 42, 0.08);
 }
 

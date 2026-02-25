@@ -5,8 +5,6 @@
 :global(.ant-picker-calendar-date) {
   padding: 0 !important;
   margin: 0 !important;
-  aspect-ratio: 1 / 1;
-  height: auto !important;
 }
 
 :global(.ant-picker-calendar-date-content) {

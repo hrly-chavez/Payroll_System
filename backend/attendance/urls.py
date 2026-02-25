@@ -23,5 +23,8 @@ urlpatterns = [
     path("admin/corrections/<int:pk>/", AdminAttendanceCorrectionDetailView.as_view(), name="attendance-correction-admin-detail"),
     path("admin/corrections/<int:pk>/review/", AdminReviewAttendanceCorrectionView.as_view(), name="attendance-correction-admin-review"),
     path("admin/corrections/<int:pk>/apply/", AdminApplyAttendanceCorrectionView.as_view(), name="attendance-correction-admin-apply"),
-
+    #Pie Chart Display
+    path("stats/", AttendanceStatsView.as_view(), name="attendance-stats"),
+    path("admin/stats/", AttendanceAdminMonthlyStatsView.as_view(), name="attendance-admin-stats"),
+    path("attendance/admin/stats/", AttendanceAdminMonthlyStatsView.as_view()),
 ]

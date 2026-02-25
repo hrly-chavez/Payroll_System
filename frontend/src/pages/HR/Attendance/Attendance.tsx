@@ -38,12 +38,31 @@ type ApiResponse = {
 
 function formatTime(t: string | null) {
   if (!t) return "-";
-  return dayjs(`2000-01-01 ${t}`).format("h:mm A");
-}
 
-function formatDate(d: string) {
-  return dayjs(d).format("DD/MM/YYYY");
-}
+  // If backend sends full datetime (ISO or "YYYY-MM-DD ..."), parse directly
+  const isDateTime = t.includes("T") || t.includes(" ");
+  if (isDateTime) {
+    const d = dayjs(t);
+    return d.isValid() ? d.format("h:mm A") : "-";
+  }
+
+  // If backend sends time-only "HH:mm:ss", attach a dummy date
+  const d = dayjs(`2000-01-01 ${t}`, "YYYY-MM-DD HH:mm:ss");
+    return d.isValid() ? d.format("h:mm A") : "-";
+  }
+
+  function formatDate(d: string) {
+    const x = dayjs(d);
+    return x.isValid() ? x.format("MM/DD/YYYY") : "-";
+  }
+  function formatTimeWithRow(t: string | null, rowDate: string) {
+    if (!t) return "-";
+    const isDateTime = t.includes("T") || t.includes(" ");
+    const d = isDateTime
+      ? dayjs(t)
+      : dayjs(`${rowDate} ${t}`, "YYYY-MM-DD HH:mm:ss");
+    return d.isValid() ? d.format("h:mm A") : "-";
+  }
 
 const Attendance: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -141,12 +160,8 @@ const Attendance: React.FC = () => {
       ),
     },
     { title: "Department", dataIndex: "department_name", render: (v: any) => v ?? "-" },
-    { title: "Time In", dataIndex: "time_in", render: (v: any) => formatTime(v) },
-    { title: "Time Out", dataIndex: "time_out", render: (v: any) => formatTime(v) },
-    {
-      title: "Classification",
-      render: () => "-",
-    },
+   { title: "Time In", dataIndex: "time_in", render: (_: any, r: HRLogRow) => formatTimeWithRow(r.time_in, r.date) },
+   { title: "Time Out", dataIndex: "time_out", render: (_: any, r: HRLogRow) => formatTimeWithRow(r.time_out, r.date) },
     {
       title: "Workshift",
       dataIndex: "shift_name",

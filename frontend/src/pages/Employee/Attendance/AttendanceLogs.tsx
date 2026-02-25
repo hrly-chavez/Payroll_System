@@ -35,12 +35,28 @@ export default function AttendaceLogs({ year, month }: Props) {
       {
         title: "Punched In",
         dataIndex: "time_in",
-        render: (val: string | null) => (val ? dayjs(val, "HH:mm:ss").format("h:mm A") : "-"),
+        render: (_val: string | null, row: AttendanceLogRow) => {
+          if (!_val) return "-";
+
+          // if backend sends a full datetime (contains T or space), parse directly
+          const isDateTime = _val.includes("T") || _val.includes(" ");
+          if (isDateTime) return dayjs(_val).format("h:mm A");
+
+          // if backend sends time-only, attach the row date so dayjs parses consistently
+          return dayjs(`${row.date} ${_val}`, "YYYY-MM-DD HH:mm:ss").format("h:mm A");
+        },
       },
       {
         title: "Punched Out",
         dataIndex: "time_out",
-        render: (val: string | null) => (val ? dayjs(val, "HH:mm:ss").format("h:mm A") : "-"),
+        render: (_val: string | null, row: AttendanceLogRow) => {
+          if (!_val) return "-";
+
+          const isDateTime = _val.includes("T") || _val.includes(" ");
+          if (isDateTime) return dayjs(_val).format("h:mm A");
+
+          return dayjs(`${row.date} ${_val}`, "YYYY-MM-DD HH:mm:ss").format("h:mm A");
+        },
       },
       {
         title: "WorkShift",

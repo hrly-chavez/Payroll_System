@@ -426,3 +426,29 @@ class AttendanceCorrectionApplySerializer(serializers.Serializer):
 
         return attrs
 
+
+
+
+#==============PIE CHART DISPLAY============================
+class AttendanceStatsSerializer(serializers.Serializer):
+    year = serializers.IntegerField()
+    month = serializers.IntegerField()
+
+    present = serializers.IntegerField()
+    late = serializers.IntegerField()
+    absent = serializers.IntegerField()
+    leave = serializers.IntegerField()
+    undertime = serializers.IntegerField()
+    overtime = serializers.IntegerField()
+
+class AttendanceAdminMonthlyStatsSerializer(serializers.Serializer):
+    year = serializers.IntegerField()
+    month = serializers.IntegerField()
+    present = serializers.IntegerField()
+    late = serializers.IntegerField()
+    absent = serializers.IntegerField()
+    leave = serializers.IntegerField()
+    undertime = serializers.IntegerField()
+    overtime = serializers.IntegerField()
+
+    

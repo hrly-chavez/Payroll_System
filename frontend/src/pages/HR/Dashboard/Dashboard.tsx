@@ -10,12 +10,7 @@ import api from "../../../api/axios";
 import { formatTime, getAttendanceStatusLabel, formatBackendTime } from "../../helpers";
 import SharedCalendar from "./../../../components/SharedCalendar/SharedCalendar";
 import { Tabs,Modal, Input } from "antd";
-import {
-  HOLIDAY_LEGEND,
-  HolidayBase,
-  HolidayType,
-  PAYROLL_COLOR,
-} from "../../../components/SharedCalendar/CalendarLegend";
+import {HOLIDAY_LEGEND,HolidayBase,HolidayType,PAYROLL_COLOR,} from "../../../components/SharedCalendar/CalendarLegend";
 import CompanyNote from "../../../components/CompanyNote/CompanyNote";
 import { Pie } from "@ant-design/plots";
 import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
@@ -121,89 +116,131 @@ const Dashboard: React.FC = () => {
   const [punchInEligibility, setPunchInEligibility] = useState<PunchInEligibilityResponse | null>(null);
   const [loadingPunchInEligibility, setLoadingPunchInEligibility] = useState(false);
 
-  const [dailySummary, setDailySummary] = useState({
-    present: 0,
-    notReported: 0,
-  });
-
-  // ===== Admin Date Donut (Employee-style) =====
-  type AdminDailyRow = { type: "Reported" | "Not Reported" | "No data"; value: number };
-
-  const adminRawDaily: AdminDailyRow[] = [
-    { type: "Reported", value: dailySummary.present || 0 },
-    { type: "Not Reported", value: dailySummary.notReported || 0 },
-    { type: "No data", value: 0 }, // placeholder for typing; not rendered when data exists
-  ];
-
-  const adminDailyTotal = (dailySummary.present || 0) + (dailySummary.notReported || 0);
-
-  const adminDailyFinal: AdminDailyRow[] =
-    adminDailyTotal === 0
-      ? [{ type: "No data", value: 1 }]
-      : [
-          { type: "Reported", value: dailySummary.present || 0 },
-          { type: "Not Reported", value: dailySummary.notReported || 0 },
-        ];
-
-  const adminDailyPercent = (value: number) =>
-    adminDailyTotal === 0 ? 0 : Math.round((value / adminDailyTotal) * 100);
-
-  const adminDailyConfig = {
-  data: adminDailyFinal,
-  angleField: "value",
-  colorField: "type",
-
-  radius: 0.98,
-  legend: false,
-
-  // smooth + crisp separators
-  animation: {
-    appear: { animation: "wave-in", duration: 800 },
-  },
-  interactions: [{ type: "element-active" }],
-
-  pieStyle: {
-    lineWidth: 2,
-    stroke: "#ffffff",
-  },
-
-  // ✅ FIX: disable labels to avoid "shape.inner" crash
-  label: false,
-
-  // center text
-  statistic: {
-    title: false,
-    content: {
-      style: {
-        whiteSpace: "pre-wrap",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        fontWeight: 800,
-        fontSize: "18px",
-        lineHeight: "22px",
-      },
-      content:
-        adminDailyTotal === 0
-          ? "No data"
-          : `${dailySummary.present || 0} / ${adminDailyTotal}\nreported`,
-    },
-  },
-
-  color: ({ type }: { type: string }) => {
-    switch (type) {
-      case "Reported":
-        return "#386FA4";
-      case "Not Reported":
-        return "#E5E7EB";
-      case "No data":
-        return "#E5E7EB";
-      default:
-        return "#E5E7EB";
-    }
-  },
-
-  appendPadding: 10,
+  // ===== Admin Monthly Attendance (All Employees) =====
+type AdminMonthlyStatsResponse = {
+  year: number;
+  month: number;
+  present: number;
+  late: number;
+  absent: number;
+  leave: number;
+  undertime: number;
+  overtime: number;
 };
+
+type PieRow = { type: string; value: number };
+
+const [selectedMonth, setSelectedMonth] = useState(dayjs().startOf("month"));
+const [adminStats, setAdminStats] = useState({
+  present: 0,
+  late: 0,
+  absent: 0,
+  leave: 0,
+  undertime: 0,
+  overtime: 0,
+});
+const [loadingAdminStats, setLoadingAdminStats] = useState(false);
+
+const PIE_COLORS: Record<string, string> = {
+  Present: "#22c55e",
+  Late: "#f59e0b",
+  Leave: "#3b82f6",
+  Absent: "#ef4444",
+  Undertime: "#a855f7",
+  Overtime: "#14b8a6",
+  "No data": "#e5e7eb",
+};
+
+const PIE_ORDER = ["Present", "Late", "Leave", "Absent", "Undertime", "Overtime", "No data"];
+const PIE_RANGE = PIE_ORDER.map((k) => PIE_COLORS[k] || "#e5e7eb");
+
+const monthOptions = Array.from({ length: 12 }, (_, i) => ({
+  value: i + 1,
+  label: dayjs().month(i).format("MMMM"),
+}));
+
+const adminRawChartData: PieRow[] = [
+  { type: "Present", value: adminStats.present },
+  { type: "Late", value: adminStats.late },
+  { type: "Leave", value: adminStats.leave },
+  { type: "Absent", value: adminStats.absent },
+  { type: "Undertime", value: adminStats.undertime },
+  { type: "Overtime", value: adminStats.overtime },
+];
+
+const adminTotal = adminRawChartData.reduce((sum, d) => sum + d.value, 0);
+const adminChartData: PieRow[] = adminTotal === 0 ? [{ type: "No data", value: 1 }] : adminRawChartData;
+
+const adminOrderedChartData = [...adminChartData].sort(
+  (a, b) => PIE_ORDER.indexOf(a.type) - PIE_ORDER.indexOf(b.type)
+);
+
+  const adminPercent = (value: number) => (adminTotal === 0 ? 0 : Math.round((value / adminTotal) * 100));
+
+  const adminMonthlyConfig = {
+    data: adminOrderedChartData,
+    angleField: "value",
+    colorField: "type",
+
+    scale: {
+      color: {
+        domain: PIE_ORDER,
+        range: PIE_RANGE,
+      },
+    },
+
+    radius: 0.98,
+    legend: false,
+    label: false,
+
+    animation: {
+      appear: { animation: "wave-in", duration: 800 },
+    },
+    interactions: [{ type: "element-active" }],
+
+    pieStyle: { lineWidth: 2, stroke: "#ffffff" },
+
+    tooltip: {
+      showTitle: false,
+      formatter: (datum: any) => {
+        const v = Number(datum?.value || 0);
+        const p = adminTotal === 0 ? 0 : Math.round((v / adminTotal) * 100);
+        return { name: String(datum?.type || ""), value: `${v} • ${p}%` };
+      },
+    },
+
+    appendPadding: 10,
+  };
+
+  const fetchAdminMonthlyAttendanceStats = async () => {
+    setLoadingAdminStats(true);
+    try {
+      const now = dayjs();
+      const params = {
+          year: selectedMonth.year(),
+          month: selectedMonth.month() + 1,
+        };
+      // NEW endpoint (all employees)
+      const res = await api.get<AdminMonthlyStatsResponse>("/attendance/admin/stats/", { params });
+
+      setAdminStats({
+        present: res.data.present || 0,
+        late: res.data.late || 0,
+        absent: res.data.absent || 0,
+        leave: res.data.leave || 0,
+        undertime: res.data.undertime || 0,
+        overtime: res.data.overtime || 0,
+      });
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to load admin attendance stats.";
+      message.error(msg);
+    } finally {
+      setLoadingAdminStats(false);
+    }
+  };
  /* =========================================================
       TIME STATES
      ========================================================= */
@@ -266,20 +303,7 @@ const Dashboard: React.FC = () => {
           };
         });
 
-      setTodayRows(filtered);
-
-/* =========================================================
-          DAILY SUMMARY CALCULATION (FOR DATE PIE)
-         ========================================================= */
-
-      const totalEmployees = res.data.results.length;
-      const presentCount = filtered.length;
-
-      setDailySummary({
-        present: presentCount,
-        notReported: totalEmployees - presentCount,
-      });
-
+      setTodayRows(filtered); 
     } catch (err: any) {
       message.error("Failed to load attendance.");
     } finally {
@@ -421,8 +445,13 @@ const Dashboard: React.FC = () => {
     fetchPunchInEligibility();
     loadCalendarEvents();
     fetchMyDashboardStats();
-    fetchTodayEmployeesAttendance(selectedDate);
+    fetchAdminMonthlyAttendanceStats();
   }, []);
+
+  useEffect(() => {
+    fetchAdminMonthlyAttendanceStats();
+  }, [selectedMonth]);
+
   useEffect(() => {
     const interval = setInterval(() => {
       fetchPunchInEligibility();
@@ -557,39 +586,53 @@ const Dashboard: React.FC = () => {
         {/* DATE CARD */}
         <Col xs={24} md={8}>
           <Card
-              title={selectedDate.format("MMMM D, YYYY")}
-              className={`${styles.compactCard} ${styles.dateCard}`}
-            >
-            <div className={styles.dateChartArea}>
-            <div className={styles.chartWrapperAdmin}>
-              <Pie {...adminDailyConfig} />
-            </div>
+              title={
+                <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
+                  <span>Attendance (All Employees)</span>
 
-            <div className={styles.chartLegendAdmin}>
-              {(adminDailyTotal === 0
-                ? [{ type: "No data" as const, value: 0 }]
-                : [
-                    { type: "Reported" as const, value: dailySummary.present || 0 },
-                    { type: "Not Reported" as const, value: dailySummary.notReported || 0 },
-                  ]
-              ).map((item) => (
-                <div key={item.type} className={styles.legendItem}>
-                  <span
-                    className={styles.legendDot}
-                    data-type={item.type}
-                    aria-hidden="true"
-                  />
-                  <div className={styles.legendText}>
-                    <div className={styles.legendLabel}>{item.type}</div>
-                    <div className={styles.legendMeta}>
-                      {item.value} • {adminDailyPercent(item.value)}%
-                    </div>
+                  <div style={{ marginLeft: "auto", width: 140 }}>
+                    <DatePicker
+                      picker="month"
+                      format="MMMM YYYY"     // e.g., "February 2026"
+                      allowClear={false}
+                      value={selectedMonth}
+                      onChange={(d) => {
+                        const thisMonth = dayjs().startOf("month");
+                        const chosen = (d ?? dayjs()).startOf("month");
+                        setSelectedMonth(chosen.isAfter(thisMonth) ? thisMonth : chosen);
+                      }}
+                      disabledDate={(current) => {
+                        if (!current) return false;
+                        const thisMonth = dayjs().startOf("month");
+                        return current.startOf("month").isAfter(thisMonth);
+                      }}
+                      style={{ width: "100%" }}
+                    />
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-          </Card>
+              }
+              className={`${styles.compactCard} ${styles.dateCard}`}
+            >
+              <div className={styles.dateChartArea}>
+                <div className={styles.chartWrapperAdmin}>
+                  <Pie {...adminMonthlyConfig} />
+                </div>
+
+                <div className={styles.chartLegendAdmin}>
+                  {(adminTotal === 0 ? [{ type: "No data", value: 0 }] : adminRawChartData).map((item) => (
+                    <div key={item.type} className={styles.legendItem}>
+                      <span className={styles.legendDot} data-type={item.type} aria-hidden="true" />
+                      <div className={styles.legendText}>
+                        <div className={styles.legendLabel}>{item.type}</div>
+                        <div className={styles.legendMeta}>
+                          {item.value} • {adminPercent(item.value)}%
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
           </Col>
 
         {/* ATTENDANCE */}

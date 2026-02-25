@@ -19,3 +19,81 @@
 Rule:
 
     If it affects money or salary, put it here.
+
+
+In this app, you can find the following modules / functions related to salary and payroll:
+
+------------------------------------------------------------
+MODULES / FUNCTIONS
+------------------------------------------------------------
+
+• Deductions (Deduction Type Management)
+  - DeductionListCreateView
+  - DeductionDetailView
+  - DeductionUpdateStatusView
+
+• Payroll Period (Cutoff)
+  - PayrollPeriodListCreateView
+  - PayrollPeriodEligibleEmployeesView
+  - PayrollPeriodMarkPaidView
+
+• Payroll Verification (Pre-generation checks)
+  - PayrollVerifyEmployeeSnapshotView
+  - PayrollVerifyEmployeeView
+
+• Commissions (Per payroll period & employee)
+  - CommissionTypeListView
+  - PayrollPeriodEmployeeCommissionListCreateView
+
+• Pay Rules (Computation Rules)
+  - SuperAdminPayRuleListCreateView
+  - SuperAdminPayRuleRetrieveUpdateView
+  - PayRuleChoicesView
+
+• Payroll Computation / Generation
+  - GeneratePayrollForPeriodView
+  - GeneratePayrollForEmployeeView
+
+• Payroll Results / Viewing
+  - PayrollEmployeeResultView
+  - EmployeePayrollListView
+
+• Payroll Approvals (CEO / SUPER_ADMIN)
+  - PayrollPeriodApprovalQueueView
+  - PayrollApproveEmployeeView
+  - PayrollDeclineEmployeeView
+  - PayrollResetAfterDeclineView
+
+• Payslip (PDF Output)
+  - EmployeePayrollDownloadPDFView
+
+
+------------------------------------------------------------
+TABLES USED
+------------------------------------------------------------
+
+- Payroll_Period
+- PayrollPeriodEmployee
+- Payroll
+
+- Pay_Rule
+- PayslipLine (or payroll.payslip_lines)   [name depends on your model, but used here]
+
+- Employee
+- Department
+- User
+
+- Employee_Salary
+- Deduction_Type
+- Employee_Deduction
+
+- Employee_Allowance
+- Allowance_Type
+
+- Commission_Type
+- PayrollPeriodEmployeeCommission
+
+- Attendance
+- Attendance_Event   (attendance events are prefetched/used in verification snapshot)
+
+- Notification

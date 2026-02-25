@@ -174,10 +174,13 @@
   flex: 0 0 auto;
 }
 
-/* map dot colors */
-.legendDot[data-type="Reported"] { background: #386FA4; }
-.legendDot[data-type="Not Reported"] { background: #E5E7EB; }
-.legendDot[data-type="No data"] { background: #E5E7EB; }
+.legendDot[data-type="Present"] { background: #22c55e; }
+.legendDot[data-type="Late"] { background: #f59e0b; }
+.legendDot[data-type="Leave"] { background: #3b82f6; }
+.legendDot[data-type="Absent"] { background: #ef4444; }
+.legendDot[data-type="Undertime"] { background: #a855f7; }
+.legendDot[data-type="Overtime"] { background: #14b8a6; }
+.legendDot[data-type="No data"] { background: #e5e7eb; }
 
 .legendText {
   display: flex;

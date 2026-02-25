@@ -8,11 +8,14 @@ from rest_framework.exceptions import ValidationError
 from rest_framework import status as http_status
 from accounts.permissions import IsRole
 from django.db import transaction
+from calendar import monthrange
+from datetime import date
 from rest_framework.parsers import MultiPartParser, FormParser,JSONParser
 from shared_model.models import *
 from rest_framework.exceptions import PermissionDenied, NotFound,ValidationError
+from datetime import timedelta
 from .serializers import *
-from .services import (punch_in,punch_out,get_today_status,_get_employee_or_400,_month_date_range,punch_in_eligibility)
+from .services import (punch_in,punch_out,get_today_status,_get_employee_or_400,_month_date_range,punch_in_eligibility,get_monthly_attendance_stats)
 
 
 class PunchInView(APIView):
@@ -612,3 +615,204 @@ class AdminApplyAttendanceCorrectionView(APIView):
             }
         )  
 
+
+
+
+#==============PIE CHART DISPLAY============================
+#Each Employee
+class AttendanceStatsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        employee = _get_employee_or_400(request.user)
+
+        year = request.query_params.get("year")
+        month = request.query_params.get("month")
+
+        today = timezone.localdate()
+        year = int(year) if year else today.year
+        month = int(month) if month else today.month
+
+        if month < 1 or month > 12:
+            raise ValidationError({"detail": "Invalid month. Must be 1-12."})
+
+        stats = get_monthly_attendance_stats(request.user, year, month)
+        return Response(AttendanceStatsSerializer(stats).data)
+    
+#Admin dashboard
+class AttendanceAdminMonthlyStatsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        role = (getattr(request.user, "role", "") or "").strip().upper()
+        if role not in {"ADMIN", "SUPER_ADMIN"} and not getattr(request.user, "is_superuser", False):
+            raise PermissionDenied("You are not allowed to view admin attendance stats.")
+
+        try:
+            year = int(request.query_params.get("year"))
+            month = int(request.query_params.get("month"))
+        except (TypeError, ValueError):
+            return Response({"detail": "year and month are required integers."}, status=400)
+
+        if month < 1 or month > 12:
+            return Response({"detail": "month must be between 1 and 12."}, status=400)
+
+        last_day = monthrange(year, month)[1]
+        start = date(year, month, 1)
+        end = date(year, month, last_day)
+
+        # -------------------------
+        # Date clamp (FINAL RULES)
+        # -------------------------
+        today = timezone.localdate()
+
+        # Future month -> return zeros
+        if start > today:
+            payload = {
+                "year": year,
+                "month": month,
+                "present": 0,
+                "late": 0,
+                "absent": 0,
+                "leave": 0,
+                "undertime": 0,
+                "overtime": 0,
+            }
+            return Response(AttendanceAdminMonthlyStatsSerializer(payload).data, status=200)
+
+        # Current month -> clamp end to today
+        if start <= today <= end:
+            end = today
+
+        # employee population
+        employees_qs = (
+            Employee.objects
+            .select_related("shift")
+            .filter(is_active=True)
+            .exclude(Q(position__iexact="CEO") | Q(user__role__iexact="SUPER_ADMIN"))
+            .exclude(Q(user__isnull=False) & Q(user__is_active=False))
+        )
+        employees = list(employees_qs)
+        employee_ids = [e.id for e in employees]
+
+        # -------------------------
+        # Month dates list (for expected day generation)
+        # -------------------------
+        month_dates = []
+        d = start
+        while d <= end:
+            month_dates.append(d)
+            d += timedelta(days=1)
+
+        # -------------------------
+        # Build workday config map in bulk:
+        # (shift_id, day_of_week) -> is_workday
+        # If missing config, treat as workday
+        # -------------------------
+        shift_ids = list({getattr(e.shift, "id", None) for e in employees if getattr(e, "shift", None)})
+        workday_rows = Shift_Workday.objects.filter(shift_id__in=shift_ids).values_list(
+            "shift_id", "day_of_week", "is_workday"
+        )
+        workday_map = {(sid, dow): is_work for sid, dow, is_work in workday_rows}
+
+        # Precompute expected dates per shift_id
+        expected_by_shift = {}
+        for sid in shift_ids:
+            expected = set()
+            for dt in month_dates:
+                dow = dt.weekday() + 1  # 1..7
+                is_workday = workday_map.get((sid, dow), True)
+                if is_workday:
+                    expected.add(dt)
+            expected_by_shift[sid] = expected
+
+        # -------------------------
+        # Leave set: (emp_id, date)
+        # -------------------------
+        leave_set = set(
+            Leave_Day.objects.filter(
+                employee_id__in=employee_ids,
+                date__gte=start,
+                date__lte=end,
+                leave_request__status="Approved",
+            ).values_list("employee_id", "date")
+        )
+
+        # -------------------------
+        # Attendance map: (emp_id, date) -> status
+        # and collect attendance_ids for events query
+        # -------------------------
+        att_rows = list(
+            Attendance.objects.filter(
+                employee_id__in=employee_ids,
+                date__gte=start,
+                date__lte=end,
+            ).values("id", "employee_id", "date", "status")
+        )
+
+        att_map = {}
+        att_ids = []
+        for r in att_rows:
+            key = (r["employee_id"], r["date"])
+            att_map[key] = r["status"]
+            att_ids.append(r["id"])
+
+        # -------------------------
+        # Approved events: (emp_id, date) -> set(types)
+        # -------------------------
+        event_map = {}
+        if att_ids:
+            event_rows = Attendance_Event.objects.filter(
+                attendance_id__in=att_ids,
+                approval_status="Approved",
+            ).values_list("attendance__employee_id", "attendance__date", "type")
+
+            for emp_id, dt, t in event_rows:
+                event_map.setdefault((emp_id, dt), set()).add(t)
+
+        counts = {
+            "present": 0,
+            "late": 0,
+            "absent": 0,
+            "leave": 0,
+            "undertime": 0,
+            "overtime": 0,
+        }
+
+        # -------------------------
+        # Classify per expected workday (employee-day)
+        # -------------------------
+        for emp in employees:
+            shift = getattr(emp, "shift", None)
+            if not shift:
+                continue
+
+            expected_dates = expected_by_shift.get(shift.id, set())
+            for dt in expected_dates:
+                key = (emp.id, dt)
+
+                # Leave overrides everything
+                if key in leave_set:
+                    counts["leave"] += 1
+                    continue
+
+                status = att_map.get(key)
+
+                # Absent if no attendance row OR explicitly ABSENT
+                if status is None or status == "ABSENT":
+                    counts["absent"] += 1
+                    continue
+
+                # Otherwise attendance exists => classify by approved events priority
+                types = event_map.get(key, set())
+                if "Overtime" in types:
+                    counts["overtime"] += 1
+                elif "Undertime" in types:
+                    counts["undertime"] += 1
+                elif "Late" in types:
+                    counts["late"] += 1
+                else:
+                    counts["present"] += 1
+
+        payload = {"year": year, "month": month, **counts}
+        return Response(AttendanceAdminMonthlyStatsSerializer(payload).data, status=200)

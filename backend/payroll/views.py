@@ -973,7 +973,7 @@ class PayrollApproveEmployeeView(APIView):
 
         notifications = []
 
-        #  Notify SUPER_ADMIN
+        # 1️ Notify SUPER_ADMIN
         super_admins = User.objects.filter(role="ADMIN")
         for admin in super_admins:
             notifications.append(
@@ -986,7 +986,7 @@ class PayrollApproveEmployeeView(APIView):
                 )
             )
 
-        #  Notify Employee without URL
+        # 2️ Notify Employee without URL
         if hasattr(ppe.employee, "user") and ppe.employee.user:
             notifications.append(
                 Notification(

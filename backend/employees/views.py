@@ -537,63 +537,99 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(new_salary).data, status=status.HTTP_201_CREATED)
 
     def _recompute_percentage_deductions(self, employee_id, salary_amount, effective_from, user):
-        """
-        Recompute employee deductions after salary change, respecting salary ranges and soft deletes.
-        """
         from shared_model.models import Employee_Deduction, Deduction_Type
+        from decimal import Decimal
+        from datetime import timedelta
 
-        # Get all deductions for active deduction types
-        deduction_types = Deduction_Type.objects.filter(is_active=True)
+        salary_amount = Decimal(str(salary_amount))
 
-        for deduction_type in deduction_types:
-            # Check if the new salary falls within this deduction's range
-            in_range = (
-                Decimal(deduction_type.salary_range_from) <= salary_amount <= Decimal(deduction_type.salary_range_to)
-            )
+        # Get ALL deduction codes this employee has ever had
+        existing_codes = (
+            Employee_Deduction.objects
+            .filter(employee_id=employee_id)
+            .values_list("deduction_type__code", flat=True)
+            .distinct()
+        )
 
-            # Try to find existing active deduction for this type
-            employee_deduction = Employee_Deduction.objects.filter(
+        for code in existing_codes:
+
+            # Find correct tier for this salary range
+            matching_type = Deduction_Type.objects.filter(
+                code=code,
+                is_active=True,
+                salary_range_from__lte=salary_amount,
+                salary_range_to__gte=salary_amount
+            ).first()
+
+            # Get currently active deduction for this code
+            active_deduction = Employee_Deduction.objects.filter(
                 employee_id=employee_id,
-                deduction_type=deduction_type,
+                deduction_type__code=code,
                 status="Active"
-            ).order_by("-effective_from").first()
+            ).first()
 
-            if in_range:
-                # Compute deduction amount
-                if deduction_type.calculation_type == "Fixed":
-                    computed_amount = deduction_type.amount
-                else:  # Percent
-                    computed_amount = round(salary_amount * (deduction_type.amount / Decimal("100")), 2)
+            if matching_type:
 
-                if employee_deduction:
-                    # Update existing deduction
-                    employee_deduction.amount = computed_amount
-                    employee_deduction.status = "Active"
-                    employee_deduction.effective_to = None
-                    employee_deduction._current_user = user
-                    employee_deduction.save(update_fields=["amount", "status", "effective_to"])
-                    print(f"[DEBUG] Updated deduction {deduction_type.code} for employee {employee_id}")
+                # Compute amount
+                if matching_type.calculation_type == "Fixed":
+                    computed_amount = matching_type.amount
                 else:
-                    # Create new deduction
-                    Employee_Deduction.objects.create(
-                        employee_id=employee_id,
-                        deduction_type=deduction_type,
-                        amount=computed_amount,
-                        frequency="Per Period",
-                        status="Active",
-                        effective_from=effective_from,
-                        effective_to=None,
+                    computed_amount = round(
+                        salary_amount * (matching_type.amount / Decimal("100")), 2
                     )
-                    print(f"[DEBUG] Created deduction {deduction_type.code} for employee {employee_id}")
-            else:
-                # Salary out of range → soft delete
-                if employee_deduction and employee_deduction.status == "Active":
-                    employee_deduction.status = "Inactive"
-                    employee_deduction.effective_to = effective_from - timedelta(days=1)
-                    employee_deduction._current_user = user
-                    employee_deduction.save(update_fields=["status", "effective_to"])
-                    print(f"[DEBUG] Soft-deleted deduction {deduction_type.code} for employee {employee_id}")
 
+                # Case 1: Already active and correct tier
+                if active_deduction and active_deduction.deduction_type_id == matching_type.id:
+                    active_deduction.amount = computed_amount
+                    active_deduction._current_user = user
+                    active_deduction.save(update_fields=["amount"])
+                    print(f"[DEBUG] Updated {code}")
+
+                else:
+                    # Inactivate old active tier
+                    if active_deduction:
+                        active_deduction.status = "Inactive"
+                        active_deduction.effective_to = effective_from - timedelta(days=1)
+                        active_deduction._current_user = user
+                        active_deduction.save(update_fields=["status", "effective_to"])
+                        print(f"[DEBUG] Inactivated old {code}")
+
+                    # Check if matching tier already exists (inactive)
+                    existing_tier = Employee_Deduction.objects.filter(
+                        employee_id=employee_id,
+                        deduction_type=matching_type
+                    ).first()
+
+                    if existing_tier:
+                        # Reactivate old tier
+                        existing_tier.status = "Active"
+                        existing_tier.amount = computed_amount
+                        existing_tier.effective_from = effective_from
+                        existing_tier.effective_to = None
+                        existing_tier._current_user = user
+                        existing_tier.save()
+                        print(f"[DEBUG] Reactivated {code}")
+
+                    else:
+                        # Create new tier (same code only)
+                        Employee_Deduction.objects.create(
+                            employee_id=employee_id,
+                            deduction_type=matching_type,
+                            amount=computed_amount,
+                            frequency="Per Period",
+                            status="Active",
+                            effective_from=effective_from,
+                        )
+                        print(f"[DEBUG] Created new tier for {code}")
+
+            else:
+                # No valid tier for this salary → inactivate if active
+                if active_deduction:
+                    active_deduction.status = "Inactive"
+                    active_deduction.effective_to = effective_from - timedelta(days=1)
+                    active_deduction._current_user = user
+                    active_deduction.save(update_fields=["status", "effective_to"])
+                    print(f"[DEBUG] Fully inactivated {code}")
 #done logs
 #employee deduction
 class EmployeeDeductionViewSet(viewsets.ModelViewSet):

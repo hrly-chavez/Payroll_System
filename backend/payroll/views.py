@@ -11,7 +11,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q
-from datetime import date
+from datetime import date, timedelta
 from .services import PayrollGenerationService,get_latest_active_payroll
 from rest_framework.exceptions import PermissionDenied
 from django.db.models.fields import DateField, DateTimeField
@@ -146,74 +146,63 @@ class DeductionDetailView(generics.RetrieveUpdateDestroyAPIView):
     # Helper: recompute Employee_Deductions
     # -----------------------------
     def _recompute_employee_deductions(self, deduction_type):
-
-        print(f"[DEBUG] Recomputing deductions for {deduction_type.code}")
-
         from shared_model.models import Employee, Employee_Deduction
 
+        today = now().date()
         employees = Employee.objects.filter(is_active=True)
 
         for employee in employees:
-            today = timezone.localdate()
-
+            # Get latest salary
             latest_salary = employee.salaries.filter(
                 effective_from__lte=today
             ).order_by("-effective_from").first()
 
             if not latest_salary:
-                print(f"[DEBUG] No salary found for {employee}")
                 continue
 
             salary = latest_salary.base_rate
 
-            print(f"[DEBUG] Employee {employee.id} salary: {salary}")
-
-            # Check if within range
+            # Check if salary is within the updated range
             in_range = (
                 Decimal(deduction_type.salary_range_from)
                 <= salary
                 <= Decimal(deduction_type.salary_range_to)
             )
 
-            # Try to get existing deduction
-            employee_deduction = Employee_Deduction.objects.filter(
+            # Look for existing deduction for today
+            deduction, created = Employee_Deduction.objects.get_or_create(
                 employee=employee,
                 deduction_type=deduction_type,
-                status="Active"
-                ).order_by("-effective_from").first()
+                effective_from=today,
+                defaults={
+                    'amount': Decimal(deduction_type.amount) if deduction_type.calculation_type == "Fixed" else round(salary * Decimal(deduction_type.amount) / Decimal("100"), 2),
+                    'frequency': "Per Period",
+                    'status': "Active"
+                }
+            )
 
             if in_range:
-                # Compute amount
-                if deduction_type.calculation_type == "Percent":
-                    computed_amount = (
-                        salary * Decimal(deduction_type.amount) / Decimal("100")
-                    )
-                else:  # Fixed
-                    computed_amount = Decimal(deduction_type.amount)
-
-                if employee_deduction:
-                    # UPDATE existing
-                    employee_deduction.amount = computed_amount
-                    employee_deduction.status = "Active"
-                    employee_deduction.save()
-                    print(f"[DEBUG] Updated deduction for {employee.fname}")
-                else:
-                    # CREATE new deduction
-                    Employee_Deduction.objects.create(
-                        employee=employee,
-                        deduction_type=deduction_type,
-                        amount=computed_amount,
-                        frequency="Per Period",
-                        effective_from=now().date(),
-                        status="Active",
-                    )
+                # If it exists but is inactive, reactivate and update amount
+                if not created and deduction.status != "Active":
+                    deduction.status = "Active"
+                    if deduction_type.calculation_type == "Percent":
+                        deduction.amount = round(salary * Decimal(deduction_type.amount) / Decimal("100"), 2)
+                    else:
+                        deduction.amount = Decimal(deduction_type.amount)
+                    deduction.save(update_fields=['status', 'amount'])
+                    print(f"[DEBUG] Reactivated deduction for {employee.fname}")
+                elif created:
                     print(f"[DEBUG] Created deduction for {employee.fname}")
-
+                else:
+                    # Already active and correct → optionally update amount if Percent
+                    if deduction_type.calculation_type == "Percent":
+                        deduction.amount = round(salary * Decimal(deduction_type.amount) / Decimal("100"), 2)
+                        deduction.save(update_fields=['amount'])
             else:
-                # OUTSIDE RANGE → deactivate if exists
-                if employee_deduction:
-                    employee_deduction.status = "Inactive"
-                    employee_deduction.save()
+                # Out of range → deactivate
+                if deduction.status == "Active":
+                    deduction.status = "Inactive"
+                    deduction.save(update_fields=['status'])
                     print(f"[DEBUG] Deactivated deduction for {employee.fname}")
 
 # Optional: Update only 'is_active' status

@@ -58,6 +58,8 @@ const EmployeeContributionsModal: React.FC<Props> = ({
   const [deductionTypes, setDeductionTypes] = useState<any[]>([]);
   const [enabledDeductions, setEnabledDeductions] = useState<number[]>([]);
 
+  const MANDATORY_DEDUCTIONS = ["SSS", "PHILHEALTH", "PAGIBIG"];
+
   /* -------------------- LOAD SALARY + DEDUCTIONS -------------------- */
   useEffect(() => {
     if (!open) return;
@@ -91,27 +93,37 @@ const EmployeeContributionsModal: React.FC<Props> = ({
   /* -------------------- SUBMIT -------------------- */
   const submit = async () => {
     try {
-      const values = await form.validateFields();
-      const effectiveFrom = values.effective_from.format("YYYY-MM-DD");
+      const values = form.getFieldsValue();
 
       const deductions = deductionTypes
-        .filter(d => enabledDeductions.includes(d.id))
+        .filter(d => enabledDeductions.includes(d.id) || MANDATORY_DEDUCTIONS.includes(d.code))
         .map((d, index) => {
-          const amount = form.getFieldValue(["system_deductions", index, "amount"]);
-          const frequency = form.getFieldValue(["system_deductions", index, "frequency"]);
+          const amount = values.system_deductions?.[index]?.amount;
+          const frequency = values.system_deductions?.[index]?.frequency;
+
+          // Only mandatory deductions must have values
+          if (MANDATORY_DEDUCTIONS.includes(d.code) && (amount === undefined || frequency === undefined)) {
+            throw new Error(`Please complete amount and frequency for ${d.code}`);
+          }
+
+          // skip non-mandatory deductions that are empty
+          if (!MANDATORY_DEDUCTIONS.includes(d.code) && (amount === undefined || frequency === undefined)) {
+            return null;
+          }
 
           return {
             deduction_type: d.id,
             amount,
             frequency,
-            effective_from: effectiveFrom,
+            effective_from: values.effective_from.format("YYYY-MM-DD"),
             status: "Active",
           };
-        });
+        })
+        .filter(Boolean); // remove nulls
 
       onNext(deductions);
-    } catch {
-      message.error("Please complete required fields");
+    } catch (err: any) {
+      message.error(err.message || "Please complete required fields");
     }
   };
 
@@ -127,7 +139,8 @@ const EmployeeContributionsModal: React.FC<Props> = ({
         <Divider>Government Contributions</Divider>
 
         {deductionTypes.map((d, index) => {
-          const isEnabled = enabledDeductions.includes(d.id);
+          const isMandatory = MANDATORY_DEDUCTIONS.includes(d.code);
+          const isEnabled = enabledDeductions.includes(d.id) || isMandatory;
 
           return (
             <div
@@ -145,47 +158,55 @@ const EmployeeContributionsModal: React.FC<Props> = ({
                 name={["system_deductions", index, "amount"]}
                 label={`${d.code} (${d.calculation_type})`}
                 initialValue={d.computed_amount}
-                rules={
-                  isEnabled
-                    ? [{ required: true, message: "Please enter amount" }]
-                    : []
-                }
+                rules={[
+                  {
+                    required: isMandatory,
+                    message: `Please enter amount for ${d.code}`,
+                  },
+                ]}
               >
                 <InputNumber
                   style={{ width: "100%" }}
                   min={0}
                   step={0.01}
-                  disabled={!isEnabled}
+                  disabled={!isEnabled && !isMandatory}
                 />
               </Form.Item>
 
-              {/* Frequency Select */}
               <Form.Item
                 name={["system_deductions", index, "frequency"]}
                 label="Frequency"
                 initialValue={d.frequency}
-                rules={isEnabled ? [{ required: true, message: "Please select frequency" }] : []}
+                rules={[
+                  {
+                    required: isMandatory,
+                    message: `Please select frequency for ${d.code}`,
+                  },
+                ]}
               >
-                <Select disabled={!isEnabled} style={{ width: "100%" }}>
+                <Select disabled={!isEnabled && !isMandatory} style={{ width: "100%" }}>
                   <Option value="Monthly">Monthly</Option>
                   <Option value="Per Period">Per Period</Option>
                   <Option value="One Time">One Time</Option>
                 </Select>
               </Form.Item>
 
-              <Button
-                danger={isEnabled}
-                type="link"
-                onClick={() =>
-                  setEnabledDeductions(prev =>
-                    isEnabled
-                      ? prev.filter(id => id !== d.id)
-                      : [...prev, d.id]
-                  )
-                }
-              >
-                {isEnabled ? "Remove" : "Add"}
-              </Button>
+              {/* Remove button only for non-mandatory */}
+              {!isMandatory && (
+                <Button
+                  danger={isEnabled}
+                  type="link"
+                  onClick={() =>
+                    setEnabledDeductions(prev =>
+                      isEnabled
+                        ? prev.filter(id => id !== d.id)
+                        : [...prev, d.id]
+                    )
+                  }
+                >
+                  {isEnabled ? "Remove" : "Add"}
+                </Button>
+              )}
             </div>
           );
         })}

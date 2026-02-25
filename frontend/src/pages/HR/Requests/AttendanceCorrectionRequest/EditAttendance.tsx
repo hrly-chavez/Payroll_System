@@ -1,10 +1,11 @@
 //src/pages/HR/Requests/AttendanceCorrectionRequest/EditAttendance.tsx
 import React, { useEffect, useState } from "react";
-import { Modal, Form, DatePicker, Select, Alert, message } from "antd";
+import { Modal, Form, DatePicker, Select, Alert, message, Divider, Checkbox } from "antd";
+
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import api from "../../../../api/axios";
-
+import CreateAttendance, { type EventRow } from "./CreateAttendance";
 type AttendanceMini = {
   id: number;
   date: string;
@@ -51,6 +52,8 @@ const EditAttendance: React.FC<Props> = ({ open, correctionId, onClose, onApplie
   const [status, setStatus] = useState<AttendanceMini["status"]>("PRESENT");
   const [timeIn, setTimeIn] = useState<Dayjs | null>(null);
   const [timeOut, setTimeOut] = useState<Dayjs | null>(null);
+  const [events, setEvents] = useState<EventRow[]>([]);
+  const [replaceEvents, setReplaceEvents] = useState(false);
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -91,7 +94,17 @@ const EditAttendance: React.FC<Props> = ({ open, correctionId, onClose, onApplie
         status,
         time_in: timeIn ? timeIn.toISOString() : null,
         time_out: timeOut ? timeOut.toISOString() : null,
-      });
+        replace_events: replaceEvents,
+        events: (events || []).map((e) => ({
+            type: e.type,
+            minutes: e.minutes ?? 0,
+            start_time: e.start_time ? dayjs(e.start_time).format("HH:mm:ss") : null,
+            end_time: e.end_time ? dayjs(e.end_time).format("HH:mm:ss") : null,
+            approval_status: e.approval_status || "Approved",
+            event_remarks: (e.event_remarks || "").trim(),
+            // holiday_id: optional, add later when you build holiday picker
+        })),
+        });
 
       message.success("Attendance updated and request verified.");
       onApplied();
@@ -105,20 +118,26 @@ const EditAttendance: React.FC<Props> = ({ open, correctionId, onClose, onApplie
 
   return (
     <Modal
-      open={open}
-      title="Apply Attendance Correction"
-      onCancel={onClose}
-      onOk={handleApply}
-      okText="Apply & Verify"
-      confirmLoading={applyLoading}
-      destroyOnClose
-    >
+        open={open}
+        title="Apply Attendance Correction"
+        onCancel={onClose}
+        onOk={handleApply}
+        okText="Apply & Verify"
+        confirmLoading={applyLoading}
+        destroyOnClose
+        width={800}
+        bodyStyle={{
+            maxHeight: "70vh",
+            overflowY: "auto",
+            paddingRight: 8,
+        }}
+        >
       {errorMsg && <Alert type="error" showIcon message={errorMsg} style={{ marginBottom: 12 }} />}
 
       {detail && (
         <div style={{ marginBottom: 12 }}>
           <div><b>Employee:</b> {detail.employee_name}</div>
-          <div><b>Date:</b> {dayjs(detail.date).format("MMM DD, YYYY")}</div>
+          <div><b>Date:</b> {detail.date ? dayjs(detail.date).format("MMM DD, YYYY") : "—"}</div>
           <div><b>Issue:</b> {detail.issue_type}</div>
           <div><b>Reason:</b> {detail.reason}</div>
           {detail.file_attached ? (
@@ -172,6 +191,24 @@ const EditAttendance: React.FC<Props> = ({ open, correctionId, onClose, onApplie
             disabled={loading}
           />
         </Form.Item>
+        <Divider />
+
+            <Form.Item label="Attendance Events">
+            <Checkbox
+                checked={replaceEvents}
+                onChange={(e) => setReplaceEvents(e.target.checked)}
+                disabled={loading}
+            >
+                Replace existing events
+            </Checkbox>
+
+            <div style={{ marginTop: 12 }}>
+                <CreateAttendance
+                disabled={loading}
+                onChange={setEvents}
+                />
+            </div>
+            </Form.Item>
       </Form>
     </Modal>
   );

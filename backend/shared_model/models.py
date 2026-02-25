@@ -473,7 +473,7 @@ class Attendance_Correction(models.Model):
     issue_choices = [
         ("Missing Time In", "Missing Time In"),
         ("Missing Time Out", "Missing Time Out"),
-        ("Missing Both", "Missing Time In & Time Out"),
+        ("Missing Time In & Time Out", "Missing Time In & Time Out"),
         ("Wrong Time In", "Wrong Time In"),
         ("Wrong Time Out", "Wrong Time Out"),
         ("WRONG_BOTH", "Wrong Time In & Time Out"),
@@ -487,7 +487,7 @@ class Attendance_Correction(models.Model):
     ]
 
     id = models.AutoField(primary_key=True)
-    date = models.DateField()
+    date = models.DateField(null=True,blank=True)
     issue_type = models.CharField(max_length=40, choices=issue_choices)
     reason = models.TextField()
     # Supports images + pdf + docs

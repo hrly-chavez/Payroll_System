@@ -400,22 +400,16 @@ class AdminAttendanceCorrectionDetailView(APIView):
 
 class AdminApplyAttendanceCorrectionView(APIView):
     """
-    HR/Admin applies the correction by editing the Attendance record.
-    POST /api/attendance/admin/corrections/<id>/apply/
-    Body: { status?, time_in?, time_out? }
+    HR/Admin applies the correction by editing the Attendance record,
+    and can optionally create Attendance_Event rows in the same request.
 
-    Behavior:
-    - updates Attendance fields
-    - sets correction status to Verified
-    - sets reviewed_by/reviewed_at
+    POST /api/attendance/admin/corrections/<id>/apply/
+    Body: { status?, time_in?, time_out?, replace_events?, events?: [] }
     """
     permission_classes = [IsAuthenticated, IsRole]
     allowed_roles = ["ADMIN", "SUPER_ADMIN"]
 
     def post(self, request, pk: int):
-        data_ser = AttendanceCorrectionApplySerializer(data=request.data)
-        data_ser.is_valid(raise_exception=True)
-
         try:
             obj = Attendance_Correction.objects.select_related(
                 "attendance", "requested_by"
@@ -426,21 +420,67 @@ class AdminApplyAttendanceCorrectionView(APIView):
         if obj.status != "Pending":
             raise ValidationError({"detail": "This request is already processed."})
 
+        # IMPORTANT: pass correction in serializer context for issue_type-aware validation
+        data_ser = AttendanceCorrectionApplySerializer(
+            data=request.data,
+            context={"request": request, "correction": obj},
+        )
+        data_ser.is_valid(raise_exception=True)
+
         attendance = obj.attendance
         changes = data_ser.validated_data
 
+        created_events = []
+
         with transaction.atomic():
             # Apply Attendance edits
+            attendance_update_fields = []
+
             if "status" in changes:
                 attendance.status = changes["status"]
+                attendance_update_fields.append("status")
 
             if "time_in" in changes:
                 attendance.time_in = changes["time_in"]
+                attendance_update_fields.append("time_in")
 
             if "time_out" in changes:
                 attendance.time_out = changes["time_out"]
+                attendance_update_fields.append("time_out")
 
-            attendance.save(update_fields=["status", "time_in", "time_out"])
+            if attendance_update_fields:
+                attendance.save(update_fields=attendance_update_fields)
+
+            # Optional: replace existing events
+            replace_events = bool(changes.get("replace_events", False))
+            events_payload = changes.get("events") or []
+
+            if replace_events:
+                Attendance_Event.objects.filter(attendance=attendance).delete()
+
+            if events_payload:
+                for e in events_payload:
+                    holiday_obj = None
+                    holiday_id = e.get("holiday_id")
+                    if holiday_id:
+                        holiday_obj = Holiday.objects.filter(id=holiday_id).first()
+
+                    remarks = (e.get("event_remarks") or "").strip()
+                    if not remarks:
+                        remarks = f"Added via correction #{obj.id}"
+
+                    ev = Attendance_Event.objects.create(
+                        attendance=attendance,
+                        type=e["type"],  # force required
+                        minutes=e.get("minutes") or 0,
+                        start_time=e.get("start_time"),
+                        end_time=e.get("end_time"),
+                        approval_status=e.get("approval_status") or "Approved",
+                        event_remarks=remarks,
+                        approved_by=request.user,
+                        holiday=holiday_obj,
+                    )
+                    created_events.append(ev)
 
             # Mark correction verified (applied)
             obj.status = "Verified"
@@ -454,7 +494,7 @@ class AdminApplyAttendanceCorrectionView(APIView):
                 "detail": "Attendance correction applied and verified.",
                 "correction": AttendanceCorrectionListSerializer(obj).data,
                 "attendance": AttendanceMiniSerializer(attendance).data,
+                "created_event_count": len(created_events),
             }
-        )
-    
+        )  
 

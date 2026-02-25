@@ -106,7 +106,7 @@ const AttendanceCorrectionRequest: React.FC = () => {
       {
         title: "Date",
         dataIndex: "date",
-        render: (v: string) => dayjs(v).format("MMM DD, YYYY"),
+        render: (v: string | null) => (v ? dayjs(v).format("MMM DD, YYYY") : "—"),
       },
       {
         title: "Issue Type",

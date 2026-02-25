@@ -1,4 +1,4 @@
-// index.tsx
+//src/ index.tsx
 import 'antd/dist/reset.css'; // for Ant Design v5+
 import './index.css';
 import React from 'react';

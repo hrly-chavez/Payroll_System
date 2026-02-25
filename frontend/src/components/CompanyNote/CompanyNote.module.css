@@ -13,7 +13,6 @@
 }
 
 .noteCard :global(.ant-card-head-title) {
-  font-weight: 650;
   color: #ffff !important;}
 
 .noteCard :global(.ant-card-body) {
@@ -40,7 +39,6 @@
   border-color: #fff !important;
   color: #aecdde !important;
   border-radius: 8px;
-  font-weight: 600;
 }
 
 .addButton:hover {

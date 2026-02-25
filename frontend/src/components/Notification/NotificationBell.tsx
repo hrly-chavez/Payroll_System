@@ -11,7 +11,11 @@ export default function NotificationBell({ count }: NotificationBellProps) {
   const navigate = useNavigate();
 
   return (
-    <Badge count={count} size="small">
+    <Badge
+      count={count}
+      size="small"
+      offset={[-10, 2]}  
+    >
       <BellFilled
         className={styles.bell}
         onClick={() => navigate("/notification")}

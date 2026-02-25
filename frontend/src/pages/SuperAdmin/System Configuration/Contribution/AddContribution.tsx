@@ -22,9 +22,10 @@ const sanitizeNumeric = (value: string) => {
 
 // ✅ Deduction code sanitizer: allow only letters, numbers, underscore, hyphen
 const sanitizeCode = (value: string) => {
-  return value.replace(/[^A-Za-z0-9_-]/g, "");
+  return value
+    .toUpperCase()              // optional: force uppercase
+    .replace(/[^A-Z]/g, "");    // ❌ remove numbers, spaces, special chars
 };
-
 const numericValidator = (_: any, value: string) => {
   if (value === undefined || value === null || value === "") {
     return Promise.resolve(); // required rule handles empties
@@ -133,13 +134,33 @@ export default function AddContribution({
     >
       <Form form={form} layout="vertical">
         {/* ✅ NOTE: Use "code" here if backend expects "code" */}
-        <Form.Item
-          label="Deductions (Code)"
-          name="code"
-          rules={[{ required: true, message: "Deduction code is required." }]}
-        >
-          <Input placeholder="Enter deduction code" />
-        </Form.Item>
+      <Form.Item
+        label="Deductions (Code)"
+        name="code"
+        rules={[
+          { required: true, message: "Deduction code is required." },
+          {
+            pattern: /^[A-Za-z]+$/,
+            message: "Only letters are allowed (no numbers or special characters).",
+          },
+        ]}
+      >
+        <Input
+          placeholder="Enter deduction code"
+          maxLength={20}
+          onChange={(e) => {
+            const cleaned = sanitizeCode(e.target.value);
+            form.setFieldsValue({ code: cleaned });
+          }}
+          onPaste={(e) => {
+            e.preventDefault();
+            const pasted = e.clipboardData.getData("text");
+            const cleaned = sanitizeCode(pasted);
+            const current = form.getFieldValue("code") || "";
+            form.setFieldsValue({ code: sanitizeCode(current + cleaned) });
+          }}
+        />
+      </Form.Item>
 
         <Form.Item
           label="Category"

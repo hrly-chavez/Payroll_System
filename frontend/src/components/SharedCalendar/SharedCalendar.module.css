@@ -17,7 +17,13 @@
   height: 100% !important;
   width: 100% !important;
   background: transparent !important;
+  border-radius: 0 !important;
 }
+
+:global(.ant-picker-cell) {
+  padding: 0 !important;
+}
+
 
 :global(.ant-picker-cell-selected .ant-picker-cell-inner) {
   background: rgba(56, 111, 164, 0.12) !important;
@@ -29,7 +35,7 @@
 
 /* Softer grid */
 :global(.ant-picker-content td) {
-  border: 1px solid rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(15, 23, 42, 0.16);
   transition: background 150ms ease, box-shadow 150ms ease;
 }
 
@@ -44,7 +50,7 @@
 
 :global(.ant-picker-cell-today .ant-picker-cell-inner) {
   border: 2px solid #386fa4 !important;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 :global(.ant-picker-content th) {
@@ -62,7 +68,7 @@
   padding: 6px;
   display: flex;
   flex-direction: column;
-  border-radius: 8px;
+  border-radius: 0 !important;
   transition: background 120ms ease;
 }
 
@@ -74,14 +80,8 @@
   position: absolute;
   top: 6px;
   left: 8px;
-  font-size: 13px;
+  font-size: 12px;
   color: #0f172a;
-}
-
-/* Today styling */
-:global(.ant-picker-cell-today .ant-picker-cell-inner) {
-  border: 2px solid #386fa4 !important;
-  border-radius: 8px;
 }
 
 /* =========================================
@@ -90,12 +90,13 @@
 
 .attendanceSplit {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: 8px;
+  left: 20%;
+  width: 60%;
+  height: 12px;
   display: flex;
-  height: 40%;
-  pointer-events: none;
+  border-radius: 4px;
+  overflow: hidden;
 }
 
 .timeInHalf {
@@ -110,20 +111,6 @@
 
 .attendanceCard {
   position: relative;
-}
-
-.attendanceCard::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 4px;
-  width: 100%;
-  background: linear-gradient(
-    90deg,
-    #386fa4,
-    #4f8ac9
-  );
 }
 
 /* =========================================

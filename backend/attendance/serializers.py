@@ -360,6 +360,36 @@ class AttendanceCorrectionDetailSerializer(serializers.ModelSerializer):
         dept = getattr(obj.requested_by, "department", None)
         return getattr(dept, "name", None)
 
+# =========================
+# Attendance Event (Create)
+# =========================
+class AttendanceEventCreateSerializer(serializers.Serializer):
+    type = serializers.ChoiceField(choices=[c[0] for c in Attendance_Event.TYPE_CHOICES])
+    minutes = serializers.IntegerField(required=False, min_value=0)
+    start_time = serializers.TimeField(required=False, allow_null=True)
+    end_time = serializers.TimeField(required=False, allow_null=True)
+    approval_status = serializers.ChoiceField(
+        choices=[c[0] for c in Attendance_Event.APPROVAL_STATUS_CHOICES],
+        required=False
+    )
+    event_remarks = serializers.CharField(required=False, allow_blank=True)
+    holiday_id = serializers.IntegerField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        start_time = attrs.get("start_time")
+        end_time = attrs.get("end_time")
+
+        if start_time and end_time and end_time < start_time:
+            raise serializers.ValidationError(
+                {"end_time": "end_time must be later than or equal to start_time."}
+            )
+
+        return attrs
+
+
+# =========================
+# Attendance Correction (Apply)
+# =========================
 class AttendanceCorrectionApplySerializer(serializers.Serializer):
     status = serializers.ChoiceField(
         choices=["PRESENT", "ABSENT", "HALF_DAY", "REST_DAY", "HOLIDAY"],
@@ -367,6 +397,10 @@ class AttendanceCorrectionApplySerializer(serializers.Serializer):
     )
     time_in = serializers.DateTimeField(required=False, allow_null=True)
     time_out = serializers.DateTimeField(required=False, allow_null=True)
+
+    # NEW
+    replace_events = serializers.BooleanField(required=False, default=False)
+    events = AttendanceEventCreateSerializer(many=True, required=False)
 
     def validate(self, attrs):
         time_in = attrs.get("time_in", None)
@@ -378,8 +412,17 @@ class AttendanceCorrectionApplySerializer(serializers.Serializer):
                 {"time_out": "time_out must be later than or equal to time_in."}
             )
 
-        # Require at least one change
-        if "status" not in attrs and "time_in" not in attrs and "time_out" not in attrs:
+        # Require at least one change: attendance edits OR events
+        has_core_change = any(k in attrs for k in ["status", "time_in", "time_out"])
+        has_events = "events" in attrs and len(attrs.get("events") or []) > 0
+
+        if not has_core_change and not has_events:
             raise serializers.ValidationError({"detail": "No changes provided."})
 
+        # Explicit: Missing Both allows null/null time_in/time_out
+        correction = self.context.get("correction")
+        if correction and getattr(correction, "issue_type", None) == "Missing Both":
+            return attrs
+
         return attrs
+

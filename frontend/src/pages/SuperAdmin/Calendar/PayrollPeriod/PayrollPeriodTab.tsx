@@ -1,4 +1,3 @@
-// src/pages/SuperAdmin/Calendar/PayrollPeriod/PayrollPeriodTab.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";

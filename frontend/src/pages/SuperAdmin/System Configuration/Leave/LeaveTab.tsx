@@ -34,7 +34,6 @@ export default function LeaveTab({ active }: Props) {
     if (data.detail) return data.detail;
     if (data.message) return data.message;
 
-    // Field errors: { field: ["msg"] }
     if (typeof data === "object") {
       const firstKey = Object.keys(data)[0];
       const val = (data as any)[firstKey];
@@ -61,7 +60,6 @@ export default function LeaveTab({ active }: Props) {
   useEffect(() => {
     if (!active) return;
     fetchLeaveTypes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
   const openLeaveModal = () => {
@@ -131,7 +129,6 @@ export default function LeaveTab({ active }: Props) {
             <tr>
               <th>Name</th>
               <th>Paid?</th>
-              
               <th>Requires Approval</th>
               <th>Active</th>
               <th>Actions</th>

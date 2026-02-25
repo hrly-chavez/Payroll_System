@@ -94,8 +94,9 @@ const AddHolidayPolicy = ({ open, onClose, refresh }: Props) => {
         >
           <Select placeholder="Select holiday type">
             <Option value="Regular">Regular</Option>
-            <Option value="Special">Special</Option>
-            <Option value="Company">Company</Option>
+            <Option value="Special Non-Working">Special Non-Working</Option>
+            <Option value="Special Working">Special Working</Option>
+            <Option value="Company Holiday">Company Holiday</Option>
           </Select>
         </Form.Item>
 

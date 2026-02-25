@@ -28,15 +28,9 @@ class HolidaySerializer(serializers.ModelSerializer):
 
         return attrs
 
-
-#  allow letters, numbers, spaces, underscore, hyphen ONLY
-# (blocks special chars like @#$%^&*(){}[];:'" etc.)
 LEAVE_NAME_REGEX = re.compile(r"^[A-Za-z0-9 _-]+$")
 
-
-# serializers.py
 class LeaveTypeSerializer(serializers.ModelSerializer):
-    # Explicitly declare the field so we control messages
     name = serializers.CharField(
         max_length=20,
         error_messages={
@@ -60,7 +54,6 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
     def validate_name(self, value):
         name = (value or "").strip()
 
-        #  allow letters, numbers, spaces, underscore, hyphen only
         if not name:
             raise serializers.ValidationError("Leave name is required.")
 
@@ -69,7 +62,6 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
                 "Leave name can only contain letters, numbers, spaces, underscore (_) and hyphen (-)."
             )
 
-        #  custom UNIQUE message (case-insensitive)
         qs = Leave_Type.objects.filter(name__iexact=name)
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
@@ -78,13 +70,6 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("A leave type with this name already exists.")
 
         return name
-        #     "id",
-        #     "name",
-        #     "is_paid",
-        #     "requires_approval",
-        #     "is_active",
-        #     "created_at",
-        # ]
 
     def create(self, validated_data):
         # Create instance in memory without saving _current_user as a field
@@ -157,10 +142,8 @@ class CommissionTypeSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         user = request.user if request and request.user.is_authenticated else None
 
-        # DO NOT use objects.create()
         instance = Commission_Type(**validated_data)
 
-        # Attach BEFORE save so signal sees it
         if user:
             instance._current_user = user
 
@@ -174,7 +157,6 @@ class CommissionTypeSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
-        # Attach BEFORE save
         if user:
             instance._current_user = user
 
@@ -198,13 +180,11 @@ class AllowanceTypeSerializer(serializers.ModelSerializer):
     def validate_name(self, value):
         name = (value or "").strip()
 
-        #  Letters + spaces only
         if not re.fullmatch(r"[A-Za-z ]+", name):
             raise serializers.ValidationError(
                 "Allowance type name must contain letters and spaces only."
             )
 
-        #  Case-insensitive unique check (with custom message)
         qs = Allowance_Type.objects.filter(name__iexact=name)
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
@@ -216,20 +196,17 @@ class AllowanceTypeSerializer(serializers.ModelSerializer):
 
         return name
 
-#holiday policy
 class HolidayPolicySerializer(serializers.ModelSerializer):
     class Meta:
-        model = HolidayPolicy  # replace with your actual model
+        model = HolidayPolicy  
         fields = "__all__"
 
     def create(self, validated_data):
         request = self.context.get("request")
         user = request.user if request and request.user.is_authenticated else None
 
-        # DO NOT use objects.create()
         instance = HolidayPolicy(**validated_data)
 
-        # Attach _current_user BEFORE saving
         if user:
             instance._current_user = user
 
@@ -240,11 +217,9 @@ class HolidayPolicySerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         user = request.user if request and request.user.is_authenticated else None
 
-        # Update fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
-        # Attach _current_user BEFORE saving
         if user:
             instance._current_user = user
 

@@ -34,8 +34,8 @@ const { Content } = Layout;
 
 interface AddressData {
   id: number;
-  province: number;       // FK ID
-  province_name: string;  // the name we want to display
+  province: number;       
+  province_name: string;  
   city: number;
   city_name: string;
   barangay: number;
@@ -207,7 +207,7 @@ const EmployeeDetailsPage: React.FC = () => {
 
       const tableData = response.data.map((item: any) => ({
         key: item.id,
-        name: item.name, // ✅ already resolved by backend
+        name: item.name, 
         amount: `₱${Number(item.amount).toLocaleString()}`,
         frequency: item.frequency,
         effective_from: item.effective_from,
@@ -231,7 +231,7 @@ const EmployeeDetailsPage: React.FC = () => {
 
     fetchAllowances(empIdNum);
     fetchSalaries(empIdNum);
-    fetchDeductions(empIdNum); // ADD THIS
+    fetchDeductions(empIdNum); 
   }, [employeeId]);
 
   // ======================
@@ -290,7 +290,7 @@ const EmployeeDetailsPage: React.FC = () => {
       title: "Salary Amount",
       dataIndex: "base_rate",
       key: "base_rate",
-      render: (val: number) => `₱${val.toLocaleString()}`, // format with commas
+      render: (val: number) => `₱${val.toLocaleString()}`, 
     },
     {
       title: "Salary Type",

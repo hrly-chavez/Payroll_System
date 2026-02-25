@@ -11,7 +11,6 @@ type Props = {
 
 const NAME_MAX = 50;
 
-// allow letters, numbers, spaces, and common punctuation: . , & - ( )
 const NAME_PATTERN = /^[a-zA-Z0-9\s.,&()\-]+$/;
 
 const AddCommissionType: React.FC<Props> = ({
@@ -55,7 +54,7 @@ const AddCommissionType: React.FC<Props> = ({
       open={open}
       title={title}
       onCancel={onCancel}
-      onOk={() => form.submit()} // submit form to ensure validators run
+      onOk={() => form.submit()} 
       okText="Save"
       destroyOnClose
     >
@@ -63,16 +62,13 @@ const AddCommissionType: React.FC<Props> = ({
         form={form}
         layout="vertical"
         onFinish={(values) => {
-          // normalize before sending
           const payload = {
             ...values,
             name: values.name?.trim(),
           };
 
-          // set normalized values back (optional)
           form.setFieldsValue(payload);
 
-          // call parent onOk (your parent should read form values / submit via axios)
           onOk();
         }}
       >

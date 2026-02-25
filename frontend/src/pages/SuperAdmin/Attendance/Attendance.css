@@ -6,8 +6,6 @@
   margin: 16px;
 }
 
-/* Stats cards */
-
 .stats-row {
   margin-bottom: 16px;
 }
@@ -69,7 +67,6 @@
   border-left: 6px solid transparent;
 }
 
-/* Present */
 .presentCard {
   border-left-color: #2e7d32;
 }
@@ -78,7 +75,6 @@
   color: #2e7d32;
 }
 
-/* Late */
 .lateCard {
   border-left-color: #f57c00;
 }
@@ -87,7 +83,6 @@
   color: #f57c00;
 }
 
-/* Absent */
 .absentCard {
   border-left-color: #c62828;
 }
@@ -96,7 +91,6 @@
   color: #c62828;
 }
 
-/* Pending */
 .pendingCard {
   border-left-color: #1976d2;
 }

@@ -1,16 +1,5 @@
 import React from "react";
-import {
-  Modal,
-  Form,
-  Input,
-  TimePicker,
-  InputNumber,
-  Switch,
-  message,
-  Row,
-  Col,
-  Divider,
-  Tag,
+import {Modal,Form,Input,TimePicker,InputNumber,Switch,message,Row,Col,Divider,Tag,
 } from "antd";
 import api from "../../../../api/axios";
 import dayjs from "dayjs";
@@ -27,10 +16,8 @@ const DAYS = [
   { label: "Sun", value: 7 },
 ];
 
-// ✅ Shift name: letters + spaces only (no numbers, no special chars)
 const SHIFT_NAME_REGEX = /^[A-Za-z]+(?:\s[A-Za-z]+)*$/;
 
-// ✅ Block letters/special chars for InputNumber (v6-safe)
 const allowOnlyDigitsKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
   const navKeys = [
     "Backspace",
@@ -78,7 +65,6 @@ const AddShift = ({ open, onClose, refresh }: any) => {
       })),
     };
 
-    // remove helper field
     delete payload.workdays_selected;
 
     await api.post("attendance/shifts/", payload);
@@ -119,7 +105,7 @@ const AddShift = ({ open, onClose, refresh }: any) => {
             {
               validator: (_, value) => {
                 const v = (value ?? "").trim();
-                if (!v) return Promise.resolve(); // required handles empty
+                if (!v) return Promise.resolve();
                 if (!SHIFT_NAME_REGEX.test(v)) {
                   return Promise.reject(
                     new Error("Shift name must contain letters and spaces only.")
@@ -140,7 +126,6 @@ const AddShift = ({ open, onClose, refresh }: any) => {
               label="Start Time"
               rules={[{ required: true, message: "Start time is required" }]}
             >
-              {/* ✅ More user-friendly time picker */}
               <TimePicker
                 style={{ width: "100%" }}
                 use12Hours
@@ -181,7 +166,6 @@ const AddShift = ({ open, onClose, refresh }: any) => {
                 { type: "number", min: 0, message: "Break minutes must be 0 or higher." },
               ]}
             >
-              {/* ✅ integers only, blocks alphabets + special chars */}
               <InputNumber
                 min={0}
                 precision={0}
@@ -221,7 +205,6 @@ const AddShift = ({ open, onClose, refresh }: any) => {
 
         <Divider style={{ margin: "12px 0" }} />
 
-        {/* ✅ Workdays selector */}
         <Form.Item
           name="workdays_selected"
           label="Workdays (click to toggle)"

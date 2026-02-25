@@ -53,10 +53,10 @@ export default function AddPayRules({
     ? "Example: 1 = 100% of base (daily_rate/hourly_rate), 1.5 = 150%"
     : "Enter exact peso amount based on rate type (e.g., ₱10 per minute).";
 
-  // ✅ detect edit mode based on modal title (simple + no prop changes)
+  //  detect edit mode based on modal title (simple + no prop changes)
   const isEditMode = title.toLowerCase().includes("edit");
 
-  // ✅ Date disabling logic
+  //  Date disabling logic
   const today = dayjs().startOf("day");
 
   // Disable past dates (already done)
@@ -105,38 +105,36 @@ export default function AddPayRules({
       width={650}
     >
       <Form form={form} layout="vertical">
-      <Form.Item
-        label="Rule Name"
-        name="name"
-        rules={[
-          { required: true, message: "Rule name is required" },
-          {
-            validator: (_, value) => {
-              if (!value) return Promise.resolve();
+        <Form.Item
+          label="Rule Name"
+          name="name"
+          rules={[
+            { required: true, message: "Rule name is required" },
+            {
+              validator: (_, value) => {
+                if (!value) return Promise.resolve();
 
-              // ✅ allow letters and spaces only
-              const valid = /^[A-Za-z\s]+$/.test(value);
+                const valid = /^[A-Za-z\s]+$/.test(value);
 
-              if (!valid) {
-                return Promise.reject(
-                  new Error("Only alphabetical characters are allowed.")
-                );
-              }
+                if (!valid) {
+                  return Promise.reject(
+                    new Error("Only alphabetical characters are allowed.")
+                  );
+                }
 
-              return Promise.resolve();
+                return Promise.resolve();
+              },
             },
-          },
-        ]}
-      >
-        <Input
-          placeholder="Enter rule name"
-          onChange={(e) => {
-            // ✅ auto-clean invalid characters while typing
-            const cleaned = e.target.value.replace(/[^A-Za-z\s]/g, "");
-            form.setFieldsValue({ name: cleaned });
-          }}
-        />
-      </Form.Item>
+          ]}
+        >
+          <Input
+            placeholder="Enter rule name"
+            onChange={(e) => {
+              const cleaned = e.target.value.replace(/[^A-Za-z\s]/g, "");
+              form.setFieldsValue({ name: cleaned });
+            }}
+          />
+        </Form.Item>
 
         <Row gutter={12}>
           <Col span={12}>
@@ -187,85 +185,88 @@ export default function AddPayRules({
           </Col>
 
           <Col span={12}>
-<Form.Item
-  label={rateLabel}
-  name="rate_value"
-  help={rateHelp}
-  rules={[
-    {
-      required: true,
-      message: isMultiplier
-        ? "Multiplier is required"
-        : "Rate value is required",
-    },
-    {
-      validator: (_, value) => {
-        if (!value) return Promise.resolve();
+            <Form.Item
+              label={rateLabel}
+              name="rate_value"
+              help={rateHelp}
+              validateTrigger="onChange"
+              rules={[
+                {
+                  required: true,
+                  message: isMultiplier
+                    ? "Multiplier is required"
+                    : "Rate value is required",
+                },
+                {
+                  validator: (_, value) => {
+                    // allow required rule to handle empty
+                    if (
+                      value === undefined ||
+                      value === null ||
+                      value === ""
+                    ) {
+                      return Promise.resolve();
+                    }
 
-        const valid = /^\d+(\.\d+)?$/.test(value);
+                    const numeric = Number(value);
 
-        if (!valid) {
-          return Promise.reject(
-            new Error("Only numbers and one decimal point are allowed.")
-          );
-        }
+                    if (isNaN(numeric)) {
+                      return Promise.reject(
+                        new Error("Only numbers and one decimal point are allowed.")
+                      );
+                    }
 
-        return Promise.resolve();
-      },
-    },
-  ]}
->
-  <InputNumber<string>
-    style={{ width: "100%" }}
-    stringMode
-    min="0"
-    step={isMultiplier ? "0.0001" : "0.01"}
-    addonBefore={isMultiplier ? "x" : "₱"}
-    placeholder={isMultiplier ? "e.g. 1, 1.5, 2" : "Enter amount"}
+                    if (numeric <= 0) {
+                      return Promise.reject(
+                        new Error("The value inputted should be greater than 0.")
+                      );
+                    }
 
-    // 🔒 HARD BLOCK letters from keyboard
-    onKeyDown={(e) => {
-      const allowedKeys = [
-        "Backspace",
-        "Delete",
-        "ArrowLeft",
-        "ArrowRight",
-        "Tab",
-      ];
+                    return Promise.resolve();
+                  },
+                },
+              ]}
+            >
+              <InputNumber<string>
+                style={{ width: "100%" }}
+                stringMode
+                step={isMultiplier ? "0.0001" : "0.01"}
+                addonBefore={isMultiplier ? "x" : "₱"}
+                placeholder={isMultiplier ? "e.g. 1, 1.5, 2" : "Enter amount"}
+                onKeyDown={(e) => {
+                  const allowedKeys = [
+                    "Backspace",
+                    "Delete",
+                    "ArrowLeft",
+                    "ArrowRight",
+                    "Tab",
+                  ];
 
-      if (
-        !/[0-9.]/.test(e.key) &&
-        !allowedKeys.includes(e.key)
-      ) {
-        e.preventDefault();
-      }
-    }}
+                  if (!/[0-9.]/.test(e.key) && !allowedKeys.includes(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
+                onPaste={(e) => {
+                  const paste = e.clipboardData.getData("text");
+                  if (!/^\d+(\.\d+)?$/.test(paste)) {
+                    e.preventDefault();
+                  }
+                }}
+                parser={(value) => {
+                  if (!value) return "";
 
-    // 🔒 Clean paste input
-    onPaste={(e) => {
-      const paste = e.clipboardData.getData("text");
-      if (!/^\d+(\.\d+)?$/.test(paste)) {
-        e.preventDefault();
-      }
-    }}
+                  let cleaned = value.replace(/[^0-9.]/g, "");
 
-    parser={(value) => {
-      if (!value) return "";
+                  const parts = cleaned.split(".");
+                  if (parts.length > 2) {
+                    cleaned = parts[0] + "." + parts.slice(1).join("");
+                  }
 
-      let cleaned = value.replace(/[^0-9.]/g, "");
-
-      // allow only ONE dot
-      const parts = cleaned.split(".");
-      if (parts.length > 2) {
-        cleaned = parts[0] + "." + parts.slice(1).join("");
-      }
-
-      return cleaned;
-    }}
-
-    formatter={(value) => value ?? ""}
-  />
-</Form.Item>
+                  return cleaned;
+                }}
+                formatter={(value) => value ?? ""}
+              />
+            </Form.Item>
           </Col>
         </Row>
 
@@ -279,7 +280,9 @@ export default function AddPayRules({
                   validator(_, value) {
                     if (value && getFieldValue("employee")) {
                       return Promise.reject(
-                        new Error("Choose either Department or Employee, not both.")
+                        new Error(
+                          "Choose either Department or Employee, not both."
+                        )
                       );
                     }
                     return Promise.resolve();
@@ -293,7 +296,10 @@ export default function AddPayRules({
                 onChange={(value) => {
                   if (value) form.setFieldsValue({ employee: null });
                 }}
-                options={departments.map((d) => ({ value: d.id, label: d.name }))}
+                options={departments.map((d) => ({
+                  value: d.id,
+                  label: d.name,
+                }))}
               />
             </Form.Item>
           </Col>
@@ -307,7 +313,9 @@ export default function AddPayRules({
                   validator(_, value) {
                     if (value && getFieldValue("applies_to")) {
                       return Promise.reject(
-                        new Error("Choose either Department or Employee, not both.")
+                        new Error(
+                          "Choose either Department or Employee, not both."
+                        )
                       );
                     }
                     return Promise.resolve();
@@ -367,10 +375,12 @@ export default function AddPayRules({
           </Col>
         </Row>
 
-        {/* ✅ Removed Active checkbox in EDIT mode */}
         {!isEditMode && (
-          <Form.Item name="is_active" valuePropName="checked" initialValue={true}>
-            {/* keep default active on add (but invisible on edit) */}
+          <Form.Item
+            name="is_active"
+            valuePropName="checked"
+            initialValue={true}
+          >
           </Form.Item>
         )}
       </Form>

@@ -1,15 +1,4 @@
-import {
-  Modal,
-  Form,
-  Input,
-  TimePicker,
-  Switch,
-  message,
-  Row,
-  Col,
-  Tooltip,
-  Divider,
-  Tag,
+import {Modal,Form,Input,TimePicker,Switch,message,Row,Col,Tooltip,Divider,Tag,
 } from "antd";
 import api from "../../../../api/axios";
 import { useEffect } from "react";
@@ -27,7 +16,6 @@ const DAYS = [
   { label: "Sun", value: 7 },
 ];
 
-// ✅ helpers: block special chars for minutes (digits only)
 const digitsOnly = (v: string) => (v ?? "").replace(/[^\d]/g, "");
 const clamp999 = (v: string) => {
   const n = Number(v || 0);
@@ -40,7 +28,6 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
 
   useEffect(() => {
     if (shift) {
-      // ✅ convert existing workdays -> selected day numbers
       const selectedDays =
         Array.isArray(shift.workdays) && shift.workdays.length
           ? shift.workdays
@@ -53,7 +40,6 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
         start_time: dayjs(shift.start_time, "HH:mm"),
         end_time: dayjs(shift.end_time, "HH:mm"),
 
-        // ✅ keep ONE naming (these match your inputs below)
         break_mins: String(shift.break_minutes ?? 0),
         grace_minutes: String(shift.grace_minutes ?? 0),
 
@@ -98,7 +84,6 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
       start_time: values.start_time.format("HH:mm"),
       end_time: values.end_time.format("HH:mm"),
 
-      // ✅ ensure numbers go to backend
       break_minutes: Number(values.break_mins || 0),
       grace_minutes: Number(values.grace_minutes || 0),
 
@@ -108,7 +93,6 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
       })),
     };
 
-    // remove helper fields / local-only fields
     delete payload.workdays_selected;
     delete payload.break_mins;
 
@@ -137,7 +121,6 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
           <Input />
         </Form.Item>
 
-        {/* Start + End time side-by-side */}
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
@@ -145,7 +128,6 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
               name="start_time"
               rules={[{ required: true, message: "Start time is required" }]}
             >
-              {/* ✅ blocks typing/special chars */}
               <TimePicker use12Hours format="hh:mm A" inputReadOnly />
             </Form.Item>
           </Col>
@@ -156,13 +138,10 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
               name="end_time"
               rules={[{ required: true, message: "End time is required" }]}
             >
-              {/* ✅ blocks typing/special chars */}
               <TimePicker use12Hours format="hh:mm A" inputReadOnly />
             </Form.Item>
           </Col>
         </Row>
-
-        {/* Break + Grace minutes side-by-side */}
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
@@ -243,7 +222,6 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
 
         <Divider style={{ margin: "12px 0" }} />
 
-        {/* ✅ Workdays selector */}
         <Form.Item
           name="workdays_selected"
           label="Workdays (click to toggle)"
@@ -260,7 +238,6 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
           <WorkdayTags form={form} />
         </Form.Item>
 
-        {/* hidden fields for confirm toggle */}
         <Form.Item name="is_overnight" hidden>
           <Input />
         </Form.Item>
@@ -269,7 +246,6 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
           <Input />
         </Form.Item>
 
-        {/* Overnight + Active side by side with hover + confirm */}
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item label="Overnight">

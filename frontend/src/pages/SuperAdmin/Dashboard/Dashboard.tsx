@@ -372,8 +372,6 @@ const [overtimeLoading, setOvertimeLoading] = useState(false);
   const handleApprove = async () => updateOverTimeStatus("Approved");
   const handleDecline = async () => updateOverTimeStatus("Declined");
 
-  
-
   /* ================= RENDER ================= */
   return (
     <Layout className="dashboard-layout">

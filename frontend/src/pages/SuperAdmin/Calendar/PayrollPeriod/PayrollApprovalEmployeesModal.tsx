@@ -1,4 +1,3 @@
-// src/pages/SuperAdmin/Calendar/PayrollPeriod/PayrollApprovalEmployeesModal.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -99,14 +98,12 @@ export default function PayrollApprovalEmployeesModal({ open, periodId, onClose 
       setStatusFilter("Processing");
       setSearchText("");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, periodId]);
 
   useEffect(() => {
     if (open && periodId) {
       loadQueue();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
   const filtered = useMemo(() => {

@@ -82,7 +82,6 @@ const Allowance = ({ active }: Props) => {
     }
   }, [active]);
 
-  // ✅ Filtered + preserve newest first
   const filteredAllowances = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return allowances;

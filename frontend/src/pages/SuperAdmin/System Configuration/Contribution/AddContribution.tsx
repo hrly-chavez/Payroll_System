@@ -15,20 +15,18 @@ type Props = {
   onAmountTypeChange: (val: "manual" | "percent") => void;
 };
 
-// ✅ allow only digits, comma, dot for numeric inputs
 const sanitizeNumeric = (value: string) => {
   return value.replace(/[^\d.,]/g, "");
 };
 
-// ✅ Deduction code sanitizer: allow only letters, numbers, underscore, hyphen
 const sanitizeCode = (value: string) => {
   return value
-    .toUpperCase()              // optional: force uppercase
-    .replace(/[^A-Z]/g, "");    // ❌ remove numbers, spaces, special chars
+    .toUpperCase()              
+    .replace(/[^A-Z]/g, "");    
 };
 const numericValidator = (_: any, value: string) => {
   if (value === undefined || value === null || value === "") {
-    return Promise.resolve(); // required rule handles empties
+    return Promise.resolve(); 
   }
 
   const ok = /^(?=.*\d)[0-9.,]+$/.test(value);
@@ -41,10 +39,9 @@ const numericValidator = (_: any, value: string) => {
   return Promise.resolve();
 };
 
-// ✅ Salary Range (To) must be > 0
 const numericGreaterThanZeroValidator = (_: any, value: string) => {
   if (value === undefined || value === null || value === "") {
-    return Promise.resolve(); // required handles empties
+    return Promise.resolve();
   }
 
   const ok = /^(?=.*\d)[0-9.,]+$/.test(value);
@@ -68,10 +65,9 @@ const numericGreaterThanZeroValidator = (_: any, value: string) => {
   return Promise.resolve();
 };
 
-// ✅ Deduction code validator (blocks special characters)
 const codeValidator = (_: any, value: string) => {
   if (value === undefined || value === null || value === "") {
-    return Promise.resolve(); // required handles empties
+    return Promise.resolve(); 
   }
 
   const ok = /^[A-Za-z0-9_-]+$/.test(value);
@@ -133,7 +129,6 @@ export default function AddContribution({
       centered
     >
       <Form form={form} layout="vertical">
-        {/* ✅ NOTE: Use "code" here if backend expects "code" */}
       <Form.Item
         label="Deductions (Code)"
         name="code"

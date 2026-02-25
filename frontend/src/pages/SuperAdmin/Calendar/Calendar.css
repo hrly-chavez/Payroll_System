@@ -6,7 +6,6 @@
   margin: 16px;
 }
 
-/* Greeting */
 .greeting-card {
   background: #f0f2f5;
   padding: 12px 20px;
@@ -15,7 +14,6 @@
   font-weight: 500;
 }
 
-/* Cards */
 .card-soft {
   border-radius: 12px !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
@@ -35,17 +33,14 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-/* Top Section */
 .top-cards {
   margin-bottom: 20px;
 }
 
-/* Bottom Section */
 .bottom-section {
   margin-top: 10px;
 }
 
-/* Big Numbers */
 .big-number {
   font-size: 36px;
   font-weight: 600;

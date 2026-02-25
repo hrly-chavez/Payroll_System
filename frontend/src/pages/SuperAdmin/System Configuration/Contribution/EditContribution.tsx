@@ -9,28 +9,20 @@ type EditArgs = {
   form: any;
 };
 
-/* ================================
-   🔒 Sanitizers
-================================ */
-
-// ✅ CODE → Letters only (no numbers, no special characters, no spaces)
 const sanitizeCode = (value: any) => {
   return String(value ?? "")
     .toUpperCase()
-    .replace(/[^A-Z]/g, ""); // remove numbers + symbols + spaces
+    .replace(/[^A-Z]/g, "");
 };
 
-// ✅ NAME → Letters + spaces only
 const sanitizeName = (value: any) => {
   return String(value ?? "")
-    .replace(/[^A-Za-z ]/g, "") // remove numbers + symbols
-    .replace(/\s+/g, " ") // collapse multiple spaces
-    .replace(/^\s+/g, ""); // remove leading space
+    .replace(/[^A-Za-z ]/g, "")
+    .replace(/\s+/g, " ") 
+    .replace(/^\s+/g, ""); 
 };
 
-/* ================================
-   ✏️ Edit Contribution Handler
-================================ */
+
 
 export function editContribution({
   record,
@@ -48,7 +40,6 @@ export function editContribution({
   setAmountType(type);
 
   form.setFieldsValue({
-    // ✅ Inject sanitized values
     code: sanitizeCode(record?.code),
     name: sanitizeName(record?.name),
 

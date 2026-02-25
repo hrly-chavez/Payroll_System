@@ -43,23 +43,28 @@ const HolidayPolicy = ({ active }: Props) => {
   }, [active]);
 
   const columns = [
-    { title: "Department", dataIndex: "department" },
-    { title: "Holiday Type", dataIndex: "holiday_type" },
-    { title: "Requires Work", dataIndex: "requires_work" },
-
     {
-      title: "Status",
-      dataIndex: "is_active",
-      render: (isActive: boolean) =>
-        isActive ? (
-          <Tag color="green">Active</Tag>
+      title: "Department",
+      dataIndex: "department",
+    },
+    {
+      title: "Holiday Type",
+      dataIndex: "holiday_type",
+    },
+    {
+      title: "Requires Work",
+      dataIndex: "requires_work",
+      align: "center" as const,
+      render: (value: boolean) =>
+        value ? (
+          <Tag color="blue">Required</Tag>
         ) : (
-          <Tag color="red">Inactive</Tag>
+          <Tag color="default">Not Required</Tag>
         ),
     },
-
     {
       title: "Actions",
+      align: "center" as const,
       render: (_: any, record: any) => (
         <Space size="middle">
           <Tooltip title="Edit policy">
@@ -100,6 +105,7 @@ const HolidayPolicy = ({ active }: Props) => {
           columns={columns}
           dataSource={policies}
           style={{ marginTop: 16 }}
+          pagination={{ pageSize: 10 }}
         />
       )}
 

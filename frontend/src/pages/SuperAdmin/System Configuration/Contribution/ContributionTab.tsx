@@ -10,7 +10,6 @@ import "../SystemConfiguration.css";
 import AddContribution from "./AddContribution";
 import { editContribution } from "./EditContribution";
 
-// ✅ ADD THIS IMPORT
 import { showBackendError } from "./utils/drfErrors";
 
 type Props = {
@@ -25,12 +24,10 @@ export default function ContributionTab({ active }: Props) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [amountType, setAmountType] = useState<"manual" | "percent">("manual");
 
-  // ✅ Search
   const [search, setSearch] = useState("");
 
   const [form] = Form.useForm();
 
-  //  Map backend field names -> form field names
   const fieldMap: Record<string, string> = {
     code: "name",             
     name: "name",
@@ -40,7 +37,6 @@ export default function ContributionTab({ active }: Props) {
     amount: "amount",
   };
 
-  //  helper: "1,234.50" -> 1234.50
   const toNumber = (v: any) => {
     if (v === null || v === undefined) return null;
     const s = String(v).trim().replace(/,/g, "");
@@ -48,7 +44,6 @@ export default function ContributionTab({ active }: Props) {
     return Number.isFinite(n) ? n : null;
   };
 
-  //  ALWAYS newest first (latest added on top)
   const fetchContributions = async () => {
     setLoading(true);
     try {
@@ -71,7 +66,6 @@ export default function ContributionTab({ active }: Props) {
     setEditingId(null);
     setAmountType("manual");
     form.resetFields();
-    // clear any previous server errors
     form.setFields([{ name: "nonFieldError", errors: [] }]);
     setIsModalOpen(true);
   };
@@ -81,7 +75,6 @@ export default function ContributionTab({ active }: Props) {
     setIsEditMode(false);
     setEditingId(null);
     setAmountType("manual");
-    // clear any previous server errors
     form.setFields([{ name: "nonFieldError", errors: [] }]);
     setIsModalOpen(false);
   };
@@ -97,7 +90,6 @@ export default function ContributionTab({ active }: Props) {
     });
   };
 
-  //Confirm modal + status update
   const confirmToggleStatus = (record: any, nextStatus: boolean) => {
     const actionText = nextStatus ? "activate" : "deactivate";
 
@@ -131,7 +123,6 @@ export default function ContributionTab({ active }: Props) {
 
   const handleSaveContribution = async () => {
     try {
-      // clear server errors before validating/saving
       form.setFields([{ name: "nonFieldError", errors: [] }]);
 
       const values = await form.validateFields();
@@ -186,10 +177,8 @@ export default function ContributionTab({ active }: Props) {
         closeContributionModal();
       }
     } catch (error: any) {
-      //  AntD validation error: already shown on the form fields
       if (error?.errorFields) return;
 
-      //  Show backend real reason + highlight fields
       const res = showBackendError(error, form, fieldMap);
 
       message.error(res.toast);
@@ -219,7 +208,6 @@ export default function ContributionTab({ active }: Props) {
 
   return (
     <div className="table-wrapper">
-      {/* ✅ Search (left) + Add button (right) aligned in same row */}
       <div
         style={{
           display: "flex",

@@ -118,7 +118,7 @@ const EmployeeDetailsPage: React.FC = () => {
 
       const tableData = response.data.map((item: any) => ({
         key: item.id,
-        name: item.name, // ✅ already resolved by backend
+        name: item.name, //already resolved by backend
         amount: `₱${Number(item.amount).toLocaleString()}`,
         frequency: item.frequency,
         effective_from: item.effective_from,

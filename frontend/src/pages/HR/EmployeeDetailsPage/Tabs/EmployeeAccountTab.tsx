@@ -70,7 +70,11 @@ const EmployeeAccountTab: React.FC<Props> = ({ employeeId }) => {
   return (
     <>
       <div style={{ marginBottom: 16 }}>
-        <Button type="primary" danger={userAccount.is_active} onClick={handleToggle}>
+        <Button
+          type="primary"
+          danger
+          onClick={handleToggle}
+        >
           {userAccount.is_active ? "Deactivate" : "Activate"}
         </Button>
 

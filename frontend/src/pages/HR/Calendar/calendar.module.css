@@ -130,10 +130,14 @@
 /* Calendar cells */
 .calendarWrap :global(.ant-picker-calendar-date) {
   margin: 0 !important;
-  padding: 6px 8px !important;
-  height: 76px !important;
+  padding: 0 !important;
   border-top: 1px solid #f0f0f0;
 }
+
+.calendarWrap :global(.ant-picker-cell-inner) {
+  height: 100% !important;
+  display: block !important;
+  padding: 0 !important;}
 
 /* Day number */
 .calendarWrap :global(.ant-picker-calendar-date-value) {
@@ -144,12 +148,6 @@
 /* Today highlight */
 .calendarWrap :global(.ant-picker-calendar-date-today) {
   border-color: #386FA4 !important;
-}
-
-/* Reduce inner spacing */
-.calendarWrap :global(.ant-picker-calendar-date-content) {
-  margin-top: 6px;
-  height: auto;
 }
 
 /* =========================
@@ -216,6 +214,7 @@
   flex-shrink: 0;
 }
 
+
 /* =========================
    TABLE
 ========================= */
@@ -274,9 +273,11 @@
   font-size: 11px;
   opacity: 0.65;
 }
+
 .fullHighlight {
   position: relative;
   height: 100%;
+  width: 100%;
 }
 
 .fullHighlight::before {
@@ -284,11 +285,10 @@
   position: absolute;
   inset: 0;
   background: rgba(56, 111, 164, 0.18);
-  border-radius: 6px;
   z-index: 0;
 }
 
-/* Make inner content appear above highlight */
+/* Keep content above */
 .fullHighlight > * {
   position: relative;
   z-index: 1;

@@ -68,7 +68,6 @@
   padding: 6px;
   display: flex;
   flex-direction: column;
-  border-radius: 0 !important;
   transition: background 120ms ease;
 }
 

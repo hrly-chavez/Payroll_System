@@ -102,13 +102,21 @@
 /* ================= Cards ================= */
 
 .attendanceCard,
-.sectionCard,
 .statusCard,
 .calendarCard {
   border-radius: var(--radius-card);
   background: var(--surface);
   border: 1px solid var(--border);
   overflow: hidden;
+  min-height: 340px;
+}
+
+/* IMPORTANT: allow chart tooltip to overflow */
+.sectionCard {
+  border-radius: var(--radius-card);
+  background: #fbfcfe;
+  border: 1px solid var(--border);
+  overflow: visible;
   min-height: 340px;
 }
 

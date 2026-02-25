@@ -89,6 +89,16 @@ type PunchInEligibilityResponse = {
     title: string;
     color: string;
   };
+  type AttendanceStatsResponse = {
+    year: number;
+    month: number;
+    present: number;
+    late: number;
+    absent: number;
+    leave: number;
+    undertime: number;
+    overtime: number;
+  };
 
 const Dashboard: React.FC = () => {
   const [nowTick, setNowTick] = useState(0);
@@ -108,13 +118,17 @@ const Dashboard: React.FC = () => {
 
   const [payrollModalOpen, setPayrollModalOpen] = useState(false);
   const [selectedPayrollRow, setSelectedPayrollRow] = useState<EmployeePayrollRow | null>(null);
+  const currentYear = dayjs().year();
+  const currentMonth = dayjs().month() + 1;
+  const now = dayjs();
 
-  const [selectedMonth, setSelectedMonth] = useState(dayjs().month() + 1); // 1–12
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [selectedFilter, setSelectedFilter] = useState<
   "ALL" | "PRESENT" | "LATE" | "LEAVE" | "ABSENT" | "UNDERTIME" | "OVERTIME" >("ALL");
 
   // ===== Attendance Pie Data (6 categories + filter + safe fallback) =====
   type PieRow = { type: string; value: number };
+
 
   const rawChartData: PieRow[] = [
     { type: "Present", value: stats.present },
@@ -124,6 +138,25 @@ const Dashboard: React.FC = () => {
     { type: "Undertime", value: stats.undertime },
     { type: "Overtime", value: stats.overtime },
   ];
+  
+  const PIE_COLORS: Record<string, string> = {
+    Present: "#22c55e",
+    Late: "#f59e0b",
+    Leave: "#3b82f6",
+    Absent: "#ef4444",
+    Undertime: "#a855f7",
+    Overtime: "#14b8a6",
+    "No data": "#e5e7eb",
+  };
+
+  const PIE_ORDER = ["Present", "Late", "Leave", "Absent", "Undertime", "Overtime", "No data"];
+  useEffect(() => {
+    // safety: if selectedMonth somehow becomes > currentMonth, clamp it
+    if (selectedMonth > currentMonth) {
+      setSelectedMonth(currentMonth);
+    }
+  }, [currentMonth, selectedMonth]);
+
 
   const total = rawChartData.reduce((sum, d) => sum + d.value, 0);
 
@@ -132,80 +165,83 @@ const Dashboard: React.FC = () => {
       ? rawChartData
       : rawChartData.filter((d) => d.type.toUpperCase() === selectedFilter);
 
-  const nonZero = filtered.filter((d) => d.value > 0);
+  
 
-  const finalChartData: PieRow[] =
-    total === 0 || nonZero.length === 0
-      ? [{ type: "No data", value: 1 }]
-      : nonZero;
+  // always keep ALL categories in the data (even 0) so mapping never shifts
+  const fullData: PieRow[] =
+    selectedFilter === "ALL"
+      ? rawChartData
+      : rawChartData.filter((d) => d.type.toUpperCase() === selectedFilter);
 
-  const getPercent = (value: number) =>
-    total === 0 ? 0 : Math.round((value / total) * 100);
+  // If everything is zero, show No data
+  const fullTotal = fullData.reduce((sum, d) => sum + d.value, 0);
+
+  const chartData: PieRow[] =
+    fullTotal === 0 ? [{ type: "No data", value: 1 }] : fullData;
+
+  // keep fixed order
+  const orderedChartData = [...chartData].sort(
+    (a, b) => PIE_ORDER.indexOf(a.type) - PIE_ORDER.indexOf(b.type)
+  );
+
+  // fixed palette in the SAME order as PIE_ORDER
+  const PIE_RANGE = PIE_ORDER.map((k) => PIE_COLORS[k] || "#e5e7eb");
 
   const attendanceConfig = {
-    data: finalChartData,
+    data: orderedChartData,
     angleField: "value",
     colorField: "type",
 
-    // donut shape (like your 2nd pic)
+    // lock mapping: type -> color
+    scale: {
+      color: {
+        domain: PIE_ORDER,
+        range: PIE_RANGE,
+      },
+    },
+
     radius: 0.82,
 
-    // smooth animation + hover
-    animation: {
-      appear: {
-        animation: "wave-in",
-        duration: 800,
+    tooltip: {
+      showTitle: false,
+      customContent: (_title: string, items: any[]) => {
+        if (!items || items.length === 0) return "";
+
+        // AntV gives tooltip items; datum is usually in items[0].data
+        const it = items[0];
+        const datum = it?.data || it?.datum || {};
+        const type = String(datum.type ?? "");
+        const v = Number(datum.value ?? 0);
+
+        const denom = fullTotal === 0 ? 0 : fullTotal; // fullTotal is from your code
+        const pct = denom === 0 ? 0 : Math.round((v / denom) * 100);
+
+        return `
+          <div style="
+            padding:8px 10px;
+            font-size:12px;
+            line-height:1.2;
+          ">
+            <div style="font-weight:600; margin-bottom:4px;">${type}</div>
+            <div>${v} • ${pct}%</div>
+          </div>
+        `;
       },
     },
-    interactions: [{ type: "element-active" }],
-
-    // slice styling (crisp separators)
-    pieStyle: {
-      lineWidth: 2,
-      stroke: "#ffffff",
-    },
-
-    // percent labels inside slices
-    label: false,
 
     legend: false,
+    label: false,
+    innerRadius: 0,
 
-    // center content (total)
-    statistic: {
-      title: false,
-      content: {
-        style: {
-          whiteSpace: "pre-wrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          fontWeight: 800,
-          fontSize: "18px",
-          lineHeight: "22px",
-        },
-        content:
-          total === 0
-            ? "No data"
-            : `${total}\nlogs`,
-      },
-    },
-
-    color: ({ type }: { type: string }) => {
-    switch (type) {
-      case "Present": return "#22c55e";
-      case "Late": return "#f59e0b";
-      case "Leave": return "#3b82f6";
-      case "Absent": return "#ef4444";
-      case "Undertime": return "#a855f7";
-      case "Overtime": return "#14b8a6";
-      case "No data": return "#e5e7eb";
-      default: return "#e5e7eb";
-    }
-  },
-
-    // no padding weirdness
+    pieStyle: { lineWidth: 2, stroke: "#ffffff" },
+    interactions: [{ type: "element-active" }],
     appendPadding: 10,
   };
-    
+ 
+
+    const getPercent = (value: number) =>
+      total === 0 ? 0 : Math.round((value / total) * 100);
+
     const fetchTodayAttendance = async () => {
       setLoadingStatus(true);
       try {
@@ -282,46 +318,31 @@ const Dashboard: React.FC = () => {
     };
 
     const fetchAttendanceStats = async () => {
-      setLoadingStats(true);
-      try {
-        const now = dayjs();
-        const params = { year: now.year(), month: selectedMonth };
+    setLoadingStats(true);
+    try {
+      const params = { year: currentYear, month: selectedMonth };
 
-        const res = await api.get<AttendanceLogsResponse>("/attendance/logs/", { params });
-        const rows = res.data.results || [];
+      const res = await api.get<AttendanceStatsResponse>("/attendance/stats/", { params });
 
-        const present = rows.filter((r) => r.status === "PRESENT").length;
-        const absent = rows.filter((r) => r.status === "ABSENT").length;
-        const leave = rows.filter((r) => r.status === "LEAVE").length;
+      setStats({
+        present: res.data.present || 0,
+        late: res.data.late || 0,
+        absent: res.data.absent || 0,
+        leave: res.data.leave || 0,
+        undertime: res.data.undertime || 0,
+        overtime: res.data.overtime || 0,
+      });
+    } catch (err: any) {
+      const backendMsg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to load attendance stats.";
+      message.error(backendMsg);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
 
-        // event_types example: "Late, UnderTime"
-        const hasEvent = (r: AttendanceLogRow, key: string) => {
-          const types = (r.event_types || "")
-            .split(",")
-            .map((x) => x.trim().toLowerCase())
-            .filter(Boolean);
-          return types.includes(key.toLowerCase());
-        };
-
-        const late = rows.filter((r) => hasEvent(r, "late")).length;
-        const undertime = rows.filter((r) => hasEvent(r, "undertime")).length;
-
-        // IMPORTANT: your backend might spell it "Overtime" or "OverTime"
-        const overtime = rows.filter(
-          (r) => hasEvent(r, "overtime") || hasEvent(r, "over time") || hasEvent(r, "overTime")
-        ).length;
-
-        setStats({ present, late, absent, leave, undertime, overtime });
-      } catch (err: any) {
-        const backendMsg =
-          err?.response?.data?.detail ||
-          err?.response?.data?.message ||
-          "Failed to load attendance stats.";
-        message.error(backendMsg);
-      } finally {
-        setLoadingStats(false);
-      }
-    };
     const fetchMyPayrollRows = async () => {
       setLoadingPayrollRows(true);
       try {
@@ -427,10 +448,10 @@ const Dashboard: React.FC = () => {
     attendance,
     formatBackendTime
   );
-    const monthOptions = Array.from({ length: 12 }, (_, i) => ({
+   const monthOptions = Array.from({ length: 12 }, (_, i) => ({
     value: i + 1,
     label: dayjs().month(i).format("MMMM"),
-  }));
+  })).filter((m) => m.value <= currentMonth);
   const punchInDisabled =
     loadingStatus ||
     loadingPunchInEligibility ||

@@ -5,9 +5,139 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from shared_model.models import Attendance, Attendance_Event, Shift_Workday
+from shared_model.models import *
+
+#==============PIE CHART DISPLAY HELPERS============================
+
+def _expected_workday_dates_for_month(shift, date_from, date_to):
+    """
+    Returns list[date] of expected workdays for the month range based on Shift_Workday.
+    If shift is missing, returns [].
+    """
+    if not shift:
+        return []
 
 
+    expected = []
+    d = date_from
+    while d <= date_to:
+        # isoweekday: Mon=1 ... Sun=7 (matches your Shift_Workday DayOfWeek choices)
+        if _is_workday_for_shift(shift, d):
+            expected.append(d)
+        d += timedelta(days=1)
+
+    return expected
+
+
+def get_monthly_attendance_stats(user, year: int, month: int) -> dict:
+    """
+    Option A: backend computes stats.
+    Rules:
+    - Count only APPROVED events
+    - Leave is based on Leave_Day with Leave_Request status Approved
+    - Leave overrides expected workdays and attendance/events on that date
+    - Absent is computed from expected workdays - (attendance dates + leave dates)
+
+    FINAL FIX (date clamping):
+    - Future month: return zeros
+    - Current month: compute start_of_month -> today only
+    - Past month: compute full month normally
+    """
+    employee = _get_employee_or_400(user)
+    date_from, date_to = _month_date_range(year, month)
+
+    # -------------------------
+    # Date clamp (FINAL RULES)
+    # -------------------------
+    today = timezone.localdate()
+
+    # Future month -> return zeros
+    if date_from > today:
+        return {
+            "year": year,
+            "month": month,
+            "present": 0,
+            "late": 0,
+            "absent": 0,
+            "leave": 0,
+            "undertime": 0,
+            "overtime": 0,
+        }
+
+    # Current month -> clamp end to today
+    if date_from <= today <= date_to:
+        date_to = today
+    # Past month -> no change
+
+    # -------------------------
+    # Leave dates (Approved only)
+    # -------------------------
+    leave_qs = Leave_Day.objects.filter(
+        employee=employee,
+        date__range=[date_from, date_to],
+        leave_request__status="Approved",
+    )
+    leave_dates = set(leave_qs.values_list("date", flat=True))
+    leave_count = leave_qs.count()
+
+    # -------------------------
+    # Attendance rows (exclude leave override dates)
+    # -------------------------
+    att_qs = Attendance.objects.filter(
+        employee=employee,
+        date__range=[date_from, date_to],
+    )
+
+    att_non_leave = att_qs.exclude(date__in=leave_dates)
+
+    # Present: treat PRESENT + HALF_DAY as "present" for dashboard
+    present_count = att_non_leave.filter(status__in=["PRESENT", "HALF_DAY"]).count()
+
+    # Any attendance row counts as "covered" (so not absent) unless it's leave override date
+    attendance_dates = set(att_non_leave.values_list("date", flat=True))
+
+    # -------------------------
+    # Approved events (count distinct attendance dates)
+    # -------------------------
+    approved_events = Attendance_Event.objects.filter(
+        attendance__employee=employee,
+        attendance__date__range=[date_from, date_to],
+        approval_status="Approved",
+    ).exclude(attendance__date__in=leave_dates)
+
+    late_count = (
+        approved_events.filter(type="Late")
+        .values("attendance__date").distinct().count()
+    )
+    undertime_count = (
+        approved_events.filter(type="Undertime")
+        .values("attendance__date").distinct().count()
+    )
+    overtime_count = (
+        approved_events.filter(type="Overtime")
+        .values("attendance__date").distinct().count()
+    )
+
+    # -------------------------
+    # Absent (computed from expected workdays)
+    # -------------------------
+    shift = getattr(employee, "shift", None)
+    expected_dates = _expected_workday_dates_for_month(shift, date_from, date_to)
+
+    covered_dates = attendance_dates.union(leave_dates)
+    absent_count = sum(1 for d in expected_dates if d not in covered_dates)
+
+    return {
+        "year": year,
+        "month": month,
+        "present": present_count,
+        "late": late_count,
+        "absent": absent_count,
+        "leave": leave_count,
+        "undertime": undertime_count,
+        "overtime": overtime_count,
+    }
+    
 # ====================== HELPERS ======================
 EARLY_PUNCH_IN_MINUTES = 60
 

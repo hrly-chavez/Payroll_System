@@ -3,7 +3,6 @@ import {
   Form,
   Input,
   TimePicker,
-  InputNumber,
   Switch,
   message,
   Row,
@@ -28,6 +27,14 @@ const DAYS = [
   { label: "Sun", value: 7 },
 ];
 
+// ✅ helpers: block special chars for minutes (digits only)
+const digitsOnly = (v: string) => (v ?? "").replace(/[^\d]/g, "");
+const clamp999 = (v: string) => {
+  const n = Number(v || 0);
+  if (Number.isNaN(n)) return "";
+  return String(Math.min(Math.max(n, 0), 999));
+};
+
 const EditShift = ({ open, onClose, shift, refresh }: any) => {
   const [form] = Form.useForm();
 
@@ -39,21 +46,20 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
           ? shift.workdays
               .filter((w: any) => w?.is_workday)
               .map((w: any) => Number(w.day_of_week))
-          : [1, 2, 3, 4, 5]; // fallback default if none returned
+          : [1, 2, 3, 4, 5];
 
       form.setFieldsValue({
         ...shift,
         start_time: dayjs(shift.start_time, "HH:mm"),
         end_time: dayjs(shift.end_time, "HH:mm"),
 
-        break_minutes: shift.break_minutes ?? 0,
-        grace_minutes: shift.grace_minutes ?? 0,
+        // ✅ keep ONE naming (these match your inputs below)
+        break_mins: String(shift.break_minutes ?? 0),
+        grace_minutes: String(shift.grace_minutes ?? 0),
 
-        // ensure booleans exist (avoid undefined issues)
         is_overnight: !!shift.is_overnight,
         is_active: shift.is_active ?? true,
 
-        // ✅ helper field for UI
         workdays_selected: selectedDays,
       });
     }
@@ -87,19 +93,24 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
   const onFinish = async (values: any) => {
     const selectedDays: number[] = values.workdays_selected || [];
 
-    const payload = {
+    const payload: any = {
       ...values,
       start_time: values.start_time.format("HH:mm"),
       end_time: values.end_time.format("HH:mm"),
-      // ✅ nested data for backend
+
+      // ✅ ensure numbers go to backend
+      break_minutes: Number(values.break_mins || 0),
+      grace_minutes: Number(values.grace_minutes || 0),
+
       workdays: DAYS.map((d) => ({
         day_of_week: d.value,
         is_workday: selectedDays.includes(d.value),
       })),
     };
 
-    // remove helper field
-    delete (payload as any).workdays_selected;
+    // remove helper fields / local-only fields
+    delete payload.workdays_selected;
+    delete payload.break_mins;
 
     await api.put(`attendance/shifts/${shift.id}/`, payload);
 
@@ -115,6 +126,7 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
       open={open}
       onCancel={onClose}
       onOk={() => form.submit()}
+      destroyOnClose
     >
       <Form form={form} layout="vertical" onFinish={onFinish}>
         <Form.Item
@@ -129,21 +141,23 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
-              name="start_time"
               label="Start Time"
+              name="start_time"
               rules={[{ required: true, message: "Start time is required" }]}
             >
-              <TimePicker format="HH:mm" style={{ width: "100%" }} />
+              {/* ✅ blocks typing/special chars */}
+              <TimePicker use12Hours format="hh:mm A" inputReadOnly />
             </Form.Item>
           </Col>
 
           <Col xs={24} md={12}>
             <Form.Item
-              name="end_time"
               label="End Time"
+              name="end_time"
               rules={[{ required: true, message: "End time is required" }]}
             >
-              <TimePicker format="HH:mm" style={{ width: "100%" }} />
+              {/* ✅ blocks typing/special chars */}
+              <TimePicker use12Hours format="hh:mm A" inputReadOnly />
             </Form.Item>
           </Col>
         </Row>
@@ -151,14 +165,78 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
         {/* Break + Grace minutes side-by-side */}
         <Row gutter={16}>
           <Col xs={24} md={12}>
-            <Form.Item name="break_minutes" label="Break Minutes">
-              <InputNumber min={0} style={{ width: "100%" }} />
+            <Form.Item
+              label="Break (mins)"
+              name="break_mins"
+              rules={[
+                { required: true, message: "Break minutes is required" },
+                { pattern: /^\d+$/, message: "Digits only" },
+                {
+                  validator: async (_: any, value: string) => {
+                    const n = Number(value);
+                    if (Number.isNaN(n))
+                      throw new Error("Digits only");
+                    if (n < 0 || n > 999)
+                      throw new Error("Must be between 0 and 999");
+                  },
+                },
+              ]}
+            >
+              <Input
+                inputMode="numeric"
+                placeholder="0"
+                maxLength={3}
+                onChange={(e) => {
+                  const cleaned = clamp999(digitsOnly(e.target.value));
+                  form.setFieldsValue({ break_mins: cleaned });
+                }}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  const pasted = e.clipboardData.getData("text");
+                  const current = String(form.getFieldValue("break_mins") || "");
+                  const cleaned = clamp999(digitsOnly(current + pasted));
+                  form.setFieldsValue({ break_mins: cleaned });
+                }}
+              />
             </Form.Item>
           </Col>
 
           <Col xs={24} md={12}>
-            <Form.Item name="grace_minutes" label="Grace Minutes">
-              <InputNumber min={0} style={{ width: "100%" }} />
+            <Form.Item
+              name="grace_minutes"
+              label="Grace Minutes"
+              rules={[
+                { required: true, message: "Grace minutes is required" },
+                { pattern: /^\d+$/, message: "Digits only" },
+                {
+                  validator: async (_: any, value: string) => {
+                    const n = Number(value);
+                    if (Number.isNaN(n))
+                      throw new Error("Digits only");
+                    if (n < 0 || n > 999)
+                      throw new Error("Must be between 0 and 999");
+                  },
+                },
+              ]}
+            >
+              <Input
+                inputMode="numeric"
+                placeholder="0"
+                maxLength={3}
+                onChange={(e) => {
+                  const cleaned = clamp999(digitsOnly(e.target.value));
+                  form.setFieldsValue({ grace_minutes: cleaned });
+                }}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  const pasted = e.clipboardData.getData("text");
+                  const current = String(
+                    form.getFieldValue("grace_minutes") || ""
+                  );
+                  const cleaned = clamp999(digitsOnly(current + pasted));
+                  form.setFieldsValue({ grace_minutes: cleaned });
+                }}
+              />
             </Form.Item>
           </Col>
         </Row>
@@ -182,7 +260,7 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
           <WorkdayTags form={form} />
         </Form.Item>
 
-        {/* ✅ Keep values in form, but NOT bind switches directly (prevents toggle lock) */}
+        {/* hidden fields for confirm toggle */}
         <Form.Item name="is_overnight" hidden>
           <Input />
         </Form.Item>
@@ -191,7 +269,7 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
           <Input />
         </Form.Item>
 
-        {/* ✅ Overnight + Active side by side with hover + confirm */}
+        {/* Overnight + Active side by side with hover + confirm */}
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item label="Overnight">
@@ -199,9 +277,7 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
                 {({ getFieldValue }) => {
                   const value = !!getFieldValue("is_overnight");
                   return (
-                    <Tooltip
-                      title={value ? "Remove Overnight" : "Mark as Overnight"}
-                    >
+                    <Tooltip title={value ? "Remove Overnight" : "Mark as Overnight"}>
                       <Switch
                         checked={value}
                         onClick={() => confirmToggle("is_overnight")}

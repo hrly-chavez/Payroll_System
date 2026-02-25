@@ -43,15 +43,29 @@ const AddAllowanceType = ({ open, onClose, refresh }: Props) => {
       }}
       onOk={submit}
       okText="Save"
-      destroyOnHidden   // ✅ Updated for AntD v5
+      destroyOnHidden
     >
       <Form form={form} layout="vertical">
         <Form.Item
           label="Name"
           name="name"
-          rules={[{ required: true, message: "Name required" }]}
+          rules={[
+            { required: true, message: "Name required" },
+            {
+              pattern: /^[A-Za-z ]+$/,
+              message: "Only letters and spaces are allowed",
+            },
+          ]}
         >
-          <Input />
+          <Input
+            placeholder="Enter allowance type name"
+            maxLength={50}
+            onChange={(e) => {
+              // remove numbers and special characters instantly
+              const cleaned = e.target.value.replace(/[^A-Za-z ]/g, "");
+              form.setFieldsValue({ name: cleaned });
+            }}
+          />
         </Form.Item>
 
         <Form.Item

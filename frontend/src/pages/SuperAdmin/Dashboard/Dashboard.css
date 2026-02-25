@@ -256,6 +256,12 @@
   .filter-row .ant-picker {
     width: 100%;
 }
+.stat-card,
+  .stat-tile,
+  .company-note-card {
+    height: auto;
+    min-height: 220px;
+  }
 }
 
 @media (max-width: 480px) {

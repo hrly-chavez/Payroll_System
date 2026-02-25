@@ -13,16 +13,20 @@ type Props = {
 
 // ✅ Allow only letters, numbers, space, hyphen
 const sanitizeLeaveName = (value: string) => {
-  return value.replace(/[^A-Za-z0-9\s-]/g, "");
+  return value
+    .replace(/[^A-Za-z ]/g, "")   // ❌ remove numbers + special characters
+    .replace(/\s+/g, " ")         // collapse multiple spaces
+    .replace(/^\s+/g, "");        // remove leading spaces
 };
 
 const leaveNameValidator = (_: any, value: string) => {
   if (!value) return Promise.resolve();
 
-  const ok = /^[A-Za-z0-9\s-]+$/.test(value);
-  if (!ok) {
+  const pattern = /^[A-Za-z ]+$/;
+
+  if (!pattern.test(value)) {
     return Promise.reject(
-      new Error("Leave name can only contain letters, numbers, spaces, and hyphen (-).")
+      new Error("Leave name must contain letters and spaces only")
     );
   }
 
@@ -57,29 +61,30 @@ export default function AddLeaveType({
         labelAlign="left"
         wrapperCol={{ span: 24 }}
       >
-        <Form.Item
-          label="Leave Name"
-          name="name"
-          rules={[
-            { required: true, message: "Please enter leave name" },
-            { validator: leaveNameValidator },
-          ]}
-        >
-          <Input
-            placeholder="Enter leave name"
-            onChange={(e) => {
-              const cleaned = sanitizeLeaveName(e.target.value);
-              form.setFieldsValue({ name: cleaned });
-            }}
-            onPaste={(e) => {
-              e.preventDefault();
-              const pasted = e.clipboardData.getData("text");
-              const cleaned = sanitizeLeaveName(pasted);
-              const current = form.getFieldValue("name") || "";
-              form.setFieldsValue({ name: current + cleaned });
-            }}
-          />
-        </Form.Item>
+      <Form.Item
+        label="Leave Name"
+        name="name"
+        rules={[
+          { required: true, message: "Please enter leave name" },
+          { validator: leaveNameValidator },
+        ]}
+      >
+        <Input
+          placeholder="Enter leave name"
+          maxLength={50}
+          onChange={(e) => {
+            const cleaned = sanitizeLeaveName(e.target.value);
+            form.setFieldsValue({ name: cleaned });
+          }}
+          onPaste={(e) => {
+            e.preventDefault();
+            const pasted = e.clipboardData.getData("text");
+            const cleaned = sanitizeLeaveName(pasted);
+            const current = form.getFieldValue("name") || "";
+            form.setFieldsValue({ name: sanitizeLeaveName(current + cleaned) });
+          }}
+        />
+      </Form.Item>
 
         <Form.Item label="Options">
           <Row gutter={16}>

@@ -1,3 +1,4 @@
+//src/api/axios.ts
 import axios from "axios";
 import { message } from "antd";
 
@@ -8,7 +9,7 @@ const baseURL =
 
 const api = axios.create({
   baseURL,
-  headers: { "Content-Type": "application/json" },
+  // do NOT force Content-Type here
 });
 /**
  * Attach access token automatically
@@ -19,6 +20,15 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // If sending FormData, let the browser set the correct multipart boundary
+    if (config.data instanceof FormData) {
+      delete (config.headers as any)["Content-Type"];
+    } else {
+      // for normal JSON requests
+      (config.headers as any)["Content-Type"] = "application/json";
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

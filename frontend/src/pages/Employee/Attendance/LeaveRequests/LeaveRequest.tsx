@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Modal, Form, Select, DatePicker, Input, Button, message } from "antd";
-import api from "../../../api/axios";
+import api from "../../../../api/axios";
 import dayjs from "dayjs";
-import styles from "./../Attendance/LeaveRequest.module.css";
+import styles from "./LeaveRequest.module.css";
 
 const { RangePicker } = DatePicker;
 

@@ -1,87 +1,218 @@
-import React from "react";
-import { Table, Tag, Button, Space } from "antd";
+// src/pages/HR/Requests/AttendanceCorrectionRequest/AttendanceCorrectionRequest.tsx
+import React, { useEffect, useMemo, useState } from "react";
+import { Table, Tag, Button, Space, message, Modal, Input, Alert } from "antd";
+import api from "../../../../api/axios";
+import dayjs from "dayjs";
 import styles from "./AttendanceCorrectionRequest.module.css";
+import EditAttendance from "./EditAttendance";
+
+type CorrectionRow = {
+  id: number;
+  attendance_id: number;
+  date: string;
+  issue_type: string;
+  reason: string;
+  file_attached: string | null;
+  requested_at: string;
+  status: "Pending" | "Verified" | "Declined";
+  decline_reason?: string | null;
+
+  // if your serializer doesn't include these yet, we can add them later
+  employee_name?: string;
+  department_name?: string;
+};
+
+const { TextArea } = Input;
 
 const AttendanceCorrectionRequest: React.FC = () => {
-  const columns = [
-    {
-      title: "Employee",
-      dataIndex: "employee",
-    },
-    {
-      title: "Date",
-      dataIndex: "date",
-    },
-    {
-      title: "Requested Time",
-      dataIndex: "time",
-    },
-    {
-      title: "Reason",
-      dataIndex: "reason",
-    },
-    {
-      title: "Status",
-      dataIndex: "status",
-      render: (status: string) => {
-        const color =
-          status === "Pending"
-            ? "gold"
-            : status === "Approved"
-            ? "green"
-            : "red";
-        return <Tag color={color}>{status}</Tag>;
+  const [rows, setRows] = useState<CorrectionRow[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const [declineOpen, setDeclineOpen] = useState(false);
+  const [declineId, setDeclineId] = useState<number | null>(null);
+  const [declineReason, setDeclineReason] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
+
+  const fetchPending = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/attendance/admin/corrections/pending/");
+      setRows(res.data?.results || []);
+    } catch (err: any) {
+      message.error(err?.response?.data?.detail || "Failed to load requests.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPending();
+  }, []);
+
+  const statusTag = (status: CorrectionRow["status"]) => {
+    const color = status === "Pending" ? "gold" : status === "Verified" ? "green" : "red";
+    return <Tag color={color}>{status}</Tag>;
+  };
+
+    const openEdit = (id: number) => {
+      setEditId(id);
+      setEditOpen(true);
+    };
+
+  const openDecline = (id: number) => {
+    setErrorMsg(null);
+    setDeclineReason("");
+    setDeclineId(id);
+    setDeclineOpen(true);
+  };
+
+  const submitDecline = async () => {
+    setErrorMsg(null);
+
+    if (!declineId) return;
+
+    if (!declineReason.trim()) {
+      setErrorMsg("Decline reason is required.");
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      await api.post(`/attendance/admin/corrections/${declineId}/review/`, {
+        status: "Declined",
+        decline_reason: declineReason.trim(),
+      });
+      message.success("Request declined.");
+      setDeclineOpen(false);
+      fetchPending();
+    } catch (err: any) {
+      const data = err?.response?.data;
+      setErrorMsg(data?.detail || data?.decline_reason?.[0] || "Failed to decline request.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const columns = useMemo(
+    () => [
+      {
+        title: "Employee",
+        dataIndex: "employee_name",
+        render: (_: any, record: CorrectionRow) => record.employee_name || "—",
       },
-    },
-    {
-      title: "Action",
-      render: () => (
-        <Space>
-          <Button type="primary" size="small">
-            Approve
-          </Button>
-          <Button danger size="small">
-            Decline
-          </Button>
-        </Space>
-      ),
-    },
-  ];
-
-
-  const dataSource = [
-    {
-      key: 1,
-      employee: "Theresa Webb",
-      date: "Mar 08, 2023",
-      time: "8:00 AM - 5:00 PM",
-      reason: "Missed punch",
-      status: "Pending",
-    },
-    {
-      key: 2,
-      employee: "Kathryn Murphy",
-      date: "Mar 05, 2023",
-      time: "9:00 AM - 6:00 PM",
-      reason: "System issue",
-      status: "Declined",
-    },
-  ];
+      {
+        title: "Date",
+        dataIndex: "date",
+        render: (v: string) => dayjs(v).format("MMM DD, YYYY"),
+      },
+      {
+        title: "Issue Type",
+        dataIndex: "issue_type",
+      },
+      {
+        title: "Reason",
+        dataIndex: "reason",
+        ellipsis: true,
+      },
+      {
+        title: "Attachment",
+        dataIndex: "file_attached",
+        render: (v: string | null) => (v ? <a href={v} target="_blank" rel="noreferrer">View</a> : "—"),
+      },
+      {
+        title: "Status",
+        dataIndex: "status",
+        render: (status: CorrectionRow["status"]) => statusTag(status),
+      },
+      {
+        title: "Action",
+        render: (_: any, record: CorrectionRow) => (
+          <Space>
+            <Button
+              type="primary"
+              size="small"
+              loading={actionLoading}
+              disabled={record.status !== "Pending" || editOpen}
+              onClick={() => openEdit(record.id)}
+            >
+              Edit / Apply
+            </Button>
+            <Button
+              danger
+              size="small"
+              loading={actionLoading}
+              disabled={record.status !== "Pending"}
+              onClick={() => openDecline(record.id)}
+            >
+              Decline
+            </Button>
+          </Space>
+        ),
+      },
+    ],
+    [actionLoading]
+  );
 
   return (
     <div className={styles.wrapper}>
       <Table
-        columns={columns}
-        dataSource={[...dataSource].sort((a, b) => {
-          return new Date(b.date).getTime() - new Date(a.date).getTime();
-        })}        
+        rowKey="id"
+        columns={columns as any}
+        dataSource={rows}
+        loading={loading}
         pagination={{
           pageSize: 5,
           showSizeChanger: true,
           pageSizeOptions: ["5", "10", "20"],
         }}
       />
+
+      <Modal
+        title="Decline Request"
+        open={declineOpen}
+        onCancel={() => {
+          setDeclineOpen(false);
+          setDeclineId(null);
+          setDeclineReason("");
+          setErrorMsg(null);
+        }}
+        onOk={submitDecline}
+        okText="Decline"
+        okButtonProps={{ danger: true, loading: actionLoading }}
+        cancelButtonProps={{ disabled: actionLoading }}
+      >
+        {errorMsg && (
+          <Alert type="error" showIcon message={errorMsg} style={{ marginBottom: 12 }} />
+        )}
+        <label>Reason</label>
+        <TextArea
+          rows={4}
+          value={declineReason}
+          onChange={(e) => setDeclineReason(e.target.value)}
+          placeholder="Enter decline reason..."
+        />
+      </Modal>
+       {editId !== null && (
+        <EditAttendance
+            key={editId}
+            open={editOpen}
+            correctionId={editId}
+            onClose={() => {
+              setEditOpen(false);
+              setEditId(null);
+            }}
+            onApplied={() => {
+              setEditOpen(false);
+              setEditId(null);
+              fetchPending();
+            }}
+          />
+      )}
     </div>
+    
   );
 };
 

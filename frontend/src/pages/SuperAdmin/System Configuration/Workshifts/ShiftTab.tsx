@@ -37,7 +37,6 @@ const ShiftTab = ({ active }: Props) => {
     try {
       const res = await api.get("attendance/shifts/");
 
-      // ✅ normalize is_active so Tag display is accurate
       const normalized = (res.data || []).map((item: any) => ({
         ...item,
         is_active: toBool(item.is_active),
@@ -68,7 +67,6 @@ const ShiftTab = ({ active }: Props) => {
     { title: "Break (min)", dataIndex: "break_minutes" },
     { title: "Grace (min)", dataIndex: "grace_minutes" },
 
-    // ✅ Status column (same design as Allowance)
     {
       title: "Status",
       dataIndex: "is_active",

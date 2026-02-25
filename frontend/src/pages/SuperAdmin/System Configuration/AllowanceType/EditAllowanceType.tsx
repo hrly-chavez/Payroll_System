@@ -62,7 +62,7 @@ const EditAllowanceType = ({ open, onClose, allowance, refresh }: Props) => {
       const proceedUpdate = async () => {
         await api.patch(`/approvals/allowance-type/${allowance.id}/`, {
           name: values.name?.trim(),
-          code: values.code, // keep as-is
+          code: values.code, 
           is_active: nextIsActive,
         });
 

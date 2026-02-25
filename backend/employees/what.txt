@@ -13,3 +13,97 @@
  Rule:
 
     If it describes an employee, put it here.
+
+In this app, you can find the following modules and system functions:
+
+------------------------------------------------------------
+MODULES / FUNCTIONS
+------------------------------------------------------------
+
+• Address Management
+  - Province list
+  - City list by province
+  - Barangay list by city
+
+• Department Management
+  - Department list
+  - Department create
+  - Department update
+  - Department retrieve
+
+• Shift Management (Admin Side)
+  - Shift list (active only)
+  - Shift create
+  - Shift update
+  - Shift retrieve
+
+• User Account Management
+  - User list
+  - User create
+  - User update
+  - Get user by employee
+  - Reset user password (admin action)
+  - Deactivate / Reactivate user
+
+• Employee Management
+  - Employee list
+  - Employee create
+  - Employee update
+  - Employee by department
+  - Employee details view
+  - Create first SUPER_ADMIN employee
+
+• Employee Salary Management
+  - Salary list
+  - Salary create
+  - Salary update
+  - Get latest salary
+  - Edit salary (creates new salary record for history)
+  - Automatic recomputation of percentage-based deductions
+
+• Employee Deduction Management
+  - Deduction list
+  - Deduction create
+  - Deduction update
+  - Deduction types by salary range
+
+• Employee Allowance Management
+  - Allowance list
+  - Allowance create
+  - Allowance update (creates new record for history)
+  - Allowance type list
+
+• Audit Logs
+  - Employee-specific audit logs
+  - System user activity logs (CREATE / UPDATE / DELETE)
+  - Automatic deletion of logs older than 1 day
+
+• Company Notes
+  - Get latest company note
+  - Create company note
+
+
+------------------------------------------------------------
+TABLES USED
+------------------------------------------------------------
+
+- Province
+- City
+- Barangay
+
+- Department
+- Shift
+
+- User
+- Employee
+- Address
+
+- Employee_Salary
+- Employee_Deduction
+- Deduction_Type
+- Employee_Allowance
+- Allowance_Type
+
+- AuditLog
+
+- Company_Note

@@ -13,3 +13,33 @@
 Rule for the team:
 
     If it’s about accounts, login, or roles, put it here.
+
+
+
+------------------------------------------------------------
+MODULES / FUNCTIONS
+------------------------------------------------------------
+
+1. Get Current Logged-in User
+   - Returns the current authenticated user's:
+     • user_name
+     • role
+   - Used for:
+     • Role-based UI rendering
+     • Identifying logged-in user
+     • Access control in frontend
+
+2. First SuperAdmin System Check
+   - Checks:
+     • Total number of users (excluding Django superusers)
+     • Whether a SUPER_ADMIN already exists
+   - Used during:
+     • Initial system setup
+     • Preventing multiple SUPER_ADMIN registrations
+     • Determining if system is already initialized
+
+------------------------------------------------------------
+TABLES USED
+------------------------------------------------------------
+
+- User

@@ -968,12 +968,12 @@ class PayrollApproveEmployeeView(APIView):
         _recompute_period_status(period)
 
         # ----------------------------
-        # ✅ Create notifications
+        #  Create notifications
         # ----------------------------
 
         notifications = []
 
-        # 1️⃣ Notify SUPER_ADMIN
+        #  Notify SUPER_ADMIN
         super_admins = User.objects.filter(role="ADMIN")
         for admin in super_admins:
             notifications.append(
@@ -986,7 +986,7 @@ class PayrollApproveEmployeeView(APIView):
                 )
             )
 
-        # 2️⃣ Notify Employee without URL
+        #  Notify Employee without URL
         if hasattr(ppe.employee, "user") and ppe.employee.user:
             notifications.append(
                 Notification(

@@ -1,0 +1,60 @@
+
+
+In this app, you can find the following modules / functions:
+
+------------------------------------------------------------
+MODULES / FUNCTIONS
+------------------------------------------------------------
+
+• Holidays
+  - Holiday list
+  - Holiday create
+  - Holiday update
+
+• Leave
+  - Leave list
+  - Leave create
+  - Leave update
+
+• Leave Type
+  - Leave type list
+  - Leave type create
+  - Leave type update
+
+• Leave Requests (Admin Side)
+  - Admin leave request list (pending/approved/declined)
+  - Displaying of all leave requests (employee requests visible to admin)
+  - Approve / decline leave requests
+
+• Commissions
+  - Commission list
+  - Commission create
+  - Commission update
+
+• Allowances
+  - Allowance type list
+  - Allowance type create
+  - Allowance type update
+
+• Holiday Policy
+  - Holiday policy list
+  - Holiday policy create
+  - Holiday policy update
+
+
+------------------------------------------------------------
+TABLES USED
+------------------------------------------------------------
+
+- Holiday
+- Leave
+- Leave_Type
+- Leave_Request
+
+- Commission
+- Allowance_Type
+- Holiday_Policy
+
+- User
+- Employee
+- Department

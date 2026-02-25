@@ -120,13 +120,6 @@ const EditHolidayPolicy = ({ open, onClose, policy, refresh }: Props) => {
           </Radio.Group>
         </Form.Item>
 
-        <Form.Item
-          name="is_active"
-          label="Active"
-          valuePropName="checked"
-        >
-          <Switch />
-        </Form.Item>
       </Form>
     </Modal>
   );

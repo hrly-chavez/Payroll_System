@@ -21,12 +21,10 @@ export default function CommissionTypeTab({ active }: Props) {
   const [editMode, setEditMode] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  // ✅ Search
   const [search, setSearch] = useState("");
 
   const [form] = Form.useForm();
 
-  // ✅ newest first (latest added on top)
   const fetchCommissionTypes = async () => {
     setLoading(true);
     try {
@@ -47,7 +45,6 @@ export default function CommissionTypeTab({ active }: Props) {
   useEffect(() => {
     if (!active) return;
     fetchCommissionTypes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
   const openModal = () => {
@@ -74,14 +71,12 @@ export default function CommissionTypeTab({ active }: Props) {
     });
   };
 
-  // ✅ SAVE (with backend field error display for duplicate name)
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
 
       const payload = {
         name: values.name?.trim(),
-        // ✅ user said they no longer use code, so remove it from payload
         is_taxable: values.is_taxable,
         is_active: values.is_active,
       };
@@ -103,20 +98,16 @@ export default function CommissionTypeTab({ active }: Props) {
       closeModal();
       fetchCommissionTypes();
     } catch (err: any) {
-      // 1) AntD form validation error (already shown under fields)
       if (err?.errorFields) return;
 
-      // 2) DRF/axios validation errors
       const data = err?.response?.data;
 
-      // Expected DRF duplicate format:
       // { name: ["A commission type with this name already exists."] }
       if (data?.name?.length) {
         form.setFields([{ name: "name", errors: [data.name[0]] }]);
         return;
       }
 
-      // Optional: handle other DRF error shapes
       const fallback =
         data?.detail ||
         (Array.isArray(data?.non_field_errors)
@@ -128,7 +119,6 @@ export default function CommissionTypeTab({ active }: Props) {
     }
   };
 
-  // ✅ filter while preserving newest-first
   const filteredCommissionTypes = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return commissionTypes;
@@ -137,7 +127,6 @@ export default function CommissionTypeTab({ active }: Props) {
       .filter((c) => {
         const haystack = [
           c.name,
-          // ✅ removed code from search as well, since not used
           c.is_taxable ? "yes" : "no",
           c.is_active ? "yes" : "no",
           c.created_at,
@@ -153,7 +142,6 @@ export default function CommissionTypeTab({ active }: Props) {
 
   return (
     <div className="table-wrapper">
-      {/* ✅ Search (left) + Add button (right) */}
       <div
         style={{
           display: "flex",

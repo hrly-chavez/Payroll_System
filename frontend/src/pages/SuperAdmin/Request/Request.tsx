@@ -25,7 +25,7 @@
   const Request: React.FC = () => {
     const [requests, setRequests] = useState<RequestItem[]>([]);
     const [loading, setLoading] = useState(false);
-    const [filterType, setFilterType] = useState<'All' | 'Holiday' | 'Leave'>('All');
+    const [filterType, setFilterType] = useState<'All' | 'Leave'>('All');
     const [filterStatus, setFilterStatus] = useState<'All' | 'Pending' | 'Approved' | 'Declined'>('All');
 
     useEffect(() => {

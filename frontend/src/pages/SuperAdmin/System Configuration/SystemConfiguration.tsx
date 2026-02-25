@@ -27,13 +27,11 @@ type TabType =
   | "holiday";
 
 const SystemConfiguration: React.FC = () => {
-  // Load last saved tab from localStorage
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     const savedTab = localStorage.getItem("systemConfigTab") as TabType;
     return savedTab || "contribution";
   });
 
-  // Save tab whenever it changes
   useEffect(() => {
     localStorage.setItem("systemConfigTab", activeTab);
   }, [activeTab]);
@@ -45,7 +43,6 @@ const SystemConfiguration: React.FC = () => {
         <Topbar title="System Configuration" />
         <Content className="system-content">
           <div className="config-container">
-            {/* Tabs */}
             <div className="config-tabs">
               <button
                 className={activeTab === "contribution" ? "active" : ""}
@@ -97,7 +94,6 @@ const SystemConfiguration: React.FC = () => {
               </button>
             </div>
 
-            {/* Section Header */}
             <div className="section-header">
               <h3>
                 {activeTab === "contribution"
@@ -116,7 +112,6 @@ const SystemConfiguration: React.FC = () => {
               </h3>
             </div>
 
-            {/* Tabs Content */}
             {activeTab === "contribution" && <ContributionTab active />}
             {activeTab === "payroll" && <PayRulesTab active />}
             {activeTab === "leave" && <LeaveTab active />}

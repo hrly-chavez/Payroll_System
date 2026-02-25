@@ -1,4 +1,3 @@
-// src/pages/SuperAdmin/Calendar/PayrollPeriod/PayrollApprovalResultModal.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -76,7 +75,6 @@ export default function PayrollApprovalResultModal({ open, periodId, employeeId,
   const [result, setResult] = useState<PayrollResult | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
 
-  // decline UI
   const [declineOpen, setDeclineOpen] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
 
@@ -109,7 +107,6 @@ export default function PayrollApprovalResultModal({ open, periodId, employeeId,
       setDeclineOpen(false);
       setDeclineReason("");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, periodId, employeeId]);
 
   const canApprove = result?.ppe_status === "Processing" && result?.payroll_status === "Generated";

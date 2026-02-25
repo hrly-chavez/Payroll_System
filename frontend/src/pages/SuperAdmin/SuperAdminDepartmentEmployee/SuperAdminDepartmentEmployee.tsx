@@ -98,7 +98,6 @@ const SuperAdminDepartmentEmployee: React.FC = () => {
               </Button>
             </div>
 
-            {/* ✅ ADD EMPLOYEE BUTTON */}
             <Button
               type="primary"
               icon={<PlusOutlined />}
@@ -130,7 +129,6 @@ const SuperAdminDepartmentEmployee: React.FC = () => {
             })}
           />
 
-          {/* ✅ EMPLOYEE FLOW MODAL */}
           {deptId && (
             <AddEmployeeFlow
               open={open}

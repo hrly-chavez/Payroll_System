@@ -381,150 +381,106 @@ const [overtimeLoading, setOvertimeLoading] = useState(false);
       <Layout>
         <Topbar title="Dashboard" />
         <Content className="dashboard-content">
-          {/* ================= TOP ROW ================= */}
-          <Row gutter={[16, 16]} align="stretch">
-            <Col xs={24} md={6}>
-              <div className="card stat-card">
-                <h4 className="card-title">{currentDate}</h4>
-                <div
-                  style={{
-                    padding: 20,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {/*DONUT CHART */}
+          <Row gutter={[16, 16]} className="equalHeightRow">
+          {/* DATE CARD */}
+          <Col xs={24} md={6}>
+            <Card title={currentDate} className="stat-card">
+              <div className="dateChartArea">
+                <div className="chartWrapperAdmin">
                   <Pie
-                  data={[
-                    { type: "Reported", value: attendanceData.PRESENT || 0 },
-                    { type: "Not Reported", value: attendanceData.ABSENT || 0 },
-                  ]}
-                  angleField="value"
-                  colorField="type"
-                  radius={1}
-                  innerRadius={0.75}
-                  legend={false}
-                  label={false}
-                  tooltip={false}
-                  height={170}
-                  scale={{
-                    color: {
-                      domain: ["Reported", "Not Reported"],
-                      range: ["#386FA4", "#D9D9D9"],
-                    },
-                  }}
-                  statistic={{
-                    title: false,
-                    content: {
-                      style: {
-                        fontSize: "16px",
-                        fontWeight: 600,
+                    data={[
+                      { type: "Reported", value: attendanceData.PRESENT || 0 },
+                      { type: "Not Reported", value: attendanceData.ABSENT || 0 },
+                    ]}
+                    angleField="value"
+                    colorField="type"
+                    radius={0.98}
+                    legend={false}
+                    label={false}
+                    scale={{
+                      color: {
+                        domain: ["Reported", "Not Reported"],
+                        range: ["#386FA4", "#E5E7EB"],
                       },
-                      formatter: () => {
-                        const reported = attendanceData.PRESENT || 0;
-                        const total =
-                          (attendanceData.PRESENT || 0) +
-                          (attendanceData.ABSENT || 0);
-
-                        return `${reported} / ${total}`;
-                      },
-                    },
-                  }}
-                />
-                  {/* CUSTOM LEGEND */}
-                  <div
-                    style={{
-                      textAlign: "center",
-                      marginTop: 16,
-                      display: "flex",
-                      justifyContent: "center",
-                      gap: 24,
-                      flexWrap: "wrap",
                     }}
-                  >
-                    <span style={{ display: "flex", alignItems: "center" }}>
-                      <span
-                        style={{
-                          width: 10,
-                          height: 10,
-                          background: "#D9D9D9",
-                          borderRadius: "50%",
-                          marginRight: 6,
-                          display: "inline-block",
-                        }}
-                      />
-                      Not Reported
-                    </span>
-                    <span style={{ display: "flex", alignItems: "center" }}>
-                      <span
-                        style={{
-                          width: 10,
-                          height: 10,
-                          background: "#386FA4",
-                          borderRadius: "50%",
-                          marginRight: 6,
-                          display: "inline-block",
-                        }}
-                      />
-                      Reported
-                    </span>
+                  />
+                </div>
+
+                <div className="chartLegendAdmin">
+                  <div className="legendItem">
+                    <div className="legendDot" data-type="Reported" />
+                    <div className="legendText">
+                      <div className="legendLabel">Reported</div>
+                    </div>
+                  </div>
+
+                  <div className="legendItem">
+                    <div className="legendDot" data-type="Not Reported" />
+                    <div className="legendText">
+                      <div className="legendLabel">Not Reported</div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </Col>
+            </Card>
+          </Col>
 
-            <Col xs={24} md={4}>
-              <div
-                className="card stat-card stat-tile primary clickable"
-                onClick={() => setIsPayrollModalOpen(true)}
-              >
-                <div className="tile-title">Pending Payroll</div>
+          {/* PENDING PAYROLL */}
+          <Col xs={24} md={4}>
+            <Card
+              className="stat-tile primary"
+              onClick={() => setIsPayrollModalOpen(true)}
+              hoverable
+            >
+              <div className="tile-title">Pending Payroll</div>
 
-                <div className="tile-body">
-                  <HourglassOutlined className="tile-icon" />
-                  <div className="tile-value">
-                    {payrollLoading ? <Spin /> : pendingPayrolls.length}
-                  </div>
+              <div className="tile-body">
+                <HourglassOutlined className="tile-icon" />
+                <div className="tile-value">
+                  {payrollLoading ? <Spin /> : pendingPayrolls.length}
                 </div>
               </div>
-            </Col>
-            <Col xs={24} md={4}>
-              <div
-                className="card stat-card stat-tile clickable"
-                onClick={async () => {
-                    const latest = await fetchOverTimeRequests();
-                    const pending = latest.filter((r) => r.status === "Pending");
+            </Card>
+          </Col>
 
-                    if (pending.length === 1) {
-                      setSelectedOverTime(pending[0]);
-                      setIsOverTimeDetailModalOpen(true);
-                    } else {
-                      setIsOverTimeModalOpen(true);
-                    }
-                  }}
-              >
-                <div className="tile-title">OverTime Pending(s)</div>
+          {/* OVERTIME */}
+          <Col xs={24} md={4}>
+            <Card
+              className="stat-tile"
+              hoverable
+              onClick={async () => {
+                const latest = await fetchOverTimeRequests();
+                const pending = latest.filter((r) => r.status === "Pending");
 
-                <div className="tile-body">
-                  <HourglassOutlined className="tile-icon" />
-                  <div className="tile-value">
-                    {overtimeData.filter((r) => r.status === "Pending").length}
-                  </div>
+                if (pending.length === 1) {
+                  setSelectedOverTime(pending[0]);
+                  setIsOverTimeDetailModalOpen(true);
+                } else {
+                  setIsOverTimeModalOpen(true);
+                }
+              }}
+            >
+              <div className="tile-title">Overtime Pending(s)</div>
+
+              <div className="tile-body">
+                <HourglassOutlined className="tile-icon" />
+                <div className="tile-value">
+                  {overtimeData.filter((r) => r.status === "Pending").length}
                 </div>
               </div>
-            </Col>
+            </Card>
+          </Col>
 
+          {/* ANNOUNCEMENTS */}
+          <Col xs={24} md={10}>
+            <CompanyNote role="SUPER_ADMIN" />
+          </Col>
 
-            <Col xs={24} md={10}>
-               <CompanyNote role="SUPER_ADMIN" />
-            </Col>  
-          </Row>
+        </Row>
 
           {/* ================= BOTTOM ROW ================= */}
-          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-            <Col xs={24} lg={16}>
+            <Row gutter={[16, 16]} className="equalHeightRow">
+              <Col xs={24} lg={16}>
               <div className="card analytics-card">
                 <div className="filter-row">
                   <Segmented

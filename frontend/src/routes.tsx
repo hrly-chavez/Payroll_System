@@ -15,7 +15,7 @@ import Unauthorized from "./pages/Login/Unauthorized";
 /* ================= EMPLOYEE ================= */
 import EmpDashboard from "./pages/Employee/Dashboard/Dashboard";
 import EmpAttendance from "./pages/Employee/Attendance/Attendance";
-import EmpPayslips from "./pages/Employee/Payslips/Payslips";
+import EmpPayslips from "./pages/Employee/Payslips/Payroll";
 
 /* ================= ADMIN / HR ================= */
 import AdDashboard from "./pages/HR/Dashboard/Dashboard";

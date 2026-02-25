@@ -1,8 +1,8 @@
-//src/pages/Employee/Dashboard/PayrollResultModal.tsx
+// src/pages/Employee/Payslips/PayrollResultModal.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Modal, Descriptions, Tag, Table, Spin, Alert, Button, Space } from "antd";
+import { Modal, Descriptions, Tag, Table, Spin, Alert, Button, Space, message } from "antd";
 import api from "../../../api/axios";
 import dayjs from "dayjs";
 
@@ -74,9 +74,74 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PayrollResult | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
-
+  const [downloading, setDownloading] = useState(false);
   const status = (employee?.status || "Processing") as EmployeeMini["status"];
 
+
+  
+ const downloadPayslipPDF = async () => {
+    if (!period?.id) return;
+
+    if (!result || employee?.status !== "Approved" || period?.status !== "Closed") {
+      message.warning("Payslip download is available only when Employee is Approved and Payroll Period is Closed.");
+      return;
+    }
+
+    setDownloading(true);
+
+    try {
+      const res = await api.get(`/payroll/my-payrolls/${period.id}/download/`, {
+        responseType: "blob",
+      });
+
+      const contentDisposition =
+        (res.headers?.["content-disposition"] || res.headers?.["Content-Disposition"]) as string | undefined;
+
+      const serverFilename = extractFilename(contentDisposition || null);
+
+      const safeFilename = (serverFilename || `Payslip_${period.code || period.id}.pdf`)
+        .replace(/[\\/:*?"<>|]+/g, "_");
+
+      // Axios already returns Blob when responseType="blob"
+      const blob: Blob = res.data;
+      const url = window.URL.createObjectURL(blob);
+
+      // 1) Force download
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = safeFilename;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      // 2) Also open preview in new tab (no file:///)
+      // (If pop-up blocked, user can still open from Downloads folder)
+      window.open(url, "_blank", "noopener,noreferrer");
+
+      // Delay revoke
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 5000);
+
+      message.success("Payslip downloaded.");
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to download payslip PDF";
+      message.error(msg);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+    const canDownload =
+      !!result &&
+      (employee?.status === "Approved") &&
+      (period?.status === "Closed");
+
+      
   const statusMap: Record<EmployeeMini["status"], { text: string; color: string }> = {
     Pending: { text: "Pending", color: "default" },
     Verified: { text: "Verified", color: "blue" },
@@ -108,7 +173,9 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
     setLoading(true);
 
     try {
-      const res = await api.get(`/payroll/periods/${period.id}/employees/${employee.id}/payroll-result/`);
+      const res = await api.get(
+        `/payroll/periods/${period.id}/employees/${employee.id}/payroll-result/`
+      );
       setResult(res.data);
     } catch (err: any) {
       const msg =
@@ -126,6 +193,7 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
       loadPayrollResult();
     } else if (!open) {
       setResult(null);
+      setErrorDetail(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, employee?.id, period?.id]);
@@ -133,19 +201,28 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
   const lines = useMemo(() => {
     const raw = result?.lines || [];
 
+    // Hide Night Differential INFO line(s) for employee view
+    const filtered = raw.filter((l) => {
+      if (l.line_type !== "INFORMATION") return true;
+      const desc = (l.description || "").toLowerCase();
+      // matches: "Night Differential days: ..."
+      if (desc.startsWith("night differential days:")) return false;
+      return true;
+    });
+
     const typeOrder: Record<PayslipLine["line_type"], number> = {
       EARNING: 1,
       DEDUCTION: 2,
       INFORMATION: 3,
     };
-
+  
     const extractDate = (desc?: string) => {
       if (!desc) return null;
       const m = desc.match(/\b\d{4}-\d{2}-\d{2}\b/);
       return m ? m[0] : null;
     };
 
-    return [...raw].sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       const ta = typeOrder[a.line_type] ?? 99;
       const tb = typeOrder[b.line_type] ?? 99;
       if (ta !== tb) return ta - tb;
@@ -219,10 +296,17 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
       render: (v: string) => money(v),
     },
   ];
-
+  
   const isDeclined =
     result &&
     (result.ppe_status === "Declined" || (result.payroll_status || "").toLowerCase() === "disapproved");
+  const extractFilename = (contentDisposition?: string | null) => {
+      if (!contentDisposition) return null;
+
+      // supports: filename="Payslip_PP-20260201-20260215.pdf"
+      const match = contentDisposition.match(/filename="?([^"]+)"?/i);
+      return match?.[1] || null;
+    };
 
   return (
     <Modal
@@ -230,7 +314,7 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
       onCancel={onClose}
       footer={null}
       width={980}
-      title={employee ? `Payroll Result: ${employee.full_name}` : "Payroll Result"}
+      title={employee ? `Payslip: ${employee.full_name}` : "Payslip"}
       style={{ top: 60 }}
       destroyOnClose
     >
@@ -278,7 +362,16 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
                   <Button onClick={loadPayrollResult} disabled={loading}>
                     Refresh
                   </Button>
+                  <Button
+                    type="primary"
+                    onClick={downloadPayslipPDF}
+                    loading={downloading}
+                    disabled={loading || downloading || !canDownload}
+                  >
+                    Download Payslip (PDF)
+                  </Button>
                 </Space>
+             
               </div>
             </div>
           </div>
@@ -291,8 +384,8 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
             <Alert
               type="warning"
               showIcon
-              message="No payroll result found"
-              description={errorDetail || "Payroll may not have been generated yet for this employee in this period."}
+              message="No payslip found"
+              description={errorDetail || "Payroll may not have been generated yet for this payroll period."}
             />
           ) : (
             <>

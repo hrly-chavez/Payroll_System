@@ -5,7 +5,6 @@
 :global(.ant-picker-calendar-date) {
   padding: 0 !important;
   margin: 0 !important;
-  height: 110px !important;
 }
 
 :global(.ant-picker-calendar-date-content) {
@@ -30,11 +29,25 @@
 
 /* Softer grid */
 :global(.ant-picker-content td) {
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  transition: background 150ms ease, box-shadow 150ms ease;
+}
+
+:global(.ant-picker-content td:hover) {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+:global(.ant-picker-cell-selected .ant-picker-cell-inner) {
+  background: rgba(56, 111, 164, 0.12) !important;
+  border-radius: 10px;
+}
+
+:global(.ant-picker-cell-today .ant-picker-cell-inner) {
+  border: 2px solid #386fa4 !important;
+  border-radius: 10px;
 }
 
 :global(.ant-picker-content th) {
-  font-weight: 600;
   color: #0f172a;
 }
 
@@ -61,7 +74,6 @@
   position: absolute;
   top: 6px;
   left: 8px;
-  font-weight: 600;
   font-size: 13px;
   color: #0f172a;
 }

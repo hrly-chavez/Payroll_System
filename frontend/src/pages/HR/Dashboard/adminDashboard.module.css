@@ -1,3 +1,32 @@
+:root {
+  /* ===== Brand ===== */
+  --brand-600: #386fa4;
+  --brand-700: #2f5f8d;
+
+  /* ===== Neutrals ===== */
+  --bg-page: #f5f7fa;
+  --surface: #ffffff;
+  --border: rgba(15, 23, 42, 0.10);
+  --text: #0f172a;
+  --muted: #64748b;
+
+  /* ===== Radius ===== */
+  --radius-card: 12px;
+  --radius-pill: 999px;
+
+  /* ===== Elevation ===== */
+  --card-shadow-soft: 0 1px 2px rgba(0,0,0,0.06),
+                      0 8px 20px rgba(15, 23, 42, 0.06);
+
+  --card-shadow-medium: 0 2px 6px rgba(0,0,0,0.10),
+                        0 16px 28px rgba(15, 23, 42, 0.10);
+
+  /* ===== Focus Ring ===== */
+  --focus: 0 0 0 3px rgba(56, 111, 164, 0.18);
+}
+
+/* ================= Layout ================= */
+
 .content {
   margin: 16px;
 }
@@ -6,242 +35,183 @@
   margin-top: 20px;
 }
 
-.equalHeightRow .ant-col {
+/* Equal height rows (desktop only) */
+.equalHeightRow :global(.ant-col) {
   display: flex;
 }
 
-.equalHeightRow .ant-card {
+.equalHeightRow :global(.ant-col > *) {
   flex: 1;
 }
 
-/* Equal height smaller cards */
-.compactCard {
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-/* CALENDAR COMPACT SIZE */
-.calendarWrapper {
-  padding-top: 4px;
-}
-
-/* overall calendar height */
-:global(.ant-picker-calendar) {
-  height: auto;
-}
-
-/* week row height */
-:global(.ant-picker-content) tbody tr {
-  height: 34px;
-}
-
-/* shrink day cell spacing */
-:global(.ant-picker-cell) {
-  padding: 2px 0 !important;
-}
-
-/* smaller day numbers */
-:global(.ant-picker-cell-inner) {
-  font-size: 12px;
-}
-
-/* header dropdown spacing */
-:global(.ant-picker-calendar-header) {
-  padding-bottom: 6px;
-}
-
-
-/* CLOCK */
-.timeRow {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 0; /* remove extra space since we now use gap on parent */
-}
-
-.timeBox {
-  text-align: center;
-  border: 1px solid #cdcdcd;
-  padding: 14px 22px;      /* bigger so it “fills” the card */
-  border-radius: 12px;
-  min-width: 160px;        /* wider like your 2nd screenshot */
-}
-
-.timeBox span {
-  font-size: 12px;
-  color: #777;
-}
-
-
-.timeBox h2 {
-  font-size: 22px;         /* slightly bigger */
-  margin: 6px 0 0;
-}
-
-.buttonRow {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 14px;
-}
-
-.punchInBtn {
-  background-color: #386fa4 !important;
-  border-color: #386fa4 !important;
-  color: white !important;
-}
-
-.punchOutBtn {
-  background-color: #a9a9a9 !important;
-  border-color: #868686 !important;
-  color: white !important;
-}
-
-/* TODAY TABLE */
-.sectionCard {
-  margin-top: 16px;
-  border-radius: 10px;
-}
-
-/* Bottom cards */
-.bottomRow {
-  margin-top: 16px;
-}
-
-.equalCard {
-  height: 100%;
-}
-/* ================== GREETING ================== */
+/* ================= Greeting ================= */
 
 .greetingCard {
   padding: 16px 20px;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.05);
+  background: var(--surface);
+  border-radius: var(--radius-card);
   margin-bottom: 16px;
+  box-shadow: var(--card-shadow-soft);
+  border: 1px solid var(--border);
 
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 
 .greetingLeft {
   font-weight: 600;
   font-size: 16px;
-  color: #222;
+  color: var(--text);
 }
 
 .greetingName {
-  color: #1890ff;
+  color: var(--brand-600);
 }
 
-/* STATUS BADGE */
 .greetingStatus {
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Color Variants */
-.IN {
-  background: #e6f7ee;
-  color: #1f9d55;
-}
-
-.OUT {
-  background: #e6f0ff;
-  color: #2f54eb;
-}
-
-.NOT_IN {
-  background: #fff7e6;
-  color: #d48806;
-}
-/* ===== ANT DESIGN REQUEST TABS ===== */
-
-.requestUnderAttendance {
-  margin-top: 12px;
-}
-
-.requestCard {
-  border-radius: 12px;
-}
-
-/* Compact Ant Tabs */
-.requestTabsAnt :global(.ant-tabs-nav) {
-  margin-bottom: 0;
-}
-
-.requestTabsAnt :global(.ant-tabs-tab) {
-  padding: 3px 6px !important;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  white-space: nowrap;
 }
 
-.requestTabsAnt :global(.ant-tabs-tab-active .ant-tabs-tab-btn) {
-  font-weight: 400;
+.IN {
+  background: rgba(31, 157, 85, 0.12);
+  color: #137a3f;
+}
+.OUT {
+  background: rgba(47, 84, 235, 0.12);
+  color: #2446c7;
+}
+.NOT_IN {
+  background: rgba(212, 136, 6, 0.14);
+  color: #a36505;
 }
 
-.requestTabsAnt :global(.ant-tabs-ink-bar) {
-  height: 2px;
+/* ================= Base Card Styling ================= */
+
+.compactCard,
+.dateCard,
+.attendanceCard,
+.pendingCard,
+.calendarCard {
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  box-shadow: var(--card-shadow-soft);
 }
 
-/* Request list */
-.requestList {
-  padding: 6px 3px;
+/* Unify Ant Card header style */
+:global(.ant-card-head) {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08) !important;
 }
 
-.requestItem {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 4px;
-  font-size: 13px;
+:global(.ant-card-head-title) {
+  font-size: 16px !important;
+  font-weight: 650 !important;
+  color: var(--text) !important;
+  padding: 14px 0 !important;
 }
 
-.requestItem + .requestItem {
-  border-top: 1px solid #f0f0f0;
-}
-
-.requestRow {
-  margin-top: 8px; 
-}
-.companyNoteCard {
-  background: #e3f2fd;
-  border-radius: 12px;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.06);
-}
-
-.noteContent {
-  font-size: 14px;
-  line-height: 1.6;
-  color: #1fff1f1f;
-}
-
-.noteAuthor {
-  margin-top: 12px;
-  font-weight: 500;
-  font-style: italic;
-  color: #1565c0;
-}
-
-.mainSection {
-  margin-top: 20px;
-}
+/* ================= Date Card ================= */
 
 .dateCard {
-  height: 360px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+  min-height: 360px;
 }
-.attendanceCard :global(.ant-card-body) {
-  flex: 1;                 /* make body take remaining height */
+
+.dateCard :global(.ant-card-body) {
+  padding: 16px;
+}
+
+/* optional: make the donut sit centered nicely */
+.pieWrapper {
   display: flex;
-  align-items: center;      /* vertical center */
-  justify-content: center;  /* horizontal center */
+  justify-content: center;
+  align-items: center;
+  height: 100%;
 }
+
+/* ===== Admin Date Donut (Employee-style) ===== */
+.dateChartArea {
+  padding: 16px;
+}
+
+.chartWrapperAdmin {
+  height: clamp(160px, 20vw, 230px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Pro legend cards (same as employee) */
+.chartLegendAdmin {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.legendItem {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(15, 23, 42, 0.02);
+}
+
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+/* map dot colors */
+.legendDot[data-type="Reported"] { background: #386FA4; }
+.legendDot[data-type="Not Reported"] { background: #E5E7EB; }
+.legendDot[data-type="No data"] { background: #E5E7EB; }
+
+.legendText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.legendLabel {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.legendMeta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ================= Attendance Card ================= */
+
+.attendanceCard {
+  min-height: 360px;
+  display: flex;
+  flex-direction: column;
+}
+
+.attendanceCard :global(.ant-card-body) {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
 .attendanceCenter {
   width: 100%;
   display: flex;
@@ -249,102 +219,248 @@
   align-items: center;
   gap: 16px;
 }
-.attendanceCard {
-  height: 360px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+
+/* CLOCK */
+.timeRow {
   display: flex;
-  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: 14px;
+  margin-bottom: 0;
 }
 
-.companyNoteCard {
-  height: 360px;
-}
-.pieWrapper {
-  display: flex;
-  justify-content: center;   /* horizontal center */
-  align-items: center;       /* vertical center */
-  height: 100%;              /* take full card body height */
-}
-.cardSmall {
-  height: 280px;
+.timeBox {
+  padding: 14px 18px;
+  min-width: 160px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  background: rgba(15, 23, 42, 0.02);
+  text-align: center;
 }
 
-.cardMedium {
-  height: 340px;
-}
-
-.cardLarge {
-  height: 420px;
-}
-
-/* ================= PENDING REQUEST CARD ================= */
-
-.pendingCard {
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
-}
-
-/* Make card header blue */
-.pendingCard :global(.ant-card-head) {
-  background: #3f6f9c;
-  border-bottom: none;
-}
-
-.pendingCard :global(.ant-card-head-title) {
-  color: #ffffff;
+.timeBox span {
+  font-size: 12px;
+  color: var(--muted);
   font-weight: 600;
 }
 
-/* Remove extra spacing */
-.pendingCard :global(.ant-card-body) {
-  padding: 16px 20px;
-  border: 1px solid #3b73a8;
+.timeBox h2 {
+  margin-top: 6px;
+  font-size: 22px;
+  color: var(--text);
+  letter-spacing: 0.2px;
 }
 
-/* Tabs inside */
-.pendingTabs :global(.ant-tabs-nav) {
-  margin-bottom: 12px;
-}
-
-.pendingTabs :global(.ant-tabs-tab) {
-  font-size: 13px;
-  padding: 6px 10px !important; 
-}
-
-.pendingTabs :global(.ant-tabs-tab-active .ant-tabs-tab-btn) {
-  font-weight: 600;
-  color: #3f6f9c;
-}
-
-.pendingTabs :global(.ant-tabs-ink-bar) {
-  background: #3f6f9c;
-  height: 2px;
-}
-
-.dateCard,
-.attendanceCard {
-  min-height: 360px;
-}
-
-.calendarCard {
+/* Buttons */
+.buttonRow {
   display: flex;
-  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
 }
 
-.calendarCard :global(.ant-card-body) {
-  padding-top: 8px;
+.punchInBtn,
+.punchOutBtn {
+  height: 38px;
+  font-size: 14px;
+  border-radius: 10px !important;
+  padding: 0 14px;
+  transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 
+.punchInBtn {
+  background-color: var(--brand-600) !important;
+  border-color: var(--brand-600) !important;
+  color: #fff !important;
+}
 
+.punchInBtn:hover {
+  background-color: var(--brand-700) !important;
+  border-color: var(--brand-700) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(56, 111, 164, 0.18);
+}
 
+.punchOutBtn {
+  background: rgba(15, 23, 42, 0.08) !important;
+  border-color: rgba(15, 23, 42, 0.18) !important;
+  color: var(--text) !important;
+}
+
+.punchOutBtn:hover {
+  background: rgba(15, 23, 42, 0.12) !important;
+  border-color: rgba(15, 23, 42, 0.22) !important;
+  transform: translateY(-1px);
+}
+
+:global(.ant-btn[disabled]) {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
 
 .punchInHint {
   margin-top: 10px;
   font-size: 12px;
-  color: #666;
+  color: var(--muted);
   text-align: center;
   line-height: 1.4;
-  word-break: normal;
   white-space: normal;
+}
+
+/* ================= Pending Requests ================= */
+
+.pendingCard {
+  border-radius: 16px;
+  overflow: hidden;
+  border: none;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+/* Blue header (match Employee Status card behavior) */
+.pendingCard :global(.ant-card-head) {
+  background: var(--brand-600) !important;
+  border-bottom: none !important;
+}
+
+.pendingCard :global(.ant-card-head-title) {
+  color: #ffffff !important;
+  font-weight: 500 !important;
+  font-size: 15px !important;
+}
+
+/* body */
+.pendingCard :global(.ant-card-body) {
+  padding: 16px;
+  background: #ffffff;
+}
+
+/* Tabs inside pending */
+.pendingTabs :global(.ant-tabs-nav) {
+  margin-bottom: 12px !important;
+}
+
+.pendingTabs :global(.ant-tabs-tab) {
+  color: rgba(0, 0, 0, 0.65);
+  font-weight: 500;
+}
+
+.pendingTabs :global(.ant-tabs-tab-active .ant-tabs-tab-btn) {
+  color: var(--brand-600) !important;
+  font-weight: 650;
+}
+
+.pendingTabs :global(.ant-tabs-ink-bar) {
+  background: var(--brand-600) !important;
+  height: 2px;
+}
+
+/* ================= Calendar ================= */
+
+.calendarCard {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(6px);
+}
+
+.calendarCard :global(.ant-card-body) {
+  padding: 12px 14px;
+}
+
+/* Optional: softer borders inside calendar */
+.calendarCard :global(.ant-picker-calendar .ant-picker-content th),
+.calendarCard :global(.ant-picker-calendar .ant-picker-content td) {
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+/* ===================================================
+   RESPONSIVE BREAKPOINTS
+   =================================================== */
+
+/* ===== Tablet (≤1024px) ===== */
+@media (max-width: 1024px) {
+  :global(.ant-card-head-title) {
+    font-size: 15px !important;
+  }
+}
+
+/* ===== Tablet / Small Laptop (≤992px) ===== */
+@media (max-width: 992px) {
+  .dateCard,
+  .attendanceCard,
+  .pendingCard,
+  .calendarCard {
+    min-height: auto;
+  }
+}
+
+/* ===== Mobile (≤768px) ===== */
+@media (max-width: 768px) {
+  .content {
+    margin: 12px;
+  }
+
+  .greetingCard {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .timeRow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .timeBox {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .buttonRow {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .punchInBtn,
+  .punchOutBtn {
+    width: 100%;
+    height: 42px;
+  }
+
+  /* stop forced equal height stacking on mobile */
+  .equalHeightRow :global(.ant-col) {
+    display: block;
+  }
+
+  .equalHeightRow :global(.ant-col > *) {
+    flex: unset;
+  }
+
+  :global(.ant-card-body) {
+    padding: 14px !important;
+  }
+}
+
+/* ===== Small Mobile (≤480px) ===== */
+@media (max-width: 480px) {
+  .content {
+    margin: 8px;
+  }
+
+  .timeBox h2 {
+    font-size: 18px;
+  }
+
+  :global(.ant-card-body) {
+    padding: 12px !important;
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .chartLegendAdmin {
+    grid-template-columns: 1fr;
+  }
 }

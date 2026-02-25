@@ -1,393 +1,278 @@
+:root {
+  --brand-600: #386fa4;
+  --brand-700: #2f5f8d;
+
+  --bg-page: #f5f7fa;
+  --surface: #ffffff;
+  --border: rgba(15, 23, 42, 0.08);
+  --text: #0f172a;
+  --muted: #64748b;
+
+  --radius-card: 14px;
+
+  /* Proper layered elevation */
+  --shadow-soft: 0 1px 2px rgba(0,0,0,0.04),
+                 0 6px 16px rgba(15,23,42,0.05);
+
+  --shadow-medium: 0 4px 10px rgba(0,0,0,0.08),
+                   0 18px 32px rgba(15,23,42,0.10);
+}
+
 /* ================= Layout ================= */
 
 .dashboard-layout {
   min-height: 100vh;
-  background: #fff;
+  background: var(--bg-page);
 }
 
 .dashboard-content {
-  margin: 10px;
+  margin: 20px; /* increased breathing room */
 }
 
-/* Make cols stretch equal height (you already had this, keep it) */
-.dashboard-content .ant-row > .ant-col {
+/* Add vertical rhythm between major sections */
+.dashboard-content > .ant-row {
+  margin-bottom: 24px;
+}
+
+/* Equal height rows (desktop only) */
+.equalHeightRow .ant-col {
   display: flex;
-  flex-direction: column;
 }
 
-/* ================= Cards ================= */
-
-.card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
-  height: 100%;
-}
-
-.analytics-card {
-  min-height: 360px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+.equalHeightRow .ant-col > * {
   flex: 1;
 }
 
-.card-title {
-  text-align: center;
-  margin-bottom: 16px;
+/* ================= Card System ================= */
+
+.card,
+.analytics-card,
+.calendar-card,
+.stat-card {
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-soft);
+  transition: box-shadow 200ms ease, transform 200ms ease;
 }
 
-.calendar-card {
-  flex: 1;
+/* Subtle lift */
+.card:hover,
+.analytics-card:hover,
+.calendar-card:hover,
+.stat-card:hover {
+  box-shadow: var(--shadow-medium);
 }
 
-/* ================= Stats ================= */
+/* Ant Card header */
+.ant-card-head {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06) !important;
+}
+
+.ant-card-head-title {
+  font-size: 16px !important;
+  font-weight: 650 !important;
+  color: var(--text) !important;
+  padding: 16px 0 !important;
+}
+
+/* ================= DATE CARD ================= */
 
 .stat-card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 14px;
-  text-align: center;
+  min-height: 210px;
+}
 
+.stat-card .ant-card-body {
+  padding: 20px; /* more breathing */
+}
+
+/* Donut wrapper */
+.dateChartArea {
+  padding: 12px 0 0 0;
+}
+
+.chartWrapperAdmin {
+  height: clamp(160px, 20vw, 230px);
   display: flex;
-  flex-direction: column;
   justify-content: center;
   align-items: center;
-
-  height: 100%;
-  min-height: 200px;
-
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 }
 
-/* ===== TILE CARD LAYOUT ===== */
-
-.stat-tile {
-  height: 100%;
-  min-height: 200px;
-
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-
-  padding: 16px;
-}
-
-.tile-title {
-  font-size: 16px;
-  font-weight: 700;
-  text-align: center;
-  color: #3f6f9e;
-}
-
-.tile-body {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-}
-
-.tile-icon {
-  font-size: 42px;
-  opacity: 0.9;
-}
-
-.tile-value {
-  font-size: 42px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-/* ===== COLOR VARIANTS ===== */
-
-.stat-card.primary {
-  background: #3f6f9e;
-  color: #fff;
-}
-
-.stat-card.primary .tile-icon,
-.stat-card.primary .tile-value,
-.stat-card.primary .tile-title {
-  color: #fff;
-}
-
-.stat-card:not(.primary) {
-  background: #fff;
-}
-
-.stat-card:not(.primary) .tile-icon,
-.stat-card:not(.primary) .tile-value {
-  color: #3f6f9e;
-}
-
-/* ================= Hover Effects ================= */
-
-.stat-tile.clickable {
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.stat-tile.clickable:hover {
-  filter: brightness(1);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
-  transform: translateY(-2px);
-}
-
-/* ================= Filter Row (Segmented + DatePicker) ================= */
-
-.filter-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap; /* IMPORTANT for small screens */
-  margin-bottom: 16px;
-}
-
-/* Make controls not overflow on small devices */
-.filter-row .ant-segmented {
-  flex: 1 1 320px;
-  min-width: 240px;
-}
-
-.filter-row .ant-picker {
-  flex: 0 1 220px;
-  min-width: 180px;
-}
-
-
-/* ================= Detail Modal (Overtime / Requests) ================= */
-
-.detail-form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.detail-field {
-  display: flex;
-  flex-direction: column;
-}
-
-.detail-field label {
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 6px;
-  color: #000;
-}
-
-.detail-field input,
-.detail-field textarea {
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid #d9d9d9;
-  background: #fafafa;
-  color: #555;
-  font-size: 14px;
-}
-
-.detail-field input {
-  height: 40px;
-}
-
-.detail-field textarea {
-  resize: vertical;
-}
-
-.detail-modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.decline-textarea {
-  min-height: 100px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid #d9d9d9;
-  background: #fafafa;
-  color: #555;
-  font-size: 14px;
-  resize: vertical;
-}
-
-.decline-textarea:focus {
-  outline: none;
-  border-color: #1677ff;
-  background: #fff;
-}
-
-/* ================= Legend ================= */
-
-.legendSection {
-  padding-top: 4px;
+/* Legend */
+.chartLegendAdmin {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 20px;
 }
 
 .legendItem {
   display: flex;
+  gap: 10px;
   align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  margin-bottom: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: #f8fafc;
 }
 
-.legendGreen,
-.legendRed,
-.legendYellow,
-.legendGray {
+.legendDot {
   width: 10px;
   height: 10px;
-  border-radius: 3px;
+  border-radius: 999px;
 }
 
-.legendGreen { background: #3fa34d; }
-.legendRed { background: #d9534f; }
-.legendYellow { background: #f0ad4e; }
-.legendGray { background: #aaaaaa; }
+.legendDot[data-type="Reported"] { background: #386FA4; }
+.legendDot[data-type="Not Reported"] { background: #E5E7EB; }
 
-/* =======================================================
-   ✅ RESPONSIVE BREAKPOINTS
-   ======================================================= */
-
-/* XL desktops */
-@media (min-width: 1400px) {
-  .dashboard-content {
-    margin: 20px;
-  }
-  .card {
-    padding: 26px;
-  }
+.legendLabel {
+  font-size: 11px;
+  color: var(--text);
 }
 
-/* Laptops / medium desktops */
-@media (max-width: 1199px) {
+/* ================= STAT TILES ================= */
+
+.stat-tile {
+  min-height: 230px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Top dashboard cards unified height */
+.stat-card,
+.stat-tile,
+.company-note-card {
+  height: 410px;
+}
+
+.stat-tile:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-medium);
+}
+
+.tile-title {
+  font-size: 15px;
+  font-weight: 650;
+  color: #386fa4;
+  margin-bottom: auto;
+  text-align: center;
+  justify-content: flex-start;
+  }
+
+.tile-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  flex: 1;
+  margin-top: 10px;
+}
+
+.tile-icon {
+  font-size: 42px;
+  color: var(--brand-600);
+}
+
+.tile-value {
+  font-size: 46px;
+  font-weight: 500;
+  color: #386fa4;
+}
+
+/* Primary tile */
+.primary {
+  background: var(--brand-600);
+  border: none;
+  box-shadow: var(--shadow-soft);
+}
+
+.primary .tile-title,
+.primary .tile-icon,
+.primary .tile-value {
+  color: #ffffff;
+}
+
+/* ================= Analytics ================= */
+
+.analytics-card {
+  min-height: 360px;
+  padding: 20px;
+}
+
+.filter-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+/* ================= Calendar ================= */
+
+.calendar-card {
+  min-height: 360px;
+  padding: 16px;
+}
+
+/* ================= RESPONSIVE ================= */
+
+@media (max-width: 992px) {
   .stat-card,
-  .stat-tile {
-    min-height: 240px;
-  }
-
-  .tile-icon,
-  .tile-value {
-    font-size: 48px;
-  }
-
-  .tile-title {
-    font-size: 18px;
-  }
-
-  .analytics-card {
-    min-height: 300px;
+  .stat-tile,
+  .analytics-card,
+  .calendar-card {
+    min-height: auto;
   }
 }
 
-/* Tablets */
-@media (max-width: 991px) {
+@media (max-width: 768px) {
+
   .dashboard-content {
-    margin: 12px;
+    margin: 16px;
   }
 
-  .card {
-    padding: 18px;
+  .equalHeightRow .ant-col {
+    display: block;
   }
 
-  .stat-card,
-  .stat-tile {
-    min-height: 220px;
-    padding: 18px;
+  .equalHeightRow .ant-col > * {
+    flex: unset;
   }
 
-  .tile-icon,
-  .tile-value {
-    font-size: 44px;
+  .chartLegendAdmin {
+    grid-template-columns: 1fr;
+    margin-top: 12px;
+    gap: 10px;
   }
 
-  .tile-title {
-    font-size: 17px;
-  }
-
-  .analytics-card {
-    min-height: 320px;
-  }
-}
-
-/* Large phones */
-@media (max-width: 767px) {
-  .dashboard-content {
-    margin: 10px;
-  }
-
-  .card {
-    padding: 16px;
-    border-radius: 10px;
-  }
-
-  .stat-card,
-  .stat-tile {
-    min-height: 200px;
-    padding: 16px;
-  }
-
-  .tile-body {
-    gap: 12px;
-  }
-
-  .tile-icon,
-  .tile-value {
-    font-size: 40px;
-  }
-
-  .tile-title {
-    font-size: 16px;
-  }
-
-  /* filter row becomes stacked */
   .filter-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
+  flex-direction: column;
+  align-items: stretch;
+}
 
   .filter-row .ant-segmented,
   .filter-row .ant-picker {
     width: 100%;
-    min-width: 0;
-    flex: 1 1 auto;
-  }
-
-  .analytics-card {
-    min-height: 300px;
-  }
+}
 }
 
-/* Small phones */
 @media (max-width: 480px) {
+
   .dashboard-content {
-    margin: 8px;
+    margin: 12px;
   }
 
-  .card {
-    padding: 14px;
-  }
-
-  .stat-card,
-  .stat-tile {
-    min-height: 180px;
-    padding: 14px;
-  }
-
-  .tile-icon,
   .tile-value {
-    font-size: 36px;
+    font-size: 34px;
   }
 
-  .tile-title {
-    font-size: 15px;
-    color: #3f6f9e;
+  .tile-icon {
+    font-size: 34px;
   }
 
-  .card-title {
-    margin-bottom: 12px;
-    font-size: 14px;
-  }
+  .ant-card-body {
+  padding: 14px !important;
+}
 }

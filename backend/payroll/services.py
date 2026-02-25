@@ -1158,22 +1158,73 @@ class PayrollGenerationService:
 
     # -------------------------
     # Night differential (time overlap 22:00–06:00)
+    #CREATES PER-DAY LINES
     # -------------------------
-    def _apply_night_differential(self, payroll, attendance_map, rule_map, rates: Rates, late_dates: set[date]):
-        """
-        Apply night differential earnings for PRESENT attendance days.
+    # def _apply_night_differential(self, payroll, attendance_map, rule_map, rates: Rates, late_dates: set[date]):
+    #     """
+    #     Apply night differential earnings for PRESENT attendance days.
 
-        Rule:
-        - Uses Pay_Rule ("Night Differential", "Earning")
-        - Computes overlap minutes with night window (22:00–06:00)
-        - If rule is PER_DAY or FIXED:
-            - Voids night diff for that date if the employee was late (late_dates)
-        - Otherwise:
-            - Uses _compute_rule_amount with minutes as quantity
-        """
+    #     Rule:
+    #     - Uses Pay_Rule ("Night Differential", "Earning")
+    #     - Computes overlap minutes with night window (22:00–06:00)
+    #     - If rule is PER_DAY or FIXED:
+    #         - Voids night diff for that date if the employee was late (late_dates)
+    #     - Otherwise:
+    #         - Uses _compute_rule_amount with minutes as quantity
+    #     """
+    #     rule = rule_map.get(("Night Differential", "Earning"))
+    #     if not rule:
+    #         return
+
+    #     for d, att in attendance_map.items():
+    #         if att.status != "PRESENT":
+    #             continue
+
+    #         minutes = self._night_diff_minutes(att)
+    #         if minutes <= 0:
+    #             continue
+
+    #         # VOID per-day night diff if late on that day
+    #         if rule.rate_type in ("PER_DAY", "FIXED"):
+    #             if d in late_dates:
+    #                 continue
+
+    #             amount = _d2(rule.rate_value)
+    #             self._create_line(
+    #                 payroll,
+    #                 "EARNING",
+    #                 f"Night Differential ({d})",
+    #                 amount,
+    #                 rule=rule,
+    #                 source_type="ATTENDANCE",
+    #                 source_id=att.id,
+    #                 quantity_min=minutes,
+    #                 rate_applied=_safe_decimal(rule.rate_value),
+    #             )
+    #             continue
+
+    #         amount, rate_applied = self._compute_rule_amount(rule, minutes, rates)
+    #         if amount > 0:
+    #             self._create_line(
+    #                 payroll,
+    #                 "EARNING",
+    #                 f"Night Differential ({minutes} min)",
+    #                 amount,
+    #                 rule=rule,
+    #                 source_type="ATTENDANCE",
+    #                 source_id=att.id,
+    #                 quantity_min=minutes,
+    #                 rate_applied=rate_applied,
+    #             )
+    def _apply_night_differential(self, payroll, attendance_map, rule_map, rates: Rates, late_dates: set[date]):
         rule = rule_map.get(("Night Differential", "Earning"))
         if not rule:
             return
+
+        eligible_dates: list[date] = []
+        total_minutes = 0
+        total_amount = DEC_0
+        rate_applied = None
 
         for d, att in attendance_map.items():
             if att.status != "PRESENT":
@@ -1183,38 +1234,53 @@ class PayrollGenerationService:
             if minutes <= 0:
                 continue
 
-            # VOID per-day night diff if late on that day
-            if rule.rate_type in ("PER_DAY", "FIXED"):
-                if d in late_dates:
-                    continue
-
-                amount = _d2(rule.rate_value)
-                self._create_line(
-                    payroll,
-                    "EARNING",
-                    f"Night Differential ({d})",
-                    amount,
-                    rule=rule,
-                    source_type="ATTENDANCE",
-                    source_id=att.id,
-                    quantity_min=minutes,
-                    rate_applied=_safe_decimal(rule.rate_value),
-                )
+            # For PER_DAY/FIXED, void if late on that date
+            if rule.rate_type in ("PER_DAY", "FIXED") and d in late_dates:
                 continue
 
-            amount, rate_applied = self._compute_rule_amount(rule, minutes, rates)
-            if amount > 0:
-                self._create_line(
-                    payroll,
-                    "EARNING",
-                    f"Night Differential ({minutes} min)",
-                    amount,
-                    rule=rule,
-                    source_type="ATTENDANCE",
-                    source_id=att.id,
-                    quantity_min=minutes,
-                    rate_applied=rate_applied,
-                )
+            eligible_dates.append(d)
+            total_minutes += int(minutes)
+
+            if rule.rate_type in ("PER_DAY", "FIXED"):
+                # Add per eligible day
+                total_amount += _d2(_safe_decimal(rule.rate_value))
+                rate_applied = _safe_decimal(rule.rate_value)
+            else:
+                # MULTIPLIER / PER_MINUTE: compute based on minutes
+                amt, ra = self._compute_rule_amount(rule, minutes, rates)
+                total_amount += _d2(amt)
+                rate_applied = ra
+
+        if not eligible_dates or total_amount <= 0:
+            return
+
+        # One earning line
+        self._create_line(
+            payroll,
+            "EARNING",
+            f"Night Differential ({len(eligible_dates)} day/s)",
+            _d2(total_amount),
+            rule=rule,
+            source_type="ATTENDANCE",
+            source_id=None,                 # multiple attendances, so no single source_id
+            quantity_min=total_minutes,
+            rate_applied=rate_applied,
+        )
+
+        # One info line to show dates (employee-visible, no effect on totals)
+        # If you're worried about long text, we can chunk this into multiple INFO lines.
+        dates_str = ", ".join([x.isoformat() for x in sorted(eligible_dates)])
+        self._create_line(
+            payroll,
+            "INFORMATION",
+            f"Night Differential days: {dates_str}",
+            DEC_0,
+            rule=rule,
+            source_type="ATTENDANCE",
+            source_id=None,
+            quantity_min=None,
+            rate_applied=None,
+        )
 
     def _night_diff_minutes(self, att: Attendance) -> int:
         """

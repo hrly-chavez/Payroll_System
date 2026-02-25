@@ -15,7 +15,13 @@ from datetime import date
 from .services import PayrollGenerationService,get_latest_active_payroll
 from rest_framework.exceptions import PermissionDenied
 from django.db.models.fields import DateField, DateTimeField
-
+from io import BytesIO
+from django.http import FileResponse
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 
 # helpers
 def _overlaps_period(eff_from, eff_to, period_start, period_end):
@@ -1210,3 +1216,532 @@ class PayrollPeriodMarkPaidView(APIView):
 
         return Response({"detail": "Payroll period marked as Paid."}, status=http_status.HTTP_200_OK)
 
+
+#========================DOWNLOAD PAYROLL EACH EMPLOYEE=====================
+
+class EmployeePayrollDownloadPDFView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, period_id: int):
+        # employee ownership: do NOT accept employee_id from client
+        emp = getattr(request.user, "employee", None)
+        if not emp:
+            return Response(
+                {"detail": "No employee profile found for this user."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        # latest active payroll (exclude Void)
+        payroll = get_latest_active_payroll(period_id=period_id, employee_id=emp.id)
+        if payroll:
+            payroll = (
+                Payroll.objects
+                .filter(id=payroll.id)
+                .select_related("payroll_period", "employee", "employee__department")
+                .prefetch_related("payslip_lines", "payslip_lines__rule")
+                .first()
+            )
+
+        if not payroll:
+            return Response(
+                {"detail": "Payroll has not been generated for this employee in this period."},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+
+        period = payroll.payroll_period
+
+        # working days: count PRESENT attendance inside the period
+        working_days = Attendance.objects.filter(
+            employee=emp,
+            date__gte=period.start_date,
+            date__lte=period.end_date,
+            status="PRESENT",
+        ).count()
+
+        # ---- formatting helpers ----
+        def _money(v):
+            try:
+                x = Decimal(str(v or "0"))
+            except Exception:
+                x = Decimal("0")
+            return f"{x:,.2f}"
+
+        def _php(v):
+            return f"PHP {_money(v)}"
+
+        def _fmt_date(d):
+            if not d:
+                return "-"
+            return d.strftime("%b-%d-%Y")  # like your sample (Feb-15-2026)
+
+        def _fmt_period_range(s, e):
+            if not s or not e:
+                return "-"
+            # sample style: "Jan 22 - Feb 4"
+            return f"{s.strftime('%b %d')} - {e.strftime('%b %d')}"
+
+        # ---- line filtering (no statuses, no Night Differential INFO dates line) ----
+        lines = list(payroll.payslip_lines.all().order_by("id"))
+        filtered_lines = []
+        for ln in lines:
+            if ln.line_type == "INFORMATION":
+                desc = (ln.description or "").lower()
+                if desc.startswith("night differential days:"):
+                    continue
+            filtered_lines.append(ln)
+
+        earnings = [l for l in filtered_lines if l.line_type == "EARNING"]
+        deductions = [l for l in filtered_lines if l.line_type == "DEDUCTION"]
+
+        # ---- bucket mapping to resemble the Excel sheet ----
+        def _sum_amount(rows):
+            total = Decimal("0.00")
+            for r in rows:
+                try:
+                    total += Decimal(str(r.amount or "0"))
+                except Exception:
+                    continue
+            return total
+
+        def _desc_contains(row, needle: str) -> bool:
+            return needle in ((row.description or "").lower())
+
+        # EARNINGS buckets
+        pay_period_pay = _sum_amount([l for l in earnings if _desc_contains(l, "basic pay")])  # divide-2 salary
+        commission_amt = _sum_amount([l for l in earnings if _desc_contains(l, "commission:")])
+        night_diff_amt = _sum_amount([l for l in earnings if _desc_contains(l, "night differential")])
+
+        allowance_rows = [l for l in earnings if _desc_contains(l, "allowance:")]
+        parking_transpo_amt = _sum_amount([l for l in allowance_rows if ("parking" in (l.description or "").lower()) or ("transpo" in (l.description or "").lower())])
+        other_allowances_amt = _sum_amount([l for l in allowance_rows if l not in [x for x in allowance_rows if ("parking" in (x.description or "").lower()) or ("transpo" in (x.description or "").lower())]])
+
+        # "Adjustments" = everything not captured above (keeps the Excel-like fixed rows)
+        captured_earn_ids = set()
+        for l in earnings:
+            d = (l.description or "").lower()
+            if "basic pay" in d or "commission:" in d or "night differential" in d or "allowance:" in d:
+                captured_earn_ids.add(l.id)
+        adjustments_amt = _sum_amount([l for l in earnings if l.id not in captured_earn_ids]) + other_allowances_amt
+
+        # DEDUCTIONS buckets
+        def _ded_code(desc: str) -> str:
+            # your deduction lines are like "Deduction: SSS"
+            s = (desc or "").strip()
+            if s.lower().startswith("deduction:"):
+                return s.split(":", 1)[1].strip()
+            return s
+
+        cash_adv_amt = Decimal("0.00")
+        lates_absences_amt = Decimal("0.00")
+        sss_amt = Decimal("0.00")
+        philhealth_amt = Decimal("0.00")
+        pagibig_amt = Decimal("0.00")
+        income_tax_amt = Decimal("0.00")
+        other_ded_amt = Decimal("0.00")
+
+        for d in deductions:
+            desc_low = (d.description or "").lower()
+
+            # lates/undertimes/absent
+            if desc_low.startswith("late") or desc_low.startswith("undertime") or desc_low.startswith("absent"):
+                lates_absences_amt += Decimal(str(d.amount or "0"))
+                continue
+
+            # cash advance detection
+            code = _ded_code(d.description or "")
+            code_low = code.lower()
+
+            if "cash" in code_low and "advance" in code_low:
+                cash_adv_amt += Decimal(str(d.amount or "0"))
+            elif code_low == "sss":
+                sss_amt += Decimal(str(d.amount or "0"))
+            elif code_low == "philhealth":
+                philhealth_amt += Decimal(str(d.amount or "0"))
+            elif code_low in {"pag-ibig", "pagibig", "hdmf"}:
+                pagibig_amt += Decimal(str(d.amount or "0"))
+            elif code_low in {"income tax", "withholding tax", "tax"}:
+                income_tax_amt += Decimal(str(d.amount or "0"))
+            else:
+                other_ded_amt += Decimal(str(d.amount or "0"))
+
+        # If there are other deductions, add them into Income Tax line to keep the sheet compact
+        income_tax_amt = income_tax_amt + other_ded_amt
+
+        # ---- build PDF (Excel-like) ----
+        buffer = BytesIO()
+
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=landscape(letter),
+            leftMargin=0.5 * inch,
+            rightMargin=0.5 * inch,
+            topMargin=0.35 * inch,
+            bottomMargin=0.35 * inch,
+            title="Payslip",
+        )
+
+        usable_w = doc.width
+
+        styles = getSampleStyleSheet()
+        base = styles["Normal"]
+        base.fontSize = 9
+        base.leading = 11
+
+        blue = colors.HexColor("#1F4E79")   # close to your Excel header blue
+        light_blue = colors.HexColor("#9DC3E6")
+        yellow = colors.HexColor("#FFF2CC")
+        black = colors.black
+        white = colors.white
+
+        title_style = ParagraphStyle(
+            "title_style",
+            parent=base,
+            fontName="Helvetica-Bold",
+            fontSize=14,
+            alignment=1,
+            textColor=black,
+        )
+        header_style = ParagraphStyle(
+            "header_style",
+            parent=base,
+            fontName="Helvetica-Bold",
+            fontSize=11,
+            alignment=1,
+            textColor=white,
+        )
+        small_center_white = ParagraphStyle(
+            "small_center_white",
+            parent=base,
+            fontName="Helvetica-Oblique",
+            fontSize=9,
+            alignment=1,
+            textColor=white,
+        )
+
+        # --- MISSING STYLES (FIX) ---
+        section_style = ParagraphStyle(
+            "section_style",
+            parent=base,
+            fontName="Helvetica-Bold",
+            fontSize=10,
+            alignment=1,          # center
+            textColor=black,
+        )
+
+        label_style = ParagraphStyle(
+            "label_style",
+            parent=base,
+            fontName="Helvetica",
+            fontSize=9,
+            alignment=0,          # left
+            textColor=black,
+        )
+
+        amount_style = ParagraphStyle(
+            "amount_style",
+            parent=base,
+            fontName="Helvetica",
+            fontSize=9,
+            alignment=2,          # right
+            textColor=black,
+        )
+        # --- END FIX ---
+
+        elements = []
+
+        # Header band
+        header_tbl = Table(
+            [
+                [Paragraph("PAYSLIP", header_style)],
+                [Paragraph("ATTI_TECH", ParagraphStyle("h2", parent=header_style, fontSize=16))],
+                [Paragraph("EMPLOYEE PAYSLIP", header_style)],
+            ],
+            colWidths=[usable_w],
+        )
+        header_tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), blue),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        elements.append(header_tbl)
+        elements.append(Spacer(1, 8))
+
+        # Employee info block (left) + pay date block (right)
+        emp_name = f"{emp.fname} {emp.lname}".strip()
+        dept_name = emp.department.name if emp.department else "-"
+        role_name = (getattr(emp, "position", "") or "-")
+        ssn_like = getattr(emp, "id_no", None) or "-"  # you don't have SSN field; use id_no
+
+        pay_date = period.pay_date or None
+
+        col1 = 1.8 * inch
+        col3 = 2.0 * inch
+        col4 = 2.7 * inch
+        col2 = usable_w - (col1 + col3 + col4)
+
+        info_tbl = Table(
+            [
+                ["Employee Name", emp_name, "", Paragraph(_fmt_date(pay_date), base)],
+                ["SSN:", ssn_like, "Pay Period", _fmt_period_range(period.start_date, period.end_date)],
+                ["Department", dept_name, "Basic Gross Pay", f"PHP {_money(payroll.total_earnings)}"],
+                ["Role", role_name, "# of working days", str(working_days)],
+            ],
+            colWidths=[col1, col2, col3, col4],
+        )
+        info_tbl.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 1, black),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+
+            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTNAME", (2, 1), (2, -1), "Helvetica-Bold"),
+            ("FONTNAME", (2, 0), (2, 0), "Helvetica-Bold"),
+            ("FONTNAME", (3, 0), (3, 0), "Helvetica-Bold"),
+
+            # yellow pay date cell (top-right)
+            ("BACKGROUND", (3, 0), (3, 0), yellow),
+            ("ALIGN", (3, 0), (3, 0), "CENTER"),
+        ]))
+        elements.append(info_tbl)
+        elements.append(Spacer(1, 10))
+
+        # Earnings vs Deductions main grid
+        def _to_dec(v):
+            try:
+                return Decimal(str(v or "0"))
+            except Exception:
+                return Decimal("0")
+
+        def _clean_label(s: str) -> str:
+            return (s or "").strip()
+
+        def _is_basic_pay(desc: str) -> bool:
+            d = (desc or "").lower()
+            return "basic pay" in d
+
+        def _is_commission(desc: str) -> bool:
+            d = (desc or "").lower()
+            return d.startswith("commission:") or "commission" in d
+
+        def _is_allowance(desc: str) -> bool:
+            d = (desc or "").lower()
+            return d.startswith("allowance:") or "allowance" in d
+
+        def _is_night_diff(desc: str) -> bool:
+            d = (desc or "").lower()
+            return "night differential" in d
+
+        def _ded_label(desc: str) -> str:
+            # You use formats like "Deduction: SSS" or sometimes "SSS"
+            s = _clean_label(desc)
+            low = s.lower()
+            if low.startswith("deduction:"):
+                return _clean_label(s.split(":", 1)[1])
+            return s
+
+        def _is_lates_absences(desc: str) -> bool:
+            d = (desc or "").lower()
+            return d.startswith("late") or d.startswith("undertime") or d.startswith("absent")
+
+        # -------------------------
+        # Build dynamic EARNINGS rows
+        # -------------------------
+        pay_period_pay = _sum_amount([l for l in earnings if _is_basic_pay(l.description)])
+
+        earn_rows = []
+        earn_rows.append(["Pay Period Pay", _php(pay_period_pay)])
+
+        # Group commissions by label
+        commission_map = {}
+        for l in earnings:
+            if _is_commission(l.description):
+                label = _clean_label(l.description)  # keep "Commission: Sales" etc.
+                commission_map[label] = commission_map.get(label, Decimal("0.00")) + _to_dec(l.amount)
+
+        for label, amt in sorted(commission_map.items(), key=lambda x: x[0].lower()):
+            if amt != Decimal("0.00"):
+                earn_rows.append([label, _php(amt)])
+
+        # Group allowances by label
+        allow_map = {}
+        for l in earnings:
+            if _is_allowance(l.description):
+                label = _clean_label(l.description)  # keep "Allowance: Meal" etc.
+                allow_map[label] = allow_map.get(label, Decimal("0.00")) + _to_dec(l.amount)
+
+        for label, amt in sorted(allow_map.items(), key=lambda x: x[0].lower()):
+            if amt != Decimal("0.00"):
+                earn_rows.append([label, _php(amt)])
+
+        # Night differential (keep as its own row if present)
+        night_diff_amt = _sum_amount([l for l in earnings if _is_night_diff(l.description)])
+        if night_diff_amt != Decimal("0.00"):
+            earn_rows.append(["Night Differential", _php(night_diff_amt)])
+
+        # Adjustments = any other earning lines not captured above
+        captured_ids = set()
+
+        for l in earnings:
+            if _is_basic_pay(l.description) or _is_commission(l.description) or _is_allowance(l.description) or _is_night_diff(l.description):
+                captured_ids.add(l.id)
+
+        adjustments_amt = _sum_amount([l for l in earnings if l.id not in captured_ids])
+        if adjustments_amt != Decimal("0.00"):
+            earn_rows.append(["Adjustments", _php(adjustments_amt)])
+
+        # -------------------------
+        # Build dynamic DEDUCTIONS rows
+        # -------------------------
+        ded_rows = []
+        ded_rows.append(["Deductions", ""])
+
+        # Lates & Absences (group)
+        lates_absences_amt = _sum_amount([d for d in deductions if _is_lates_absences(d.description)])
+        if lates_absences_amt != Decimal("0.00"):
+            ded_rows.append(["Lates & Absences", _php(lates_absences_amt)])
+
+        # Group the rest by label (SSS, Philhealth, Pag-ibig, Income Tax, Cash Advance, etc.)
+        ded_map = {}
+        for d in deductions:
+            if _is_lates_absences(d.description):
+                continue
+            label = _ded_label(d.description)
+            ded_map[label] = ded_map.get(label, Decimal("0.00")) + _to_dec(d.amount)
+
+        # Optional: normalize common labels (so you get consistent names)
+        def _normalize_ded_label(label: str) -> str:
+            low = (label or "").lower().strip()
+            if "cash" in low and "advance" in low:
+                return "Cash Advance"
+            if low == "sss":
+                return "SSS"
+            if low in {"philhealth", "phil health"}:
+                return "Philhealth"
+            if low in {"pag-ibig", "pagibig", "hdmf"}:
+                return "Pag-ibig"
+            if low in {"income tax", "withholding tax", "tax"}:
+                return "Income Tax"
+            return label
+
+        normalized_map = {}
+        for label, amt in ded_map.items():
+            new_label = _normalize_ded_label(label)
+            normalized_map[new_label] = normalized_map.get(new_label, Decimal("0.00")) + amt
+
+        # Add rows sorted
+        for label, amt in sorted(normalized_map.items(), key=lambda x: x[0].lower()):
+            if amt != Decimal("0.00"):
+                ded_rows.append([label, _php(amt)])
+
+        # Build combined table with 4 columns: earn_label, earn_val, ded_label, ded_val
+        # Make both sides start AFTER their section header row
+        # earn_rows currently starts with ["Pay Period Pay", ...]
+        # ded_rows currently starts with ["Deductions", ""] then real rows
+        earn_items = earn_rows[:]  # keep as-is
+        ded_items = ded_rows[1:]   # skip the "Deductions" placeholder row (we will create a nicer header)
+
+        max_len = max(len(earn_items), len(ded_items))
+
+        grid_data = []
+
+        # SECTION HEADER ROW (spans 2 columns each)
+        grid_data.append([
+            Paragraph("EARNINGS", section_style), "",
+            Paragraph("DEDUCTIONS", section_style), ""
+        ])
+
+        # DATA ROWS
+        for i in range(max_len):
+            e = earn_items[i] if i < len(earn_items) else ["", ""]
+            d = ded_items[i] if i < len(ded_items) else ["", ""]
+
+            e_label = Paragraph(e[0] if e[0] else "", label_style)
+            e_amt   = Paragraph(e[1] if e[1] else "", amount_style)
+
+            d_label = Paragraph(d[0] if d[0] else "", label_style)
+            d_amt   = Paragraph(d[1] if d[1] else "", amount_style)
+
+            grid_data.append([e_label, e_amt, d_label, d_amt])
+
+        col_amt = 1.6 * inch
+        col_label = (usable_w - (2 * col_amt)) / 2  # split remaining equally
+
+        grid_tbl = Table(
+            grid_data,
+            colWidths=[col_label, col_amt, col_label, col_amt],
+            repeatRows=1,
+        )
+
+        grid_tbl.setStyle(TableStyle([
+            # Grid lines
+            ("GRID", (0, 0), (-1, -1), 1, black),
+
+            # Section header styling
+            ("SPAN", (0, 0), (1, 0)),
+            ("SPAN", (2, 0), (3, 0)),
+            ("BACKGROUND", (0, 0), (1, 0), colors.lightgrey),
+            ("BACKGROUND", (2, 0), (3, 0), colors.lightgrey),
+            ("ALIGN", (0, 0), (3, 0), "CENTER"),
+            ("VALIGN", (0, 0), (3, 0), "MIDDLE"),
+
+            # Alignment for amounts
+            ("ALIGN", (1, 1), (1, -1), "RIGHT"),
+            ("ALIGN", (3, 1), (3, -1), "RIGHT"),
+
+            # Vertical alignment (top looks better for wrapped lines)
+            ("VALIGN", (0, 1), (-1, -1), "TOP"),
+
+            # Padding (this is what makes it look like a payslip)
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(grid_tbl)
+        elements.append(Spacer(1, 10))
+
+        # Totals rows
+        totals_tbl = Table(
+            [
+                ["Total Earnings", _php(payroll.total_earnings), "Total Deductions", _php(payroll.total_deductions)],
+                ["Net Pay =", _php(payroll.net_pay), "", ""],
+            ],
+            colWidths=[col_label, col_amt, col_label, col_amt],  # SAME as grid
+        )
+        totals_tbl.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 1, black),
+            ("FONTNAME", (0, 0), (0, 0), "Helvetica-Bold"),
+            ("FONTNAME", (2, 0), (2, 0), "Helvetica-Bold"),
+            ("FONTNAME", (0, 1), (1, 1), "Helvetica-Bold"),
+            ("ALIGN", (1, 0), (1, 1), "RIGHT"),
+            ("ALIGN", (3, 0), (3, 0), "RIGHT"),
+
+            # Net pay row highlight (blue like sample)
+            ("BACKGROUND", (0, 1), (3, 1), light_blue),
+            ("SPAN", (2, 1), (3, 1)),
+            ("ALIGN", (0, 1), (0, 1), "RIGHT"),
+        ]))
+        elements.append(totals_tbl)
+        elements.append(Spacer(1, 12))
+
+        # Footer band
+        footer_tbl = Table(
+            [[Paragraph("If you have any questions about your payslip, please contact: Human Resource", small_center_white)]],
+            colWidths=[usable_w],
+        )
+        footer_tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), blue),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ]))
+        elements.append(footer_tbl)
+
+        doc.build(elements)
+        buffer.seek(0)
+
+        filename = f"Payslip_{period.code}.pdf"
+        return FileResponse(buffer, as_attachment=True, filename=filename, content_type="application/pdf")
+    

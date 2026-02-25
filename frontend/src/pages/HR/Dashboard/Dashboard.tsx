@@ -119,25 +119,91 @@ const Dashboard: React.FC = () => {
   
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [punchInEligibility, setPunchInEligibility] = useState<PunchInEligibilityResponse | null>(null);
-    const [loadingPunchInEligibility, setLoadingPunchInEligibility] = useState(false);
+  const [loadingPunchInEligibility, setLoadingPunchInEligibility] = useState(false);
 
   const [dailySummary, setDailySummary] = useState({
     present: 0,
     notReported: 0,
   });
 
-  // ================= DAILY PIE DATA =================
-  const dailyChartData = [
-    {
-      type: "Reported",
-      value: dailySummary.present,
-    },
-    {
-      type: "Not Reported",
-      value: dailySummary.notReported,
-    },
+  // ===== Admin Date Donut (Employee-style) =====
+  type AdminDailyRow = { type: "Reported" | "Not Reported" | "No data"; value: number };
+
+  const adminRawDaily: AdminDailyRow[] = [
+    { type: "Reported", value: dailySummary.present || 0 },
+    { type: "Not Reported", value: dailySummary.notReported || 0 },
+    { type: "No data", value: 0 }, // placeholder for typing; not rendered when data exists
   ];
 
+  const adminDailyTotal = (dailySummary.present || 0) + (dailySummary.notReported || 0);
+
+  const adminDailyFinal: AdminDailyRow[] =
+    adminDailyTotal === 0
+      ? [{ type: "No data", value: 1 }]
+      : [
+          { type: "Reported", value: dailySummary.present || 0 },
+          { type: "Not Reported", value: dailySummary.notReported || 0 },
+        ];
+
+  const adminDailyPercent = (value: number) =>
+    adminDailyTotal === 0 ? 0 : Math.round((value / adminDailyTotal) * 100);
+
+  const adminDailyConfig = {
+  data: adminDailyFinal,
+  angleField: "value",
+  colorField: "type",
+
+  radius: 0.98,
+  legend: false,
+
+  // smooth + crisp separators
+  animation: {
+    appear: { animation: "wave-in", duration: 800 },
+  },
+  interactions: [{ type: "element-active" }],
+
+  pieStyle: {
+    lineWidth: 2,
+    stroke: "#ffffff",
+  },
+
+  // ✅ FIX: disable labels to avoid "shape.inner" crash
+  label: false,
+
+  // center text
+  statistic: {
+    title: false,
+    content: {
+      style: {
+        whiteSpace: "pre-wrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        fontWeight: 800,
+        fontSize: "18px",
+        lineHeight: "22px",
+      },
+      content:
+        adminDailyTotal === 0
+          ? "No data"
+          : `${dailySummary.present || 0} / ${adminDailyTotal}\nreported`,
+    },
+  },
+
+  color: ({ type }: { type: string }) => {
+    switch (type) {
+      case "Reported":
+        return "#386FA4";
+      case "Not Reported":
+        return "#E5E7EB";
+      case "No data":
+        return "#E5E7EB";
+      default:
+        return "#E5E7EB";
+    }
+  },
+
+  appendPadding: 10,
+};
  /* =========================================================
       TIME STATES
      ========================================================= */
@@ -494,78 +560,37 @@ const Dashboard: React.FC = () => {
               title={selectedDate.format("MMMM D, YYYY")}
               className={`${styles.compactCard} ${styles.dateCard}`}
             >
-            <div style={{ padding: 20 }}>
-              {/* DAILY DONUT CHART */}
-              <Pie
-              data={[
-                { type: "Reported", value: dailySummary.present || 0 },
-                { type: "Not Reported", value: dailySummary.notReported || 0 },
-              ]}
-              angleField="value"
-              colorField="type"
-              radius={1}
-              innerRadius={0.75}
-              legend={false}
-              label={false}
-              tooltip={false}
-              height={170}
-              scale={{
-                color: {
-                  domain: ["Reported", "Not Reported"],
-                  range: ["#386FA4", "#D9D9D9"],
-                },
-              }}
-              statistic={{
-                title: false,
-                content: {
-                  style: {
-                    fontSize: "16px",
-                    fontWeight: 600,
-                  },
-                  formatter: () => {
-                    const reported = dailySummary.present || 0;
-                    const total =
-                      (dailySummary.present || 0) +
-                      (dailySummary.notReported || 0);
-
-                    return `${reported} / ${total}`;
-                  },
-                },
-              }}
-            />
-              {/* LEGEND */}
-              <div style={{ textAlign: "center", marginTop: 10 }}>
-                <span style={{ marginRight: 15 }}>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      width: 10,
-                      height: 10,
-                      background: "#d9d9d9",
-                      borderRadius: "50%",
-                      marginRight: 6,
-                    }}
-                  />
-                  Not Reported
-                </span>
-
-                <span>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      width: 10,
-                      height: 10,
-                      background: "#386FA4",
-                      borderRadius: "50%",
-                      marginRight: 6,
-                    }}
-                  />
-                  Reported
-                </span>
-              </div>
+            <div className={styles.dateChartArea}>
+            <div className={styles.chartWrapperAdmin}>
+              <Pie {...adminDailyConfig} />
             </div>
+
+            <div className={styles.chartLegendAdmin}>
+              {(adminDailyTotal === 0
+                ? [{ type: "No data" as const, value: 0 }]
+                : [
+                    { type: "Reported" as const, value: dailySummary.present || 0 },
+                    { type: "Not Reported" as const, value: dailySummary.notReported || 0 },
+                  ]
+              ).map((item) => (
+                <div key={item.type} className={styles.legendItem}>
+                  <span
+                    className={styles.legendDot}
+                    data-type={item.type}
+                    aria-hidden="true"
+                  />
+                  <div className={styles.legendText}>
+                    <div className={styles.legendLabel}>{item.type}</div>
+                    <div className={styles.legendMeta}>
+                      {item.value} • {adminDailyPercent(item.value)}%
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
           </Card>
-        </Col>
+          </Col>
 
         {/* ATTENDANCE */}
         <Col xs={24} md={8}>

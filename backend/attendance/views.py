@@ -262,6 +262,25 @@ class EmployeeAttendanceCorrectionCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         obj = serializer.save()
 
+        # Create a notification for SUPER_ADMIN users
+        admins = User.objects.filter(role='ADMIN')
+
+        employee_name = ""
+        if request.user.employee:
+            employee_name = f"{request.user.employee.fname} {request.user.employee.lname}"
+        else:
+            employee_name = request.user.user_name  # fallback
+
+        for admin in admins:
+            Notification.objects.create(
+                user=admin,
+                title="New Attendance Correction Request",
+                description=f"{employee_name} submitted an attendance correction request.",
+                category="attendance",
+                redirect_url="/admin/requests"
+            )
+
+
         return Response(
             {
                 "detail": "Attendance correction request submitted.",

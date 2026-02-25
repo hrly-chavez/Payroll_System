@@ -12,6 +12,9 @@ import NotificationPage from "./pages/Notifications/Notifications";
 /* UNAUTHORIZED */
 import Unauthorized from "./pages/Login/Unauthorized";
 
+/* RESET PASSWORD */
+import ResetPassword from "./pages/Login/ResetPassword";
+
 /* ================= EMPLOYEE ================= */
 import EmpDashboard from "./pages/Employee/Dashboard/Dashboard";
 import EmpAttendance from "./pages/Employee/Attendance/Attendance";
@@ -47,6 +50,7 @@ const Router: React.FC = () => {
         <Route path="/" element={<Login />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
         <Route path="/notification" element={<NotificationPage />} />
+        <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
 
         {/* ================= EMPLOYEE ROUTES ================= */}
         <Route element={<ProtectedRoute allowedRoles={["EMPLOYEE"]} />}>

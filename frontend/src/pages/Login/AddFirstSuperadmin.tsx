@@ -56,48 +56,112 @@ const AddFirstSuperadmin: React.FC<Props> = ({ open, onNext, onClose, mode }) =>
     api.get(`/employees/cities/${cityId}/barangays/`).then(res => setBarangays(res.data));
   };
 
+  const sanitizeInput = (value: string) => {
+    if (!value) return "";
+
+    // Trim
+    let sanitized = value.trim();
+
+    // Block HTML tags
+    sanitized = sanitized.replace(/<[^>]*>/g, "");
+
+    // Block < and >
+    sanitized = sanitized.replace(/[<>]/g, "");
+
+    // Normalize spaces
+    sanitized = sanitized.replace(/\s+/g, " ");
+
+    return sanitized;
+  };
+
+  const disablePastDates = (current: any) => {
+    return current && current < new Date().setHours(0, 0, 0, 0);
+  };
+
   const handleNext = async () => {
     try {
       const values = await form.validateFields();
       setLoading(true);
 
+      // Sanitize all string inputs
       const payload = {
-        fname: values.fname,
-        lname: values.lname,
-        initial: values.initial || "",
-        suffix: values.suffix || "",
-        contact_no: values.contact_no,
-        email: values.email,
+        fname: sanitizeInput(values.fname),
+        lname: sanitizeInput(values.lname),
+        initial: sanitizeInput(values.initial || ""),
+        suffix: sanitizeInput(values.suffix || ""),
+        contact_no: sanitizeInput(values.contact_no),
+        email: sanitizeInput(values.email),
         hired_date: values.hired_date.format("YYYY-MM-DD"),
-        position: values.position,
-        bank_info: values.bank_info || "",
+        position: sanitizeInput(values.position),
+        bank_info: sanitizeInput(values.bank_info || ""),
         status: values.status,
         address: {
-          street: values.address.street,
-          sitio: values.address.sitio || "",
-          barangay: values.address.barangay,
-          city: values.address.city,
-          province: values.address.province,
-          zip_code: values.address.zip_code || "",
+          street: sanitizeInput(values.address?.street || ""),
+          sitio: sanitizeInput(values.address?.sitio || ""),
+          barangay: values.address?.barangay,
+          city: values.address?.city,
+          province: values.address?.province,
+          zip_code: sanitizeInput(values.address?.zip_code || ""),
         },
       };
 
+      // Extra validation: block if any field still contains < >
+      const stringFields = Object.values(payload).flatMap(val =>
+        typeof val === "object" && val !== null
+          ? Object.values(val)
+          : val
+      );
+
+      if (stringFields.some(v => typeof v === "string" && /[<>]/.test(v))) {
+        message.error("Invalid characters detected.");
+        setLoading(false);
+        return;
+      }
+
       const res = await api.post("/employees/employees/create-first-superadmin/", payload);
 
-      message.success(`SUPER_ADMIN created! Username: ${res.data.username}, Password: ${res.data.password}`);
+      message.success(`SUPER_ADMIN created! Username: ${res.data.username} password: ${res.data.password}`);
+
       form.resetFields();
-      onNext(res.data.employee_id, { username: res.data.username, password: res.data.password });
+      onNext(res.data.employee_id, {
+        username: res.data.username,
+        password: res.data.password,
+      });
+
     } catch (err: any) {
       console.error(err);
-      message.error(
-        err.response?.data?.error ||
-        err.response?.data?.message ||
-        "Failed to create SUPER_ADMIN"
-      );
+
+      // --- Parse DRF field errors ---
+      if (err.response?.data) {
+        const data = err.response.data;
+        if (typeof data === "object") {
+          // DRF returns field errors as { field_name: [errors] }
+          const messages: string[] = [];
+          Object.values(data).forEach((val: any) => {
+            if (Array.isArray(val)) {
+              val.forEach(msg => messages.push(msg));
+            } else if (typeof val === "string") {
+              messages.push(val);
+            }
+          });
+
+          if (messages.length > 0) {
+            messages.forEach(msg => message.error(msg));
+          } else {
+            message.error("Failed to create SUPER_ADMIN");
+          }
+        } else if (typeof data === "string") {
+          message.error(data);
+        }
+      } else {
+        message.error("Failed to create SUPER_ADMIN");
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  
 
   return (
     <Modal
@@ -151,7 +215,10 @@ const AddFirstSuperadmin: React.FC<Props> = ({ open, onNext, onClose, mode }) =>
 
           <Col xs={24} md={12}>
             <Form.Item name="hired_date" label="Hired Date" rules={[{ required: true }]}>
-              <DatePicker style={{ width: "100%" }} />
+              <DatePicker
+                style={{ width: "100%" }}
+                disabledDate={disablePastDates}
+              />
             </Form.Item>
           </Col>
 
@@ -200,13 +267,13 @@ const AddFirstSuperadmin: React.FC<Props> = ({ open, onNext, onClose, mode }) =>
           </Col>
 
           <Col xs={24} md={12}>
-            <Form.Item name={["address", "street"]} label="Street" rules={[{ required: true }]}>
+            <Form.Item name={["address", "street"]} label="Street" >
               <Input />
             </Form.Item>
           </Col>
 
           <Col xs={24} md={12}>
-            <Form.Item name={["address", "zip_code"]} label="Zip Code" rules={[{ required: true }]}>
+            <Form.Item name={["address", "zip_code"]} label="Zip Code" >
               <Input maxLength={4} />
             </Form.Item>
           </Col>

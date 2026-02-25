@@ -30,4 +30,10 @@ urlpatterns = [
     path("company-notes/latest/", LatestCompanyNoteView.as_view(), name="latest-company-note"),
     path("company-notes/", CompanyNoteCreateView.as_view(), name="create-company-note"),
 
+    #forgot pass
+    path("forgot-password/", ForgotPasswordView.as_view()),
+    #reset pass
+    path("reset-password-confirm/", ResetPasswordConfirmView.as_view()),
+
+
 ]

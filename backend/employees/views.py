@@ -14,6 +14,14 @@ from django.core.mail import send_mail
 from django.contrib.auth.hashers import make_password
 from shared_model.signals import create_audit_log
 from datetime import timedelta
+from django.utils.http import urlsafe_base64_encode
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.encoding import force_bytes
+from django.core.mail import EmailMultiAlternatives
+from django.conf import settings
+from django.template.loader import render_to_string
+from django.contrib.auth import get_user_model
+from django.utils.http import urlsafe_base64_decode
 
 import logging
 import secrets
@@ -287,6 +295,40 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         user.save()
 
         # --------------------------
+        # SEND EMAIL
+        # --------------------------
+        try:
+            send_mail(
+                subject="Payroll System - SUPER ADMIN Account Created",
+                message=f"""
+                            Hello {employee.fname} {employee.lname},
+
+                            Your SUPER ADMIN account has been successfully created.
+
+                            Login Details:
+
+                            Username: {username}
+                            Temporary Password: {password}
+
+                            IMPORTANT:
+                            Please login immediately and change your password.
+
+                            Login here:
+                            http://localhost:3000/
+
+                            If you did not expect this email, please contact system support.
+
+                            Regards,
+                            Payroll System
+                            """,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[employee.email],
+                fail_silently=False,
+            )
+        except Exception as e:
+            print("Email sending failed:", str(e))
+
+        # --------------------------
         # MANUAL AUDIT LOG
         # --------------------------
         AuditLog.objects.create(
@@ -356,6 +398,60 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         user.set_password(password)
         user._current_user = signed_in_user
         user.save()
+
+        # -----------------------------
+        # 3.5 Send Credentials Email
+        # -----------------------------
+        try:
+            subject = "Your Payroll System Account Credentials"
+
+            context = {
+                "full_name": f"{employee.fname} {employee.lname}",
+                "username": username,
+                "password": password,
+            }
+
+            text_content = f"""
+        Hello {context['full_name']},
+
+        Your Payroll System account has been created.
+
+        Username: {username}
+        Password: {password}
+
+        Please log in and change your password immediately.
+
+        Regards,
+        Payroll System Admin
+        """
+
+            html_content = f"""
+            <p>Hello <strong>{context['full_name']}</strong>,</p>
+
+            <p>Your <strong>Payroll System</strong> account has been created.</p>
+
+            <p>
+                <strong>Username:</strong> {username}<br>
+                <strong>Password:</strong> {password}
+            </p>
+
+            <p>Please log in and change your password immediately.</p>
+
+            <br>
+            <p>Regards,<br>Payroll System Admin</p>
+            """
+
+            email = EmailMultiAlternatives(
+                subject,
+                text_content,
+                settings.DEFAULT_FROM_EMAIL,
+                [employee.email],  # send to employee email
+            )
+            email.attach_alternative(html_content, "text/html")
+            email.send(fail_silently=False)
+
+        except Exception as e:
+            print("Email sending failed:", str(e))
 
         # -----------------------------
         # 4. Create Salary
@@ -456,6 +552,103 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             "message": "Employee updated successfully",
             "employee": EmployeeSerializer(updated_employee).data
         })
+#forgot pass
+#undone logs
+User = get_user_model()
+
+class ForgotPasswordView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        username = request.data.get("username")
+
+        if not username:
+            return Response(
+                {"detail": "Username is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            user = User.objects.select_related("employee").get(user_name=username)
+        except User.DoesNotExist:
+            return Response(
+                {"detail": "If the account exists, a reset link has been sent."},
+                status=status.HTTP_200_OK
+            )
+
+        # 🔐 Make sure user has linked employee + email
+        if not user.employee or not user.employee.email:
+            return Response(
+                {"detail": "If the account exists, a reset link has been sent."},
+                status=status.HTTP_200_OK
+            )
+
+        email = user.employee.email
+
+        # Generate token
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+
+        reset_url = f"http://localhost:3000/reset-password/{uid}/{token}/"
+
+        send_mail(
+            subject="Payroll System Password Reset",
+            message=f"""
+                        Hello {user.user_name},
+
+                        Click the link below to reset your password:
+
+                        {reset_url}
+
+                        If you did not request this, please ignore this email.
+                        """,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+        )
+
+        return Response(
+            {"detail": "If the account exists, a reset link has been sent."},
+            status=status.HTTP_200_OK
+        )
+
+User = get_user_model()
+
+class ResetPasswordConfirmView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        uid = request.data.get("uid")
+        token = request.data.get("token")
+        password = request.data.get("password")
+
+        if not uid or not token or not password:
+            return Response(
+                {"detail": "Invalid request."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            user_id = urlsafe_base64_decode(uid).decode()
+            user = User.objects.get(pk=user_id)
+        except Exception:
+            return Response(
+                {"detail": "Invalid link."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not default_token_generator.check_token(user, token):
+            return Response(
+                {"detail": "Token expired or invalid."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user.set_password(password)
+        user.save()
+
+        return Response(
+            {"detail": "Password reset successful."},
+            status=status.HTTP_200_OK
+        )
 
 #done logs
 #employee salary

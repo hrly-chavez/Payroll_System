@@ -6,6 +6,7 @@ import { UserOutlined, LockOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import styles from "./login_styles.module.css";
 import api from "../../api/axios";
+import ForgotPasswordModal from "./ForgotPasswordModal";
 
 // NEW import for first-time super admin creation
 import AddFirstSuperadmin from "./AddFirstSuperadmin";
@@ -19,6 +20,9 @@ export default function Login() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  //for modal
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
 
   const [showSuperAdminModal, setShowSuperAdminModal] = useState(false);
   
@@ -164,6 +168,15 @@ export default function Login() {
                 }}
               />
             </Form.Item>
+            <div style={{ textAlign: "right", marginBottom: "10px" }}>
+              <Button
+                type="link"
+                style={{ padding: 0 }}
+                onClick={() => setForgotPasswordOpen(true)}
+              >
+                Forgot Password?
+              </Button>
+            </div>
 
             <Button
               type="primary"
@@ -189,6 +202,11 @@ export default function Login() {
           mode="SUPERADMIN_SETUP"
         />
       )}
+
+      <ForgotPasswordModal
+        open={forgotPasswordOpen}
+        onClose={() => setForgotPasswordOpen(false)}
+      />
 
     </div>
   );

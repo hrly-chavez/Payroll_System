@@ -1,6 +1,9 @@
 from rest_framework import serializers
 from shared_model.models import *
 from django.utils import timezone
+from django.utils.html import strip_tags
+import re
+from datetime import date
 
 #---------------------address
 
@@ -165,6 +168,69 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
             "shift", "department", "address",
         ]
 
+    # -------------------------
+    # GLOBAL STRING SANITIZER
+    # -------------------------
+    def sanitize_string(self, value):
+        if not value:
+            return value
+
+        value = value.strip()
+        value = strip_tags(value)          # remove html tags
+        value = re.sub(r"[<>]", "", value) # remove < >
+        value = re.sub(r"\s+", " ", value) # normalize spaces
+
+        return value
+
+    # -------------------------
+    # FIELD VALIDATIONS
+    # -------------------------
+
+    def validate_fname(self, value):
+        return self.sanitize_string(value)
+
+    def validate_lname(self, value):
+        return self.sanitize_string(value)
+
+    def validate_initial(self, value):
+        return self.sanitize_string(value)
+
+    def validate_suffix(self, value):
+        return self.sanitize_string(value)
+
+    def validate_position(self, value):
+        return self.sanitize_string(value)
+
+    def validate_bank_info(self, value):
+        return self.sanitize_string(value)
+
+    def validate_contact_no(self, value):
+        value = self.sanitize_string(value)
+
+        if not re.match(r"^[0-9]{10,12}$", value):
+            raise serializers.ValidationError(
+                "Contact number must be 10-12 digits."
+            )
+        return value
+
+    def validate_email(self, value):
+        value = self.sanitize_string(value)
+
+        if "<" in value or ">" in value:
+            raise serializers.ValidationError("Invalid email format.")
+
+        return value.lower()
+
+    def validate_hired_date(self, value):
+        if value < date.today():
+            raise serializers.ValidationError(
+                "Hired date cannot be in the past."
+            )
+        return value
+
+    # -------------------------
+    # CREATE METHOD
+    # -------------------------
     def create(self, validated_data):
         # extract _current_user if passed from view
         user = validated_data.pop("_current_user", None)

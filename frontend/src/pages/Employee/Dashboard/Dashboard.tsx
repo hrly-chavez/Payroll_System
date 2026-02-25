@@ -652,7 +652,7 @@ const payrollColumns = useMemo(() => {
               </div>
             </Card>
               {/* PAYSLIP & ATTENDANCE CORRECTION STATUS */}
-            <Card title="Information" className={styles.statusCard}>
+            <Card title="Status" className={styles.statusCard}>
               <Tabs
                 defaultActiveKey="payslip"
                 items={[

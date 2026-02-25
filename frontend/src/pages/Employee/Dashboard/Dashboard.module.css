@@ -67,7 +67,6 @@
 }
 
 .greetingLeft {
-  font-weight: 600;
   font-size: 16px;
   color: var(--text);
 }
@@ -80,7 +79,6 @@
   padding: 7px 14px;
   border-radius: var(--radius-pill);
   font-size: 12px;
-  font-weight: 700;
   letter-spacing: 0.2px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   white-space: nowrap;
@@ -150,12 +148,10 @@
 
 .statusCard :global(.ant-tabs-tab) {
   color: rgba(0, 0, 0, 0.65);
-  font-weight: 500;
 }
 
 .statusCard :global(.ant-tabs-tab-active .ant-tabs-tab-btn) {
   color: #386fa4 !important;
-  font-weight: 600;
 }
 
 .statusCard :global(.ant-tabs-ink-bar) {
@@ -167,7 +163,6 @@
 /* Header title */
 .statusCard :global(.ant-card-head-title) {
   color: #ffffff !important;
-  font-weight: 650;
   font-size: 15px;
 }
 
@@ -183,7 +178,6 @@
 
 :global(.ant-card-head-title) {
   font-size: 16px !important;
-  font-weight: 650 !important;
   color: var(--text) !important;
   padding: 14px 0 !important;
 }
@@ -210,13 +204,11 @@
 .timeBox span {
   font-size: 12px;
   color: var(--muted);
-  font-weight: 600;
 }
 
 .timeBox h2 {
   margin-top: 6px;
   font-size: 22px;
-  font-weight: 750;
   color: var(--text);
   letter-spacing: 0.2px;
 }
@@ -234,7 +226,6 @@
   height: 38px;
   font-size: 14px;
   border-radius: 10px !important;
-  font-weight: 650;
   padding: 0 14px;
   transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
@@ -333,7 +324,6 @@
 
 .legendLabel {
   font-size: 13px;
-  font-weight: 700;
   color: var(--text);
 }
 
@@ -352,7 +342,6 @@
 
 .attendanceTitle {
   font-size: 15px;
-  font-weight: 700;
   color: var(--text);
 }
 
@@ -417,7 +406,6 @@
 
 .payslipStatus {
   font-size: 13px;
-  font-weight: 650;
   color: var(--text);
 }
 

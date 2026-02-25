@@ -48,15 +48,23 @@ const AddEmployeeFlow: React.FC<Props> = ({ open, departmentId, onClose }) => {
   // -----------------------------
   // FINAL SUBMIT AFTER ALLOWANCES
   // -----------------------------
-  const handleFinalSubmit = async (finalAllowances: any[]) => {
+  const handleFinalSubmit = async (
+    finalAllowances: any[] = [],
+    roleOverride?: string
+  ) => {
+    const roleToUse = roleOverride || selectedRole;
+
     try {
       const payload = {
         ...employeeDetails,
-        role: selectedRole,
-        salary: salaryData,
-        contributions: contributionsData,
-        allowances: finalAllowances, // use direct value
+        role: roleToUse,
+        salary: roleToUse === "SUPER_ADMIN" ? null : salaryData,
+        contributions: roleToUse === "SUPER_ADMIN" ? [] : contributionsData,
+        allowances: finalAllowances,
       };
+
+      console.log("ROLE BEING SENT:", roleToUse);
+      console.log("FULL PAYLOAD:", payload);
 
       const res = await api.post(
         "/employees/employees/create-full-employee/",
@@ -85,8 +93,13 @@ const AddEmployeeFlow: React.FC<Props> = ({ open, departmentId, onClose }) => {
           initialValues={employeeDetails}
           onNext={(data) => {
             setEmployeeDetails(data);
-            setSelectedRole(data.role); // get role from data
-            setStep(2);
+
+            if (data.role === "SUPER_ADMIN") {
+              handleFinalSubmit([], data.role); // pass role directly
+            } else {
+              setSelectedRole(data.role);
+              setStep(2);
+            }
           }}
           onClose={onClose}
         />

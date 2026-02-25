@@ -225,13 +225,30 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         if self.action == "create_first_superadmin":
             return [AllowAny()]  # bypass auth completely
         return [IsAuthenticated(), IsRole()]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        queryset = super().get_queryset()
+
+        # If ADMIN → hide SUPER_ADMIN employees
+        if user.role == "ADMIN":
+            queryset = queryset.exclude(user__role="SUPER_ADMIN")
+
+        return queryset
     
     # public actions (unauthenticated) only for first superadmin
     public_actions = ['create_first_superadmin']
 
     @action(detail=False, methods=["get"], url_path=r"by-department/(?P<dept_id>\d+)")
     def by_department(self, request, dept_id=None):
+        user = request.user
         employees = self.queryset.filter(department_id=dept_id)
+
+        # If logged-in user is ADMIN, exclude SUPER_ADMIN employees
+        if user.role == "ADMIN":
+            employees = employees.exclude(user__role="SUPER_ADMIN")
+
         serializer = self.get_serializer(employees, many=True)
         return Response(serializer.data)
     

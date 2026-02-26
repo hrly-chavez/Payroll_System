@@ -63,32 +63,62 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     serializer_class = DepartmentSerializer
     public_actions = ['list', 'retrieve']
 
+    # ---------------- CREATE ----------------
+    @transaction.atomic
     def create(self, request, *args, **kwargs):
+        holiday_base = request.data.get("holiday_base")
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # Manually create instance
+        # Create Department
         department = Department(**serializer.validated_data)
-        department._current_user = request.user  # attach before saving
+        department._current_user = request.user
         department.save()
 
+        # Create DepartmentHolidayCalendar
+        if holiday_base:
+            DepartmentHolidayCalendar.objects.create(
+                department=department,
+                base=holiday_base,
+            )
+        else:
+            raise ValidationError({"holiday_base": "This field is required."})
+
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-    
+
+    # ---------------- UPDATE ----------------
+    @transaction.atomic
     def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
+        partial = kwargs.pop("partial", False)
         instance = self.get_object()
 
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        holiday_base = request.data.get("holiday_base")
+
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=partial
+        )
         serializer.is_valid(raise_exception=True)
 
-        # Attach user BEFORE saving
+        # Attach user before saving
         instance._current_user = request.user
-
         self.perform_update(serializer)
 
+        # Update Holiday Calendar
+        if holiday_base:
+            # Remove old holiday base
+            DepartmentHolidayCalendar.objects.filter(
+                department=instance
+            ).update(is_active=False)
+
+            # Create new active one
+            DepartmentHolidayCalendar.objects.update_or_create(
+                department=instance,
+                base=holiday_base,
+                defaults={"is_active": True},
+            )
+
         return Response(serializer.data)
-
-
 
 # para ni sa populate ang shifts sa drop down
 class ShiftViewSet(viewsets.ModelViewSet):

@@ -8,7 +8,7 @@ import {
   Divider,
   Select,
 } from "antd";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import api from "api/axios";
 import dayjs from "dayjs";
 
@@ -38,20 +38,71 @@ const EmployeeContributionsModal: React.FC<Props> = ({
 
   const MANDATORY_DEDUCTIONS = ["SSS", "PHILHEALTH", "PAGIBIG"];
 
-  // preload values when editing
+  const isMandatoryCode = (code: any) =>
+    MANDATORY_DEDUCTIONS.includes(String(code || "").toUpperCase());
+
+  // 🔒 Strict numeric blockers (type + paste)
+  const blockNonNumeric = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    const allowedNav = [
+      "Backspace",
+      "Delete",
+      "Tab",
+      "Enter",
+      "ArrowLeft",
+      "ArrowRight",
+      "Home",
+      "End",
+    ];
+    if (allowedNav.includes(e.key)) return;
+
+    const isDigit = /^[0-9]$/.test(e.key);
+    const isDot = e.key === ".";
+
+    const input = e.currentTarget;
+    const current = input.value || "";
+
+    if (!isDigit && !isDot) {
+      e.preventDefault();
+      return;
+    }
+    if (isDot && current.includes(".")) {
+      e.preventDefault();
+    }
+  };
+
+  const blockBeforeInput = (e: React.FormEvent<HTMLInputElement>) => {
+    const native = e.nativeEvent as InputEvent;
+    const data = native.data;
+    if (!data) return;
+
+    if (!/^[0-9.]$/.test(data)) {
+      native.preventDefault();
+      return;
+    }
+
+    const input = e.currentTarget as HTMLInputElement;
+    if (data === "." && input.value.includes(".")) {
+      native.preventDefault();
+    }
+  };
+
+  const blockPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const text = e.clipboardData.getData("text") ?? "";
+    if (!/^\d*\.?\d*$/.test(text.trim())) {
+      e.preventDefault();
+    }
+  };
+
+  // preload effective date when editing
   useEffect(() => {
     if (open && initialValues?.length) {
-      // Enable those previously saved
-      setEnabledDeductions(initialValues.map((d) => d.deduction_type));
-
-      // Pre-fill system_deductions (by matching to deductionTypes later)
       const effectiveFrom = initialValues[0]?.effective_from
         ? dayjs(initialValues[0].effective_from)
         : undefined;
 
-      form.setFieldsValue({
-        effective_from: effectiveFrom,
-      });
+      form.setFieldsValue({ effective_from: effectiveFrom });
     }
   }, [open, initialValues, form]);
 
@@ -72,18 +123,20 @@ const EmployeeContributionsModal: React.FC<Props> = ({
 
         setDeductionTypes(computed);
 
-        // ✅ enable mandatory by default + also enable existing saved deductions (edit mode)
+        // enable mandatory by default + also enable existing saved deductions (edit mode)
         const mandatoryIds = computed
-          .filter((d: any) => MANDATORY_DEDUCTIONS.includes(d.code))
+          .filter((d: any) => isMandatoryCode(d.code))
           .map((d: any) => d.id);
 
         const initialEnabledIds = initialValues?.length
           ? initialValues.map((x) => x.deduction_type)
           : [];
 
-        setEnabledDeductions(Array.from(new Set([...mandatoryIds, ...initialEnabledIds])));
+        setEnabledDeductions(
+          Array.from(new Set([...mandatoryIds, ...initialEnabledIds]))
+        );
 
-        // ✅ map initialValues into the correct indexes (important!)
+        // map initialValues into the correct indexes
         if (initialValues?.length) {
           const indexed: any[] = new Array(computed.length).fill(null).map(() => ({
             amount: undefined,
@@ -91,7 +144,9 @@ const EmployeeContributionsModal: React.FC<Props> = ({
           }));
 
           for (const saved of initialValues) {
-            const idx = computed.findIndex((d: any) => d.id === saved.deduction_type);
+            const idx = computed.findIndex(
+              (d: any) => d.id === saved.deduction_type
+            );
             if (idx !== -1) {
               indexed[idx] = {
                 amount: saved.amount,
@@ -117,6 +172,16 @@ const EmployeeContributionsModal: React.FC<Props> = ({
     load();
   }, [open, salaryBase, initialValues, form]);
 
+  const enableOptional = (id: number) => {
+    setEnabledDeductions((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  };
+
+  const removeOptional = (id: number, index: number) => {
+    setEnabledDeductions((prev) => prev.filter((x) => x !== id));
+    form.setFieldValue(["system_deductions", index, "amount"], undefined);
+    form.setFieldValue(["system_deductions", index, "frequency"], undefined);
+  };
+
   /* -------------------- SUBMIT -------------------- */
   const submit = async () => {
     try {
@@ -128,22 +193,17 @@ const EmployeeContributionsModal: React.FC<Props> = ({
 
       const deductions = deductionTypes
         .map((d, index) => {
-          const isMandatory = MANDATORY_DEDUCTIONS.includes(d.code);
-          const isEnabled = isMandatory || enabledDeductions.includes(d.id);
+          const mandatory = isMandatoryCode(d.code);
+          const enabled = mandatory || enabledDeductions.includes(d.id);
 
           // optional but not enabled → skip
-          if (!isEnabled) return null;
+          if (!enabled) return null;
 
           const amount = values.system_deductions?.[index]?.amount;
           const frequency = values.system_deductions?.[index]?.frequency;
 
-          // mandatory always required
-          if (isMandatory && (amount === undefined || frequency === undefined)) {
-            throw new Error(`Please complete amount and frequency for ${d.code}`);
-          }
-
-          // optional required only when enabled
-          if (!isMandatory && (amount === undefined || frequency === undefined)) {
+          // required when shown (mandatory OR enabled optional)
+          if (amount === undefined || frequency === undefined) {
             throw new Error(`Please complete amount and frequency for ${d.code}`);
           }
 
@@ -163,17 +223,6 @@ const EmployeeContributionsModal: React.FC<Props> = ({
     }
   };
 
-  const enableOptional = (id: number) => {
-    setEnabledDeductions((prev) => (prev.includes(id) ? prev : [...prev, id]));
-  };
-
-  const removeOptional = (id: number, index: number) => {
-    setEnabledDeductions((prev) => prev.filter((x) => x !== id));
-    // ✅ clear values so it won't submit or look filled later
-    form.setFieldValue(["system_deductions", index, "amount"], undefined);
-    form.setFieldValue(["system_deductions", index, "frequency"], undefined);
-  };
-
   return (
     <Modal
       open={open}
@@ -186,15 +235,15 @@ const EmployeeContributionsModal: React.FC<Props> = ({
         <Divider>Government Contributions</Divider>
 
         {deductionTypes.map((d, index) => {
-          const isMandatory = MANDATORY_DEDUCTIONS.includes(d.code);
-          const isEnabled = isMandatory || enabledDeductions.includes(d.id);
+          const mandatory = isMandatoryCode(d.code);
+          const enabled = mandatory || enabledDeductions.includes(d.id);
 
           const calcType = String(d.calculation_type || "");
           const isFixed = calcType.toLowerCase() === "fixed";
           const isPercent = calcType.toLowerCase() === "percent";
 
-          // ✅ OPTIONAL NOT ADDED YET: show only title + Add
-          if (!isMandatory && !isEnabled) {
+          // OPTIONAL not added yet: show only title + Add
+          if (!mandatory && !enabled) {
             return (
               <div
                 key={d.id}
@@ -217,7 +266,7 @@ const EmployeeContributionsModal: React.FC<Props> = ({
             );
           }
 
-          // ✅ Mandatory OR Enabled Optional: show inputs
+          // Mandatory OR Enabled Optional: show inputs
           return (
             <div
               key={d.id}
@@ -235,7 +284,7 @@ const EmployeeContributionsModal: React.FC<Props> = ({
                 initialValue={d.computed_amount}
                 rules={[
                   {
-                    required: isEnabled, // if shown, must be filled
+                    required: true,
                     message: `Please enter amount for ${d.code}`,
                   },
                 ]}
@@ -243,11 +292,14 @@ const EmployeeContributionsModal: React.FC<Props> = ({
                 <InputNumber
                   style={{ width: "100%" }}
                   min={0}
-                  step={0.01}
-                  // ✅ Fixed should not be editable
+                  precision={2}
+                  controls={false}
+                  inputMode="decimal"
                   disabled={isFixed}
-                  // Optional: show % for percent type
                   addonAfter={isPercent ? "%" : undefined}
+                  onKeyDown={blockNonNumeric}
+                  onBeforeInput={blockBeforeInput}
+                  onPaste={blockPaste}
                 />
               </Form.Item>
 
@@ -256,7 +308,7 @@ const EmployeeContributionsModal: React.FC<Props> = ({
                 label="Frequency"
                 rules={[
                   {
-                    required: isEnabled,
+                    required: true,
                     message: `Please select frequency for ${d.code}`,
                   },
                 ]}
@@ -268,8 +320,12 @@ const EmployeeContributionsModal: React.FC<Props> = ({
                 </Select>
               </Form.Item>
 
-              {!isMandatory && (
-                <Button type="link" danger onClick={() => removeOptional(d.id, index)}>
+              {!mandatory && (
+                <Button
+                  type="link"
+                  danger
+                  onClick={() => removeOptional(d.id, index)}
+                >
                   Remove
                 </Button>
               )}

@@ -131,6 +131,7 @@ const Payroll: React.FC = () => {
               dataSource={rows}
               rowKey={(row) => String(row.period_id)}
               loading={loading}
+              scroll={{ x: "max-content" }}
               size="large"
               pagination={{ pageSize: 8 }}
               onRow={(row) => ({

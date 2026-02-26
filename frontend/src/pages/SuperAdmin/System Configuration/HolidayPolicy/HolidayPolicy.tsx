@@ -222,6 +222,7 @@ const HolidayPolicy = ({ active }: Props) => {
           dataSource={policies}
           style={{ marginTop: 16 }}
           pagination={{ pageSize: 10 }}
+          scroll={{ x: "max-content" }}
         />
       )}
 

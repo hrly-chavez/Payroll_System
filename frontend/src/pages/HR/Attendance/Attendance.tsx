@@ -411,7 +411,8 @@ const columns = [
               loading={loading}
               dataSource={rows}
               columns={columns as any}
-              pagination={{ pageSize: 10, showSizeChanger: true }}
+              scroll={{ x: "max-content" }}
+              pagination={{ pageSize: 10, showSizeChanger: true}}
               rowClassName={styles.rowStyle}
             />
           </Card>

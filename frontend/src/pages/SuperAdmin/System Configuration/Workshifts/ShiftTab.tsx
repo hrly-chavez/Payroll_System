@@ -120,6 +120,7 @@ const ShiftTab = ({ active }: Props) => {
           columns={columns}
           dataSource={shifts}
           style={{ marginTop: 16 }}
+          scroll={{ x: "max-content" }}
         />
       )}
 

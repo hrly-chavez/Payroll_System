@@ -21,6 +21,7 @@ const TaxTab: React.FC<Props> = ({ deductions, loading }) => {
       dataSource={deductions}
       loading={loading}
       pagination={false}
+      scroll={{ x: "max-content" }}
     />
   );
 };

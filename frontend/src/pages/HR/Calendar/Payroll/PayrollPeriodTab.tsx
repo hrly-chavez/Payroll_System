@@ -156,6 +156,7 @@ export default function PayrollPeriodTab({
       <Table
         columns={payrollColumns}
         dataSource={filtered}
+        scroll={{ x: "max-content" }}
         rowKey="id"
         pagination={{
           pageSize: 10,

@@ -86,7 +86,12 @@ const EmployeeAccountTab: React.FC<Props> = ({ employeeId }) => {
         </Button>
       </div>
 
-      <Table columns={columns} dataSource={[userAccount]} pagination={false} />
+      <Table 
+        columns={columns} 
+        dataSource={[userAccount]} 
+        pagination={false} 
+        scroll={{ x: "max-content" }}
+      />
 
       <ForgotPasswordModal
         open={isForgotPasswordOpen}

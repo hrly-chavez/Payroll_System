@@ -137,6 +137,7 @@ const AttendanceLogs: React.FC = () => {
       dataSource={logs}
       loading={loading}
       pagination={{ pageSize: 5 }}
+      scroll={{ x: "max-content" }}
     />
   );
 };

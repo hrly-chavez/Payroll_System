@@ -74,6 +74,7 @@ const BaseSalaryTab: React.FC<Props> = ({
         dataSource={salaries}
         loading={loading}
         pagination={false}
+        scroll={{ x: "max-content" }}
       />
 
       <EditEmployeeSalaryModal

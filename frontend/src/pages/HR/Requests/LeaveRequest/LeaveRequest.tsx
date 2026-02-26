@@ -145,6 +145,7 @@ const LeaveRequests = () => {
           columns={columns}
           rowKey="id"
           dataSource={sortedRequests}
+          scroll={{ x: "max-content" }}
           pagination={{
             pageSize: 10,
             showSizeChanger: true,

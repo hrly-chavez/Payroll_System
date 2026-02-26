@@ -1,4 +1,5 @@
-import { Modal, Form, Input, Select, Switch, message, Spin, Radio } from "antd";
+// src/pages/SuperAdmin/System Configuration/HolidayPolicy/EditHolidayPolicy.tsx
+import { Modal, Form, Select, message, Spin, Radio } from "antd";
 import { useEffect, useState } from "react";
 import api from "../../../../api/axios";
 
@@ -11,13 +12,36 @@ type Props = {
   refresh: () => void;
 };
 
+type DepartmentType = {
+  id: number;
+  name: string;
+};
+
+type BaseRow = {
+  base: "PH" | "US" | "COMPANY";
+  base_display: string;
+};
+
+const HOLIDAY_TYPES = [
+  { value: "Regular", label: "Regular" },
+  { value: "Special Non-Working", label: "Special Non-Working" },
+  { value: "Special Working", label: "Special Working" },
+  { value: "Company Holiday", label: "Company Holiday" },
+];
+
 const EditHolidayPolicy = ({ open, onClose, policy, refresh }: Props) => {
   const [form] = Form.useForm();
-  const [loading, setLoading] = useState(false);
-  const [departments, setDepartments] = useState<any[]>([]);
+
+  const [saving, setSaving] = useState(false);
+
+  const [departments, setDepartments] = useState<DepartmentType[]>([]);
   const [departmentsLoading, setDepartmentsLoading] = useState(false);
 
-  // Fetch departments from backend
+  const [bases, setBases] = useState<BaseRow[]>([]);
+  const [basesLoading, setBasesLoading] = useState(false);
+
+  const selectedDepartment = Form.useWatch("department", form);
+
   const fetchDepartments = async () => {
     setDepartmentsLoading(true);
     try {
@@ -31,29 +55,64 @@ const EditHolidayPolicy = ({ open, onClose, policy, refresh }: Props) => {
     }
   };
 
-  useEffect(() => {
-    fetchDepartments();
-  }, []);
-
-  // Populate form when policy changes
-  useEffect(() => {
-    if (policy && departments.length) {
-      // Find the department object that matches the policy.department id
-      const selectedDept = departments.find(
-        (dept) => dept.id === policy.department
-      );
-
-      form.setFieldsValue({
-        ...policy,
-        department: selectedDept?.id || undefined, // set the ID
-      });
+  const fetchBases = async (departmentId: number) => {
+    setBasesLoading(true);
+    try {
+      const res = await api.get(`approvals/departments/${departmentId}/holiday-bases/`);
+      setBases(res.data || []);
+    } catch (err) {
+      console.error(err);
+      setBases([]);
+      message.error("Failed to load active bases for this department");
+    } finally {
+      setBasesLoading(false);
     }
-  }, [policy, departments, form]);
+  };
+
+  // load departments when modal opens
+  useEffect(() => {
+    if (!open) return;
+    fetchDepartments();
+  }, [open]);
+
+  // when department changes, load bases
+  useEffect(() => {
+    if (!open) return;
+
+    if (!selectedDepartment) {
+      setBases([]);
+      form.setFieldsValue({ base: undefined });
+      return;
+    }
+
+    fetchBases(selectedDepartment);
+  }, [selectedDepartment, open]);
+
+  // populate form when policy changes + modal opens
+  useEffect(() => {
+    if (!open) return;
+    if (!policy) return;
+
+    // set initial values
+    form.setFieldsValue({
+      department: policy.department,
+      base: policy.base, // IMPORTANT: now part of the policy
+      holiday_type: policy.holiday_type,
+      requires_work: policy.requires_work,
+    });
+
+    // ensure bases are loaded for the existing department so base dropdown is valid
+    if (policy.department) {
+      fetchBases(policy.department);
+    }
+  }, [policy, open, form]);
 
   const handleSubmit = async () => {
+    if (!policy?.id) return;
+
     try {
       const values = await form.validateFields();
-      setLoading(true);
+      setSaving(true);
 
       await api.put(`approvals/holiday-policy/${policy.id}/`, values);
 
@@ -62,10 +121,14 @@ const EditHolidayPolicy = ({ open, onClose, policy, refresh }: Props) => {
       onClose();
     } catch (err: any) {
       if (!err?.errorFields) {
-        message.error("Failed to update holiday policy");
+        const detail =
+          err?.response?.data?.detail ||
+          err?.response?.data?.base?.[0] ||
+          "Failed to update holiday policy";
+        message.error(detail);
       }
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -75,8 +138,9 @@ const EditHolidayPolicy = ({ open, onClose, policy, refresh }: Props) => {
       open={open}
       onCancel={onClose}
       onOk={handleSubmit}
-      confirmLoading={loading}
+      confirmLoading={saving}
       okText="Update"
+      destroyOnClose
     >
       <Form form={form} layout="vertical">
         <Form.Item
@@ -87,10 +151,31 @@ const EditHolidayPolicy = ({ open, onClose, policy, refresh }: Props) => {
           {departmentsLoading ? (
             <Spin />
           ) : (
-            <Select placeholder="Select department">
+            <Select placeholder="Select department" showSearch optionFilterProp="children">
               {departments.map((dept) => (
                 <Option key={dept.id} value={dept.id}>
                   {dept.name}
+                </Option>
+              ))}
+            </Select>
+          )}
+        </Form.Item>
+
+        <Form.Item
+          name="base"
+          label="Base"
+          rules={[{ required: true, message: "Please select a base" }]}
+        >
+          {basesLoading ? (
+            <Spin />
+          ) : (
+            <Select
+              placeholder={selectedDepartment ? "Select base" : "Select department first"}
+              disabled={!selectedDepartment}
+            >
+              {bases.map((b) => (
+                <Option key={b.base} value={b.base}>
+                  {b.base} - {b.base_display}
                 </Option>
               ))}
             </Select>
@@ -102,10 +187,12 @@ const EditHolidayPolicy = ({ open, onClose, policy, refresh }: Props) => {
           label="Holiday Type"
           rules={[{ required: true, message: "Select holiday type" }]}
         >
-          <Select>
-            <Option value="Regular">Regular</Option>
-            <Option value="Special">Special</Option>
-            <Option value="Company">Company</Option>
+          <Select placeholder="Select holiday type">
+            {HOLIDAY_TYPES.map((t) => (
+              <Option key={t.value} value={t.value}>
+                {t.label}
+              </Option>
+            ))}
           </Select>
         </Form.Item>
 
@@ -119,7 +206,6 @@ const EditHolidayPolicy = ({ open, onClose, policy, refresh }: Props) => {
             <Radio value={false}>Not Required</Radio>
           </Radio.Group>
         </Form.Item>
-
       </Form>
     </Modal>
   );

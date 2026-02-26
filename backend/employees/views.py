@@ -74,26 +74,32 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     # ---------------- CREATE ----------------
     @transaction.atomic
     def create(self, request, *args, **kwargs):
-        holiday_base = request.data.get("holiday_base")
+        holiday_bases = request.data.get("holiday_base", [])
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # Create Department
-        department = Department(**serializer.validated_data)
+        # Properly create instance using serializer
+        department = serializer.save()
+
+        # Attach user for signals
         department._current_user = request.user
         department.save()
 
-        # Create DepartmentHolidayCalendar
-        if holiday_base:
+        if not holiday_bases:
+            raise ValidationError({"holiday_base": "At least one holiday base is required."})
+
+        for base in holiday_bases:
             DepartmentHolidayCalendar.objects.create(
                 department=department,
-                base=holiday_base,
+                base=base,
             )
-        else:
-            raise ValidationError({"holiday_base": "This field is required."})
 
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        # Re-serialize properly using instance
+        return Response(
+            self.get_serializer(department).data,
+            status=status.HTTP_201_CREATED
+        )
 
     # ---------------- UPDATE ----------------
     @transaction.atomic
@@ -101,30 +107,26 @@ class DepartmentViewSet(viewsets.ModelViewSet):
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
 
-        holiday_base = request.data.get("holiday_base")
+        holiday_bases = request.data.get("holiday_base", [])
 
-        serializer = self.get_serializer(
-            instance, data=request.data, partial=partial
-        )
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
 
-        # Attach user before saving
         instance._current_user = request.user
         self.perform_update(serializer)
 
-        # Update Holiday Calendar
-        if holiday_base:
-            # Remove old holiday base
+        if holiday_bases:
+            # Delete old bases
             DepartmentHolidayCalendar.objects.filter(
                 department=instance
-            ).update(is_active=False)
+            ).delete()
 
-            # Create new active one
-            DepartmentHolidayCalendar.objects.update_or_create(
-                department=instance,
-                base=holiday_base,
-                defaults={"is_active": True},
-            )
+            # Create new ones
+            for base in holiday_bases:
+                DepartmentHolidayCalendar.objects.create(
+                    department=instance,
+                    base=base,
+                )
 
         return Response(serializer.data)
 

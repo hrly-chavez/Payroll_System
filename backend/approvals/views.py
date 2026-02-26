@@ -15,7 +15,7 @@ from shared_model.models import *
 from django.db import transaction
 from datetime import timedelta
 from decimal import Decimal
-
+from rest_framework import status as http_status
 class HolidayListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Holiday.objects.filter(is_active=True).order_by("-date")
@@ -481,3 +481,105 @@ class HolidayPolicyRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIVi
     queryset = HolidayPolicy.objects.all()
     serializer_class = HolidayPolicySerializer
     permission_classes = [IsAuthenticated]
+
+class HolidayPolicyListCreateView(generics.ListCreateAPIView):
+    serializer_class = HolidayPolicySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = HolidayPolicy.objects.select_related("department").order_by("-created_at")
+
+        # optional filters for admin UI
+        department = self.request.query_params.get("department")
+        base = self.request.query_params.get("base")
+        holiday_type = self.request.query_params.get("holiday_type")
+
+        if department:
+            qs = qs.filter(department_id=department)
+        if base:
+            qs = qs.filter(base=base)
+        if holiday_type:
+            qs = qs.filter(holiday_type=holiday_type)
+
+        return qs
+
+
+class HolidayPolicyRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = HolidayPolicy.objects.select_related("department")
+    serializer_class = HolidayPolicySerializer
+    permission_classes = [IsAuthenticated]
+
+
+class DepartmentActiveHolidayBasesView(APIView):
+    """
+    Returns active holiday bases for a department (PH/US/COMPANY).
+    Frontend will use this later for the Base dropdown.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, department_id: int):
+        rows = DepartmentHolidayCalendar.objects.filter(
+            department_id=department_id,
+            is_active=True,
+        ).order_by("base")
+
+        return Response([
+            {"base": r.base, "base_display": r.get_base_display()}
+            for r in rows
+        ])
+
+
+class HolidayPolicyEnsureView(APIView):
+    """
+    Auto-create missing HolidayPolicy rows for all ACTIVE bases of a department.
+    Creates 1 policy per (department, base, holiday_type).
+
+    Default requires_work=True is the safest default for payroll (won’t accidentally “forgive” absences).
+    You can override with payload { "default_requires_work": false } if you want.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        department_id = request.data.get("department_id")
+        if not department_id:
+            return Response(
+                {"detail": "department_id is required."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        default_requires_work = request.data.get("default_requires_work", True)
+        dept = Department.objects.filter(id=department_id).first()
+        if not dept:
+            return Response(
+                {"detail": "Department not found."},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+
+        active_bases = DepartmentHolidayCalendar.objects.filter(
+            department_id=department_id,
+            is_active=True,
+        ).values_list("base", flat=True)
+
+        # take the canonical choices directly from the model
+        holiday_types = [c[0] for c in HolidayPolicy.HOLIDAY_TYPES]
+
+        created = 0
+        for base in active_bases:
+            for htype in holiday_types:
+                obj, was_created = HolidayPolicy.objects.get_or_create(
+                    department_id=department_id,
+                    base=base,
+                    holiday_type=htype,
+                    defaults={"requires_work": default_requires_work},
+                )
+                if was_created:
+                    # attach audit user if your signals rely on _current_user
+                    obj._current_user = request.user
+                    obj.save()
+                    created += 1
+
+        return Response(
+            {"detail": "Ensure complete.", "created": created},
+            status=http_status.HTTP_200_OK,
+        )

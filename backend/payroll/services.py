@@ -19,7 +19,7 @@ from shared_model.models import *
 DEC_0 = Decimal("0.00")
 
 # -------------------------------------------------------------------
-# Helpers 
+# Helpers Outside class
 # -------------------------------------------------------------------
 def _overlaps_period(eff_from, eff_to, period_start, period_end):
     """
@@ -40,12 +40,6 @@ def _overlaps_period(eff_from, eff_to, period_start, period_end):
         return False
     return True
 
-def _get_active_holiday_bases(self, department: Department) -> list[str]:
-    return list(
-        DepartmentHolidayCalendar.objects
-        .filter(department=department, is_active=True)
-        .values_list("base", flat=True)
-    )
 
 def get_latest_active_payroll(period_id: int, employee_id: int) -> Payroll | None:
     """
@@ -86,6 +80,8 @@ def _safe_decimal(x, field_name="value"):
     except Exception:
         raise ValidationError({field_name: f"Invalid decimal value: {x}"})
 
+
+
 # -------------------------------------------------------------------
 # Data containers
 # -------------------------------------------------------------------
@@ -116,6 +112,118 @@ class PayrollGenerationService:
     # -------------------------
     #  HELPERS
     # -------------------------
+    def _get_commission_tax_rules(self, employee: Employee, department: Department, period: Payroll_Period):
+        """
+        Load ACTIVE commission tax rules overlapping the payroll period.
+
+        We'll select the best match per commission during computation:
+        - priority: employee-specific > department-specific > global
+        - effective_from latest wins within same priority
+        """
+        qs = Commission_Tax_Rule.objects.filter(is_active=True)
+
+        # overlap period
+        qs = qs.filter(
+            effective_from__lte=period.end_date
+        ).filter(
+            Q(effective_to__isnull=True) | Q(effective_to__gte=period.start_date)
+        )
+
+        return list(
+            qs.select_related("commission_type", "applies_to", "employee")
+            .order_by("-effective_from", "-id")
+        )
+    
+    def _pick_commission_tax_rule(
+        self,
+        rules: list[Commission_Tax_Rule],
+        commission_type: Commission_Type,
+        commission_amount: Decimal,
+        employee: Employee,
+        department: Department,
+    ) -> Commission_Tax_Rule | None:
+        """
+        Find the single best matching tax rule for a commission amount.
+
+        Matching constraints:
+        - same commission_type
+        - bracket match (min_amount <= amount <= max_amount, max null means infinity)
+        - scope match priority:
+            3) employee rule
+            2) department rule
+            1) global rule
+        Tie-break:
+        - latest effective_from (rules already ordered by -effective_from, -id)
+        """
+        INF = Decimal("999999999999")
+
+        amt = _safe_decimal(commission_amount, "commission_amount")
+        best = None
+        best_pr = -1
+
+        for r in rules:
+            if r.commission_type_id != commission_type.id:
+                continue
+
+            r_min = _safe_decimal(r.min_amount or 0, "min_amount")
+            r_max = _safe_decimal(r.max_amount, "max_amount") if r.max_amount is not None else INF
+
+            # bracket match
+            if amt < r_min or amt > r_max:
+                continue
+
+            # scope priority
+            if r.employee_id == employee.id:
+                pr = 3
+            elif r.employee_id is None and r.applies_to_id == department.id:
+                pr = 2
+            elif r.employee_id is None and r.applies_to_id is None:
+                pr = 1
+            else:
+                pr = 0
+
+            if pr <= 0:
+                continue
+
+            # choose highest priority; within same pr, first wins because ordering is newest first
+            if pr > best_pr:
+                best = r
+                best_pr = pr
+
+        return best
+
+
+    def _compute_commission_tax_amount(self, rule: Commission_Tax_Rule, commission_amount: Decimal) -> tuple[Decimal, Decimal]:
+        """
+        Compute tax deduction amount for a commission based on the rule.
+
+        Supported:
+        - MULTIPLIER: commission_amount * rate_value
+        - FIXED: rate_value
+
+        Returns (tax_amount, rate_applied)
+        """
+        amt = _safe_decimal(commission_amount, "commission_amount")
+        rv = _safe_decimal(rule.rate_value, "rate_value")
+
+        if rule.rate_type == "MULTIPLIER":
+            tax = _d2(amt * rv)
+            return tax, rv
+
+        if rule.rate_type == "FIXED":
+            tax = _d2(rv)
+            return tax, rv
+
+        raise ValidationError({"detail": f"Unsupported commission tax rate_type: {rule.rate_type}"})
+
+
+    def _get_active_holiday_bases(self, department: Department) -> list[str]:
+        return list(
+            DepartmentHolidayCalendar.objects
+            .filter(department=department, is_active=True)
+            .values_list("base", flat=True)
+        )
+
     def _month_ends_within(self, start_date: date, end_date: date) -> list[tuple[date, date]]:
         """
         Return [(month_start, month_end)] for each month whose *month_end* falls inside [start_date, end_date].
@@ -441,7 +549,7 @@ class PayrollGenerationService:
 
         # 8 allowances / deductions / commissions
         self._apply_allowances(payroll=payroll,allowances=ctx["allowances"],period=period,employee=ctx["employee"],shift=ctx["shift"],leave_map=ctx["leave_map"],)
-        self._apply_commissions(payroll, ctx["commissions"])
+        self._apply_commissions(payroll=payroll,commissions=ctx["commissions"],employee=ctx["employee"],department=ctx["department"],commission_tax_rules=ctx["commission_tax_rules"],)
         self._apply_deductions(payroll, ctx["deductions"], period)
 
         # 9 totals
@@ -487,13 +595,14 @@ class PayrollGenerationService:
         # Leave placeholder for now (ready when other team finishes)
         leave_map = self._get_leave_map(employee, period)
 
-        holiday_map = self._get_holiday_map(period, department)
+        holiday_map = self._get_holiday_map(period, active_bases)
         holiday_policy_map = self._get_holiday_policy_map(department)
 
         allowances = self._get_allowances(employee, period)
         deductions = self._get_deductions(employee, period)
         commissions = self._get_commissions(employee, period)
-
+        commission_tax_rules = self._get_commission_tax_rules(employee, department, period)
+    
         rule_map = self._get_pay_rules(employee, department, period)
 
         warnings = []
@@ -516,7 +625,7 @@ class PayrollGenerationService:
             "shift": shift,
             "salary": salary,
             "payroll_setting": payroll_setting,
-             "active_holiday_bases": active_bases,
+            
             "attendance_map": attendance_map,
             "approved_events": approved_events,
             "leave_map": leave_map,
@@ -525,6 +634,7 @@ class PayrollGenerationService:
             "allowances": allowances,
             "deductions": deductions,
             "commissions": commissions,
+            "commission_tax_rules": commission_tax_rules,
             "rule_map": rule_map,
             "warnings": warnings,
         }
@@ -628,16 +738,16 @@ class PayrollGenerationService:
         # If somehow duplicates exist (shouldn't due to constraint), last one wins
         return {r.date: r for r in rows}
 
-    def _get_holiday_map(self, period: Payroll_Period, department: Department):
+    def _get_holiday_map(self, period: Payroll_Period, active_bases: list[str]):
         """
-        Return holiday policy as:
-            { holiday_type: requires_work_boolean }
+        Return holidays as:
+            { date: [Holiday, ...] }
 
+        active_bases is precomputed in _build_context via DepartmentHolidayCalendar.
         Used by:
-        - absence computation (if holiday requires work and employee absent -> absent)
+        - absence computation
+        - worked holiday earnings
         """
-        active_bases = self._get_active_holiday_bases(department)
-
         if not active_bases:
             return {}  # no bases active => no applicable holidays
 
@@ -654,7 +764,7 @@ class PayrollGenerationService:
             holiday_map.setdefault(h.date, []).append(h)
 
         return holiday_map
-
+    
     def _get_holiday_policy_map(self, department):
         """
         Return holiday policy as:
@@ -1632,23 +1742,77 @@ class PayrollGenerationService:
                 source_id=a.id
             )
 
-    def _apply_commissions(self, payroll: Payroll, commissions):
+    def _apply_commissions(
+        self,
+        payroll: Payroll,
+        commissions,
+        employee: Employee,
+        department: Department,
+        commission_tax_rules: list[Commission_Tax_Rule],
+    ):
         """
-        Apply per-period commissions into EARNING payslip lines.
+        Apply per-period commissions into EARNING lines.
+        If commission_type.is_taxable => also apply Commission Tax Rule as DEDUCTION line.
 
-        Commissions are assumed:
-        - already attached to the period+employee (PayrollPeriodEmployeeCommission)
-        - validated elsewhere (e.g., amount > 0)
+        Hard-stop behavior (recommended):
+        - If taxable commission has NO matching tax rule => raise ValidationError
+        (prevents silent under-withholding).
         """
         for c in commissions:
             amt = _d2(c.amount)
             if amt <= 0:
                 continue
+
             ct = getattr(c, "commission_type", None)
             label = getattr(ct, "name", None) or "Commission"
-            desc = f"Commission: {label}"
-            self._create_line(payroll, "EARNING", desc, amt, source_type="MANUAL", source_id=c.id)
 
+            # 1) Commission earning line
+            self._create_line(
+                payroll,
+                "EARNING",
+                f"Commission: {label}",
+                amt,
+                source_type="MANUAL",
+                source_id=c.id,
+            )
+
+            # 2) Tax handling (only if taxable)
+            if not ct:
+                continue
+
+            if bool(getattr(ct, "is_taxable", False)) is not True:
+                continue
+
+            # Find a matching tax rule for this commission
+            rule = self._pick_commission_tax_rule(
+                rules=commission_tax_rules,
+                commission_type=ct,
+                commission_amount=amt,
+                employee=employee,
+                department=department,
+            )
+
+            if not rule:
+                raise ValidationError({
+                    "detail": f"Missing Commission Tax Rule for taxable commission '{label}' amount {amt}. "
+                            f"Create a rule bracket that matches this amount (employee/department/global)."
+                })
+
+            tax_amount, rate_applied = self._compute_commission_tax_amount(rule, amt)
+
+            if tax_amount <= 0:
+                continue
+
+            self._create_line(
+                payroll,
+                "DEDUCTION",
+                f"Commission Tax: {label}",
+                tax_amount,
+                source_type="COMMISSION_TAX_RULE",
+                source_id=rule.id,
+                quantity_min=None,
+                rate_applied=rate_applied,
+            )
     def _apply_deductions(self, payroll: Payroll, deductions, period: Payroll_Period):
         """
         Apply employee deductions into DEDUCTION payslip lines.

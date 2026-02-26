@@ -455,3 +455,17 @@ class DepartmentHolidayCalendarAdmin(admin.ModelAdmin):
     )
 
     ordering = ("department",)
+
+@admin.register(Commission_Tax_Rule)
+class CommissionTaxRuleAdmin(admin.ModelAdmin):
+    list_display = (
+        "id", "name", "commission_type",
+        "min_amount", "max_amount",
+        "rate_type", "rate_value",
+        "employee", "applies_to",
+        "effective_from", "effective_to",
+        "is_active", "created_at",
+    )
+    list_filter = ("commission_type", "rate_type", "is_active", "effective_from", "applies_to")
+    search_fields = ("name", "commission_type__name", "employee__fname", "employee__lname", "applies_to__name")
+    ordering = ("-id",)

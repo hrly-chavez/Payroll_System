@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Layout, Table, Input, Button, message, Tooltip, Switch } from "antd";
+import { Layout, Table, Input, Button, message, Tooltip, Switch, Tag } from "antd";
 import type { TableProps } from "antd";
-import { PlusOutlined, SearchOutlined, SlidersOutlined, EditOutlined } from "@ant-design/icons";
+import { PlusOutlined, SearchOutlined, EditOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
@@ -53,7 +53,16 @@ const Department: React.FC = () => {
 
   const columns: TableProps<DepartmentType>["columns"] = [
     { title: "ID", dataIndex: "id", key: "id", width: 80 },
-    { title: "Department", dataIndex: "name", key: "name", render: (text) => <span className={styles.rowLink}>{text}</span> },
+    {
+      title: "Department",
+      dataIndex: "name",
+      key: "name",
+      sorter: (a, b) => a.name.localeCompare(b.name), // alphabetical sort
+      sortDirections: ["ascend", "descend"],
+      render: (text) => (
+        <span className={styles.rowLink}>{text}</span>
+      ),
+    },
     {
       title: "Workshift",
       dataIndex: "shift",
@@ -68,8 +77,12 @@ const Department: React.FC = () => {
       title: "Holiday Base",
       dataIndex: "holiday_base",
       key: "holiday_base",
-      render: (base) =>
-        base === "PH" ? "Philippines" : base === "US" ? "United States" : "Company",
+      render: (bases: string[]) => {
+        if (!bases || bases.length === 0) return "—";
+        return bases.map((base) => (
+          <Tag key={base}>{base}</Tag>
+        ));
+      },
     },
     {
       title: "Actions",
@@ -116,9 +129,6 @@ const Department: React.FC = () => {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              <Button icon={<SlidersOutlined />} className={styles.filterBtn}>
-                Filter
-              </Button>
             </div>
 
             <Button

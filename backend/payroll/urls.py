@@ -8,6 +8,12 @@ urlpatterns = [
     path("superadmin/pay-rules/", SuperAdminPayRuleListCreateView.as_view(), name="superadmin-payrule-list-create"),
     path("superadmin/pay-rules/<int:pk>/", SuperAdminPayRuleRetrieveUpdateView.as_view(), name="superadmin-payrule-detail"),
     
+    # Commission Rules (Pay_Rule)
+    path("superadmin/commission-tax-rules/", SuperAdminCommissionTaxRuleListCreateView.as_view()),
+    path("superadmin/commission-tax-rules/<int:pk>/", SuperAdminCommissionTaxRuleRetrieveUpdateView.as_view()),
+    path("superadmin/commission-tax-rules/choices/", CommissionTaxRuleChoicesView.as_view()),
+    # optional: dropdown helper
+    path("commission-types/active/", CommissionTypeAllActiveView.as_view()),
 
     #Deductions
     path('superadmin/deductions/', DeductionListCreateView.as_view(), name='deductions-list-create'),

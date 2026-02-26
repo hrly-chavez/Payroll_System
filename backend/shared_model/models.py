@@ -664,6 +664,58 @@ class Pay_Rule(models.Model):
     def __str__(self):
         return f"{self.name} - {self.event_type}"
 
+class Commission_Tax_Rule(models.Model):
+    """
+    Commission tax/withholding rules using AMOUNT BRACKETS.
+    Separate from Pay_Rule because Pay_Rule is attendance-event/minutes driven.
+    """
+
+    RATE_TYPE_CHOICES = [
+        ("MULTIPLIER", "Multiplier"),  # tax = commission_amount * rate_value
+        ("FIXED", "Fixed"),            # tax = rate_value
+    ]
+
+    id = models.AutoField(primary_key=True)
+
+    name = models.CharField(max_length=100, unique=True)
+    commission_type = models.ForeignKey("Commission_Type",on_delete=models.PROTECT,related_name="tax_rules",)
+
+    # bracket range
+    min_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    max_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+
+    rate_type = models.CharField(max_length=20, choices=RATE_TYPE_CHOICES)
+    rate_value = models.DecimalField(max_digits=10, decimal_places=4, default=0.0000)
+
+    effective_from = models.DateField()
+    effective_to = models.DateField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    # optional scoping
+    applies_to = models.ForeignKey("Department",on_delete=models.CASCADE,null=True,blank=True,related_name="commission_tax_rules",)
+    employee = models.ForeignKey("Employee",on_delete=models.SET_NULL,null=True,blank=True,related_name="commission_tax_rules",)
+
+    def clean(self):
+        if self.max_amount is not None and self.max_amount < self.min_amount:
+            raise ValidationError({"max_amount": "max_amount cannot be less than min_amount."})
+        if self.effective_to and self.effective_to < self.effective_from:
+            raise ValidationError({"effective_to": "effective_to cannot be earlier than effective_from."})
+        if self.applies_to and self.employee:
+            raise ValidationError({
+                "applies_to": "Choose either Department or Employee, not both.",
+                "employee": "Choose either Department or Employee, not both.",
+            })
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        rng = f"{self.min_amount} - {self.max_amount}" if self.max_amount is not None else f"{self.min_amount}+"
+        scope = "Employee" if self.employee_id else ("Department" if self.applies_to_id else "Global")
+        return f"{self.name} ({self.commission_type}) [{scope}] ({rng})"
+
 class Payroll_Setting(models.Model):
     id = models.AutoField(primary_key=True)
 
@@ -768,7 +820,8 @@ class Payslip(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
 
     created_at = models.DateTimeField(auto_now_add=True)
-
+    commission_tax_rule = models.ForeignKey("Commission_Tax_Rule",on_delete=models.SET_NULL,null=True,blank=True,related_name="payslip_lines")
+    
     class Meta:
         ordering = ["id"]
         indexes = [

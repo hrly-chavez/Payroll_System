@@ -4,6 +4,10 @@ from shared_model.models import *
 from django.utils import timezone
 from decimal import Decimal,InvalidOperation
 from rest_framework.validators import UniqueValidator
+from rest_framework.exceptions import ValidationError
+from decimal import Decimal
+from django.db import models
+
 
 #  salary/amount numeric-like: must contain at least 1 digit, and only digits/comma/dot
 NUMERIC_LIKE_REGEX = re.compile(r"^(?=.*\d)[0-9.,]+$")
@@ -325,7 +329,7 @@ class PayrollPeriodEmployeeCommissionCreateSerializer(serializers.ModelSerialize
         return value
 
 #==========================================PAYRULE ========================================
-from rest_framework.exceptions import ValidationError
+
 from decimal import Decimal
 
 class PayRuleSerializer(serializers.ModelSerializer):
@@ -407,7 +411,111 @@ class PayRuleSerializer(serializers.ModelSerializer):
         if obj.employee:
             return f"{obj.employee.fname} {obj.employee.lname}".strip()
         return None
-    
+
+#==========================================COMMISSION RULE ========================================
+class CommissionTypeMiniSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Commission_Type
+        fields = ["id", "name", "is_taxable", "is_active"]
+
+class CommissionTaxRuleSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(
+        max_length=100,
+        validators=[
+            UniqueValidator(
+                queryset=Commission_Tax_Rule.objects.all(),
+                message="A commission tax rule with this name already exists. Please choose a different name.",
+            )
+        ],
+    )
+
+    commission_type_name = serializers.CharField(source="commission_type.name", read_only=True)
+    applies_to_name = serializers.CharField(source="applies_to.name", read_only=True)
+    employee_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Commission_Tax_Rule
+        fields = "__all__"
+
+    def get_employee_name(self, obj):
+        if obj.employee:
+            return f"{obj.employee.fname} {obj.employee.lname}".strip()
+        return None
+
+    def validate(self, attrs):
+        commission_type = attrs.get("commission_type", getattr(self.instance, "commission_type", None))
+        applies_to = attrs.get("applies_to", getattr(self.instance, "applies_to", None))
+        employee = attrs.get("employee", getattr(self.instance, "employee", None))
+
+        min_amount = attrs.get("min_amount", getattr(self.instance, "min_amount", None))
+        max_amount = attrs.get("max_amount", getattr(self.instance, "max_amount", None))
+
+        effective_from = attrs.get("effective_from", getattr(self.instance, "effective_from", None))
+        effective_to = attrs.get("effective_to", getattr(self.instance, "effective_to", None))
+
+        if applies_to and employee:
+            raise ValidationError({
+                "applies_to": ["Choose either Department or Employee, not both."],
+                "employee": ["Choose either Department or Employee, not both."],
+            })
+
+        if effective_to and effective_from and effective_to < effective_from:
+            raise ValidationError({"effective_to": ["effective_to cannot be earlier than effective_from."]})
+
+        if min_amount is not None and max_amount is not None and max_amount < min_amount:
+            raise ValidationError({"max_amount": ["max_amount cannot be less than min_amount."]})
+
+        # Optional guard: prevent negative rate_value
+        rate_value = attrs.get("rate_value", getattr(self.instance, "rate_value", None))
+        if rate_value is not None:
+            if Decimal(str(rate_value)) < 0:
+                raise ValidationError({"rate_value": ["Rate value cannot be negative."]})
+
+        # ---- bracket overlap validation (same commission_type + same scope + overlapping effective range)
+        if not commission_type:
+            return attrs
+
+        qs = Commission_Tax_Rule.objects.filter(commission_type=commission_type, is_active=True)
+
+        # same scope
+        if employee:
+            qs = qs.filter(employee=employee)
+        else:
+            qs = qs.filter(employee__isnull=True)
+            if applies_to:
+                qs = qs.filter(applies_to=applies_to)
+            else:
+                qs = qs.filter(applies_to__isnull=True)
+
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+
+        # overlap in dates: (existing.start <= new.end_or_inf) AND (existing.end_or_inf >= new.start)
+        new_start = effective_from
+        new_end = effective_to  # can be None
+
+        qs = qs.filter(effective_from__lte=(new_end or new_start)).filter(
+            models.Q(effective_to__isnull=True) | models.Q(effective_to__gte=new_start)
+        )
+
+        # overlap amount bracket (max=None means infinity)
+        INF = Decimal("999999999999")
+
+        a_min = Decimal(str(min_amount or 0))
+        a_max = Decimal(str(max_amount)) if max_amount is not None else INF
+
+        for existing in qs:
+            b_min = Decimal(str(existing.min_amount or 0))
+            b_max = Decimal(str(existing.max_amount)) if existing.max_amount is not None else INF
+
+            overlaps = not (a_max < b_min or b_max < a_min)
+            if overlaps:
+                raise ValidationError({
+                    "min_amount": ["Bracket overlaps an existing commission rule in the same scope/effective range."],
+                    "max_amount": ["Bracket overlaps an existing commission rule in the same scope/effective range."],
+                })
+
+        return attrs
 #==========================================PAYROLL GENERATION===========================
 
 class GeneratePayrollPeriodResponseSerializer(serializers.Serializer):

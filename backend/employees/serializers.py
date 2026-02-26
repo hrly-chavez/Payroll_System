@@ -549,3 +549,49 @@ class CompanyNoteSerializer(serializers.ModelSerializer):
             user=user,   # ✅ SAVE USER TO DB
             **validated_data
         )
+
+class AttendanceCorrectionLogSerializer(serializers.ModelSerializer):
+    employee_name = serializers.SerializerMethodField()
+    reviewed_by_name = serializers.SerializerMethodField()
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Attendance_Correction
+        fields = [
+            "id",
+            "requested_at",
+            "date",
+            "issue_type",
+            "status",
+            "reason",
+            "decline_reason",
+            "reviewed_at",
+            "employee_name",
+            "reviewed_by_name",
+            "file_url",
+        ]
+
+    def get_employee_name(self, obj):
+        # assuming Employee.__str__ returns name (common)
+        return str(obj.requested_by) if obj.requested_by else ""
+
+    def get_reviewed_by_name(self, obj):
+        return str(obj.reviewed_by) if obj.reviewed_by else ""
+
+    def get_file_url(self, obj):
+        request = self.context.get("request")
+        if obj.file_attached and hasattr(obj.file_attached, "url"):
+            # make absolute URL if request exists
+            return request.build_absolute_uri(obj.file_attached.url) if request else obj.file_attached.url
+        return None
+
+class EmployeeDropdownSerializer(serializers.ModelSerializer):
+    value = serializers.IntegerField(source="id") 
+    label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Employee
+        fields = ["value", "label"]
+
+    def get_label(self, obj):
+        return f"{obj.fname} {obj.lname}".strip()

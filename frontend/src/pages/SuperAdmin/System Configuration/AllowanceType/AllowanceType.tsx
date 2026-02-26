@@ -167,6 +167,7 @@ const Allowance = ({ active }: Props) => {
         <Table
           rowKey="id"
           columns={columns}
+          scroll={{ x: "max-content" }}
           dataSource={filteredAllowances}
         />
       )}

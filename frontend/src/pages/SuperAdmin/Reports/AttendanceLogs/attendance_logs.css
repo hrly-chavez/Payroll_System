@@ -1,0 +1,37 @@
+/* src/pages/Admin/Reports/Attendance Logs/attendance_logs.css */
+
+.name-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.name-cell span {
+  font-weight: 500;
+}
+
+.emp {
+  font-weight: 600;
+}
+
+.issue {
+  font-weight: 500;
+}
+.ant-table {
+  width: 100%;
+}
+
+.ant-table-container {
+  overflow-x: hidden !important;
+}
+
+.ant-table-content {
+  overflow-x: hidden !important;
+}
+.ant-table-body {
+  overflow-y: visible !important;
+}
+
+.ant-table-container {
+  overflow: visible !important;
+}

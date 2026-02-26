@@ -629,3 +629,54 @@ class PayrollDeclineInputSerializer(serializers.Serializer):
 #Void Reason(nullable)
 class PayrollResetAfterDeclineSerializer(serializers.Serializer):
     void_reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)  
+
+#payroll logs
+class PayrollPeriodListSerializer(serializers.ModelSerializer):
+    period_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Payroll_Period
+        fields = [
+            "id",
+            "code",
+            "start_date",
+            "end_date",
+            "pay_date",
+            "status",
+            "created_at",
+            "period_label",
+        ]
+
+    def get_period_label(self, obj):
+        return f"{obj.start_date} - {obj.end_date}"
+
+
+class PayrollPeriodEmployeeSerializer(serializers.ModelSerializer):
+    employee_name = serializers.SerializerMethodField()
+    verified_by_name = serializers.SerializerMethodField()
+    approved_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PayrollPeriodEmployee
+        fields = [
+            "id",
+            "status",
+            "verified_at",
+            "approved_at",
+            "declined_reason",
+            "created_at",
+            "updated_at",
+            "employee_name",
+            "verified_by_name",
+            "approved_by_name",
+        ]
+
+    def get_employee_name(self, obj):
+        # Employee.__str__ usually returns full name; if not, adjust to fname/lname
+        return str(obj.employee) if obj.employee else ""
+
+    def get_verified_by_name(self, obj):
+        return str(obj.verified_by) if obj.verified_by else ""
+
+    def get_approved_by_name(self, obj):
+        return str(obj.approved_by) if obj.approved_by else ""

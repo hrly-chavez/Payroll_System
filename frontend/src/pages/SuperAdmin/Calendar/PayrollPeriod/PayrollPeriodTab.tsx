@@ -118,6 +118,7 @@ export default function PayrollPeriodTab({
         className="superadmin-table"
         columns={payrollColumns as any}
         dataSource={filtered}
+        scroll={{ x: "max-content" }}
         rowKey="id"
         pagination={{
           current: currentPage,

@@ -280,6 +280,7 @@ const Attendance: React.FC = () => {
               loading={loading}
               dataSource={rows}
               columns={columns as any}
+              scroll={{ x: "max-content" }}
               pagination={{ pageSize: 10, showSizeChanger: true}}
               rowClassName={styles.rowStyle}
             />

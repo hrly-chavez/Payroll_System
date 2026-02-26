@@ -9,6 +9,7 @@ import random, string
 from rest_framework.views import APIView
 from decimal import Decimal
 from django.db import transaction
+from django.db.models import Q
 from django.utils.timezone import now
 from django.core.mail import send_mail
 from django.contrib.auth.hashers import make_password
@@ -22,6 +23,13 @@ from django.conf import settings
 from django.template.loader import render_to_string
 from django.contrib.auth import get_user_model
 from django.utils.http import urlsafe_base64_decode
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from io import BytesIO
+from django.http import FileResponse
 
 import logging
 import secrets
@@ -1068,3 +1076,290 @@ class CompanyNoteCreateView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save()
+
+class AttendanceCorrectionLogListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = AttendanceCorrectionLogSerializer
+
+    def get_queryset(self):
+        qs = Attendance_Correction.objects.select_related("requested_by", "reviewed_by").all()
+
+        search = self.request.query_params.get("search")
+        month = self.request.query_params.get("month")  # YYYY-MM
+        status_ = self.request.query_params.get("status")
+
+        if status_:
+            qs = qs.filter(status=status_)
+
+        if month:
+            # month like "2026-02"
+            try:
+                year, mon = month.split("-")
+                qs = qs.filter(requested_at__year=int(year), requested_at__month=int(mon))
+            except:
+                pass
+
+        if search:
+            qs = qs.filter(
+                Q(issue_type__icontains=search)
+                | Q(status__icontains=search)
+                | Q(reason__icontains=search)
+                | Q(decline_reason__icontains=search)
+                # requested_by is Employee; if it has fields like fname/lname, add them here
+            )
+
+        return qs
+    
+class AttendanceCorrectionLogsPDFView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """
+        Export Attendance Correction Logs (PDF)
+
+        Query params:
+        - scope=all | user
+        - employee_id=<int> (required when scope=user)
+        - date=YYYY-MM-DD (optional)
+        - month=YYYY-MM (optional)
+        - year=YYYY (optional)
+
+        Priority: date > month > year > none (no date filtering)
+        """
+
+        scope = (request.query_params.get("scope") or "all").strip().lower()
+        employee_id = request.query_params.get("employee_id")
+
+        date_str = request.query_params.get("date")
+        month_str = request.query_params.get("month")
+        year_str = request.query_params.get("year")
+
+        qs = (
+            Attendance_Correction.objects
+            .select_related("requested_by", "requested_by__department", "reviewed_by")
+            .order_by("-requested_at")
+        )
+
+        #  for showing employee name in Scope header
+        employee_name = None
+
+        # --- scope filter ---
+        if scope == "user":
+            if not employee_id:
+                return Response(
+                    {"detail": "employee_id is required when scope=user."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # filter
+            qs = qs.filter(requested_by_id=employee_id)
+
+            #  fetch employee name for header (requested_by is Employee FK)
+            try:
+                emp_obj = Employee.objects.select_related("department").filter(id=employee_id).first()
+                if emp_obj:
+                    base_name = f"{getattr(emp_obj, 'fname', '')} {getattr(emp_obj, 'lname', '')}".strip()
+                    if getattr(emp_obj, "department", None):
+                        employee_name = f"{base_name} ({emp_obj.department.name})" if base_name else emp_obj.department.name
+                    else:
+                        employee_name = base_name or str(emp_obj)
+            except Exception:
+                employee_name = None
+
+        # --- date filter (priority: date > month > year) ---
+        try:
+            if date_str:
+                qs = qs.filter(date=date.fromisoformat(date_str))
+            elif month_str:
+                y, m = month_str.split("-")
+                qs = qs.filter(date__year=int(y), date__month=int(m))
+            elif year_str:
+                qs = qs.filter(date__year=int(year_str))
+        except Exception:
+            return Response(
+                {"detail": "Invalid date/month/year format."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # ---- build PDF ----
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=landscape(letter),
+            leftMargin=0.45 * inch,
+            rightMargin=0.45 * inch,
+            topMargin=0.45 * inch,
+            bottomMargin=0.45 * inch,
+            title="Attendance Correction Logs",
+        )
+        usable_w = doc.width
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "title_style",
+            parent=styles["Title"],
+            fontName="Helvetica-Bold",
+            fontSize=18,
+            alignment=1,
+            spaceAfter=10,
+        )
+
+        normal = styles["Normal"]
+        normal.fontSize = 9
+        normal.leading = 11
+
+        small = ParagraphStyle(
+            "small",
+            parent=normal,
+            fontSize=8.5,
+            leading=10.5,
+            wordWrap="CJK",
+        )
+
+        header_cell = ParagraphStyle(
+            "header_cell",
+            parent=small,
+            fontName="Helvetica-Bold",
+            textColor=colors.white,
+            alignment=1,
+        )
+
+        def _fmt_dt(dt):
+            return dt.strftime("%b %d, %Y %I:%M %p") if dt else "-"
+
+        def _fmt_date(d):
+            return d.strftime("%Y-%m-%d") if d else "-"
+
+        def _status_color(s: str):
+            s = (s or "").lower()
+            if s == "verified":
+                return colors.HexColor("#16a34a")
+            if s == "declined":
+                return colors.HexColor("#dc2626")
+            return colors.HexColor("#f59e0b")  # pending
+
+        # Header / metadata
+        elements = []
+        elements.append(Paragraph("ATTENDANCE CORRECTION LOGS", title_style))
+        elements.append(Spacer(1, 6))
+
+        #  Scope label now shows employee NAME (and optional dept) when scope=user
+        if scope == "all":
+            filter_label = "All Users"
+        else:
+            display = employee_name or f"employee_id={employee_id}"
+            filter_label = f"{display}"
+
+        date_filter_label = (
+            f"Date: {date_str}" if date_str else
+            f"Month: {month_str}" if month_str else
+            f"Year: {year_str}" if year_str else
+            "No date filter"
+        )
+
+        meta_tbl = Table(
+            [
+                ["Scope:", filter_label, "Filter:", date_filter_label],
+                ["Generated At:", _fmt_dt(timezone.now()), "", ""],
+            ],
+            colWidths=[0.12 * usable_w, 0.38 * usable_w, 0.12 * usable_w, 0.38 * usable_w],
+            hAlign="CENTER",
+        )
+        meta_tbl.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.7, colors.black),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("SPAN", (2, 1), (3, 1)),
+        ]))
+        elements.append(meta_tbl)
+        elements.append(Spacer(1, 12))
+
+        # Table data
+        data = [[
+            Paragraph("Requested At", header_cell),
+            Paragraph("Attendance Date", header_cell),
+            Paragraph("Employee", header_cell),
+            Paragraph("Issue Type", header_cell),
+            Paragraph("Status", header_cell),
+            Paragraph("Reviewed By", header_cell),
+            Paragraph("Reviewed At", header_cell),
+            Paragraph("Reason", header_cell),
+            Paragraph("Decline Reason", header_cell),
+        ]]
+
+        for row in qs:
+            emp = row.requested_by
+            emp_name = f"{getattr(emp, 'fname', '')} {getattr(emp, 'lname', '')}".strip() or str(emp)
+            attachment = "Yes" if row.file_attached else "-"
+
+            data.append([
+                Paragraph(_fmt_dt(row.requested_at), small),
+                Paragraph(_fmt_date(row.date), small),
+                Paragraph(emp_name, small),
+                Paragraph(row.issue_type or "-", small),
+                Paragraph(row.status or "-", small),
+                Paragraph(str(row.reviewed_by) if row.reviewed_by else "-", small),
+                Paragraph(_fmt_dt(row.reviewed_at), small),
+                Paragraph(row.reason or "-", small),
+                Paragraph(row.decline_reason or "-", small),
+            ])
+
+        # Fit to page width (no clipping)
+        col_widths = [
+            0.11 * usable_w,  # requested at
+            0.10 * usable_w,  # attendance date
+            0.12 * usable_w,  # employee
+            0.12 * usable_w,  # issue type
+            0.08 * usable_w,  # status
+            0.10 * usable_w,  # reviewed by
+            0.10 * usable_w,  # reviewed at
+            0.15 * usable_w,  # reason
+            0.10 * usable_w,  # decline reason
+            0.02 * usable_w,  # attachment
+        ]
+
+        tbl = Table(data, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
+        tbl.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.6, colors.black),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E79")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+
+            # center some columns
+            ("ALIGN", (4, 1), (6, -1), "CENTER"),
+            ("ALIGN", (9, 1), (9, -1), "CENTER"),
+        ]))
+
+        # Optional: color status text
+        qs_list = list(qs)  # avoid re-evaluating QS by index
+        for i in range(1, len(data)):
+            status_val = qs_list[i - 1].status
+            tbl.setStyle(TableStyle([
+                ("TEXTCOLOR", (4, i), (4, i), _status_color(status_val)),
+                ("FONTNAME", (4, i), (4, i), "Helvetica-Bold"),
+            ]))
+
+        elements.append(tbl)
+
+        doc.build(elements)
+        buffer.seek(0)
+
+        filename = "Attendance_Correction_Logs.pdf"
+        return FileResponse(buffer, as_attachment=True, filename=filename, content_type="application/pdf")
+
+class EmployeeDropdownListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = EmployeeDropdownSerializer
+
+    def get_queryset(self):
+        #  only active employees
+        return Employee.objects.filter(is_active=True).order_by("lname", "fname") 

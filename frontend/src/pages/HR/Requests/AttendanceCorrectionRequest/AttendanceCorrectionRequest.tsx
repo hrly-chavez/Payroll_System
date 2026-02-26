@@ -163,6 +163,7 @@ const AttendanceCorrectionRequest: React.FC = () => {
         columns={columns as any}
         dataSource={rows}
         loading={loading}
+        scroll={{ x: "max-content" }}
         pagination={{
           pageSize: 5,
           showSizeChanger: true,

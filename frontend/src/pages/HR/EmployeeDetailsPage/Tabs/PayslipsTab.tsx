@@ -128,6 +128,7 @@ const PayslipsTab: React.FC<PayslipsTabProps> = ({ employeeId }) => {
         rowKey={(row) => String(row.period_id)}
         size="small"
         loading={loadingPayrollRows}
+        scroll={{ x: "max-content" }}
         pagination={{ pageSize: 5 }}
         tableLayout="fixed"
         onRow={(row) => ({

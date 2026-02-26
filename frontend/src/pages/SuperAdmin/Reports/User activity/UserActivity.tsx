@@ -43,7 +43,13 @@ const UserActivity: React.FC = () => {
 
   if (loading) return <Spin tip="Loading..." style={{ marginTop: 50 }} />;
 
-  return <Table columns={columns} dataSource={logs} rowKey="id" pagination={{ pageSize: 10 }} scroll={{ x: 800 }} />;
+  return <Table 
+    columns={columns} 
+    dataSource={logs} 
+    rowKey="id" 
+    pagination={{ pageSize: 10 }} 
+    scroll={{ x: "max-content" }}
+    />;
 };
 
 export default UserActivity;

@@ -110,6 +110,7 @@ const Reports: React.FC = () => {
               columns={columns}
               dataSource={data}
               pagination={false}
+              scroll={{ x: "max-content" }}
               rowKey="key"
             />
           </div>

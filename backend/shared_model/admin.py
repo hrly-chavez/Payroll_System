@@ -389,32 +389,14 @@ class LeaveRequestAdmin(admin.ModelAdmin):
 
 @admin.register(HolidayPolicy)
 class HolidayPolicyAdmin(admin.ModelAdmin):
-    list_display = (
-        "department",
-        "holiday_type",
-        "requires_work",
-        "created_at",
-    )
+    list_display = ("department", "base", "holiday_type", "requires_work", "created_at")
+    list_filter = ("department", "base", "holiday_type", "requires_work")
+    search_fields = ("department__name", "holiday_type", "base")
 
-    list_filter = (
-        "department",
-        "holiday_type",
-        "requires_work",
-    )
+    # IMPORTANT: include base here
+    fields = ("department", "base", "holiday_type", "requires_work", "created_at")
+    readonly_fields = ("created_at",)
 
-    search_fields = (
-        "department__name",
-        "holiday_type",
-    )
-
-    fields = (
-        "department",
-        "holiday_type",
-        "requires_work",
-        "created_at",
-    )
-
-    ordering = ("-created_at",)
 @admin.register(Attendance_Correction)
 class AttendanceCorrectionAdmin(admin.ModelAdmin):
     list_display = (
@@ -454,3 +436,22 @@ admin.site.register(Company_Note)
 admin.site.register(Notification)
 admin.site.register(Leave_Day)
 admin.site.register(PayrollPeriodEmployee)
+@admin.register(DepartmentHolidayCalendar)
+class DepartmentHolidayCalendarAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "department",
+        "base",
+        "is_active",
+    )
+
+    list_filter = (
+        "base",
+        "is_active",
+    )
+
+    search_fields = (
+        "department__name",
+    )
+
+    ordering = ("department",)

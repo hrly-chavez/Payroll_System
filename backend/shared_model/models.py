@@ -35,17 +35,13 @@ class Address(models.Model):
     def __str__(self):
         return f"{self.province.name} - {self.city.name} - {self.barangay.name}"
 class Department(models.Model):
-    HOLIDAY_BASE_CHOICES = [
-        ("PH", "Philippines"),
-        ("US", "United States"),
-        ("COMPANY", "Company"),
-    ]
+    
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=50)
     is_active = models.BooleanField(default=True)
     created_at = models.DateField(auto_now_add=True)
     shift_id = models.ForeignKey("Shift", on_delete=models.SET_NULL,related_name="departments",null=True,blank=True)
-    holiday_base = models.CharField(max_length=20,choices=HOLIDAY_BASE_CHOICES,default="PH",help_text="This department follows THIS holiday calendar..")
+   
     
     def __str__(self):
         return self.name
@@ -305,7 +301,7 @@ class Allowance_Type(models.Model):
     code = models.CharField(max_length=10, null=True, blank=True, default="")
     is_active = models.BooleanField(default=True)
     created_at = models.DateField(default=timezone.now)
-    code = models.CharField(max_length=10, null=True, blank=True, default="")
+    
 
     def __str__(self):
         return self.name
@@ -417,6 +413,11 @@ class Holiday(models.Model):
         ]
 
 class HolidayPolicy(models.Model):
+    HOLIDAY_BASE_CHOICES = [
+        ("PH", "Philippines"),
+        ("US", "United States"),
+        ("COMPANY", "Company"),
+    ]
     HOLIDAY_TYPES = [
         ("Regular", "Regular"),
         ("Special Non-Working", "Special Non-Working"),
@@ -425,17 +426,45 @@ class HolidayPolicy(models.Model):
     ]
 
     department = models.ForeignKey(Department, on_delete=models.CASCADE)
+    base = models.CharField(max_length=20, choices=HOLIDAY_BASE_CHOICES)
     holiday_type = models.CharField(max_length=50, choices=HOLIDAY_TYPES)
     requires_work = models.BooleanField(default=False)
     created_at = models.DateTimeField(default=timezone.now)
 
+    def clean(self):
+        ok = DepartmentHolidayCalendar.objects.filter(
+            department=self.department,
+            base=self.base,
+            is_active=True
+        ).exists()
+        if not ok:
+            raise ValidationError({"base": "This base is not active for the selected department."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["department", "holiday_type"],
-                name="unique_holiday_policy_per_dept_type"
+                fields=["department", "base", "holiday_type"],
+                name="unique_holiday_policy_per_dept_base_type"
             )
         ]
+
+
+class DepartmentHolidayCalendar(models.Model):
+    HOLIDAY_BASE_CHOICES = [ ("PH", "Philippines"), ("US", "United States"), ("COMPANY", "Company"), ] 
+    department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name="holiday_calendars") 
+    base = models.CharField(max_length=20, choices=HOLIDAY_BASE_CHOICES) 
+    is_active = models.BooleanField(default=True) 
+    def __str__(self):
+        return f"{self.department.name} - {self.get_base_display()}"
+    class Meta: 
+             constraints = [ 
+                 models.UniqueConstraint(fields=["department", "base"],
+                                          name="unique_dept_holiday_base") 
+                                          ]
         
 class Attendance_Event(models.Model): 
     TYPE_CHOICES = [
@@ -503,23 +532,6 @@ class Attendance_Correction(models.Model):
     def __str__(self):
         return f"{self.requested_by} | {self.date} | {self.issue_type} | {self.status}"
     
-    
-        if not file:
-            return file
-
-        allowed_extensions = ["jpg", "jpeg", "png", "webp", "pdf"]
-        ext = file.name.split(".")[-1].lower()
-
-        if ext not in allowed_extensions:
-            raise serializers.ValidationError(
-                "Invalid file type. Only JPG, PNG, WEBP, and PDF are allowed."
-            )
-
-        # Optional: file size limit (5MB)
-        if file.size > 5 * 1024 * 1024:
-            raise serializers.ValidationError("File size must be under 5MB.")
-
-        return file
     class Meta:
         ordering = ["-requested_at"]
         indexes = [

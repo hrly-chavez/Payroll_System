@@ -40,6 +40,13 @@ def _overlaps_period(eff_from, eff_to, period_start, period_end):
         return False
     return True
 
+def _get_active_holiday_bases(self, department: Department) -> list[str]:
+    return list(
+        DepartmentHolidayCalendar.objects
+        .filter(department=department, is_active=True)
+        .values_list("base", flat=True)
+    )
+
 def get_latest_active_payroll(period_id: int, employee_id: int) -> Payroll | None:
     """
     Return the latest *non-void* payroll record for one employee in one payroll period.
@@ -472,6 +479,8 @@ class PayrollGenerationService:
         salary = self._get_effective_salary(employee, period.end_date)
         payroll_setting = self._get_payroll_setting()
 
+        active_bases = self._get_active_holiday_bases(department)
+
         attendance_map = self._get_attendance_map(employee, period)
         approved_events = self._get_approved_events(attendance_map)
 
@@ -507,6 +516,7 @@ class PayrollGenerationService:
             "shift": shift,
             "salary": salary,
             "payroll_setting": payroll_setting,
+             "active_holiday_bases": active_bases,
             "attendance_map": attendance_map,
             "approved_events": approved_events,
             "leave_map": leave_map,
@@ -626,14 +636,24 @@ class PayrollGenerationService:
         Used by:
         - absence computation (if holiday requires work and employee absent -> absent)
         """
+        active_bases = self._get_active_holiday_bases(department)
+
+        if not active_bases:
+            return {}  # no bases active => no applicable holidays
+
         rows = Holiday.objects.filter(
             date__gte=period.start_date,
             date__lte=period.end_date,
             status="Approved",
             is_active=True,
-            base=department.holiday_base,   # <-- IMPORTANT
+            base__in=active_bases,
         )
-        return {h.date: h for h in rows}
+
+        holiday_map: dict[date, list[Holiday]] = {}
+        for h in rows:
+            holiday_map.setdefault(h.date, []).append(h)
+
+        return holiday_map
 
     def _get_holiday_policy_map(self, department):
         """
@@ -644,7 +664,7 @@ class PayrollGenerationService:
         - absence computation (if holiday requires work and employee absent -> absent)
         """
         rows = HolidayPolicy.objects.filter(department=department)
-        return {r.holiday_type: bool(r.requires_work) for r in rows}
+        return {(r.base, r.holiday_type): bool(r.requires_work) for r in rows}
 
     def _get_allowances(self, employee: Employee, period: Payroll_Period):
         # Return all ACTIVE employee allowances that overlap the payroll period.
@@ -772,48 +792,62 @@ class PayrollGenerationService:
             shift_work_minutes=shift_work_minutes,
         )
     
-    def _compute_absences(self,expected_days,attendance_map,leave_map,holiday_map,holiday_policy_map,) -> tuple[int, set[date]]:
+    def _compute_absences(
+        self,
+        expected_days,
+        attendance_map,
+        leave_map,
+        holiday_map,
+        holiday_policy_map,
+    ) -> tuple[int, set[date]]:
         """
         Compute absences for the payroll period.
 
+        Updated for multi-base holidays:
+
         Inputs:
-        - expected_days: list of dates employee is expected to work (shift workdays)
-        - attendance_map: {date: Attendance}
-        - leave_map: {date: Leave_Day} (approved leaves)
-        - holiday_map: {date: Holiday} (approved/active holidays)
-        - holiday_policy_map: {holiday_type: requires_work_bool}
+        - expected_days: list[date] employee is expected to work (shift workdays)
+        - attendance_map: dict[date, Attendance]
+        - leave_map: dict[date, Leave_Day] (approved leaves)
+        - holiday_map: dict[date, list[Holiday]]  (approved/active holidays for ACTIVE bases)
+        - holiday_policy_map: dict[(base, holiday_type), bool]  -> requires_work
 
         Rules:
         A) If leave exists for the day -> NOT absent
-        B) If holiday exists:
-           - if requires_work is False -> NOT absent
-           - if requires_work is True -> absent if no attendance
+        B) If holiday(s) exist on that date:
+        - If ANY holiday on that date is "not requires work" -> NOT absent (day off wins)
+        - Else (all require work) -> absent if no attendance
         C) Normal day:
-           - absent if no attendance record exists
-
-        Output:
-        - (absent_count, absent_dates_set)
+        - absent if no attendance record exists
         """
         absent_dates: set[date] = set()
 
         for d in expected_days:
-            # A) Leave override (placeholder)
+            # A) Leave override
             if d in leave_map:
                 continue
 
-            # B) Holiday check
-            h = holiday_map.get(d)
-            if h:
-                requires_work = bool(holiday_policy_map.get(h.type, False))
-                if not requires_work:
+            # B) Holiday check (now may be multiple holidays per date)
+            holidays = holiday_map.get(d)  # list[Holiday] | None
+            if holidays:
+                # If any holiday on that date does NOT require work => not absent
+                any_day_off = False
+
+                for h in holidays:
+                    requires_work = bool(holiday_policy_map.get((h.base, h.type), False))
+                    if not requires_work:
+                        any_day_off = True
+                        break
+
+                if any_day_off:
                     continue  # not absent
 
-                # requires work: if no attendance -> absent
+                # All holidays require work -> absent if no attendance
                 if d not in attendance_map:
                     absent_dates.add(d)
                 continue
 
-            # C) Normal day
+            # C) Normal expected workday
             if d not in attendance_map:
                 absent_dates.add(d)
 
@@ -1348,58 +1382,61 @@ class PayrollGenerationService:
     # Holiday earnings (worked on approved holiday)
     # -------------------------
     def _apply_worked_holidays(self, payroll, ctx, rates: Rates):
-        """
-        Apply holiday earnings for days where:
-        - Attendance is PRESENT
-        - The date is an approved holiday for the department base
-
-        Behavior:
-        - Determine holiday rule name from holiday type
-        - Fetch Pay_Rule(event_type, "Earning")
-        - Compute amount using minutes worked (bounded by shift window)
-        - Create earning payslip line
-
-        Raises:
-        - ValidationError if required holiday Pay_Rule is missing
-        """
-        holiday_map = ctx["holiday_map"]
-        policy_map = ctx["holiday_policy_map"]
+        holiday_map = ctx["holiday_map"]                # date -> list[Holiday]
+        policy_map = ctx["holiday_policy_map"]          # (base, type) -> requires_work
         rule_map = ctx["rule_map"]
         attendance_map = ctx["attendance_map"]
-        dept = ctx["department"]
+
+        base_priority = {"COMPANY": 3, "PH": 2, "US": 1}  # tie-break only
 
         for d, att in attendance_map.items():
             if att.status != "PRESENT":
                 continue
 
-            h = holiday_map.get(d)
-            if not h:
+            holidays = holiday_map.get(d)
+            if not holidays:
                 continue
 
-            requires_work = bool(policy_map.get(h.type, False))
-            # If they worked anyway, pay holiday earning based on holiday type (reg/special/company)
-            event_type = self._holiday_type_to_rule_event(h.type)
-            rule = rule_map.get((event_type, "Earning"))
-            if not rule:
-                raise ValidationError({"detail": f"Missing Pay Rule for {event_type} (Earning)."})
-            # Multiplier usually: daily_rate * multiplier (we convert to minutes for consistency)
-            # simplest: compute using full shift minutes
             minutes = self._attendance_work_minutes(att, ctx["shift"])
             if minutes <= 0:
                 continue
-            amount, rate_applied = self._compute_rule_amount(rule, minutes, rates)
-            if amount > 0:
-                self._create_line(
-                    payroll,
-                    "EARNING",
-                    f"{event_type} ({d})",
-                    amount,
-                    rule=rule,
-                    source_type="ATTENDANCE",
-                    source_id=att.id,
-                    quantity_min=minutes,
-                    rate_applied=rate_applied,
-                )
+
+            best = None  # (amount, priority, Holiday, rule, rate_applied)
+
+            for h in holidays:
+                event_type = self._holiday_type_to_rule_event(h.type)
+                rule = rule_map.get((event_type, "Earning"))
+                if not rule:
+                    raise ValidationError({"detail": f"Missing Pay Rule for {event_type} (Earning)."})
+
+                amount, rate_applied = self._compute_rule_amount(rule, minutes, rates)
+                pr = base_priority.get(h.base, 0)
+
+                if best is None:
+                    best = (amount, pr, h, rule, rate_applied, event_type)
+                    continue
+
+                if amount > best[0] or (amount == best[0] and pr > best[1]):
+                    best = (amount, pr, h, rule, rate_applied, event_type)
+
+            if not best:
+                continue
+
+            amount, _, h, rule, rate_applied, event_type = best
+            if amount <= 0:
+                continue
+
+            self._create_line(
+                payroll,
+                "EARNING",
+                f"{event_type} ({d}) [{h.base}]",
+                amount,
+                rule=rule,
+                source_type="ATTENDANCE",
+                source_id=att.id,
+                quantity_min=minutes,
+                rate_applied=rate_applied,
+            )
 
     def _holiday_type_to_rule_event(self, holiday_type: str) -> str:
         """

@@ -21,7 +21,6 @@ import "./Dashboard.css";
 import OverTimeModal  from "./OverTimeModal";
 import OverTimeDetailModal  from "./OverTimeDetailModal";
 import DeclineReasonModal from "./DeclineReasonModal";
-import PendingPayrollModal from "./PendingPayrollModal";
 import { HourglassOutlined } from "@ant-design/icons";
 
 import {HOLIDAY_LEGEND,HolidayBase,HolidayType,} from "../../../components/SharedCalendar/CalendarLegend";
@@ -35,13 +34,7 @@ const { Content } = Layout;
 
 
 
-interface Payroll {
-  id: number;
-  employee_name: string;
-  period: string;
-  total_amount: number;
-  status: string;
-}
+
 
 type AttendanceStatus =
   | "PRESENT"
@@ -114,12 +107,10 @@ const Dashboard: React.FC = () => {
   const [chartHeight, setChartHeight] = useState<number>(280);
 
 /* ================= OVERTIME STATE ================= */
-const [overtimeData, setOvertimeData] = useState<OverTimeRequest[]>([]);
-const [overtimeLoading, setOvertimeLoading] = useState(false);
+  const [overtimeData, setOvertimeData] = useState<OverTimeRequest[]>([]);
+  const [overtimeLoading, setOvertimeLoading] = useState(false);
 
-  /* ================= PAYROLL STATE ================= */
-  const [pendingPayrolls, setPendingPayrolls] = useState<Payroll[]>([]);
-  const [payrollLoading, setPayrollLoading] = useState(false);
+
 
   /* ================= ATTENDANCE STATE ================= */
   const [attendanceData, setAttendanceData] =
@@ -143,68 +134,58 @@ const [overtimeLoading, setOvertimeLoading] = useState(false);
     useState<OverTimeRequest | null>(null);
   const [isDeclineModalOpen, setIsDeclineModalOpen] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
-  const [isPayrollModalOpen, setIsPayrollModalOpen] = useState(false);
+  
 
   /* ================= FETCH FUNCTIONS ================= */
   const fetchOverTimeRequests = async () => {
-    setOvertimeLoading(true);
-    try {
-      const now = dayjs();
+      setOvertimeLoading(true);
+      try {
+        const now = dayjs();
 
-      const params = {
-        year: now.year(),
-        month: now.month() + 1,
-      };
+        const params = {
+          year: now.year(),
+          month: now.month() + 1,
+        };
 
-      const res = await api.get<PendingOTResponse>(
-        "/attendance/super_admin/overtime/pending/",
-        { params }
-      );
+        const res = await api.get<PendingOTResponse>(
+          "/attendance/super_admin/overtime/pending/",
+          { params }
+        );
 
-      const mapped: OverTimeRequest[] = (res.data.results || []).map((r) => ({
-        id: r.id,
-        employee_id: r.employee_id,
-        name: r.full_name,
+        const mapped: OverTimeRequest[] = (res.data.results || []).map((r) => ({
+          id: r.id,
+          employee_id: r.employee_id,
+          name: r.full_name,
 
-        attendance_id: r.attendance_id,
-        attendance_date: r.attendance_date,
+          attendance_id: r.attendance_id,
+          attendance_date: r.attendance_date,
 
-        type: r.type, 
+          type: r.type, 
 
-        minutes: r.minutes,
-        start_time: r.start_time,
-        end_time: r.end_time,
+          minutes: r.minutes,
+          start_time: r.start_time,
+          end_time: r.end_time,
 
-        time_in: r.time_in,
-        time_out: r.time_out,
+          time_in: r.time_in,
+          time_out: r.time_out,
 
-        status: r.approval_status,
-        event_remarks: r.event_remarks,
-        department_name: r.department_name,
-        shift_name: r.shift_name,
-      }));
+          status: r.approval_status,
+          event_remarks: r.event_remarks,
+          department_name: r.department_name,
+          shift_name: r.shift_name,
+        }));
 
-      setOvertimeData(mapped);
-      return mapped;
-    } catch {
-      message.error("Failed to fetch overtime requests");
-      return [];
-    } finally {
-      setOvertimeLoading(false);
-    }
-  };
+        setOvertimeData(mapped);
+        return mapped;
+      } catch {
+        message.error("Failed to fetch overtime requests");
+        return [];
+      } finally {
+        setOvertimeLoading(false);
+      }
+    };
 
-  const fetchPendingPayrolls = async () => {
-    setPayrollLoading(true);
-    try {
-      const res = await api.get<Payroll[]>("/superadmin/pending-payrolls/");
-      setPendingPayrolls(res.data);
-    } catch {
-      message.error("Failed to fetch payrolls");
-    } finally {
-      setPayrollLoading(false);
-    }
-  };
+    
 
   /* ================= ATTENDANCE COUNT FUNCTION ================= */
   const countFromRows = (list: any[], totalEmployees: number) => {
@@ -298,7 +279,6 @@ const [overtimeLoading, setOvertimeLoading] = useState(false);
   useEffect(() => {
     fetchOverTimeRequests();
     loadCalendarEvents();
-    fetchPendingPayrolls();
     fetchAttendanceAnalytics(selectedDate, rangeMode);
   }, []);
 
@@ -380,63 +360,16 @@ const [overtimeLoading, setOvertimeLoading] = useState(false);
         <Topbar title="Dashboard" />
         <Content className="dashboard-content">
           <Row gutter={[16, 16]} className="equalHeightRow">
-          {/* DATE CARD */}
-          <Col xs={24} md={6}>
-            <Card title={currentDate} className="stat-card">
-              <div className="dateChartArea">
-                <div className="chartWrapperAdmin">
-                  <Pie
-                    data={[
-                      { type: "Reported", value: attendanceData.PRESENT || 0 },
-                      { type: "Not Reported", value: attendanceData.ABSENT || 0 },
-                    ]}
-                    angleField="value"
-                    colorField="type"
-                    radius={0.98}
-                    legend={false}
-                    label={false}
-                    scale={{
-                      color: {
-                        domain: ["Reported", "Not Reported"],
-                        range: ["#386FA4", "#E5E7EB"],
-                      },
-                    }}
-                  />
-                </div>
-
-                <div className="chartLegendAdmin">
-                  <div className="legendItem">
-                    <div className="legendDot" data-type="Reported" />
-                    <div className="legendText">
-                      <div className="legendLabel">Reported</div>
-                    </div>
-                  </div>
-
-                  <div className="legendItem">
-                    <div className="legendDot" data-type="Not Reported" />
-                    <div className="legendText">
-                      <div className="legendLabel">Not Reported</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </Col>
+          
 
           {/* PENDING PAYROLL */}
           <Col xs={24} md={4}>
-            <Card
-              className="stat-tile primary"
-              onClick={() => setIsPayrollModalOpen(true)}
-              hoverable
-            >
-              <div className="tile-title">Pending Payroll</div>
+            <Card className="stat-tile primary" hoverable>
+              <div className="tile-title">Off Set (Coming Soon)</div>
 
               <div className="tile-body">
                 <HourglassOutlined className="tile-icon" />
-                <div className="tile-value">
-                  {payrollLoading ? <Spin /> : pendingPayrolls.length}
-                </div>
+                <div className="tile-value">—</div>
               </div>
             </Card>
           </Col>
@@ -459,7 +392,7 @@ const [overtimeLoading, setOvertimeLoading] = useState(false);
               }}
             >
               <div className="tile-title">Overtime Pending(s)</div>
-
+                {/* Change this into clock coming soon */}
               <div className="tile-body">
                 <HourglassOutlined className="tile-icon" />
                 <div className="tile-value">
@@ -543,13 +476,7 @@ const [overtimeLoading, setOvertimeLoading] = useState(false);
             onSave={handleDecline}
           />
 
-          <PendingPayrollModal
-            visible={isPayrollModalOpen}
-            onClose={() => setIsPayrollModalOpen(false)}
-            data={pendingPayrolls}
-            loading={payrollLoading}
-            navigateToAll={() => navigate("/superadmin/payroll")}
-          />
+
         </Content>
       </Layout>
     </Layout>

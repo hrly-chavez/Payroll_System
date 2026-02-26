@@ -181,6 +181,7 @@
                   columns={columns}
                   rowKey={record => `${record.type}-${record.id}`}
                   pagination={{ pageSize: 10 }}
+                  scroll={{ x: "max-content" }}
                 />
               )}
             </Card>

@@ -468,6 +468,7 @@ const EmployeeDetailsPage: React.FC = () => {
                       dataSource={salaries}
                       loading={loadingSalaries}
                       pagination={false}
+                      scroll={{ x: "max-content" }}
                     />
                   </Tabs.TabPane>
                 )}
@@ -489,6 +490,7 @@ const EmployeeDetailsPage: React.FC = () => {
                       dataSource={allowances}
                       loading={loadingAllowances}
                       pagination={false}
+                      scroll={{ x: "max-content" }}
                     />
                   </Tabs.TabPane>
                 )}
@@ -510,6 +512,7 @@ const EmployeeDetailsPage: React.FC = () => {
                       dataSource={deductions}
                       loading={loadingDeductions}
                       pagination={false}
+                      scroll={{ x: "max-content" }}
                     />
                   </Tabs.TabPane>
                 )}
@@ -541,6 +544,7 @@ const EmployeeDetailsPage: React.FC = () => {
                       ]}
                       dataSource={[userAccount]}
                       pagination={false}
+                      scroll={{ x: "max-content" }}
                     />
                   ) : (
                     <p>No user account linked to this employee.</p>
@@ -566,6 +570,7 @@ const EmployeeDetailsPage: React.FC = () => {
                     loading={loadingLogs}
                     rowKey="id"
                     pagination={{ pageSize: 10 }}
+                    scroll={{ x: "max-content" }}
                   />
                 </Tabs.TabPane>
 

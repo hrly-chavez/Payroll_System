@@ -105,6 +105,7 @@ const AllowanceTab: React.FC<Props> = ({ employeeId }) => {
         dataSource={allowances}
         loading={loading}
         pagination={false}
+        scroll={{ x: "max-content" }}
       />
 
       <EditEmployeeAllowanceModal

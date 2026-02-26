@@ -197,6 +197,7 @@ const AllRequests: React.FC = () => {
         rowKey={(record) => `${record.model}-${record.id}`}
         loading={loading}
         dataSource={sortedData}
+        scroll={{ x: "max-content" }}
         pagination={{
           pageSize: 10,
           showSizeChanger: true,

@@ -150,6 +150,7 @@ const Department: React.FC = () => {
             rowKey="id"
             loading={loading}
             pagination={false}
+            scroll={{ x: "max-content" }}
             className={styles.table}
             onRow={(record) => ({
               onClick: () =>

@@ -97,6 +97,7 @@ export default function HolidayTab({ active, searchText, refreshKey }: Props) {
     <Table
       columns={holidayColumns}
       dataSource={filtered}
+      scroll={{ x: "max-content" }}
       rowKey="id"
       pagination={{
         pageSize: 10,

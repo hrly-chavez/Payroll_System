@@ -103,6 +103,7 @@ const PayrollReleaseLogs: React.FC<Props> = ({ selectedPeriodId, onSelectPeriodI
         dataSource={periods}
         loading={loading}
         pagination={{ pageSize: 5 }}
+        scroll={{ x: "max-content" }}
         rowSelection={{
           type: "radio",
           selectedRowKeys: selectedPeriodId ? [selectedPeriodId] : [],

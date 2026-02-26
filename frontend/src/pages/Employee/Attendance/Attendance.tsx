@@ -323,6 +323,7 @@ const Attendance: React.FC = () => {
                     columns={leaveColumns}
                     dataSource={leaveRequests}
                     pagination={{ pageSize: 5 }}
+                    scroll={{ x: "max-content" }}
                   />
                 </Spin>
               </Tabs.TabPane>

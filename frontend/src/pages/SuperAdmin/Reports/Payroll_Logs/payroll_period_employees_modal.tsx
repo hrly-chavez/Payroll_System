@@ -177,7 +177,7 @@ const PayrollPeriodEmployeesModal: React.FC<Props> = ({ open, period, onClose })
         dataSource={rows}
         loading={loading}
         pagination={{ pageSize: 8 }}
-        // ✅ no scroll={{y}} so the modal won’t create that inner vertical scrollbar
+        scroll={{ x: "max-content" }}
       />
     </Modal>
   );

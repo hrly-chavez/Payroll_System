@@ -22,6 +22,7 @@ const AuditLogsTab: React.FC<Props> = ({ logs, loading }) => {
       columns={columns}
       dataSource={logs}
       loading={loading}
+      scroll={{ x: "max-content" }}
       rowKey="id"
     />
   );

@@ -39,9 +39,16 @@ class DepartmentSerializer(serializers.ModelSerializer):
         write_only=True
     )
 
+    holiday_base = serializers.SerializerMethodField()
+
     class Meta:
         model = Department
         fields = "__all__"
+
+    def get_holiday_base(self, obj):
+        return list(
+            obj.holiday_calendars.values_list("base", flat=True)
+        )
 
     def create(self, validated_data):
         # Pop the _current_user from context instead of kwargs

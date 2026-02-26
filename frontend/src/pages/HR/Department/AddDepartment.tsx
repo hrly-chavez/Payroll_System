@@ -8,7 +8,7 @@ export interface DepartmentType {
   id?: number;
   name: string;
   shift?: number;
-  holiday_base: string;
+  holiday_base: string[];
   is_active?: boolean;
 }
 
@@ -130,7 +130,7 @@ const AddDepartment: React.FC<Props> = ({ open, onClose, initialValues }) => {
           name="holiday_base"
           rules={[{ required: true, message: "Please select a holiday base" }]}
         >
-          <Select placeholder="Choose">
+          <Select mode="multiple" placeholder="Choose">
             {HOLIDAY_OPTIONS.map((option) => (
               <Select.Option key={option.value} value={option.value}>
                 {option.label}

@@ -451,4 +451,32 @@ class AttendanceAdminMonthlyStatsSerializer(serializers.Serializer):
     undertime = serializers.IntegerField()
     overtime = serializers.IntegerField()
 
-    
+class EmployeeDropdownSerializer(serializers.ModelSerializer):
+    value = serializers.IntegerField(source="id")
+    label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Employee
+        fields = ["value", "label"]
+
+    def get_label(self, obj):
+        fname = (getattr(obj, "fname", "") or "").strip()
+        lname = (getattr(obj, "lname", "") or "").strip()
+        full = f"{fname} {lname}".strip()
+        return full or f"Employee #{obj.id}"
+
+
+class AttendanceLogRowSerializer(serializers.Serializer):
+    """
+    Matches your HRLogRow shape.
+    """
+    id = serializers.IntegerField()
+    date = serializers.DateField()
+    status = serializers.CharField(allow_blank=True, allow_null=True)
+    time_in = serializers.CharField(allow_null=True)
+    time_out = serializers.CharField(allow_null=True)
+    employee_id = serializers.IntegerField()
+    full_name = serializers.CharField()
+    department_name = serializers.CharField(allow_null=True)
+    shift_name = serializers.CharField(allow_null=True)
+    event_types = serializers.CharField(allow_blank=True, allow_null=True)

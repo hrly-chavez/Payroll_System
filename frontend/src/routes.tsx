@@ -1,6 +1,6 @@
 // frontend/src/routes.tsx
 import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 /* AUTH */
@@ -89,6 +89,9 @@ const Router: React.FC = () => {
           <Route path="/super-admin/system" element={<SupSystemConfig />} />
           <Route path="/super-admin/requests" element={<SupRequest />} />
         </Route>
+
+        {/* ================= CATCH-ALL ================= */}
+        <Route path="*" element={<Navigate to="/" replace />} />
 
       </Routes>
     </BrowserRouter>

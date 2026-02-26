@@ -1,5 +1,5 @@
 //src/pages/HR/EmployeeDetailPage/Modals/EditEmployeeSalaryModal.tsx
-import { Modal, Form, Select, InputNumber, DatePicker, Button, message } from "antd";
+import { Modal, Form, Select, InputNumber, DatePicker, Button, message, Input } from "antd";
 import api from "api/axios";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
@@ -57,6 +57,7 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
         pay_type: values.pay_type,
         base_rate: values.base_rate,
         effective_from: values.effective_from.format("YYYY-MM-DD"),
+        reason: values.reason,
       });
 
       message.success("Salary updated successfully");
@@ -98,6 +99,14 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
           rules={[{ required: true }]}
         >
           <DatePicker style={{ width: "100%" }} />
+        </Form.Item>
+
+        <Form.Item
+          label="Reason for Change"
+          name="reason"
+          rules={[{ required: true, message: "Please provide a reason for this change" }]}
+        >
+          <Input.TextArea rows={3} placeholder="Why are you making these changes?" />
         </Form.Item>
 
         <Button type="primary" block loading={loading} onClick={handleSubmit}>

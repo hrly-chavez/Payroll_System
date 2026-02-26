@@ -68,7 +68,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
 class UserAccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["user_id", "user_name", "role", "is_active"]
+        fields = ["user_id", "user_name", "role", "is_active", "user_status"]
 
 #gamit pag load sa admin department nga mga employees
 class EmployeeSerializer(serializers.ModelSerializer):
@@ -262,18 +262,24 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
    
 class EmployeeUpdateSerializer(serializers.ModelSerializer):
     address = AddressSerializer(required=False)
+    reason = serializers.CharField(write_only=True, required=True)
 
     class Meta:
         model = Employee
         fields = [
             "fname", "initial", "lname", "suffix", "status", "contact_no",
             "email", "hired_date", "position", "bank_info", "shift",
-            "department", "address", "is_active",
+            "department", "address", "is_active", "reason",
         ]
 
     def update(self, instance, validated_data):
         user = validated_data.pop("_current_user", None)
+        reason = validated_data.pop("reason", None)  
         address_data = validated_data.pop("address", None)
+
+        # Attach _reason for audit logging in signals
+        if reason:
+            setattr(instance, "_audit_reason", reason)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -296,9 +302,10 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
   
 #for salary
 class EmployeeSalarySerializer(serializers.ModelSerializer):
+    reason = serializers.CharField(write_only=True, required=True)
     class Meta:
         model = Employee_Salary
-        fields = ["id", "employee", "pay_type", "base_rate", "effective_from", "created_at"]
+        fields = ["id", "employee", "pay_type", "base_rate", "effective_from", "created_at", "reason", ]
 
     def validate(self, attrs):
         # Ensure unique salary per employee per effective_from
@@ -312,19 +319,31 @@ class EmployeeSalarySerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # Get current user from context
         user = self.context.get("_current_user")
+        reason = validated_data.pop("reason", None)
         instance = Employee_Salary(**validated_data)
         if user:
             instance._current_user = user  # attach for AuditLog
+        # Attach reason for audit , optional just checking if theres a reason
+        if reason:
+            setattr(instance, "_audit_reason", reason)
+        
         instance.save()
+
+        
         return instance
 
     def update(self, instance, validated_data):
         user = self.context.get("_current_user")
+        reason = validated_data.pop("reason", None)
+        
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         if user:
             instance._current_user = user
+        if reason:
+            setattr(instance, "_audit_reason", reason)
         instance.save()
+        
         return instance
 #para sa deduction sa taxes like sss, pagibig, philhealth
 #para sad ni sya sa POST / PUT

@@ -62,6 +62,7 @@ def create_audit_log(instance, action, old_data=None, new_data=None):
         return
 
     user = get_instance_user(instance)
+    reason = getattr(instance, "_audit_reason", None)
     AuditLog = apps.get_model("shared_model", "AuditLog")
 
     AuditLog.objects.create(
@@ -71,6 +72,7 @@ def create_audit_log(instance, action, old_data=None, new_data=None):
         object_id=str(instance.pk),
         old_data=old_data,
         new_data=new_data,
+        reason=reason,
     )
 
 @receiver(post_save)
@@ -89,6 +91,9 @@ def log_save(sender, instance, created, **kwargs):
     old_data = _old_values.get((sender, instance.pk), {}) if not created else {}
     new_data = serialize_instance(instance)
     user = get_instance_user(instance)
+
+    # Extract reason if it exists
+    reason = getattr(instance, "_audit_reason", None)
 
     if created:
         # CREATE: old/new data is blank

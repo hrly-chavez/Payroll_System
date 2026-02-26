@@ -165,6 +165,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         ('SUPER_ADMIN', 'Super Admin'),
     )
 
+    STATUS_CHOICES = (
+        ("ACTIVE", "Active"),
+        ("INACTIVE", "Inactive"),
+        ("SUSPENDED", "Suspended"),  # optional
+        ("TERMINATED", "Terminated"),
+    )
+
     user_id = models.AutoField(primary_key=True)
     user_name = models.CharField(max_length=150, unique=True)
 
@@ -173,6 +180,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='EMPLOYEE')
     is_active = models.BooleanField(default=True)
+    user_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="ACTIVE")
     is_staff = models.BooleanField(default=False)
 
     employee = models.OneToOneField(
@@ -916,6 +924,7 @@ class AuditLog(models.Model):
     object_id = models.CharField(max_length=50)
     old_data = models.JSONField(null=True, blank=True)
     new_data = models.JSONField(null=True, blank=True)
+    reason = models.TextField(null=True, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

@@ -170,6 +170,11 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         user = self.get_object()
 
+        # Get reason from request
+        reason = request.data.get("reason")
+        if reason:
+            user._audit_reason = reason
+
         # Generate strong random password (12 characters, mix of letters, digits, punctuation)
         new_password = ''.join(
             secrets.choice(string.ascii_letters + string.digits + string.punctuation)
@@ -178,16 +183,16 @@ class UserViewSet(viewsets.ModelViewSet):
 
         # Hash password properly
         user.set_password(new_password)
-
-        # Attach current user for AuditLog
-        user._current_user = request.user
         user.save()
 
-        create_audit_log(
-            instance=user,
+        AuditLog.objects.create(
+            user=request.user,  # the admin who performed the reset
             action="RESET_PASSWORD",
-            old_data="",
-            new_data="Password was reset by admin"
+            model_name="User",
+            object_id=str(user.pk),
+            old_data="",  # could store old password hash if you want
+            new_data=f"Password reset by {request.user.user_name}",
+            reason=reason,
         )
 
         logger.info(f"Password for user '{user.user_name}' has been reset by admin '{request.user.user_name}'.")
@@ -227,22 +232,22 @@ class UserViewSet(viewsets.ModelViewSet):
         # Attach current user for audit log
         user._current_user = request.user
 
+        # Get reason from request
+        reason = request.data.get("reason")
+        if reason:
+            user._audit_reason = reason  # attach reason to instance
+
+        # Toggle active status
         if user.is_active:
             user.is_active = False
+            user.user_status = "INACTIVE"  # update user_status if you added the field
             action_name = "DEACTIVATED"
         else:
             user.is_active = True
+            user.user_status = "ACTIVE"
             action_name = "REACTIVATED"
 
-        user.save()
-
-        # Audit log
-        create_audit_log(
-            instance=user,
-            action=action_name,
-            old_data=f"is_active: {not user.is_active}",
-            new_data=f"is_active: {user.is_active}"
-        )
+        user.save()  # signals will now pick up _audit_reason
 
         return Response(
             {"detail": f"User successfully {action_name.lower()}.", "is_active": user.is_active},
@@ -525,49 +530,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             "username": username,
             "password": password
         }, status=201)
-
     
-    # -------------------
-    # CREATE EMPLOYEE
-    # -------------------
-    def create(self, request, *args, **kwargs):
-        serializer = EmployeeCreateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        # Role restriction
-        signed_in_user = request.user
-        requested_role = request.data.get("role", "EMPLOYEE")
-        if signed_in_user.role == "ADMIN" and requested_role != "EMPLOYEE":
-            return Response({"error": "ADMINs can only create EMPLOYEE users."}, status=403)
-        if signed_in_user.role == "SUPER_ADMIN" and requested_role not in ["ADMIN", "SUPER_ADMIN"]:
-            return Response({"error": "SUPER_ADMIN can only create ADMIN or SUPER_ADMIN users."}, status=403)
-        if signed_in_user.role not in ["ADMIN", "SUPER_ADMIN"]:
-            return Response({"error": "You do not have permission to create users."}, status=403)
-
-        # Save employee WITH _current_user
-        employee = serializer.save(_current_user=request.user)
-
-        # Generate username and password
-        username = f"{employee.fname.lower()}{employee.id}"
-        password = "".join(random.choices(string.ascii_letters + string.digits, k=8))
-
-        # Create user manually and attach _current_user BEFORE saving
-        user = User(
-            user_name=username,
-            role=requested_role,
-            employee=employee,
-        )
-        user.set_password(password)
-        user._current_user = request.user
-        user.save()  # triggers post_save signal, AuditLog sees _current_user
-
-        return Response({
-            "message": "Employee and user created successfully",
-            "employee_id": employee.id,
-            "username": username,
-            "password": password
-        }, status=201)
-
     # -------------------
     # UPDATE EMPLOYEE
     # -------------------
@@ -608,7 +571,7 @@ class ForgotPasswordView(APIView):
                 status=status.HTTP_200_OK
             )
 
-        # 🔐 Make sure user has linked employee + email
+        #  Make sure user has linked employee + email
         if not user.employee or not user.employee.email:
             return Response(
                 {"detail": "If the account exists, a reset link has been sent."},

@@ -3,6 +3,7 @@ import React, { useEffect } from "react";
 import { Modal, Form, Input, DatePicker, Select, message } from "antd";
 import dayjs from "dayjs";
 import api from "api/axios";
+const { TextArea } = Input;
 
 type Props = {
   open: boolean;
@@ -59,6 +60,7 @@ const EditEmployeeDetailsModal: React.FC<Props> = ({
         hired_date: values.hired_date ? values.hired_date.format("YYYY-MM-DD") : null,
         position: values.position,
         bank_info: values.bank_info,
+        reason: values.reason,
       };
 
       await api.put(`/employees/employees/${employee.id}/update/`, payload);
@@ -126,6 +128,14 @@ const EditEmployeeDetailsModal: React.FC<Props> = ({
 
         <Form.Item label="Hired Date" name="hired_date">
           <DatePicker style={{ width: "100%" }} />
+        </Form.Item>
+
+        <Form.Item
+          label="Reason for Change"
+          name="reason"
+          rules={[{ required: true, message: "Please provide a reason for this change" }]}
+        >
+          <Input.TextArea rows={3} placeholder="Why are you making these changes?" />
         </Form.Item>
 
       </Form>

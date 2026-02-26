@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Table, Button, Modal, message, Spin } from "antd";
+import { Table, Button, message, Spin } from "antd";
 import api from "api/axios";
-import ForgotPasswordModal from "../Modals/ForgotPasswordModal"; // make sure path is correct
+import ForgotPasswordModal from "../Modals/ForgotPasswordModal";
+import DeactivateUserModal from "../Modals/DeactivateUserModal";
 
 interface Props {
   employeeId: number;
@@ -11,6 +12,7 @@ const EmployeeAccountTab: React.FC<Props> = ({ employeeId }) => {
   const [userAccount, setUserAccount] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+  const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
 
   const fetchUserAccount = async () => {
     setLoading(true);
@@ -29,28 +31,6 @@ const EmployeeAccountTab: React.FC<Props> = ({ employeeId }) => {
   useEffect(() => {
     fetchUserAccount();
   }, [employeeId]);
-
-  const handleToggle = () => {
-    if (!userAccount) return;
-
-    Modal.confirm({
-      title: `Are you sure you want to ${
-        userAccount.is_active ? "deactivate" : "activate"
-      } this user?`,
-      onOk: async () => {
-        try {
-          const res = await api.post(
-            `/employees/users/${userAccount.user_id}/deactivate/`
-          );
-          message.success(res.data.detail);
-          fetchUserAccount(); // refresh after toggle
-        } catch (err: any) {
-          console.error(err);
-          message.error(err.response?.data?.detail || "Failed to update status");
-        }
-      },
-    });
-  };
 
   if (loading) return <Spin tip="Loading user account..." />;
 
@@ -72,10 +52,10 @@ const EmployeeAccountTab: React.FC<Props> = ({ employeeId }) => {
       <div style={{ marginBottom: 16 }}>
         <Button
           type="primary"
-          danger
-          onClick={handleToggle}
+          danger={userAccount.is_active}
+          onClick={() => setIsDeactivateModalOpen(true)}
         >
-          {userAccount.is_active ? "Deactivate" : "Activate"}
+          {userAccount.is_active ? "Deactivate" : "Reactivate"}
         </Button>
 
         <Button
@@ -98,6 +78,17 @@ const EmployeeAccountTab: React.FC<Props> = ({ employeeId }) => {
           fetchUserAccount();
         }}
       />
+
+      {userAccount && (
+        <DeactivateUserModal
+          open={isDeactivateModalOpen}
+          userId={userAccount.user_id}
+          username={userAccount.user_name}
+          isActive={userAccount.is_active}
+          onClose={() => setIsDeactivateModalOpen(false)}
+          onSuccess={fetchUserAccount}
+        />
+      )}
     </>
   );
 };

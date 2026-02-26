@@ -58,7 +58,7 @@ const EmployeeContributionsModal: React.FC<Props> = ({
   const [deductionTypes, setDeductionTypes] = useState<any[]>([]);
   const [enabledDeductions, setEnabledDeductions] = useState<number[]>([]);
 
-  const MANDATORY_DEDUCTIONS = ["SSS", "PHILHEALTH", "PAGIBIG"];
+  const MANDATORY_DEDUCTIONS = ["sss", "philhealth", "pag-ibig"];
 
   /* -------------------- LOAD SALARY + DEDUCTIONS -------------------- */
   useEffect(() => {
@@ -96,18 +96,18 @@ const EmployeeContributionsModal: React.FC<Props> = ({
       const values = form.getFieldsValue();
 
       const deductions = deductionTypes
-        .filter(d => enabledDeductions.includes(d.id) || MANDATORY_DEDUCTIONS.includes(d.code))
+        .filter(d => enabledDeductions.includes(d.id) || MANDATORY_DEDUCTIONS.includes(d.code.toLowerCase()))
         .map((d, index) => {
           const amount = values.system_deductions?.[index]?.amount;
           const frequency = values.system_deductions?.[index]?.frequency;
 
           // Only mandatory deductions must have values
-          if (MANDATORY_DEDUCTIONS.includes(d.code) && (amount === undefined || frequency === undefined)) {
+          if (MANDATORY_DEDUCTIONS.includes(d.code.toLowerCase()) && (amount === undefined || frequency === undefined)) {
             throw new Error(`Please complete amount and frequency for ${d.code}`);
           }
 
           // skip non-mandatory deductions that are empty
-          if (!MANDATORY_DEDUCTIONS.includes(d.code) && (amount === undefined || frequency === undefined)) {
+          if (!MANDATORY_DEDUCTIONS.includes(d.code.toLowerCase()) && (amount === undefined || frequency === undefined)) {
             return null;
           }
 
@@ -139,7 +139,7 @@ const EmployeeContributionsModal: React.FC<Props> = ({
         <Divider>Government Contributions</Divider>
 
         {deductionTypes.map((d, index) => {
-          const isMandatory = MANDATORY_DEDUCTIONS.includes(d.code);
+          const isMandatory = MANDATORY_DEDUCTIONS.includes(d.code.toLowerCase());
           const isEnabled = enabledDeductions.includes(d.id) || isMandatory;
 
           return (

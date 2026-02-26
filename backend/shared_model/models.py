@@ -305,7 +305,6 @@ class Allowance_Type(models.Model):
     code = models.CharField(max_length=10, null=True, blank=True, default="")
     is_active = models.BooleanField(default=True)
     created_at = models.DateField(default=timezone.now)
-    code = models.CharField(max_length=10, null=True, blank=True, default="")
 
     def __str__(self):
         return self.name

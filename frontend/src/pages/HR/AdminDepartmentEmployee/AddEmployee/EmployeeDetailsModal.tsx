@@ -178,7 +178,10 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
             label="First Name"
             rules={[
               { required: true, message: "First name is required" },
-              { pattern: /^[A-Za-z]+$/, message: "Alphabet letters only" }
+              {
+                pattern: /^[A-Za-z]+(?: [A-Za-z]+)*$/,
+                message: "Letters and single spaces only (e.g., Shaira Mae)"
+              }       
             ]}
           >
             <Input />
@@ -186,9 +189,8 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
           </Col>
 
           <Col xs={24} md={12}>
-            <Form.Item name="initial" label="Middle Initial"
+            <Form.Item name="initial" label="Middle Initial (Optional)"
             rules={[
-              { required: true, message: "Middle initial is required" },
               { pattern: /^[A-Za-z]+$/, message: "Alphabet letters only" }
             ]}>
               <Input maxLength={1} />
@@ -201,7 +203,10 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
             label="Last Name"
             rules={[
               { required: true, message: "Last name is required" },
-              { pattern: /^[A-Za-z]+$/, message: "Alphabet letters only" }
+              {
+                pattern: /^[A-Za-z]+(?: [A-Za-z]+)*$/,
+                message: "Letters and single spaces only (e.g., Dela Cruz)"
+              }
             ]}
           >
             <Input />
@@ -219,10 +224,14 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
             name="contact_no"
             label="Contact Number"
             rules={[
-              { pattern: /^[0-9]+$/, message: "Numbers only" }
+              { required: true, message: "Contact number is required" },
+              {
+                pattern: /^[0-9]{11}$/,
+                message: "Contact number must be exactly 11 digits"
+              }
             ]}
           >
-            <Input inputMode="numeric" />
+            <Input inputMode="numeric" maxLength={11} />
           </Form.Item>
           </Col>
 

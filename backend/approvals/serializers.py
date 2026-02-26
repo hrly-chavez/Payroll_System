@@ -197,9 +197,45 @@ class AllowanceTypeSerializer(serializers.ModelSerializer):
         return name
 
 class HolidayPolicySerializer(serializers.ModelSerializer):
+    # nice-to-have fields for frontend tables
+    department_name = serializers.CharField(source="department.name", read_only=True)
+    base_display = serializers.CharField(source="get_base_display", read_only=True)
+    holiday_type_display = serializers.CharField(source="get_holiday_type_display", read_only=True)
+
     class Meta:
-        model = HolidayPolicy  
-        fields = "__all__"
+        model = HolidayPolicy
+        fields = [
+            "id",
+            "department",
+            "department_name",
+            "base",
+            "base_display",
+            "holiday_type",
+            "holiday_type_display",
+            "requires_work",
+            "created_at",
+        ]
+
+    def validate(self, attrs):
+        """
+        Enforce: base must be active for the department.
+        (Your model.clean already does this, but doing it here gives cleaner API errors.)
+        """
+        department = attrs.get("department") or getattr(self.instance, "department", None)
+        base = attrs.get("base") or getattr(self.instance, "base", None)
+
+        if department and base:
+            ok = DepartmentHolidayCalendar.objects.filter(
+                department=department,
+                base=base,
+                is_active=True,
+            ).exists()
+            if not ok:
+                raise serializers.ValidationError({
+                    "base": "This base is not active for the selected department."
+                })
+
+        return attrs
 
     def create(self, validated_data):
         request = self.context.get("request")
@@ -224,4 +260,4 @@ class HolidayPolicySerializer(serializers.ModelSerializer):
             instance._current_user = user
 
         instance.save()
-        return instance
+        return instance 

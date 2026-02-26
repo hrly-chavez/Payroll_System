@@ -1,3 +1,4 @@
+/* src/pages/SuperAdmin/System Configuration/HolidayPolicy/HolidayPolicy.css */
 .holiday-policy-wrapper {
   margin-top: 12px;
 }
@@ -42,4 +43,11 @@
 
 .holiday-policy-card .ant-table {
   border-radius: 6px;
+}
+.controlsRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }

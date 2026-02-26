@@ -15,13 +15,16 @@ import AllowanceTypeTab from "./AllowanceType/AllowanceType";
 import HolidayPolicy from "./HolidayPolicy/HolidayPolicy";
 
 
+import CommissionRuleTab from "./Commission Rules/CommissionRuleTab";
+
 const { Content } = Layout;
 
 type TabType =
   | "contribution"
   | "payroll"
   | "leave"
-  | "commission"
+  | "commission"          
+  | "commission_rules"    
   | "workshifts"
   | "allowance"
   | "holiday";
@@ -35,6 +38,23 @@ const SystemConfiguration: React.FC = () => {
   useEffect(() => {
     localStorage.setItem("systemConfigTab", activeTab);
   }, [activeTab]);
+
+  const headerTitle =
+    activeTab === "contribution"
+      ? "Contribution Table"
+      : activeTab === "payroll"
+      ? "Payroll Rules"
+      : activeTab === "leave"
+      ? "Leave Types"
+      : activeTab === "holiday"
+      ? "Holiday Policy"
+      : activeTab === "workshifts"
+      ? "Workshifts"
+      : activeTab === "allowance"
+      ? "Allowance Types"
+      : activeTab === "commission_rules"
+      ? "Commission Rules"
+      : "Commission Types";
 
   return (
     <Layout className="system-layout">
@@ -72,6 +92,14 @@ const SystemConfiguration: React.FC = () => {
                 Commission Types
               </button>
 
+          
+              <button
+                className={activeTab === "commission_rules" ? "active" : ""}
+                onClick={() => setActiveTab("commission_rules")}
+              >
+                Commission Rules
+              </button>
+
               <button
                 className={activeTab === "workshifts" ? "active" : ""}
                 onClick={() => setActiveTab("workshifts")}
@@ -95,27 +123,18 @@ const SystemConfiguration: React.FC = () => {
             </div>
 
             <div className="section-header">
-              <h3>
-                {activeTab === "contribution"
-                  ? "Contribution Table"
-                  : activeTab === "payroll"
-                  ? "Payroll Rules"
-                  : activeTab === "leave"
-                  ? "Leave Types"
-                  : activeTab === "holiday"
-                  ? "Holiday Policy"
-                  : activeTab === "workshifts"
-                  ? "Workshifts"
-                  : activeTab === "allowance"
-                  ? "Allowance Types"
-                  : "Commission Types"}
-              </h3>
+              <h3>{headerTitle}</h3>
             </div>
 
             {activeTab === "contribution" && <ContributionTab active />}
             {activeTab === "payroll" && <PayRulesTab active />}
             {activeTab === "leave" && <LeaveTab active />}
-            {activeTab === "holiday" && <HolidayPolicy active />}            {activeTab === "commission" && <CommissionTypeTab active />}
+            {activeTab === "holiday" && <HolidayPolicy active />}
+            {activeTab === "commission" && <CommissionTypeTab active />}
+
+            {/* NEW */}
+            {activeTab === "commission_rules" && <CommissionRuleTab active />}
+
             {activeTab === "workshifts" && <ShiftTab active />}
             {activeTab === "allowance" && <AllowanceTypeTab active />}
           </div>

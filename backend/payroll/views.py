@@ -542,7 +542,7 @@ class PayrollPeriodEmployeeCommissionListCreateView(APIView):
 
 
 #==========================================PAYRULE========================================
-#done logs
+
 class SuperAdminPayRuleListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = PayRuleSerializer
@@ -561,7 +561,7 @@ class SuperAdminPayRuleListCreateView(generics.ListCreateAPIView):
 
         serializer.save()
 
-#done logs
+
 class SuperAdminPayRuleRetrieveUpdateView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = PayRuleSerializer
@@ -601,6 +601,50 @@ class PayRuleChoicesView(APIView):
             "rate_type_choices": rate_type_choices,
         })
 
+
+#==========================================COMMISSION RULE========================================
+class CommissionTypeAllActiveView(generics.ListAPIView):
+    """
+    If you want a dropdown for choosing which commission_type the rule applies to.
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = CommissionTypeMiniSerializer
+
+    def get_queryset(self):
+        return Commission_Type.objects.filter(is_active=True).order_by("name")
+
+
+class SuperAdminCommissionTaxRuleListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CommissionTaxRuleSerializer
+
+    def get_queryset(self):
+        return (
+            Commission_Tax_Rule.objects
+            .select_related("commission_type", "applies_to", "employee")
+            .order_by("-id")
+        )
+
+
+class SuperAdminCommissionTaxRuleRetrieveUpdateView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CommissionTaxRuleSerializer
+
+    queryset = Commission_Tax_Rule.objects.select_related(
+        "commission_type", "applies_to", "employee"
+    ).all()
+
+
+class CommissionTaxRuleChoicesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({
+            "rate_type_choices": [
+                {"value": v, "label": l}
+                for v, l in Commission_Tax_Rule.RATE_TYPE_CHOICES
+            ],
+        }, status=http_status.HTTP_200_OK)
 
 #======================================PAYROLL GENERATION========================================
 #Ari nlaang butang notif para sa CEO kay after ma generate need na dayon approval

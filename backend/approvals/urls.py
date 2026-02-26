@@ -32,4 +32,6 @@ urlpatterns = [
     #Holiday Policy
     path("holiday-policy/", HolidayPolicyListCreateView.as_view(), name="holiday-policy-list-create"),
     path("holiday-policy/<int:pk>/", HolidayPolicyRetrieveUpdateDestroyView.as_view(), name="holiday-policy-detail"),
+    path("holiday-policy/ensure/", HolidayPolicyEnsureView.as_view(), name="holiday-policy-ensure"),
+    path("departments/<int:department_id>/holiday-bases/", DepartmentActiveHolidayBasesView.as_view(), name="department-holiday-bases"),
 ]

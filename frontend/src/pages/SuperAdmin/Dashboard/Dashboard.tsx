@@ -9,8 +9,6 @@ import SharedCalendar from "../../../components/SharedCalendar/SharedCalendar";
 import CompanyNote from "../../../components/CompanyNote/CompanyNote";
 import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
 
-import { Pie } from "@ant-design/plots";
-
 import * as echarts from "echarts";
 import dayjs from "dayjs";
 import type { Dayjs } from "dayjs";
@@ -363,7 +361,7 @@ const Dashboard: React.FC = () => {
           
 
           {/* PENDING PAYROLL */}
-          <Col xs={24} md={4}>
+          <Col xs={25} md={7}>
             <Card className="stat-tile primary" hoverable>
               <div className="tile-title">Off Set (Coming Soon)</div>
 
@@ -375,7 +373,7 @@ const Dashboard: React.FC = () => {
           </Col>
 
           {/* OVERTIME */}
-          <Col xs={24} md={4}>
+          <Col xs={25} md={7}>
             <Card
               className="stat-tile"
               hoverable
@@ -403,7 +401,7 @@ const Dashboard: React.FC = () => {
           </Col>
 
           {/* ANNOUNCEMENTS */}
-          <Col xs={15} md={10}>
+          <Col xs={24} md={10}>
             <CompanyNote role="SUPER_ADMIN" />
           </Col>
 

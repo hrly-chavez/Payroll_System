@@ -1,6 +1,6 @@
 .noteCard {
   border-radius: 16px;
-  background: #aecdde;
+  background: #3d85ac;
   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
   height: 100%;
   display: flex;
@@ -37,7 +37,7 @@
 .addButton {
   background: #fff !important;
   border-color: #fff !important;
-  color: #aecdde !important;
+  color: #3d85ac !important;
   border-radius: 8px;
 }
 

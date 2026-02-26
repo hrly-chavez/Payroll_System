@@ -1737,3 +1737,231 @@ class EmployeePayrollDownloadPDFView(APIView):
         filename = f"Payslip_{period.code}.pdf"
         return FileResponse(buffer, as_attachment=True, filename=filename, content_type="application/pdf")
     
+#payroll logs
+class PayrollPeriodReportListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PayrollPeriodListSerializer
+
+    def get_queryset(self):
+        qs = Payroll_Period.objects.all().order_by("-end_date")
+
+        search = self.request.query_params.get("search")
+        status_ = self.request.query_params.get("status")
+        month = self.request.query_params.get("month")  # YYYY-MM (filter by end_date month)
+
+        if status_:
+            qs = qs.filter(status=status_)
+
+        if month:
+            try:
+                y, m = month.split("-")
+                qs = qs.filter(end_date__year=int(y), end_date__month=int(m))
+            except:
+                pass
+
+        if search:
+            qs = qs.filter(
+                Q(code__icontains=search) |
+                Q(status__icontains=search)
+            )
+
+        return qs
+
+
+class PayrollPeriodEmployeeReportListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PayrollPeriodEmployeeSerializer
+
+    def get_queryset(self):
+        period_id = self.kwargs["period_id"]
+
+        qs = (
+            PayrollPeriodEmployee.objects
+            .select_related("employee", "verified_by", "approved_by", "period")
+            .filter(period_id=period_id)
+            .order_by("employee__lname", "employee__fname")
+        )
+
+        search = self.request.query_params.get("search")
+        status_ = self.request.query_params.get("status")  # Pending/Verified/Processing/Approved/Declined
+
+        if status_:
+            qs = qs.filter(status=status_)
+
+        if search:
+            # If you have employee fname/lname fields (common), this will work:
+            qs = qs.filter(
+                Q(employee__fname__icontains=search) |
+                Q(employee__lname__icontains=search)
+            )
+
+        return qs
+    
+class PayrollPeriodReleaseLogsPDFView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, period_id: int):
+        period = get_object_or_404(Payroll_Period, id=period_id)
+
+        ppe_qs = (
+            PayrollPeriodEmployee.objects
+            .filter(period=period)
+            .select_related("employee", "employee__department", "verified_by", "approved_by")
+            .order_by("employee__lname", "employee__fname")
+        )
+
+        buffer = BytesIO()
+
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=landscape(letter),
+            leftMargin=0.45 * inch,
+            rightMargin=0.45 * inch,
+            topMargin=0.45 * inch,
+            bottomMargin=0.45 * inch,
+            title="Payroll Release Logs",
+        )
+
+        usable_w = doc.width  #  this is the safe printable width
+
+        styles = getSampleStyleSheet()
+
+        title_style = ParagraphStyle(
+            "title_style",
+            parent=styles["Title"],
+            fontName="Helvetica-Bold",
+            fontSize=18,
+            alignment=1,
+            spaceAfter=10,
+        )
+
+        normal = styles["Normal"]
+        normal.fontSize = 9
+        normal.leading = 11
+
+        small = ParagraphStyle(
+            "small",
+            parent=normal,
+            fontSize=8.5,
+            leading=10.5,
+            wordWrap="CJK",  #  helps wrapping long text like decline reasons
+        )
+
+        header_cell = ParagraphStyle(
+            "header_cell",
+            parent=small,
+            fontName="Helvetica-Bold",
+            textColor=colors.white,
+            alignment=1,
+        )
+
+        def fmt_dt(dt):
+            return dt.strftime("%b %d, %Y %I:%M %p") if dt else "-"
+
+        elements = []
+
+        #  Title
+        elements.append(Paragraph("PAYROLL RELEASE LOGS", title_style))
+        elements.append(Spacer(1, 6))
+
+        #  Period info block (fits doc width)
+        info = [
+            ["Code:", period.code, "Status:", period.status],
+            ["Start Date:", str(period.start_date), "End Date:", str(period.end_date)],
+            ["Pay Date:", str(period.pay_date) if period.pay_date else "-", "Created At:", str(period.created_at)],
+        ]
+
+        period_info = Table(
+            info,
+            colWidths=[0.13 * usable_w, 0.37 * usable_w, 0.13 * usable_w, 0.37 * usable_w],
+            hAlign="CENTER",
+        )
+        period_info.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.7, colors.black),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        elements.append(period_info)
+        elements.append(Spacer(1, 12))
+
+        #  Table data with proper wrapping
+        data = [[
+            Paragraph("Employee", header_cell),
+            Paragraph("Department", header_cell),
+            Paragraph("Status", header_cell),
+            Paragraph("Verified By", header_cell),
+            Paragraph("Verified At", header_cell),
+            Paragraph("Approved By", header_cell),
+            Paragraph("Approved At", header_cell),
+            Paragraph("Declined Reason", header_cell),
+        ]]
+
+        for ppe in ppe_qs:
+            emp = ppe.employee
+            emp_name = f"{getattr(emp, 'fname', '')} {getattr(emp, 'lname', '')}".strip() or str(emp)
+            dept = emp.department.name if getattr(emp, "department", None) else "-"
+
+            data.append([
+                Paragraph(emp_name, small),
+                Paragraph(dept, small),
+                Paragraph(ppe.status or "-", small),
+                Paragraph(str(ppe.verified_by) if ppe.verified_by else "-", small),
+                Paragraph(fmt_dt(ppe.verified_at), small),
+                Paragraph(str(ppe.approved_by) if ppe.approved_by else "-", small),
+                Paragraph(fmt_dt(ppe.approved_at), small),
+                Paragraph(ppe.declined_reason or "-", small),
+            ])
+
+        #  EXACT-FIT col widths (sum = doc.width) so it never clips
+        col_widths = [
+            0.17 * usable_w,  # Employee
+            0.14 * usable_w,  # Department
+            0.10 * usable_w,  # Status
+            0.12 * usable_w,  # Verified By
+            0.12 * usable_w,  # Verified At
+            0.12 * usable_w,  # Approved By
+            0.12 * usable_w,  # Approved At
+            0.11 * usable_w,  # Declined Reason
+        ]
+
+        table = Table(
+            data,
+            colWidths=col_widths,
+            repeatRows=1,
+            hAlign="LEFT",  #  keep it inside margins
+        )
+
+        table.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.6, colors.black),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E79")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+
+            # padding
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+
+            # align center for status + dates
+            ("ALIGN", (2, 1), (2, -1), "CENTER"),
+            ("ALIGN", (4, 1), (6, -1), "CENTER"),
+        ]))
+
+        elements.append(table)
+
+        doc.build(elements)
+        buffer.seek(0)
+
+        filename = f"Payroll_Release_Logs_{period.code}.pdf"
+        return FileResponse(
+            buffer,
+            as_attachment=True,
+            filename=filename,
+            content_type="application/pdf"
+        )

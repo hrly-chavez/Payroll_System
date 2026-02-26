@@ -1,0 +1,10 @@
+.ppe-filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.emp-name {
+  font-weight: 600;
+}

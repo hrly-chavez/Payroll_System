@@ -1,155 +1,185 @@
-import React, { useState } from 'react';
-import { Layout, Tabs, Table, Button, Input, DatePicker, Avatar, Tag } from 'antd';
-import Sidebar from '../../../components/Sidebar/Sidebar';
-import Topbar from '../../../components/Topbar/Topbar';
-import './Reports.css';
+import React, { useEffect, useMemo, useState } from "react";
+import { Layout, Tabs, Button, Input, DatePicker, message } from "antd";
+import Sidebar from "../../../components/Sidebar/Sidebar";
+import Topbar from "../../../components/Topbar/Topbar";
+import "./Reports.css";
 
-import UserActivity from './User activity/UserActivity';
+import api from "api/axios";
+import UserActivity from "./User activity/UserActivity";
+import AttendaceLogs from "./AttendanceLogs/attendance_logs";
+import PayrollReleaseLogs from "./Payroll_Logs/payroll_release_logs";
+
+// ✅ NEW
+import AttendanceReportModal from "./AttendanceLogs/attendance_report_modal";
 
 const { Content } = Layout;
 const { TabPane } = Tabs;
 
-/* ---------------- ATTENDANCE MODIFICATIONS ---------------- */
-const attendanceColumns = [
-  { title: 'Date / Time', dataIndex: 'date' },
-  {
-    title: 'Employee Name',
-    dataIndex: 'employee',
-    render: (_: any, record: any) => (
-      <div className="name-cell">
-        <Avatar src={record.employeeAvatar} />
-        <span>{record.employee}</span>
-      </div>
-    ),
-  },
-  {
-    title: 'Changed By',
-    dataIndex: 'changedBy',
-    render: (_: any, record: any) => (
-      <div className="name-cell">
-        <Avatar src={record.changedByAvatar} />
-        <span>{record.changedBy}</span>
-      </div>
-    ),
-  },
-  { title: 'Field', dataIndex: 'field' },
-  { title: 'Old', dataIndex: 'oldValue' },
-  { title: 'New', dataIndex: 'newValue' },
-  { title: 'Reason', dataIndex: 'reason' },
-];
+const TAB_STORAGE_KEY = "reports_active_tab";
 
-const attendanceData = [
-  {
-    key: '1',
-    date: 'March 20, 2025',
-    employee: 'Jeremy Neigh',
-    employeeAvatar: 'https://i.pravatar.cc/40?img=3',
-    changedBy: 'Annette Black',
-    changedByAvatar: 'https://i.pravatar.cc/40?img=5',
-    field: 'Time in',
-    oldValue: '8:45 AM',
-    newValue: '8:00 AM',
-    reason: 'Forgot to log in',
-  },
-];
+const downloadFile = async (url: string, filename: string) => {
+  const res = await api.get(url, { responseType: "blob" });
 
-/* ---------------- PAYROLL ADJUSTMENT LOGS ---------------- */
-const payrollAdjustmentColumns = [
-  { title: 'Payroll Period', dataIndex: 'payrollPeriod' },
-  {
-    title: 'Employee Name',
-    dataIndex: 'employee',
-    render: (_: any, record: any) => (
-      <div className="name-cell">
-        <Avatar src={record.employeeAvatar} />
-        <span>{record.employee}</span>
-      </div>
-    ),
-  },
-  {
-    title: 'Changed By',
-    dataIndex: 'changedBy',
-    render: (_: any, record: any) => (
-      <div className="name-cell">
-        <Avatar src={record.changedByAvatar} />
-        <span>{record.changedBy}</span>
-      </div>
-    ),
-  },
-  { title: 'Type', dataIndex: 'type' },
-  { title: 'Amount', dataIndex: 'amount' },
-  { title: 'Reason', dataIndex: 'reason' },
-];
+  const blob = new Blob([res.data], { type: "application/pdf" });
+  const objectUrl = window.URL.createObjectURL(blob);
 
-const payrollAdjustmentData = [
-  {
-    key: '1',
-    payrollPeriod: 'March 1–15, 2025',
-    employee: 'Jeremy Neigh',
-    employeeAvatar: 'https://i.pravatar.cc/40?img=3',
-    changedBy: 'Annette Black',
-    changedByAvatar: 'https://i.pravatar.cc/40?img=5',
-    type: 'Bonus',
-    amount: '+₱2,500.00',
-    reason: 'Performance incentive',
-  },
-];
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
 
-/* ---------------- PAYROLL APPROVAL & RELEASE LOGS ---------------- */
-const payrollApprovalColumns = [
-  { title: 'Payroll Period', dataIndex: 'payrollPeriod' },
-  {
-    title: 'Prepared By',
-    dataIndex: 'preparedBy',
-    render: (_: any, record: any) => (
-      <div className="name-cell">
-        <Avatar src={record.preparedByAvatar} />
-        <span>{record.preparedBy}</span>
-      </div>
-    ),
-  },
-  {
-    title: 'Approved By',
-    dataIndex: 'approvedBy',
-    render: (_: any, record: any) => (
-      <div className="name-cell">
-        <Avatar src={record.approvedByAvatar} />
-        <span>{record.approvedBy}</span>
-      </div>
-    ),
-  },
-  { title: 'Approved Date', dataIndex: 'approvedDate' },
-  {
-    title: 'Status',
-    dataIndex: 'status',
-    render: (status: string) => {
-      const color =
-        status === 'Approved'
-          ? 'green'
-          : status === 'Pending'
-          ? 'orange'
-          : 'red';
-      return <Tag color={color}>{status}</Tag>;
-    },
-  },
-];
+  a.remove();
+  window.URL.revokeObjectURL(objectUrl);
+};
 
-const payrollApprovalData = [
-  {
-    key: '1',
-    payrollPeriod: 'March 1–15, 2025',
-    preparedBy: 'Annette Black',
-    preparedByAvatar: 'https://i.pravatar.cc/40?img=5',
-    approvedBy: 'Jeremy Neigh',
-    approvedByAvatar: 'https://i.pravatar.cc/40?img=3',
-    approvedDate: 'March 18, 2025',
-    status: 'Approved',
-  },
-];
-
-/* ---------------- COMPONENT ---------------- */
 const Reports: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('1');
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    return localStorage.getItem(TAB_STORAGE_KEY) || "1";
+  });
+
+  const [search, setSearch] = useState("");
+  const [month, setMonth] = useState<string | null>(null);
+
+  //  Tab 3 selected period
+  const [selectedPayrollPeriodId, setSelectedPayrollPeriodId] = useState<number | null>(null);
+
+  const [generating, setGenerating] = useState(false);
+
+  //  Tab 2 modal
+  const [attendanceModalOpen, setAttendanceModalOpen] = useState(false);
+
+  //  dropdown data
+  const [employeeOptions, setEmployeeOptions] = useState<{ value: number; label: string }[]>([]);
+
+  useEffect(() => {
+    localStorage.setItem(TAB_STORAGE_KEY, activeTab);
+  }, [activeTab]);
+
+  //  load employees for dropdown 
+  const loadEmployees = async () => {
+    try {
+      const res = await api.get("/employees/dropdown/");
+      const data = Array.isArray(res.data) ? res.data : (res.data?.results ?? []);
+
+      const opts = data.map((e: any) => ({
+        value: Number(e.value ?? e.id),
+        label: String(e.label ?? `Employee #${e.value ?? e.id}`),
+      }));
+
+      setEmployeeOptions(opts);
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to load employees for dropdown.");
+      setEmployeeOptions([]);
+    }
+  };
+
+  useEffect(() => {
+    loadEmployees(); 
+  }, []);
+
+  const filenameToday = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }, []);
+
+  const handleGenerateReport = async () => {
+    //  TAB 2: open modal (choose all/specific + date/month/year)
+    if (activeTab === "2") {
+      setAttendanceModalOpen(true);
+      return;
+    }
+
+    //  TAB 1
+    if (activeTab === "1") {
+      try {
+        setGenerating(true);
+
+        const params = new URLSearchParams();
+        if (search) params.append("search", search);
+        if (month) params.append("month", month);
+
+        await downloadFile(
+          `/reports/user-activity/pdf/?${params.toString()}`,
+          `User_Activity_Logs_${filenameToday}.pdf`
+        );
+      } catch (err) {
+        console.error(err);
+        message.error("Failed to generate user activity report.");
+      } finally {
+        setGenerating(false);
+      }
+      return;
+    }
+
+    //  TAB 3 (needs selected period)
+    if (activeTab === "3") {
+      if (!selectedPayrollPeriodId) {
+        message.warning("Please select a payroll period first.");
+        return;
+      }
+
+      try {
+        setGenerating(true);
+
+        await downloadFile(
+          `/payroll/reports/payroll-periods/${selectedPayrollPeriodId}/release-logs/pdf/`,
+          `Payroll_Release_Logs_${selectedPayrollPeriodId}_${filenameToday}.pdf`
+        );
+      } catch (err) {
+        console.error(err);
+        message.error("Failed to generate payroll release report.");
+      } finally {
+        setGenerating(false);
+      }
+    }
+  };
+
+  //  called by the attendance modal
+  const handleGenerateAttendancePDF = async (payload: {
+    scope: "all" | "user";
+    employeeId?: number;
+    filterType: "date" | "month" | "year";
+    date?: string;
+    month?: string;
+    year?: string;
+  }) => {
+    try {
+      setGenerating(true);
+
+      const params = new URLSearchParams();
+      params.append("scope", payload.scope);
+
+      if (payload.scope === "user") {
+        if (!payload.employeeId) {
+          message.warning("Please select an employee.");
+          return;
+        }
+        params.append("employee_id", String(payload.employeeId));
+      }
+
+      if (payload.filterType === "date" && payload.date) params.append("date", payload.date);
+      if (payload.filterType === "month" && payload.month) params.append("month", payload.month);
+      if (payload.filterType === "year" && payload.year) params.append("year", payload.year);
+
+      // optional (only if your backend supports it)
+      // if (search) params.append("search", search);
+
+      await downloadFile(
+        `/employees/reports/attendance-corrections/pdf/?${params.toString()}`, //  FIXED URL
+        `Attendance_Correction_Logs_${filenameToday}.pdf`
+      );
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to generate attendance correction report.");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   return (
     <Layout className="reports-layout">
@@ -160,49 +190,51 @@ const Reports: React.FC = () => {
 
         <Content className="reports-content">
           <div className="reports-card">
-            <Tabs activeKey={activeTab} onChange={setActiveTab}>
+            <Tabs
+              activeKey={activeTab}
+              onChange={(key) => {
+                setActiveTab(key);
+                if (key !== "3") setSelectedPayrollPeriodId(null);
+              }}
+            >
               <TabPane tab="User Activity Logs" key="1" />
               <TabPane tab="Attendance Correction Logs" key="2" />
               <TabPane tab="Payroll Release Logs" key="3" />
-              
             </Tabs>
 
             <div className="reports-filters">
-              <Input.Search placeholder="Search" allowClear />
+              <Input.Search
+                placeholder="Search"
+                allowClear
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+
               <div className="filters-right">
-                <DatePicker picker="month" />
-                <Button type="primary">Generate Report</Button>
+                <DatePicker picker="month" onChange={(d) => setMonth(d ? d.format("YYYY-MM") : null)} />
+
+                <Button type="primary" onClick={handleGenerateReport} loading={generating}>
+                  Generate Report
+                </Button>
               </div>
             </div>
 
-            {activeTab === '1' && <UserActivity />}
-
-            {activeTab === '2' && (
-              <Table
-                columns={attendanceColumns}
-                dataSource={attendanceData}
-                pagination={{ pageSize: 5 }}
-                scroll={{ x: 900 }}
+            {activeTab === "1" && <UserActivity />}
+            {activeTab === "2" && <AttendaceLogs />}
+            {activeTab === "3" && (
+              <PayrollReleaseLogs
+                selectedPeriodId={selectedPayrollPeriodId}
+                onSelectPeriodId={setSelectedPayrollPeriodId}
               />
             )}
 
-            {activeTab === '3' && (
-              <Table
-                columns={payrollAdjustmentColumns}
-                dataSource={payrollAdjustmentData}
-                pagination={{ pageSize: 5 }}
-                scroll={{ x: 900 }}
-              />
-            )}
-
-            {activeTab === '4' && (
-              <Table
-                columns={payrollApprovalColumns}
-                dataSource={payrollApprovalData}
-                pagination={{ pageSize: 5 }}
-                scroll={{ x: 900 }}
-              />
-            )}
+            {/*  Attendance report modal */}
+            <AttendanceReportModal
+              open={attendanceModalOpen}
+              onClose={() => setAttendanceModalOpen(false)}
+              onGenerate={handleGenerateAttendancePDF}
+              employeeOptions={employeeOptions}
+            />
           </div>
         </Content>
       </Layout>

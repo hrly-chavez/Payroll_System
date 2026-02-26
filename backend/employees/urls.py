@@ -35,5 +35,8 @@ urlpatterns = [
     #reset pass
     path("reset-password-confirm/", ResetPasswordConfirmView.as_view()),
 
+    path("reports/attendance-corrections/", AttendanceCorrectionLogListView.as_view()),
+    path("reports/attendance-corrections/pdf/", AttendanceCorrectionLogsPDFView.as_view()),
+    path("dropdown/", EmployeeDropdownListView.as_view()), 
 
 ]

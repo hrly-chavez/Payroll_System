@@ -149,15 +149,15 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
         SUPER_ADMIN: '/super-admin/system',
       },
     },
-    {
-      key: 'reports',
-      label: 'Reports',
-      icon: <BarChartOutlined />,
-      roles: ['ADMIN'],
-      hrefs: {
-        ADMIN: '/admin/reports',
-      },
-    },
+    // {
+    //   key: 'reports',
+    //   label: 'Reports',
+    //   icon: <BarChartOutlined />,
+    //   roles: ['ADMIN'],
+    //   hrefs: {
+    //     ADMIN: '/admin/reports',
+    //   },
+    // },
     {
       key: 'reports',
       label: 'Logs',

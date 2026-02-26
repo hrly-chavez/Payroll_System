@@ -1,5 +1,6 @@
 from django.db.models import Q
 from django.utils import timezone
+from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
@@ -14,8 +15,15 @@ from rest_framework.parsers import MultiPartParser, FormParser,JSONParser
 from shared_model.models import *
 from rest_framework.exceptions import PermissionDenied, NotFound,ValidationError
 from datetime import timedelta
+from io import BytesIO
 from .serializers import *
 from .services import (punch_in,punch_out,get_today_status,_get_employee_or_400,_month_date_range,punch_in_eligibility,get_monthly_attendance_stats)
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+
 
 
 class PunchInView(APIView):
@@ -816,3 +824,345 @@ class AttendanceAdminMonthlyStatsView(APIView):
 
         payload = {"year": year, "month": month, **counts}
         return Response(AttendanceAdminMonthlyStatsSerializer(payload).data, status=200)
+
+class AttendanceEmployeesDropdownView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = EmployeeDropdownSerializer
+
+    def get_queryset(self):
+        return Employee.objects.filter(is_active=True).order_by("lname", "fname")
+
+
+class AttendanceLogsPDFView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """
+        Export Attendance Logs (PDF)
+
+        Query params:
+        - scope=all | user
+        - employee_id=<int> (required when scope=user)
+        - date=YYYY-MM-DD (optional)
+        - month=YYYY-MM (optional)
+        - year=YYYY (optional)
+
+        Priority: date > month > year > none
+        """
+
+        scope = (request.query_params.get("scope") or "all").strip().lower()
+        employee_id = request.query_params.get("employee_id")
+
+        date_str = request.query_params.get("date")
+        month_str = request.query_params.get("month")
+        year_str = request.query_params.get("year")
+
+        # Build queryset
+        qs = (
+            Attendance.objects
+            .select_related("employee", "employee__department", "employee__shift")
+            .prefetch_related("events")
+            .order_by("-date", "-id")
+        )
+
+        # Scope filter
+        employee_obj = None
+        if scope == "user":
+            if not employee_id:
+                return Response(
+                    {"detail": "employee_id is required when scope=user."},
+                    status=http_status.HTTP_400_BAD_REQUEST
+                )
+            employee_obj = get_object_or_404(Employee, id=employee_id)
+            qs = qs.filter(employee_id=employee_id)
+
+        # Date filter (priority: date > month > year)
+        try:
+            if date_str:
+                qs = qs.filter(date=date.fromisoformat(date_str))
+            elif month_str:
+                y, m = month_str.split("-")
+                qs = qs.filter(date__year=int(y), date__month=int(m))
+            elif year_str:
+                qs = qs.filter(date__year=int(year_str))
+        except Exception:
+            return Response(
+                {"detail": "Invalid date/month/year format."},
+                status=http_status.HTTP_400_BAD_REQUEST
+            )
+
+        # Helpers
+        def fmt_dt(dt):
+            if not dt:
+                return "-"
+            local = timezone.localtime(dt) if timezone.is_aware(dt) else dt
+            return local.strftime("%b %d, %Y %I:%M %p")
+
+        def fmt_date(d):
+            return d.strftime("%Y-%m-%d") if d else "-"
+
+        def fmt_time(value):
+            """
+            Accepts datetime/time/string and returns readable time like '09:10 PM'
+            """
+            if not value:
+                return "-"
+
+            # If it's a datetime (Attendance.time_in / time_out are DateTimeField)
+            if hasattr(value, "strftime") and hasattr(value, "tzinfo"):
+                dt = timezone.localtime(value) if timezone.is_aware(value) else value
+                return dt.strftime("%I:%M %p")  # e.g. 09:10 PM
+
+            # If it's a time object (Attendance_Event.start_time/end_time are TimeField)
+            if hasattr(value, "hour") and hasattr(value, "minute") and not hasattr(value, "date"):
+                return value.strftime("%I:%M %p")
+
+            # fallback (string)
+            return str(value)
+
+        def status_color(s):
+            s = (s or "").upper()
+            if s == "PRESENT":
+                return colors.HexColor("#16a34a")
+            if s == "ABSENT":
+                return colors.HexColor("#dc2626")
+            if s in {"HALF_DAY", "HALF DAY"}:
+                return colors.HexColor("#f59e0b")
+            return colors.HexColor("#2563eb")
+
+        def employee_label(emp: Employee | None):
+            if not emp:
+                return "-"
+            fname = (getattr(emp, "fname", "") or "").strip()
+            lname = (getattr(emp, "lname", "") or "").strip()
+            full = f"{fname} {lname}".strip()
+            return full or f"Employee #{emp.id}"
+
+        # Header labels
+        scope_label = "All Users"
+        if scope == "user" and employee_obj:
+            dept = getattr(getattr(employee_obj, "department", None), "name", None) or "-"
+            scope_label = f"{employee_label(employee_obj)} ({dept})"
+
+        date_filter_label = (
+            f"Date: {date_str}" if date_str else
+            f"Month: {month_str}" if month_str else
+            f"Year: {year_str}" if year_str else
+            "No date filter"
+        )
+
+        # Build PDF
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=landscape(letter),
+            leftMargin=0.45 * inch,
+            rightMargin=0.45 * inch,
+            topMargin=0.45 * inch,
+            bottomMargin=0.45 * inch,
+            title="Attendance Logs",
+        )
+        usable_w = doc.width
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "title_style",
+            parent=styles["Title"],
+            fontName="Helvetica-Bold",
+            fontSize=18,
+            alignment=1,
+            spaceAfter=10,
+        )
+
+        normal = styles["Normal"]
+        normal.fontSize = 9
+        normal.leading = 11
+
+        small = ParagraphStyle(
+            "small",
+            parent=normal,
+            fontSize=8.5,
+            leading=10.5,
+            wordWrap="CJK",
+        )
+
+        header_cell = ParagraphStyle(
+            "header_cell",
+            parent=small,
+            fontName="Helvetica-Bold",
+            textColor=colors.white,
+            alignment=1,
+        )
+
+        elements = []
+        elements.append(Paragraph("ATTENDANCE LOGS", title_style))
+        elements.append(Spacer(1, 6))
+
+        meta_tbl = Table(
+            [
+                ["Scope:", scope_label, "Filter:", date_filter_label],
+                ["Generated At:", fmt_dt(timezone.now()), "", ""],
+            ],
+            colWidths=[0.12 * usable_w, 0.38 * usable_w, 0.12 * usable_w, 0.38 * usable_w],
+            hAlign="CENTER",
+        )
+        meta_tbl.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.7, colors.black),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("SPAN", (2, 1), (3, 1)),
+        ]))
+        elements.append(meta_tbl)
+        elements.append(Spacer(1, 12))
+
+        # Table header
+        data = [[
+            Paragraph("Date", header_cell),
+            Paragraph("Employee", header_cell),
+            Paragraph("Department", header_cell),
+            Paragraph("Workshift", header_cell),
+            Paragraph("Time In", header_cell),
+            Paragraph("Time Out", header_cell),
+            Paragraph("Status", header_cell),
+            Paragraph("Event Types", header_cell),
+        ]]
+
+        # Rows
+        for a in qs:
+            emp = getattr(a, "employee", None)
+            dept_name = getattr(getattr(emp, "department", None), "name", None)
+            shift_name = getattr(getattr(emp, "shift", None), "name", None)
+
+            events = [str(e.type) for e in a.events.all()]
+            event_types = ", ".join(events) if events else "-"
+
+            data.append([
+                Paragraph(fmt_date(getattr(a, "date", None)), small),
+                Paragraph(employee_label(emp), small),
+                Paragraph(dept_name or "-", small),
+                Paragraph(shift_name or "-", small),
+                Paragraph(fmt_time(getattr(a, "time_in", None)), small),
+                Paragraph(fmt_time(getattr(a, "time_out", None)), small),
+                Paragraph(str(getattr(a, "status", "") or "-"), small),
+                Paragraph(event_types, small),
+            ])
+        # Column widths (fit to page)
+        col_widths = [
+            0.10 * usable_w,  # date
+            0.16 * usable_w,  # employee
+            0.14 * usable_w,  # department
+            0.14 * usable_w,  # workshift
+            0.10 * usable_w,  # time in
+            0.10 * usable_w,  # time out
+            0.10 * usable_w,  # status
+            0.16 * usable_w,  # event types
+        ]
+
+        tbl = Table(data, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
+        tbl.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.6, colors.black),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E79")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+            ("ALIGN", (4, 1), (6, -1), "CENTER"),
+        ]))
+
+        # Color status text
+        for i in range(1, len(data)):
+            status_val = str(getattr(qs[i - 1], "status", "") or "")
+            tbl.setStyle(TableStyle([
+                ("TEXTCOLOR", (6, i), (6, i), status_color(status_val)),
+                ("FONTNAME", (6, i), (6, i), "Helvetica-Bold"),
+            ]))
+
+        elements.append(tbl)
+
+        doc.build(elements)
+        buffer.seek(0)
+
+        filename = "Attendance_Logs.pdf"
+        from django.http import FileResponse
+        return FileResponse(buffer, as_attachment=True, filename=filename, content_type="application/pdf")
+    
+class AttendanceLogsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """
+        GET /attendance/attendance-logs/
+
+        Query params:
+        - year=YYYY (required)
+        - month=MM (required)
+        - search=keyword (optional)
+        """
+
+        year = request.query_params.get("year")
+        month = request.query_params.get("month")
+        keyword = (request.query_params.get("search") or "").strip()
+
+        if not year or not month:
+            return Response({"detail": "year and month are required."}, status=400)
+
+        try:
+            y = int(year)
+            m = int(month)
+        except ValueError:
+            return Response({"detail": "Invalid year/month."}, status=400)
+
+        qs = (
+            Attendance.objects
+            .select_related("employee", "employee__department", "employee__shift")
+            .prefetch_related("events")
+            .filter(date__year=y, date__month=m)
+            .order_by("-date", "-id")
+        )
+
+        if keyword:
+            qs = qs.filter(
+                Q(employee__fname__icontains=keyword) |
+                Q(employee__lname__icontains=keyword) |
+                Q(employee__department__name__icontains=keyword)
+            )
+
+        results = []
+        for a in qs:
+            emp = a.employee
+
+            event_types = ", ".join([e.type for e in a.events.all()]) or "-"
+
+            results.append({
+                "id": a.id,
+                "date": a.date.isoformat() if a.date else None,
+                "status": a.status,
+                "time_in": timezone.localtime(a.time_in).isoformat() if a.time_in else None,
+                "time_out": timezone.localtime(a.time_out).isoformat() if a.time_out else None,
+                "employee_id": emp.id,
+                "full_name": f"{(emp.fname or '').strip()} {(emp.lname or '').strip()}".strip(),
+                "department_name": getattr(emp.department, "name", None),
+                "shift_name": getattr(emp.shift, "name", None),
+                "event_types": event_types,
+            })
+
+        stats = {
+            "present": sum(1 for r in results if r["status"] == "PRESENT"),
+            "absent": sum(1 for r in results if r["status"] == "ABSENT"),
+            "lates": sum(1 for r in results if "Late" in (r["event_types"] or "")),
+        }
+
+        return Response({
+            "year": y,
+            "month": m,
+            "stats": stats,
+            "count": len(results),
+            "results": results
+        })

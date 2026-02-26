@@ -27,4 +27,9 @@ urlpatterns = [
     path("stats/", AttendanceStatsView.as_view(), name="attendance-stats"),
     path("admin/stats/", AttendanceAdminMonthlyStatsView.as_view(), name="attendance-admin-stats"),
     path("attendance/admin/stats/", AttendanceAdminMonthlyStatsView.as_view()),
+
+    #pdf generation
+    path("attendance-logs/pdf/", AttendanceLogsPDFView.as_view(), name="attendance_logs_pdf"),
+    path("attendance-logs/employees/dropdown/", AttendanceEmployeesDropdownView.as_view(), name="attendance_logs_employee_dropdown"),
+    path("attendance-logs/", AttendanceLogsView.as_view(), name="attendance_logs"),
 ]

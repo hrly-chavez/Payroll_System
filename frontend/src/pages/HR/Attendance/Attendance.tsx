@@ -1,6 +1,25 @@
 // src/pages/HR/Attendance/Attendance.tsx
 import React, { useEffect, useState } from "react";
-import { Layout, Card, Row, Col, Input, Table, Avatar, Tag, Statistic, message, DatePicker, Segmented } from "antd";
+import {
+  Layout,
+  Card,
+  Row,
+  Col,
+  Input,
+  Table,
+  Avatar,
+  Tag,
+  Statistic,
+  message,
+  DatePicker,
+  Segmented,
+  Button,
+  Modal,
+  Radio,
+  Select,
+  Space,
+  Divider,
+} from "antd";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 import styles from "./Attendance.module.css";
@@ -36,33 +55,35 @@ type ApiResponse = {
   results: HRLogRow[];
 };
 
-function formatTime(t: string | null) {
+type EmployeeOption = { value: number; label: string };
+
+function formatDate(d: string) {
+  const x = dayjs(d);
+  return x.isValid() ? x.format("MM/DD/YYYY") : "-";
+}
+
+function formatTimeWithRow(t: string | null, rowDate: string) {
   if (!t) return "-";
-
-  // If backend sends full datetime (ISO or "YYYY-MM-DD ..."), parse directly
   const isDateTime = t.includes("T") || t.includes(" ");
-  if (isDateTime) {
-    const d = dayjs(t);
-    return d.isValid() ? d.format("h:mm A") : "-";
-  }
+  const d = isDateTime ? dayjs(t) : dayjs(`${rowDate} ${t}`, "YYYY-MM-DD HH:mm:ss");
+  return d.isValid() ? d.format("h:mm A") : "-";
+}
 
-  // If backend sends time-only "HH:mm:ss", attach a dummy date
-  const d = dayjs(`2000-01-01 ${t}`, "YYYY-MM-DD HH:mm:ss");
-    return d.isValid() ? d.format("h:mm A") : "-";
-  }
+// PDF download helper (does NOT redirect tab)
+const downloadPDF = async (url: string, filename: string) => {
+  const res = await api.get(url, { responseType: "blob" });
+  const blob = new Blob([res.data], { type: "application/pdf" });
+  const objectUrl = window.URL.createObjectURL(blob);
 
-  function formatDate(d: string) {
-    const x = dayjs(d);
-    return x.isValid() ? x.format("MM/DD/YYYY") : "-";
-  }
-  function formatTimeWithRow(t: string | null, rowDate: string) {
-    if (!t) return "-";
-    const isDateTime = t.includes("T") || t.includes(" ");
-    const d = isDateTime
-      ? dayjs(t)
-      : dayjs(`${rowDate} ${t}`, "YYYY-MM-DD HH:mm:ss");
-    return d.isValid() ? d.format("h:mm A") : "-";
-  }
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+
+  a.remove();
+  window.URL.revokeObjectURL(objectUrl);
+};
 
 const Attendance: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -71,13 +92,26 @@ const Attendance: React.FC = () => {
   const [search, setSearch] = useState("");
 
   type RangeMode = "Month" | "Week" | "Day";
-
   const [rangeMode, setRangeMode] = useState<RangeMode>("Month");
-  const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs());   
-  const [selectedMonth, setSelectedMonth] = useState<Dayjs>(dayjs()); 
+  const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs());
+  const [selectedMonth, setSelectedMonth] = useState<Dayjs>(dayjs());
 
-  const [allRows, setAllRows] = useState<HRLogRow[]>([]); 
+  const [allRows, setAllRows] = useState<HRLogRow[]>([]);
 
+  // PDF modal state (same concept as attendance correction)
+  const [pdfOpen, setPdfOpen] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  // scope
+  const [pdfScope, setPdfScope] = useState<"all" | "user">("all");
+  const [employeeOptions, setEmployeeOptions] = useState<EmployeeOption[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
+
+  // filter type
+  const [pdfFilterType, setPdfFilterType] = useState<"date" | "month" | "year">("month");
+  const [pdfDate, setPdfDate] = useState<Dayjs | null>(dayjs());
+  const [pdfMonth, setPdfMonth] = useState<Dayjs | null>(dayjs());
+  const [pdfYear, setPdfYear] = useState<Dayjs | null>(dayjs());
 
   const computeStatsFromRows = (list: HRLogRow[]) => {
     const present = list.filter((r) => r.status === "PRESENT").length;
@@ -108,8 +142,7 @@ const Attendance: React.FC = () => {
 
     return list.filter((r) => {
       const d = dayjs(r.date);
-      return (d.isAfter(start, "day") || d.isSame(start, "day")) &&
-            (d.isBefore(end, "day") || d.isSame(end, "day"));
+      return (d.isAfter(start, "day") || d.isSame(start, "day")) && (d.isBefore(end, "day") || d.isSame(end, "day"));
     });
   };
 
@@ -123,7 +156,7 @@ const Attendance: React.FC = () => {
       const params: any = { year: y, month: m };
       if (opts?.keyword && opts.keyword.trim()) params.search = opts.keyword.trim();
 
-      const res = await api.get<ApiResponse>("/attendance/admin/logs/", { params });
+      const res = await api.get<ApiResponse>("/attendance/attendance-logs/", { params });
 
       setAllRows(res.data.results);
 
@@ -132,60 +165,154 @@ const Attendance: React.FC = () => {
       setRows(filtered);
       setStats(computeStatsFromRows(filtered));
     } catch (err: any) {
-      const backendMsg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        "Failed to load attendance logs.";
+      const backendMsg = err?.response?.data?.detail || err?.response?.data?.message || "Failed to load attendance logs.";
       message.error(backendMsg);
     } finally {
       setLoading(false);
     }
   };
 
+  // Load employees for dropdown (use your working dropdown endpoint)
+  const loadEmployees = async () => {
+    try {
+
+      const res = await api.get("/employees/dropdown/");
+      const data = Array.isArray(res.data) ? res.data : res.data?.results ?? [];
+
+      const opts: EmployeeOption[] = data.map((e: any) => {
+        const fullName = `${e.fname ?? ""} ${e.lname ?? ""}`.trim();
+        return {
+          value: Number(e.value ?? e.id),
+          label: String(e.label ?? (fullName || `Employee #${e.value ?? e.id}`)),
+        };
+      });
+
+      setEmployeeOptions(opts);
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to load employees for PDF dropdown.");
+      setEmployeeOptions([]);
+    }
+  };
 
   useEffect(() => {
     fetchLogs({ keyword: "" });
+    loadEmployees();
   }, []);
 
+const columns = [
+  {
+    title: "Name",
+    dataIndex: "full_name",
+    render: (_: any, record: HRLogRow) => (
+      <div className={styles.nameCell}>
+        <Avatar>{record.full_name?.[0] ?? "E"}</Avatar>
+        <span>{record.full_name}</span>
+      </div>
+    ),
+  },
+  { title: "Department", dataIndex: "department_name", render: (v: any) => v ?? "-" },
+  { title: "Time In", dataIndex: "time_in", render: (_: any, r: HRLogRow) => formatTimeWithRow(r.time_in, r.date) },
+  { title: "Time Out", dataIndex: "time_out", render: (_: any, r: HRLogRow) => formatTimeWithRow(r.time_out, r.date) },
+  { title: "Workshift", dataIndex: "shift_name", render: (v: any) => v ?? "-" },
+  { title: "Date", dataIndex: "date", render: (v: any) => formatDate(v) },
+  {
+    title: "Status",
+    dataIndex: "status",
+    render: (status: string) => {
+      const map: Record<string, { label: string; color: string }> = {
+        PRESENT: { label: "Present", color: "green" },
+        ABSENT: { label: "Absent", color: "red" },
+        HALF_DAY: { label: "Half Day", color: "orange" },
+        REST_DAY: { label: "Rest Day", color: "blue" },
+        HOLIDAY: { label: "Holiday", color: "purple" },
+      };
 
-  const columns = [
-    {
-      title: "Name",
-      dataIndex: "full_name",
-      render: (_: any, record: HRLogRow) => (
-        <div className={styles.nameCell}>
-          <Avatar>{record.full_name?.[0] ?? "E"}</Avatar>
-          <span>{record.full_name}</span>
-        </div>
-      ),
+      const x = map[status] || { label: status, color: "default" };
+      return <Tag color={x.color}>{x.label}</Tag>;
     },
-    { title: "Department", dataIndex: "department_name", render: (v: any) => v ?? "-" },
-   { title: "Time In", dataIndex: "time_in", render: (_: any, r: HRLogRow) => formatTimeWithRow(r.time_in, r.date) },
-   { title: "Time Out", dataIndex: "time_out", render: (_: any, r: HRLogRow) => formatTimeWithRow(r.time_out, r.date) },
-    {
-      title: "Workshift",
-      dataIndex: "shift_name",
-      render: (v: any) => v ?? "-",
-    },
-    { title: "Date", dataIndex: "date", render: (v: any) => formatDate(v) },
-    {
-      title: "Status",
-      dataIndex: "status",
-      render: (status: string) => {
-        const map: Record<string, { label: string; color: string }> = {
-          PRESENT: { label: "Present", color: "green" },
-          ABSENT: { label: "Absent", color: "red" },
-          HALF_DAY: { label: "Half Day", color: "orange" },
-          REST_DAY: { label: "Rest Day", color: "blue" },
-          HOLIDAY: { label: "Holiday", color: "purple" },
-        };
+  },
+  {
+    title: "Event Types",
+    dataIndex: "event_types",
+    render: (v: string) => (v && v.trim() ? v : "-"),
+  },
+];
+  const handleOpenPDFModal = () => {
+    // prefill modal based on current UI selection (nice UX)
+    if (rangeMode === "Day") {
+      setPdfFilterType("date");
+      setPdfDate(selectedDate);
+    } else if (rangeMode === "Week") {
+      // For week mode, you can still export by month, or use "date" anchor.
+      // We'll default to "date" anchor (backend can interpret it as a date filter),
+      // but if your backend only supports date/month/year, date is fine.
+      setPdfFilterType("date");
+      setPdfDate(selectedDate);
+    } else {
+      setPdfFilterType("month");
+      setPdfMonth(selectedMonth);
+    }
 
-        const x = map[status] || { label: status, color: "default" };
-        return <Tag color={x.color}>{x.label}</Tag>;
-      },
+    setPdfOpen(true);
+  };
 
-    },
-  ];
+  const handleGeneratePDF = async () => {
+    try {
+      // Validate scope
+      if (pdfScope === "user" && !selectedEmployeeId) {
+        message.warning("Please select an employee.");
+        return;
+      }
+
+      // Validate filter choice
+      if (pdfFilterType === "date" && !pdfDate) {
+        message.warning("Please select a date.");
+        return;
+      }
+      if (pdfFilterType === "month" && !pdfMonth) {
+        message.warning("Please select a month.");
+        return;
+      }
+      if (pdfFilterType === "year" && !pdfYear) {
+        message.warning("Please select a year.");
+        return;
+      }
+
+      setPdfLoading(true);
+
+      const params = new URLSearchParams();
+      params.append("scope", pdfScope);
+
+      if (pdfScope === "user" && selectedEmployeeId) {
+        params.append("employee_id", String(selectedEmployeeId));
+      }
+
+      if (pdfFilterType === "date" && pdfDate) params.append("date", pdfDate.format("YYYY-MM-DD"));
+      if (pdfFilterType === "month" && pdfMonth) params.append("month", pdfMonth.format("YYYY-MM"));
+      if (pdfFilterType === "year" && pdfYear) params.append("year", pdfYear.format("YYYY"));
+
+      // If you want the PDF export to support search keyword too, only add if your backend supports it.
+      // params.append("search", search);
+
+      // Set this to your actual Attendance Logs PDF endpoint
+      // Example:
+      // /reports/attendance-logs/pdf/
+      // /attendance/admin/logs/pdf/
+      // Use whatever you implement on backend.
+      const url = `/attendance/attendance-logs/pdf/?${params.toString()}`;
+
+      const stamp = dayjs().format("YYYY-MM-DD");
+      await downloadPDF(url, `Attendance_Logs_${stamp}.pdf`);
+
+      setPdfOpen(false);
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to generate attendance PDF.");
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -249,8 +376,7 @@ const Attendance: React.FC = () => {
                       if (!d) return;
                       setSelectedDate(d);
 
-                      const ymChanged =
-                        d.year() !== selectedMonth.year() || d.month() !== selectedMonth.month();
+                      const ymChanged = d.year() !== selectedMonth.year() || d.month() !== selectedMonth.month();
 
                       if (ymChanged) {
                         setSelectedMonth(d);
@@ -264,7 +390,12 @@ const Attendance: React.FC = () => {
                     }}
                   />
                 )}
+
+                <Button type="primary" onClick={handleOpenPDFModal}>
+                  Generate PDF
+                </Button>
               </div>
+
               <Search
                 placeholder="Search name / department"
                 value={search}
@@ -280,11 +411,97 @@ const Attendance: React.FC = () => {
               loading={loading}
               dataSource={rows}
               columns={columns as any}
-              pagination={{ pageSize: 10, showSizeChanger: true}}
+              pagination={{ pageSize: 10, showSizeChanger: true }}
               rowClassName={styles.rowStyle}
             />
           </Card>
         </Content>
+
+        <Modal
+          title="Generate Attendance Report"
+          open={pdfOpen}
+          onCancel={() => setPdfOpen(false)}
+          onOk={handleGeneratePDF}
+          okText="Generate PDF"
+          confirmLoading={pdfLoading}
+          destroyOnClose
+        >
+          <Space direction="vertical" style={{ width: "100%" }} size={12}>
+            <div>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Scope</div>
+              <Radio.Group
+                value={pdfScope}
+                onChange={(e) => {
+                  const v = e.target.value as "all" | "user";
+                  setPdfScope(v);
+                  if (v === "all") setSelectedEmployeeId(null);
+                }}
+              >
+                <Radio value="all">All users</Radio>
+                <Radio value="user">Specific user</Radio>
+              </Radio.Group>
+            </div>
+
+            {pdfScope === "user" && (
+              <div>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>Employee</div>
+                <Select
+                  showSearch
+                  placeholder="Select employee"
+                  style={{ width: "100%" }}
+                  options={employeeOptions}
+                  value={selectedEmployeeId ?? undefined}
+                  onChange={(v) => setSelectedEmployeeId(Number(v))}
+                  filterOption={(input, option) =>
+                    String(option?.label ?? "")
+                      .toLowerCase()
+                      .includes(input.toLowerCase())
+                  }
+                />
+              </div>
+            )}
+
+            <Divider style={{ margin: "10px 0" }} />
+
+            <div>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Filter</div>
+              <Radio.Group
+                value={pdfFilterType}
+                onChange={(e) => setPdfFilterType(e.target.value)}
+              >
+                <Radio value="date">By date</Radio>
+                <Radio value="month">By month</Radio>
+                <Radio value="year">By year</Radio>
+              </Radio.Group>
+            </div>
+
+            {pdfFilterType === "date" && (
+              <DatePicker
+                style={{ width: "100%" }}
+                value={pdfDate}
+                onChange={(d) => setPdfDate(d)}
+              />
+            )}
+
+            {pdfFilterType === "month" && (
+              <DatePicker
+                picker="month"
+                style={{ width: "100%" }}
+                value={pdfMonth}
+                onChange={(d) => setPdfMonth(d)}
+              />
+            )}
+
+            {pdfFilterType === "year" && (
+              <DatePicker
+                picker="year"
+                style={{ width: "100%" }}
+                value={pdfYear}
+                onChange={(d) => setPdfYear(d)}
+              />
+            )}
+          </Space>
+        </Modal>
       </Layout>
     </Layout>
   );

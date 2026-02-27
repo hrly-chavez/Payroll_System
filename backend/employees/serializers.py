@@ -302,7 +302,7 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
   
 #for salary
 class EmployeeSalarySerializer(serializers.ModelSerializer):
-    reason = serializers.CharField(write_only=True, required=True)
+    reason = serializers.CharField(write_only=True, required=False)
     class Meta:
         model = Employee_Salary
         fields = ["id", "employee", "pay_type", "base_rate", "effective_from", "created_at", "reason", ]
@@ -323,6 +323,7 @@ class EmployeeSalarySerializer(serializers.ModelSerializer):
         instance = Employee_Salary(**validated_data)
         if user:
             instance._current_user = user  # attach for AuditLog
+            instance._audit_reason = reason or f"Salary created by {user.user_name}" if user else None
         # Attach reason for audit , optional just checking if theres a reason
         if reason:
             setattr(instance, "_audit_reason", reason)

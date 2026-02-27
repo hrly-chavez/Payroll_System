@@ -79,7 +79,7 @@ export default function Login() {
         return;
       }
 
-      const tokenRes = await api.post("/auth/token/", {
+      const tokenRes = await api.post("/accounts/login/", {
         user_name: sanitizedUsername,
         password: sanitizedPassword,
       });

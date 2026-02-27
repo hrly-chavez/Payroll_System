@@ -23,17 +23,19 @@ const Topbar: React.FC<TopbarProps> = ({
   const navigate = useNavigate();
   const [notifCount, setNotifCount] = useState<number>(0);
 
-  const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("user_name");
-    localStorage.removeItem("role");
-    if (onLogout) onLogout();
+  const handleLogout = async () => {
+    try {
+      await api.post("/auth/logout/"); // call backend
 
-    // Show logout message
-    message.success("You have been logged out successfully");
+      message.success("You have been logged out successfully");
 
-    navigate("/", { replace: true });
+      if (onLogout) onLogout();
+
+      navigate("/", { replace: true });
+    } catch (error) {
+      console.error("Logout error:", error);
+      message.error("Failed to logout properly.");
+    }
   };
 
   const fetchNotifCount = async () => {

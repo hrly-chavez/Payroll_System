@@ -1,24 +1,34 @@
-// frontend/src/components/ProtectedRoute.tsx
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
-import { message } from "antd";
+import api from "../api/axios";
+import { Spin } from "antd";
 
 interface Props {
   allowedRoles?: string[];
 }
 
 const ProtectedRoute: React.FC<Props> = ({ allowedRoles }) => {
-  const token = localStorage.getItem("access_token");
-  const role = localStorage.getItem("role");
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
 
-  // Not logged in
-  if (!token) {
-    return <Navigate to="/" replace />;
-  }
+  useEffect(() => {
+    api.get("/accounts/me/")
+      .then((res) => {
+        setUser(res.data);
+      })
+      .catch(() => {
+        setUser(null);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
 
-  // Logged in but not authorized
-  if (allowedRoles && role && !allowedRoles.includes(role)) {
-    message.error("You are not authorized to access this page.");
+  if (loading) return <Spin fullscreen />;
+
+  if (!user) return <Navigate to="/" replace />;
+
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/unauthorized" replace />;
   }
 

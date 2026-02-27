@@ -2,6 +2,7 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
+import PublicRoute from "./components/PublicRoute";
 
 /* AUTH */
 import Login from "./pages/Login/Login";
@@ -11,6 +12,9 @@ import NotificationPage from "./pages/Notifications/Notifications";
 
 /* UNAUTHORIZED */
 import Unauthorized from "./pages/Login/Unauthorized";
+
+/* NOT FOUND */
+import NotFoundPage from "./pages/Login/NotFoundPage";
 
 /* RESET PASSWORD */
 import ResetPassword from "./pages/Login/ResetPassword";
@@ -47,7 +51,9 @@ const Router: React.FC = () => {
       <Routes>
 
         {/* ================= PUBLIC ================= */}
-        <Route path="/" element={<Login />} />
+        <Route element={<PublicRoute />}>
+          <Route path="/" element={<Login />} />
+        </Route>
         <Route path="/unauthorized" element={<Unauthorized />} />
         <Route path="/notification" element={<NotificationPage />} />
         <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
@@ -91,7 +97,7 @@ const Router: React.FC = () => {
         </Route>
 
         {/* ================= CATCH-ALL ================= */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
 
       </Routes>
     </BrowserRouter>

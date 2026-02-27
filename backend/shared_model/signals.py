@@ -3,7 +3,6 @@ from django.dispatch import receiver
 from django.forms.models import model_to_dict
 from django.core.serializers.json import DjangoJSONEncoder
 from .models import AuditLog, Notification, Province, City, Barangay, Holiday
-from accounts.current_user import get_current_user
 import json
 from django.db.models.fields.files import FieldFile
 _old_values = {}

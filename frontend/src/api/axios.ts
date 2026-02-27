@@ -1,7 +1,6 @@
-//src/api/axios.ts
+// src/api/axios.ts
 import axios from "axios";
 import { message } from "antd";
-
 
 const baseURL =
   process.env.REACT_APP_API_BASE_URL ||
@@ -9,23 +8,15 @@ const baseURL =
 
 const api = axios.create({
   baseURL,
-  // do NOT force Content-Type here
+  withCredentials: true, //  VERY IMPORTANT (send cookies)
 });
-/**
- * Attach access token automatically
- */
+
+// No more attaching Authorization header
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("access_token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-
-    // If sending FormData, let the browser set the correct multipart boundary
     if (config.data instanceof FormData) {
       delete (config.headers as any)["Content-Type"];
     } else {
-      // for normal JSON requests
       (config.headers as any)["Content-Type"] = "application/json";
     }
 
@@ -34,21 +25,14 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-/**
- * Handle expired token (optional but recommended)
- */
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear auth
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("role");
-      localStorage.removeItem("user_name");
-
-      // Show message only
-      message.error("Your session has expired. Please login again.");
+      // Only redirect if NOT already on login page
+      if (window.location.pathname !== "/") {
+        window.location.href = "/";
+      }
     }
 
     return Promise.reject(error);

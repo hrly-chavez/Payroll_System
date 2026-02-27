@@ -6,6 +6,7 @@ import { Modal, Descriptions, Tag, Table, Spin, Alert, message, Button, Space, I
 import api from "../../../../api/axios";
 import dayjs from "dayjs";
 
+
 type EligibleEmployee = {
   id: number;
   full_name: string;
@@ -116,26 +117,31 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
     }
   };
   const formatNightDiffInfoDescription = (text: string) => {
-    // Expected format: "Night Differential days: 2026-02-01, 2026-02-03, ..."
-    const prefix = "Night Differential days:";
-    if (!text?.startsWith(prefix)) return null;
+    // Supports:
+    // "Night Differential days: 2026-01-01, 2026-01-02"
+    // "Night Differential days (cont.): 2026-02-03, 2026-02-04"
+    const m = (text || "").match(/^Night Differential days(?:\s*\(cont\.\))?:\s*(.*)$/);
+    if (!m) return null;
 
-    const raw = text.slice(prefix.length).trim(); // "2026-02-01, 2026-02-03"
-    if (!raw) return { title: prefix, formatted: [], rawDates: [] as string[] };
+    const title = "Night Differential days:";
+    const raw = (m[1] || "").trim();
+
+    if (!raw) return { title, formatted: [], rawDates: [] as string[] };
 
     const rawDates = raw
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
 
-    const formatted = rawDates
-      .map((d) => {
-        const parsed = dayjs(d, "YYYY-MM-DD", true);
-        return parsed.isValid() ? parsed.format("MMM DD, YYYY") : d;
-      });
+    const formatted = rawDates.map((d) => {
+      const parsed = dayjs(d, "YYYY-MM-DD", true);
+      return parsed.isValid() ? parsed.format("MMM DD, YYYY") : d;
+    });
 
-    return { title: prefix, formatted, rawDates };
+    return { title, formatted, rawDates };
   };
+
+
   const statusMap: Record<EligibleEmployee["status"], { text: string; color: string }> = {
     Pending: { text: "Pending", color: "default" },
     Verified: { text: "Verified", color: "blue" },
@@ -326,18 +332,26 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
   return (
     <>
     <Modal
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      width={980}
-      title={employee ? `Payroll Result: ${employee.full_name}` : "Payroll Result"}
-      style={{ top: 60 }}
-      destroyOnClose
-    >
+        open={open}
+        onCancel={onClose}
+        footer={null}
+        title={employee ? `Payroll Result: ${employee.full_name}` : "Payroll Result"}
+        centered
+        destroyOnClose
+        width="min(1100px, calc(100vw - 24px))"
+        style={{ top: 12 }}
+        styles={{
+          body: {
+            padding: 12,
+            maxHeight: "calc(100vh - 120px)",
+            overflow: "auto",
+          },
+        }}
+      >
       {!employee || !period ? null : (
         <>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
-            <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 12 }}>
+            <div style={{ flex: "1 1 360px", minWidth: 280 }}>
               <Descriptions bordered size="small" column={1}>
                 <Descriptions.Item label="Employee ID">{employee.id}</Descriptions.Item>
                 <Descriptions.Item label="Department">{employee.department_name || "-"}</Descriptions.Item>
@@ -357,7 +371,7 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
               </Descriptions>
             </div>
 
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: "1 1 360px", minWidth: 280 }}>
               <Descriptions bordered size="small" column={1} title="Totals">
                 <Descriptions.Item label="Payroll ID">{result?.payroll_id ?? "-"}</Descriptions.Item>
                 <Descriptions.Item label="Payroll Status">
@@ -423,8 +437,8 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
                   rowKey="id"
                   pagination={false}
                   size="small"
-                  scroll={{ y: 420 }}
                   locale={{ emptyText: "No payslip lines found" }}
+                  
                 />
               </div>
 

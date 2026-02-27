@@ -18,6 +18,8 @@ const EmployeeSalaryModal: React.FC<Props> = ({
   initialValues,
 }) => {
   const [form] = Form.useForm();
+
+  const payType = Form.useWatch("pay_type", form);
   const [loading, setLoading] = useState(false);
 
   // ✅ Strict blockers: prevent typing/pasting letters & special chars
@@ -125,7 +127,6 @@ const EmployeeSalaryModal: React.FC<Props> = ({
           <Select
             options={[
               { label: "Monthly", value: "Monthly" },
-              { label: "Per Period", value: "Per Period" },
               { label: "Daily", value: "Daily" },
               { label: "Hourly", value: "Hourly" },
             ]}
@@ -135,12 +136,22 @@ const EmployeeSalaryModal: React.FC<Props> = ({
         <Form.Item
           name="base_rate"
           label="Base Rate"
+          extra={
+            payType === "Monthly"
+              ? "Enter the monthly salary of the employee."
+              : payType === "Daily"
+              ? "Enter the daily rate of the employee."
+              : payType === "Hourly"
+              ? "Enter the hourly rate of the employee."
+              : undefined
+          }
           rules={[
             { required: true, message: "Base rate is required" },
             {
               validator: (_, value) => {
                 if (value === undefined || value === null) return Promise.resolve();
-                if (value <= 0) return Promise.reject("Base rate must be greater than 0");
+                if (value <= 0)
+                  return Promise.reject("Base rate must be greater than 0");
                 return Promise.resolve();
               },
             },

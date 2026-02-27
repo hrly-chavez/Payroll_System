@@ -3,7 +3,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { Table, Button, Space, Tag, message } from "antd";
 import dayjs from "dayjs";
 import api from "api/axios";
-import PayrollResultModal from "../Modals/EmployeePayrollResultModal";
+import PayrollResultModal from "../../../Employee/Payslips/PayrollResultModal";
 
 interface PayslipsTabProps {
   employeeId: number;

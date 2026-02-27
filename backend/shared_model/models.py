@@ -208,7 +208,6 @@ class User(AbstractBaseUser, PermissionsMixin):
 class Employee_Salary(models.Model):
     PAY_TYPES = [
         ("Monthly","Monthly"),
-        ("Per Period","Per Period"),
         ("Daily","Daily"),
         ("Hourly","Hourly"),
     ]

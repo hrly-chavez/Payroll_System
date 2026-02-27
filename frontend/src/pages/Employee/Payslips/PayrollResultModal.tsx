@@ -78,7 +78,30 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
   const status = (employee?.status || "Processing") as EmployeeMini["status"];
 
 
-  
+  const formatNightDiffInfoDescription = (text: string) => {
+    // Supports:
+    // "Night Differential days: 2026-01-01, 2026-01-02"
+    // "Night Differential days (cont.): 2026-02-03, 2026-02-04"
+    const m = (text || "").match(/^Night Differential days(?:\s*\(cont\.\))?:\s*(.*)$/);
+    if (!m) return null;
+
+    const title = "Night Differential days:";
+    const raw = (m[1] || "").trim();
+
+    if (!raw) return { title, formatted: [], rawDates: [] as string[] };
+
+    const rawDates = raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const formatted = rawDates.map((d) => {
+      const parsed = dayjs(d, "YYYY-MM-DD", true);
+      return parsed.isValid() ? parsed.format("MMM DD, YYYY") : d;
+    });
+
+    return { title, formatted, rawDates };
+  };
  const downloadPayslipPDF = async () => {
     if (!period?.id) return;
 
@@ -201,28 +224,19 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
   const lines = useMemo(() => {
     const raw = result?.lines || [];
 
-    // Hide Night Differential INFO line(s) for employee view
-    const filtered = raw.filter((l) => {
-      if (l.line_type !== "INFORMATION") return true;
-      const desc = (l.description || "").toLowerCase();
-      // matches: "Night Differential days: ..."
-      if (desc.startsWith("night differential days:")) return false;
-      return true;
-    });
-
     const typeOrder: Record<PayslipLine["line_type"], number> = {
       EARNING: 1,
       DEDUCTION: 2,
       INFORMATION: 3,
     };
-  
+
     const extractDate = (desc?: string) => {
       if (!desc) return null;
       const m = desc.match(/\b\d{4}-\d{2}-\d{2}\b/);
       return m ? m[0] : null;
     };
 
-    return [...filtered].sort((a, b) => {
+    return [...raw].sort((a, b) => {
       const ta = typeOrder[a.line_type] ?? 99;
       const tb = typeOrder[b.line_type] ?? 99;
       if (ta !== tb) return ta - tb;
@@ -236,7 +250,6 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
       return (a.id ?? 0) - (b.id ?? 0);
     });
   }, [result]);
-
   const lineColumns = [
     {
       title: "Type",
@@ -257,6 +270,34 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
       dataIndex: "description",
       render: (v: string, row: PayslipLine) => {
         const ruleLabel = row.rule_name ? ` (${row.rule_name})` : "";
+
+        // Pretty format Night Differential INFO dates
+        if (row.line_type === "INFORMATION") {
+          const info = formatNightDiffInfoDescription(v || "");
+          if (info) {
+            return (
+              <div>
+                <div style={{ fontWeight: 600 }}>{info.title}</div>
+
+                {info.formatted.length > 0 ? (
+                  <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {info.formatted.map((label, idx) => (
+                      <Tag key={`${info.rawDates[idx]}-${idx}`}>{label}</Tag>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, opacity: 0.75 }}>-</div>
+                )}
+
+                {ruleLabel ? (
+                  <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>{ruleLabel}</div>
+                ) : null}
+              </div>
+            );
+          }
+        }
+
+        // Default rendering for all other lines
         return (
           <div>
             <div>{v || "-"}</div>
@@ -313,15 +354,23 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
       open={open}
       onCancel={onClose}
       footer={null}
-      width={980}
       title={employee ? `Payslip: ${employee.full_name}` : "Payslip"}
-      style={{ top: 60 }}
+      centered
       destroyOnClose
+      width="min(1100px, calc(100vw - 24px))"
+      style={{ top: 12 }}
+      styles={{
+        body: {
+          padding: 12,
+          maxHeight: "calc(100vh - 120px)",
+          overflow: "auto",
+        },
+      }}
     >
       {!employee || !period ? null : (
         <>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
-            <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 12 }}>
+              <div style={{ flex: "1 1 360px", minWidth: 280 }}>
               <Descriptions bordered size="small" column={1}>
                 <Descriptions.Item label="Employee ID">{employee.id}</Descriptions.Item>
                 <Descriptions.Item label="Department">{employee.department_name || "-"}</Descriptions.Item>
@@ -339,7 +388,7 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
               </Descriptions>
             </div>
 
-            <div style={{ flex: 1 }}>
+              <div style={{ flex: "1 1 360px", minWidth: 280 }}>
               <Descriptions bordered size="small" column={1} title="Totals">
                 <Descriptions.Item label="Payroll ID">{result?.payroll_id ?? "-"}</Descriptions.Item>
                 <Descriptions.Item label="Payroll Status">
@@ -407,8 +456,8 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
                   rowKey="id"
                   pagination={false}
                   size="small"
-                  scroll={{ y: 420 }}
                   locale={{ emptyText: "No payslip lines found" }}
+                  
                 />
               </div>
 

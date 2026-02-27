@@ -647,7 +647,7 @@ class CommissionTaxRuleChoicesView(APIView):
         }, status=http_status.HTTP_200_OK)
 
 #======================================PAYROLL GENERATION========================================
-#Ari nlaang butang notif para sa CEO kay after ma generate need na dayon approval
+
 class GeneratePayrollForPeriodView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -681,7 +681,7 @@ class GeneratePayrollForPeriodView(APIView):
         serializer = GeneratePayrollPeriodResponseSerializer(result)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-#per employee butang notif para sa mga na decline
+
 class GeneratePayrollForEmployeeView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -764,6 +764,68 @@ class PayrollEmployeeResultView(APIView):
 
         return Response(PayrollResultSerializer(payload).data, status=http_status.HTTP_200_OK)
 
+#this is for admin and superadmin viewing the result of Payslips
+class AdminEmployeePayrollListView(APIView):
+    """
+    Admin/SuperAdmin endpoint to fetch payrolls for any employee by ID.
+    """
+    permission_classes = [AllowAny]  # Adjust to IsAdminUser or custom role permission
+
+    def get(self, request):
+        employee_id = request.query_params.get("employee_id")
+        if not employee_id:
+            return Response({"detail": "employee_id is required."}, status=http_status.HTTP_400_BAD_REQUEST)
+
+        emp = get_object_or_404(Employee, pk=employee_id)
+
+        # Fetch all PPE rows for this employee
+        ppe_qs = (
+            PayrollPeriodEmployee.objects
+            .filter(employee=emp)
+            .select_related("period")
+            .order_by("-period__start_date")
+        )
+
+        period_ids = list(ppe_qs.values_list("period_id", flat=True))
+
+        payroll_rows = (
+            Payroll.objects
+            .filter(employee=emp, payroll_period_id__in=period_ids)
+            .exclude(status="Void")
+            .select_related("payroll_period")
+            .order_by("payroll_period_id", "-run_no", "-id")
+        )
+
+        latest_by_period = {}
+        for pr in payroll_rows:
+            if pr.payroll_period_id not in latest_by_period:
+                latest_by_period[pr.payroll_period_id] = pr
+
+        data = []
+        for ppe in ppe_qs:
+            period = ppe.period
+            pr = latest_by_period.get(period.id)
+
+            data.append({
+                "employee_id": emp.id,
+                "employee_full_name": f"{emp.fname} {emp.lname}".strip(),
+                "department_name": emp.department.name if emp.department else None,
+                "period_id": period.id,
+                "period_code": period.code,
+                "period_start_date": period.start_date,
+                "period_end_date": period.end_date,
+                "pay_date": period.pay_date,
+                "period_status": period.status,
+                "ppe_status": ppe.status,
+                "declined_reason": ppe.declined_reason,
+                "payroll_id": pr.id if pr else None,
+                "payroll_status": pr.status if pr else None,
+                "run_no": pr.run_no if pr else None,
+                "net_pay": pr.net_pay if pr else None,
+            })
+
+        return Response(EmployeePayrollRowSerializer(data, many=True).data, status=http_status.HTTP_200_OK)
+    
 #For employee dashboard payroll(rows & columns)
 class EmployeePayrollListView(APIView):
     permission_classes = [AllowAny]
@@ -830,68 +892,7 @@ class EmployeePayrollListView(APIView):
 
         return Response(EmployeePayrollRowSerializer(data, many=True).data, status=http_status.HTTP_200_OK)
 
-#this is for admin and superadmin viewing the result of Payslips
-class AdminEmployeePayrollListView(APIView):
-    """
-    Admin/SuperAdmin endpoint to fetch payrolls for any employee by ID.
-    """
-    permission_classes = [AllowAny]  # Adjust to IsAdminUser or custom role permission
 
-    def get(self, request):
-        employee_id = request.query_params.get("employee_id")
-        if not employee_id:
-            return Response({"detail": "employee_id is required."}, status=http_status.HTTP_400_BAD_REQUEST)
-
-        emp = get_object_or_404(Employee, pk=employee_id)
-
-        # Fetch all PPE rows for this employee
-        ppe_qs = (
-            PayrollPeriodEmployee.objects
-            .filter(employee=emp)
-            .select_related("period")
-            .order_by("-period__start_date")
-        )
-
-        period_ids = list(ppe_qs.values_list("period_id", flat=True))
-
-        payroll_rows = (
-            Payroll.objects
-            .filter(employee=emp, payroll_period_id__in=period_ids)
-            .exclude(status="Void")
-            .select_related("payroll_period")
-            .order_by("payroll_period_id", "-run_no", "-id")
-        )
-
-        latest_by_period = {}
-        for pr in payroll_rows:
-            if pr.payroll_period_id not in latest_by_period:
-                latest_by_period[pr.payroll_period_id] = pr
-
-        data = []
-        for ppe in ppe_qs:
-            period = ppe.period
-            pr = latest_by_period.get(period.id)
-
-            data.append({
-                "employee_id": emp.id,
-                "employee_full_name": f"{emp.fname} {emp.lname}".strip(),
-                "department_name": emp.department.name if emp.department else None,
-                "period_id": period.id,
-                "period_code": period.code,
-                "period_start_date": period.start_date,
-                "period_end_date": period.end_date,
-                "pay_date": period.pay_date,
-                "period_status": period.status,
-                "ppe_status": ppe.status,
-                "declined_reason": ppe.declined_reason,
-                "payroll_id": pr.id if pr else None,
-                "payroll_status": pr.status if pr else None,
-                "run_no": pr.run_no if pr else None,
-                "net_pay": pr.net_pay if pr else None,
-            })
-
-        return Response(EmployeePayrollRowSerializer(data, many=True).data, status=http_status.HTTP_200_OK)
-    
 #==========================================CEO / SUPERADMIN APPROVAL===========================
 
 class PayrollPeriodApprovalQueueView(APIView):
@@ -960,7 +961,6 @@ class PayrollPeriodApprovalQueueView(APIView):
         })
     
 #this is where the admin approve
-#undone logs
 class PayrollApproveEmployeeView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1046,8 +1046,6 @@ class PayrollApproveEmployeeView(APIView):
 
         return Response({"detail": "Payroll approved."}, status=http_status.HTTP_200_OK)
 
-#undone logs
-#Ari nalang sad butang ang notif kung sa payroll period kay naay gi declined na employee para mo notif ditso sa HR
 class PayrollDeclineEmployeeView(APIView):
     permission_classes = [IsAuthenticated]
 

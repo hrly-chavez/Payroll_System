@@ -128,20 +128,20 @@ class HolidayUpdateStatusView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-#Leave Type    
+ 
 class LeaveTypeListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Leave_Type.objects.all().order_by('-created_at')
     serializer_class = LeaveTypeSerializer
 
-#done logs
+
 # views.py
 class LeaveTypeCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Leave_Type.objects.all()
     serializer_class = LeaveTypeSerializer
 
-#done logs
+
 class LeaveTypeUpdateView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Leave_Type.objects.all()
@@ -157,7 +157,7 @@ class LeaveTypeUpdateView(generics.RetrieveUpdateAPIView):
         # Perform the update (post_save will handle audit logs)
         serializer.save()
 
-#done logs
+
 #Leave Request
 class LeaveRequestListCreateView(generics.ListCreateAPIView):
     serializer_class = LeaveRequestSerializer
@@ -243,7 +243,7 @@ class AdminLeaveRequestListView(generics.ListAPIView):
 
         return queryset
 
-#done logs
+
 # -----------------------------
 # Admin action to approve or decline leave
 # -----------------------------

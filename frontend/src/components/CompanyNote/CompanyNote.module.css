@@ -1,6 +1,6 @@
 .noteCard {
   border-radius: 16px;
-  background: #3d85ac;
+  background: #386fa4;
   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
   height: 100%;
   display: flex;
@@ -9,7 +9,11 @@
 
 .noteCard :global(.ant-card-head) {
   background: transparent;
-  border-bottom: 1px solid rgba(83, 155, 206, 0.35);
+  border-bottom: none !important;
+}
+
+.noteCard :global(.ant-card-head-wrapper) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.24) !important;
 }
 
 .noteCard :global(.ant-card-head-title) {
@@ -37,7 +41,7 @@
 .addButton {
   background: #fff !important;
   border-color: #fff !important;
-  color: #3d85ac !important;
+  color: #386fa4 !important;
   border-radius: 8px;
 }
 

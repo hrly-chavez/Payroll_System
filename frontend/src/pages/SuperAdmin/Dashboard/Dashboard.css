@@ -139,7 +139,7 @@
 
 /* Primary tile */
 .primary {
-  background: var(--brand-600);
+  background: #c4c4c4;
   border: none;
   box-shadow: var(--shadow-soft);
 }

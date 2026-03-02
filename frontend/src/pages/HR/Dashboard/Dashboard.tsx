@@ -713,11 +713,6 @@ const adminOrderedChartData = [...adminChartData].sort(
                   label: "Leave",
                   children: <div>Leave requests here</div>,
                 },
-                {
-                key: "attendance correction",
-                  label: "Attendance Correction",
-                  children: <div>Attendance question requests here</div>,
-                },
               ]}
             />
               </Card>

@@ -728,15 +728,6 @@ const payrollColumns = useMemo(() => {
                       </div>
                     ),
                   },
-                  {
-                    key: "attendance correction",
-                    label: "Attendance Correction",
-                    children: (
-                    <div className="App">
-                      <h1>Columns Here</h1>
-                    </div>
-                    ),
-                  },
                 ]}
               />
             </Card>

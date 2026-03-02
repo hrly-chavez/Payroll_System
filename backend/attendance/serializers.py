@@ -63,7 +63,7 @@ class AttendanceLogSerializer(serializers.ModelSerializer):
         types = list(obj.events.values_list("type", flat=True))
         return ", ".join(types) if types else ""
 
-#Admin & SuperAdmin Can see All attendance Logs
+#Admin & SuperAdmin Can see All attendance Logs (includes Bar Graph)
 class CEOandHRAttendanceLogSerializer(serializers.ModelSerializer):
     employee_id = serializers.IntegerField(source="employee.id", read_only=True)
     full_name = serializers.SerializerMethodField()
@@ -427,8 +427,6 @@ class AttendanceCorrectionApplySerializer(serializers.Serializer):
         return attrs
 
 
-
-
 #==============PIE CHART DISPLAY============================
 class AttendanceStatsSerializer(serializers.Serializer):
     year = serializers.IntegerField()
@@ -451,4 +449,29 @@ class AttendanceAdminMonthlyStatsSerializer(serializers.Serializer):
     undertime = serializers.IntegerField()
     overtime = serializers.IntegerField()
 
-    
+
+class AttendanceAnalyticsQuerySerializer(serializers.Serializer):
+    """
+    Query params ONLY.
+    GET ?mode=Day|Week|Month|Year&date=YYYY-MM-DD(optional)
+    """
+    mode = serializers.ChoiceField(choices=["Day", "Week", "Month", "Year"])
+    date = serializers.DateField(required=False)
+
+
+class AttendanceAnalyticsRangeSerializer(serializers.Serializer):
+    """
+    Response payload ONLY.
+    """
+    mode = serializers.ChoiceField(choices=["Day", "Week", "Month", "Year"])
+    date = serializers.DateField()
+
+    start_date = serializers.DateField()
+    end_date = serializers.DateField()
+
+    present = serializers.IntegerField()
+    late = serializers.IntegerField()
+    absent = serializers.IntegerField()
+    leave = serializers.IntegerField()
+    undertime = serializers.IntegerField()
+    overtime = serializers.IntegerField() 

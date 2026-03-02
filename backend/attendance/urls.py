@@ -27,4 +27,8 @@ urlpatterns = [
     path("stats/", AttendanceStatsView.as_view(), name="attendance-stats"),
     path("admin/stats/", AttendanceAdminMonthlyStatsView.as_view(), name="attendance-admin-stats"),
     path("attendance/admin/stats/", AttendanceAdminMonthlyStatsView.as_view()),
+
+    # Bar Chart Analytics (Day/Week/Month/Year)
+    path("admin/analytics/", AttendanceAdminAnalyticsView.as_view(), name="attendance-admin-analytics"),
+    path("super_admin/analytics/", AttendanceAdminAnalyticsView.as_view(), name="attendance-super_admin-analytics"),
 ]

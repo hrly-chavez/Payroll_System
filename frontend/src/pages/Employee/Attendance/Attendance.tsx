@@ -1,12 +1,13 @@
 // src/pages/Employee/Attendance/Attendance.tsx
 "use client";
 
-import React, { useState, useEffect, useMemo} from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {Layout,Card,Calendar,Tooltip,Button,Row,Select,Tabs,Spin,Table,Tag,} from "antd";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
-import {CalendarOutlined,LeftOutlined,RightOutlined,} from "@ant-design/icons";
-
+import { CalendarOutlined, FileSearchOutlined } from "@ant-design/icons";
+import AttendanceCorrectionLogs from "./AttendanceCorrection/AttendanceCorrectionLogs";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 import AttendanceCorrection from "./AttendanceCorrection/AttendanceCorrection";
@@ -22,7 +23,7 @@ import {
   PAYROLL_COLOR,
 } from "../../../components/SharedCalendar/CalendarLegend";
 import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLegendDisplay";
-
+import LeaveRequestLogs from "./LeaveRequests/LeaveRequestLogs";
 
 
 const { Content } = Layout;
@@ -37,7 +38,7 @@ const attendanceData: Record<string, { in: string; out: string }> = {
 };
 
 const Attendance: React.FC = () => {
-
+  const navigate = useNavigate();
   type PayrollPeriod = {
   id: number;
   start_date: string;
@@ -290,6 +291,7 @@ const Attendance: React.FC = () => {
                 >
                   Request Leave
                 </Button>
+                
               </div>
             </Row>
 
@@ -311,21 +313,17 @@ const Attendance: React.FC = () => {
 
           {/* ===== Logs & Requests ===== */}
           <Card className={styles.historyCard}>
-              <Tabs defaultActiveKey="logs" className={styles.pillTabs}>
+            <Tabs defaultActiveKey="logs" className={styles.pillTabs}>
               <Tabs.TabPane tab="Attendance Logs" key="logs">
                 <AttendaceLogs year={year} month={month + 1} />
               </Tabs.TabPane>
 
-              <Tabs.TabPane tab="Requests" key="requests">
-                <Spin spinning={loadingRequests}>
-                  <Table
-                    rowKey="id"
-                    columns={leaveColumns}
-                    dataSource={leaveRequests}
-                    pagination={{ pageSize: 5 }}
-                    scroll={{ x: "max-content" }}
-                  />
-                </Spin>
+              <Tabs.TabPane tab="Leave Request(s)" key="requests">
+                <LeaveRequestLogs />
+              </Tabs.TabPane>
+
+              <Tabs.TabPane tab="Correction Request(s)" key="corrections">
+                <AttendanceCorrectionLogs />
               </Tabs.TabPane>
             </Tabs>
           </Card>

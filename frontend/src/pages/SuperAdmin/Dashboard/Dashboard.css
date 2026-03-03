@@ -164,12 +164,47 @@
   margin-bottom: 20px;
   flex-wrap: wrap;
 }
+/* Make analytics card a flex column so chart can fill remaining space */
+.analytics-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 360px;  /* keep    original intent */
+  height: auto;       /* important */
+}
 
+.analytics-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.chart-area {
+  flex: 1;
+  min-height: 260px;
+  width: 100%;
+  display: flex;              /* important */
+}
+
+.chart-area .ant-spin-nested-loading,
+.chart-area .ant-spin-container {
+  height: 100%;               /* important */
+  width: 100%;
+}
+
+.chart-area .ant-spin-container {
+  display: flex;              /* important */
+}
+
+.chart-area .chart-fill {
+  flex: 1;                    /* important */
+  min-height: 260px;
+}
 /* ================= Calendar ================= */
 
 .calendar-card {
   min-height: 360px;
   padding: 16px;
+  
 }
 
 /* ================= RESPONSIVE ================= */

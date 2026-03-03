@@ -1,41 +1,89 @@
-import React, { useEffect, useRef } from 'react';
-import * as echarts from 'echarts';
-
-// ECharts optional extensions (dataTool provides helpers for data processing, etc.)
-// We're using the built-in extension to enable extra features without adding new deps
-import 'echarts/extension/dataTool';
+import React, { useEffect, useRef } from "react";
+import * as echarts from "echarts";
+import "echarts/extension/dataTool";
 
 interface ChartProps {
-  // Compose option for bar, line, and pie charts
   option: echarts.ComposeOption<
-    | echarts.BarSeriesOption
-    | echarts.LineSeriesOption
-    | echarts.PieSeriesOption
+    echarts.BarSeriesOption | echarts.LineSeriesOption | echarts.PieSeriesOption
   >;
   style?: React.CSSProperties;
 }
 
 const Chart: React.FC<ChartProps> = ({ option, style }) => {
-  const chartRef = useRef<HTMLDivElement>(null);
+  const chartElRef = useRef<HTMLDivElement>(null);
+  const chartInstanceRef = useRef<echarts.ECharts | null>(null);
+
+  const rafIdRef = useRef<number | null>(null);
+  const resizingRef = useRef(false);
+
+  const scheduleResize = () => {
+    if (!chartInstanceRef.current) return;
+
+    // debounce resize calls into the next animation frame
+    if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+
+    rafIdRef.current = requestAnimationFrame(() => {
+      if (!chartInstanceRef.current) return;
+
+      // guard against ResizeObserver feedback loops
+      if (resizingRef.current) return;
+      resizingRef.current = true;
+
+      try {
+        chartInstanceRef.current.resize();
+      } finally {
+        resizingRef.current = false;
+      }
+    });
+  };
 
   useEffect(() => {
-    if (!chartRef.current) return;
+    if (!chartElRef.current) return;
 
-    const chartInstance = echarts.init(chartRef.current);
+    if (!chartInstanceRef.current) {
+      chartInstanceRef.current = echarts.init(chartElRef.current);
+    }
 
-    // ✅ Use as 'any' to bypass strict TS but still type-safe for our ComposeOption
-    chartInstance.setOption(option as any);
+    const chart = chartInstanceRef.current;
 
-    const handleResize = () => chartInstance.resize();
-    window.addEventListener('resize', handleResize);
+    // Update option (do NOT force resize here; RO will handle sizing)
+    chart.setOption(option as any, { notMerge: true, lazyUpdate: true });
 
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      chartInstance.dispose();
-    };
+    // Still schedule one resize after option update (safe + debounced)
+    scheduleResize();
   }, [option]);
 
-  return <div ref={chartRef} style={{ width: '100%', height: 400, ...style }} />;
+  useEffect(() => {
+    if (!chartElRef.current || !chartInstanceRef.current) return;
+
+    const ro = new ResizeObserver(() => {
+      scheduleResize();
+    });
+
+    ro.observe(chartElRef.current);
+
+    return () => {
+      ro.disconnect();
+
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+
+      chartInstanceRef.current?.dispose();
+      chartInstanceRef.current = null;
+    };
+  }, []);
+
+  return (
+    <div
+      ref={chartElRef}
+      style={{
+        width: "100%",
+        height: "100%",
+        minHeight: 260,
+        ...style,
+      }}
+    />
+  );
 };
 
 export default Chart;

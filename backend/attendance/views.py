@@ -942,14 +942,13 @@ class AttendanceAdminAnalyticsView(APIView):
         }
         return Response(AttendanceAnalyticsRangeSerializer(payload).data, status=200)
     
-
+#==============PDF NI(?) butang comment Please============================
 class AttendanceEmployeesDropdownView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = EmployeeDropdownSerializer
 
     def get_queryset(self):
         return Employee.objects.filter(is_active=True).order_by("lname", "fname")
-
 
 class AttendanceLogsPDFView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1284,3 +1283,4 @@ class AttendanceLogsView(APIView):
             "count": len(results),
             "results": results
         })
+

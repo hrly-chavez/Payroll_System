@@ -26,18 +26,7 @@ const BaseSalaryTab: React.FC<Props> = ({
   const [selectedSalary, setSelectedSalary] = useState<Salary | undefined>(undefined);
 
   const openModal = () => {
-    if (!salaries.length) {
-      message.warning("No salary record found");
-      return;
-    }
-
-    const latest = [...salaries].sort(
-      (a, b) =>
-        new Date(b.effective_from).getTime() -
-        new Date(a.effective_from).getTime()
-    )[0];
-
-    setSelectedSalary(latest);
+    setSelectedSalary(undefined); // Always open as fresh form
     setIsModalOpen(true);
   };
 
@@ -65,7 +54,7 @@ const BaseSalaryTab: React.FC<Props> = ({
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <h3>Base Salary</h3>
         <Button type="primary" onClick={openModal}>
-          Edit Base Salary
+        Update Base Salary
         </Button>
       </div>
 

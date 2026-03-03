@@ -3,7 +3,8 @@ from django.dispatch import receiver
 from django.forms.models import model_to_dict
 from django.core.serializers.json import DjangoJSONEncoder
 from .models import AuditLog, Notification, Province, City, Barangay, Holiday
-import json
+import json, sys
+from django.apps import apps
 from django.db.models.fields.files import FieldFile
 _old_values = {}
 
@@ -77,6 +78,12 @@ def create_audit_log(instance, action, old_data=None, new_data=None):
 @receiver(post_save)
 def log_save(sender, instance, created, **kwargs):
     """Log CREATE or UPDATE actions."""
+    if not apps.ready:
+        return
+
+    if 'migrate' in sys.argv:
+        return
+
     if sender == AuditLog:
         return
     

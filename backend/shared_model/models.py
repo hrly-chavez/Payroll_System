@@ -402,7 +402,7 @@ class Holiday(models.Model):
     date = models.DateField()
     name = models.CharField(max_length=50)
     type = models.CharField(max_length=50, choices=holiday_types)
-    base = models.CharField(max_length=20,choices=HOLIDAY_BASE_CHOICES)
+    base = models.CharField(max_length=20,choices=HOLIDAY_BASE_CHOICES, null=True, blank=True)
     remarks = models.TextField(null=True,blank=True)
     status = models.CharField(max_length=20,choices=[("Pending","Pending"),("Approved","Approved"),("Declined","Declined")],default="Pending")
     is_active = models.BooleanField(default=True)
@@ -433,7 +433,7 @@ class HolidayPolicy(models.Model):
     ]
 
     department = models.ForeignKey(Department, on_delete=models.CASCADE)
-    base = models.CharField(max_length=20, choices=HOLIDAY_BASE_CHOICES)
+    base = models.CharField(max_length=20, choices=HOLIDAY_BASE_CHOICES, null=True, blank=True)
     holiday_type = models.CharField(max_length=50, choices=HOLIDAY_TYPES)
     requires_work = models.BooleanField(default=False)
     created_at = models.DateTimeField(default=timezone.now)
@@ -463,7 +463,7 @@ class HolidayPolicy(models.Model):
 class DepartmentHolidayCalendar(models.Model):
     HOLIDAY_BASE_CHOICES = [ ("PH", "Philippines"), ("US", "United States"), ("COMPANY", "Company"), ] 
     department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name="holiday_calendars") 
-    base = models.CharField(max_length=20, choices=HOLIDAY_BASE_CHOICES) 
+    base = models.CharField(max_length=20, choices=HOLIDAY_BASE_CHOICES, null=True, blank=True) 
     is_active = models.BooleanField(default=True) 
     def __str__(self):
         return f"{self.department.name} - {self.get_base_display()}"

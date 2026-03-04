@@ -25,6 +25,8 @@ const AddEmployeeFlow: React.FC<Props> = ({ open, departmentId, onClose }) => {
   const [allowancesData, setAllowancesData] = useState<any[]>([]);
   const [credentials, setCredentials] = useState({ username: "", password: "" });
 
+  const [loading, setLoading] = useState(false);
+
   const currentUserRole = localStorage.getItem("role");
 
   const allowedRoles: ("EMPLOYEE" | "ADMIN" | "SUPER_ADMIN")[] =
@@ -42,6 +44,7 @@ const AddEmployeeFlow: React.FC<Props> = ({ open, departmentId, onClose }) => {
       setContributionsData([]);
       setAllowancesData([]);
       setCredentials({ username: "", password: "" });
+      setLoading(false); // reset loading
     }
   }, [open]);
 
@@ -53,6 +56,8 @@ const AddEmployeeFlow: React.FC<Props> = ({ open, departmentId, onClose }) => {
     roleOverride?: string
   ) => {
     const roleToUse = roleOverride || selectedRole;
+
+    setLoading(true); // start loading
 
     try {
       const payload = {
@@ -79,6 +84,8 @@ const AddEmployeeFlow: React.FC<Props> = ({ open, departmentId, onClose }) => {
       setStep(6);
     } catch (err: any) {
       message.error(err.response?.data?.message || "Failed to create employee");
+    } finally {
+      setLoading(false); // stop loading
     }
   };
 
@@ -144,6 +151,7 @@ const AddEmployeeFlow: React.FC<Props> = ({ open, departmentId, onClose }) => {
           }}
           onBack={() => setStep(3)}
           onClose={onClose}
+          loading={loading} // <-- pass loading state to modal
         />
       )}
 

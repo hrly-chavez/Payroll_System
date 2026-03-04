@@ -109,44 +109,46 @@ const EditEmployeeAddressModal: React.FC<Props> = ({
 
 
 
-    const handleSubmit = async () => {
-        try {
-            const values = await form.validateFields();
-            setLoading(true);
+  const handleSubmit = async () => {
+      try {
+          const values = await form.validateFields();
+          setLoading(true);
 
-            const payload = {
-            address: {
-                province: values.province,
-                city: values.city,
-                barangay: values.barangay,
-                street: values.street,
-                sitio: values.sitio || "",
-                zip_code: values.zip_code,
-            },
-            };
+          const payload = {
+          address: {
+              province: values.province,
+              city: values.city,
+              barangay: values.barangay,
+              street: values.street,
+              sitio: values.sitio || "",
+              zip_code: values.zip_code,
+          },
+          };
 
-            await api.patch(
-            `/employees/employees/${employeeId}/update/`,
-            payload
-            );
+          await api.patch(
+          `/employees/employees/${employeeId}/update/`,
+          payload
+          );
 
-            message.success("Address updated successfully");
-            onSuccess();
-        } catch (err: any) {
-            console.error(err.response?.data || err);
-            message.error("Failed to update address");
-        } finally {
-            setLoading(false);
-        }
-    };
+          message.success("Address updated successfully");
+          onSuccess();
+      } catch (err: any) {
+          console.error(err.response?.data || err);
+          message.error("Failed to update address");
+      } finally {
+          setLoading(false);
+      }
+  };
 
-    useEffect(() => {
-    if (!open) {
-        form.resetFields();
-        setCities([]);
-        setBarangays([]);
-    }
-    }, [open, form]);
+  useEffect(() => {
+  if (!open) {
+      form.resetFields();
+      setCities([]);
+      setBarangays([]);
+  }
+  }, [open, form]);
+
+  
 
 
   return (
@@ -203,20 +205,65 @@ const EditEmployeeAddressModal: React.FC<Props> = ({
           </Col>
 
           <Col span={12}>
-            <Form.Item name="sitio" label="Sitio">
-              <Input />
+            <Form.Item
+              name="sitio"
+              label="Sitio"
+              rules={[
+                {
+                  pattern: /^[^<>]*$/,
+                  message: "HTML tags are not allowed",
+                },
+              ]}
+            >
+              <Input
+                onChange={(e) => {
+                  const cleaned = e.target.value.replace(/[<>]/g, "");
+                  form.setFieldsValue({ sitio: cleaned });
+                }}
+              />
             </Form.Item>
           </Col>
 
           <Col span={12}>
-            <Form.Item name="street" label="Street" rules={[{ required: true }]}>
-              <Input />
+            <Form.Item
+              name="street"
+              label="Street"
+              rules={[
+                {
+                  pattern: /^[^<>]*$/,
+                  message: "HTML tags are not allowed",
+                },
+              ]}
+            >
+              <Input
+                onChange={(e) => {
+                  const cleaned = e.target.value.replace(/[<>]/g, "");
+                  form.setFieldsValue({ street: cleaned });
+                }}
+              />
             </Form.Item>
           </Col>
 
           <Col span={12}>
-            <Form.Item name="zip_code" label="Zip Code" rules={[{ required: true }]}>
-              <Input maxLength={4} />
+            <Form.Item
+              name="zip_code"
+              label="Zip Code"
+              rules={[
+                { message: "Zip Code is required" },
+                {
+                  pattern: /^[0-9]+$/,
+                  message: "Zip Code must contain digits only",
+                },
+              ]}
+            >
+              <Input
+                maxLength={4}
+                inputMode="numeric"
+                onChange={(e) => {
+                  const numbersOnly = e.target.value.replace(/\D/g, "");
+                  form.setFieldsValue({ zip_code: numbersOnly });
+                }}
+              />
             </Form.Item>
           </Col>
         </Row>

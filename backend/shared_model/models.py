@@ -129,7 +129,7 @@ class Employee(models.Model):
     contact_no = models.CharField(max_length=12)
     hired_date = models.DateField()
     position = models.CharField(max_length=20)
-    bank_info = models.CharField(max_length=50)
+    bank_info = models.CharField(max_length=50,null=True,blank=True)
     email = models.CharField(max_length=50, unique=True)
     created_at = models.DateField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
@@ -138,6 +138,15 @@ class Employee(models.Model):
     
     def __str__(self):
         return f"{self.fname} {self.lname}"
+    
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["email"],
+                condition=models.Q(is_active=True),
+                name="unique_active_employee_email"
+            )
+        ]
     
 class UserManager(BaseUserManager):
     #Mao ni ang makita na UI sa django-admin kung mag og User

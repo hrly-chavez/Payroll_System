@@ -312,6 +312,30 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
     
     # -------------------
+    # CHECKING EXISTING EMAIL EMPLOYEE
+    # ------------------- 
+    @action(detail=False, methods=["get"], url_path="check-email")
+    def check_email(self, request):
+        email = request.query_params.get("email")
+        employee_id = request.query_params.get("employee_id")
+
+        if not email:
+            return Response({"error": "Email parameter is required."}, status=400)
+
+        queryset = Employee.objects.filter(
+            email__iexact=email,
+            is_active=True
+        )
+
+        # EXCLUDE CURRENT EMPLOYEE (for update)
+        if employee_id:
+            queryset = queryset.exclude(id=employee_id)
+
+        exists = queryset.exists()
+
+        return Response({"exists": exists})
+        
+    # -------------------
     # CREATE FIRST SUPER ADMIN EMPLOYEE
     # ------------------- 
     @action(detail=False, methods=["post"], url_path="create-first-superadmin")

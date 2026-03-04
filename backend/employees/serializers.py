@@ -160,6 +160,24 @@ class AddressSerializer(serializers.ModelSerializer):
             "zip_code",
         ]
 
+    # -------------------------
+    # CUSTOM VALIDATORS
+    # -------------------------
+    def validate_street(self, value):
+        if value and re.search(r"[<>]", value):
+            raise ValidationError("Street cannot contain < or > characters.")
+        return value
+
+    def validate_sitio(self, value):
+        if value and re.search(r"[<>]", value):
+            raise ValidationError("Sitio cannot contain < or > characters.")
+        return value
+
+    def validate_zip_code(self, value):
+        if value and not value.isdigit():
+            raise ValidationError("Zip code must contain numbers only.")
+        return value
+
 
 class EmployeeCreateSerializer(serializers.ModelSerializer):
     address = AddressSerializer()
@@ -203,6 +221,8 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
         return self.sanitize_string(value)
 
     def validate_bank_info(self, value):
+        if not value:
+            return value
         return self.sanitize_string(value)
 
     def validate_contact_no(self, value):
@@ -211,16 +231,24 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Contact number must be exactly 11 digits.")
         return value
 
-    def validate_email(self, value):
-        value = self.sanitize_string(value)
-        if "<" in value or ">" in value:
-            raise serializers.ValidationError("Invalid email format.")
-        return value.lower()
-
     def validate_hired_date(self, value):
         if value < date.today():
             raise serializers.ValidationError("Hired date cannot be in the past.")
         return value
+
+    # -------------------------
+    # EMAIL VALIDATION
+    # -------------------------
+    def validate_email(self, value):
+        value = self.sanitize_string(value)
+
+        if "<" in value or ">" in value:
+            raise serializers.ValidationError("Invalid email format.")
+
+        if Employee.objects.filter(email__iexact=value, is_active=True).exists():
+            raise serializers.ValidationError("An employee with this email already exists.")
+
+        return value.lower()
 
     # -------------------------
     # ADDRESS VALIDATION
@@ -266,6 +294,20 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
             "department", "address", "is_active", "reason",
         ]
 
+    # -------------------------
+    # EMAIL VALIDATION
+    # -------------------------
+    def validate_email(self, value):
+        employee = self.instance
+
+        if Employee.objects.filter(
+            email__iexact=value,
+            is_active=True
+        ).exclude(id=employee.id).exists():
+            raise serializers.ValidationError("An employee with this email already exists.")
+
+        return value
+
     def update(self, instance, validated_data):
         user = validated_data.pop("_current_user", None)
         reason = validated_data.pop("reason", None)  
@@ -310,6 +352,7 @@ class EmployeeSalarySerializer(serializers.ModelSerializer):
                 "A salary for this employee starting from this date already exists."
             )
         return attrs
+    
     def create(self, validated_data):
         # Get current user from context
         user = self.context.get("_current_user")

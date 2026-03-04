@@ -36,6 +36,7 @@ interface Props {
   onBack: () => void;
   onNext: (data: AllowanceItem[]) => void;
   onClose: () => void;
+  loading?: boolean; // <-- add loading prop
 }
 
 export default function EmployeeAllowanceModal({
@@ -44,6 +45,7 @@ export default function EmployeeAllowanceModal({
   onBack,
   onNext,
   onClose,
+  loading = false,
 }: Props) {
   const [form] = Form.useForm();
   const [allowanceTypes, setAllowanceTypes] = useState<any[]>([]);
@@ -53,6 +55,7 @@ export default function EmployeeAllowanceModal({
 
   // 🔒 Strict numeric blockers: prevent letters & special chars (type + paste)
   const blockNonNumeric = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (loading) e.preventDefault();
     if (e.ctrlKey || e.metaKey || e.altKey) return;
 
     const allowedNav = [
@@ -107,7 +110,7 @@ export default function EmployeeAllowanceModal({
     }
   };
 
-  // ✅ Single useEffect
+  // Single useEffect
   useEffect(() => {
     if (!open) return;
 
@@ -144,12 +147,12 @@ export default function EmployeeAllowanceModal({
     loadAllowanceTypes();
   }, [open, initialValues, form]);
 
-  // ✅ build a quick lookup set of already-added types
+  // build a quick lookup set of already-added types
   const addedTypeIds = useMemo(() => {
     return new Set(submittedAllowances.map((a) => a.allowance_type));
   }, [submittedAllowances]);
 
-  // ✅ Add allowance
+  // Add allowance
   const handleAdd = (values: any) => {
     const exists = submittedAllowances.some(
       (a) => a.allowance_type === values.allowance_type
@@ -172,13 +175,15 @@ export default function EmployeeAllowanceModal({
     form.resetFields();
   };
 
-  // ✅ Remove allowance
+  // Remove allowance
   const handleRemove = (typeId: number) => {
+    if (loading) return;
     setSubmittedAllowances((prev) => prev.filter((a) => a.allowance_type !== typeId));
   };
 
-  // ✅ Next step
+  // Next step
   const handleNext = () => {
+    if (loading) return;
     onNext(submittedAllowances);
   };
 
@@ -189,6 +194,7 @@ export default function EmployeeAllowanceModal({
       footer={null}
       title="Add Allowances"
       width={600}
+      maskClosable={!loading}
     >
       <Form form={form} layout="vertical" onFinish={handleAdd}>
         <Form.Item
@@ -232,6 +238,7 @@ export default function EmployeeAllowanceModal({
             onKeyDown={blockNonNumeric}
             onBeforeInput={blockBeforeInput}
             onPaste={blockPaste}
+            disabled={loading} // block typing while loading
           />
         </Form.Item>
 
@@ -251,7 +258,7 @@ export default function EmployeeAllowanceModal({
           />
         </Form.Item>
 
-        <Button type="primary" htmlType="submit" block>
+        <Button type="primary" htmlType="submit" block disabled={loading}>
           Add Allowance
         </Button>
       </Form>
@@ -271,6 +278,7 @@ export default function EmployeeAllowanceModal({
                   danger
                   type="link"
                   onClick={() => handleRemove(item.allowance_type)}
+                  disabled={loading} // disable while loading
                 >
                   Remove
                 </Button>,
@@ -293,7 +301,12 @@ export default function EmployeeAllowanceModal({
         }}
       >
         <Button onClick={onBack}>Back</Button>
-        <Button type="primary" onClick={handleNext}>
+        <Button
+          type="primary"
+          onClick={handleNext}
+          loading={loading}  // ← show spinner
+          disabled={loading} // ← prevent multiple clicks
+        >
           Next
         </Button>
       </div>

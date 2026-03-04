@@ -4,7 +4,7 @@ from calendar import monthrange
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
-
+from django.db.models import Q
 from shared_model.models import *
 
 #==============PIE CHART DISPLAY HELPERS============================
@@ -137,7 +137,156 @@ def get_monthly_attendance_stats(user, year: int, month: int) -> dict:
         "undertime": undertime_count,
         "overtime": overtime_count,
     }
-    
+
+
+def get_admin_attendance_analytics_for_range(date_from: date, date_to: date) -> dict:
+    """
+    Computes attendance analytics for ALL employees within [date_from, date_to],
+    using the same rules as the admin monthly pie chart:
+    - Future range -> zeros
+    - Clamp end to today
+    - Expected workdays based on Shift_Workday (missing config => workday)
+    - Leave overrides everything (Approved only)
+    - Only APPROVED Attendance_Event counts
+    - Absent is computed from expected workdays per employee:
+        absent if no Attendance row OR status == ABSENT
+    - Present if attendance exists and no higher-priority approved events
+    - Priority: Overtime > Undertime > Late > Present
+    """
+
+    today = timezone.localdate()
+
+    if date_from > today:
+        return {
+            "start_date": date_from,
+            "end_date": date_to,
+            "present": 0,
+            "late": 0,
+            "absent": 0,
+            "leave": 0,
+            "undertime": 0,
+            "overtime": 0,
+        }
+
+    if date_from <= today <= date_to:
+        date_to = today
+
+    # employee population (same filter as your admin stats)
+    employees_qs = (
+        Employee.objects
+        .select_related("shift")
+        .filter(is_active=True)
+        .exclude(Q(position__iexact="CEO") | Q(user__role__iexact="SUPER_ADMIN"))
+        .exclude(Q(user__isnull=False) & Q(user__is_active=False))
+    )
+    employees = list(employees_qs)
+    employee_ids = [e.id for e in employees]
+
+    # build date list
+    dates = []
+    d = date_from
+    while d <= date_to:
+        dates.append(d)
+        d += timedelta(days=1)
+
+    # workday config map: (shift_id, day_of_week) -> is_workday
+    shift_ids = list({getattr(e.shift, "id", None) for e in employees if getattr(e, "shift", None)})
+    workday_rows = Shift_Workday.objects.filter(shift_id__in=shift_ids).values_list(
+        "shift_id", "day_of_week", "is_workday"
+    )
+    workday_map = {(sid, dow): is_work for sid, dow, is_work in workday_rows}
+
+    # expected dates per shift
+    expected_by_shift = {}
+    for sid in shift_ids:
+        expected = set()
+        for dt in dates:
+            dow = dt.weekday() + 1  # 1..7
+            is_workday = workday_map.get((sid, dow), True)
+            if is_workday:
+                expected.add(dt)
+        expected_by_shift[sid] = expected
+
+    # leave set: (emp_id, date)
+    leave_set = set(
+        Leave_Day.objects.filter(
+            employee_id__in=employee_ids,
+            date__gte=date_from,
+            date__lte=date_to,
+            leave_request__status="Approved",
+        ).values_list("employee_id", "date")
+    )
+
+    # attendance rows: (emp_id, date) -> status
+    att_rows = list(
+        Attendance.objects.filter(
+            employee_id__in=employee_ids,
+            date__gte=date_from,
+            date__lte=date_to,
+        ).values("id", "employee_id", "date", "status")
+    )
+
+    att_map = {}
+    att_ids = []
+    for r in att_rows:
+        key = (r["employee_id"], r["date"])
+        att_map[key] = r["status"]
+        att_ids.append(r["id"])
+
+    # approved events: (emp_id, date) -> set(types)
+    event_map = {}
+    if att_ids:
+        event_rows = Attendance_Event.objects.filter(
+            attendance_id__in=att_ids,
+            approval_status="Approved",
+        ).values_list("attendance__employee_id", "attendance__date", "type")
+
+        for emp_id, dt, t in event_rows:
+            event_map.setdefault((emp_id, dt), set()).add(t)
+
+    counts = {
+        "present": 0,
+        "late": 0,
+        "absent": 0,
+        "leave": 0,
+        "undertime": 0,
+        "overtime": 0,
+    }
+
+    for emp in employees:
+        shift = getattr(emp, "shift", None)
+        if not shift:
+            continue
+
+        expected_dates = expected_by_shift.get(shift.id, set())
+        for dt in expected_dates:
+            key = (emp.id, dt)
+
+            # Leave overrides
+            if key in leave_set:
+                counts["leave"] += 1
+                continue
+
+            status = att_map.get(key)
+
+            # Absent if missing row OR explicit ABSENT
+            if status is None or status == "ABSENT":
+                counts["absent"] += 1
+                continue
+
+            # At this point: not leave, not absent, attendance exists
+            counts["present"] += 1
+
+            types = event_map.get(key, set())
+            if "Late" in types:
+                counts["late"] += 1
+            if "Undertime" in types:
+                counts["undertime"] += 1
+            if "Overtime" in types:
+                counts["overtime"] += 1
+
+    return {"start_date": date_from, "end_date": date_to, **counts}
+
 # ====================== HELPERS ======================
 EARLY_PUNCH_IN_MINUTES = 60
 

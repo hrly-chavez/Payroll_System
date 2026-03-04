@@ -77,13 +77,19 @@ const EditEmployeeContributionsModal: React.FC<Props> = ({
           for (const saved of initialValues) {
             const idx = computed.findIndex((d: any) => d.id === saved.deduction_type);
             if (idx !== -1) {
-              indexed[idx] = { amount: saved.amount, frequency: saved.frequency };
+              indexed[idx] = { 
+                amount: saved.amount ?? computed[idx].computed_amount, // fallback
+                frequency: saved.frequency ?? "Per Period" // fallback
+              };
             }
           }
         } else {
           computed.forEach((d: any, idx: number) => {
             if (isMandatoryCode(d.code)) {
-              indexed[idx] = { amount: d.computed_amount, frequency: "Per Period" };
+              indexed[idx] = {
+                amount: indexed[idx]?.amount ?? d.computed_amount,
+                frequency: indexed[idx]?.frequency ?? "Per Period",
+              };
             }
           });
         }

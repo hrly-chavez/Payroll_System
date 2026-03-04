@@ -161,9 +161,6 @@ class AddressSerializer(serializers.ModelSerializer):
         ]
 
 
-# =========================
-# Employee Create Serializer
-# =========================
 class EmployeeCreateSerializer(serializers.ModelSerializer):
     address = AddressSerializer()
 
@@ -181,18 +178,15 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
     def sanitize_string(self, value):
         if not value:
             return value
-
         value = value.strip()
-        value = strip_tags(value)          # remove html tags
+        value = strip_tags(value)          # remove HTML tags
         value = re.sub(r"[<>]", "", value) # remove < >
         value = re.sub(r"\s+", " ", value) # normalize spaces
-
         return value
 
     # -------------------------
     # FIELD VALIDATIONS
     # -------------------------
-
     def validate_fname(self, value):
         return self.sanitize_string(value)
 
@@ -213,51 +207,51 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
 
     def validate_contact_no(self, value):
         value = self.sanitize_string(value)
-
-        if not re.match(r"^[0-9]{10,12}$", value):
-            raise serializers.ValidationError(
-                "Contact number must be 10-12 digits."
-            )
+        if not re.match(r"^\d{11}$", value):
+            raise serializers.ValidationError("Contact number must be exactly 11 digits.")
         return value
 
     def validate_email(self, value):
         value = self.sanitize_string(value)
-
         if "<" in value or ">" in value:
             raise serializers.ValidationError("Invalid email format.")
-
         return value.lower()
 
     def validate_hired_date(self, value):
         if value < date.today():
-            raise serializers.ValidationError(
-                "Hired date cannot be in the past."
-            )
+            raise serializers.ValidationError("Hired date cannot be in the past.")
+        return value
+
+    # -------------------------
+    # ADDRESS VALIDATION
+    # -------------------------
+    def validate_address(self, value):
+        for key, val in value.items():
+            if isinstance(val, str):
+                sanitized = self.sanitize_string(val)
+                # Additional numeric validation for zip code
+                if key == "zip_code" and sanitized and not sanitized.isdigit():
+                    raise serializers.ValidationError({"zip_code": "Zip code must contain digits only."})
+                value[key] = sanitized
         return value
 
     # -------------------------
     # CREATE METHOD
     # -------------------------
     def create(self, validated_data):
-        # extract _current_user if passed from view
         user = validated_data.pop("_current_user", None)
         address_data = validated_data.pop("address")
 
-        # Create Address instance manually
         address = Address(**address_data)
         if user:
-            address._current_user = user  # attach user for audit
-        address.save()  # triggers post_save, AuditLog sees _current_user
+            address._current_user = user
+        address.save()
 
-        # Instantiate Employee manually
         employee = Employee(**validated_data)
         employee.address = address
-
         if user:
             employee._current_user = user
-
-        employee.save()  # triggers post_save, AuditLog sees _current_user
-
+        employee.save()
         return employee
    
 class EmployeeUpdateSerializer(serializers.ModelSerializer):
@@ -360,13 +354,19 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
-        employee = data["employee"]
-        deduction_type = data.get("deduction_type")
+        # Support PATCH (partial update)
+        employee = data.get("employee") or getattr(self.instance, "employee", None)
+        deduction_type = data.get("deduction_type") or getattr(self.instance, "deduction_type", None)
+
+        if not employee:
+            raise serializers.ValidationError("employee is required")
 
         if not deduction_type:
-            raise serializers.ValidationError(
-                "deduction_type is required"
-            )
+            raise serializers.ValidationError("deduction_type is required")
+
+        # If only status is being updated → skip salary recalculation
+        if set(data.keys()) == {"status"}:
+            return data
 
         # Get latest salary
         salary = (
@@ -391,7 +391,7 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
 
         if not deduction_type:
             raise serializers.ValidationError(
-                f"Salary not valid for {data['deduction_type'].code}"
+                f"Salary not valid for {deduction_type.code}"
             )
 
         # Compute amount

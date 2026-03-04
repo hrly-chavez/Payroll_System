@@ -894,6 +894,39 @@ class EmployeeDeductionViewSet(viewsets.ModelViewSet):
         ]
 
         return Response(data)
+
+    @action(detail=False, methods=["post"], url_path="replace")
+    def replace_deductions(self, request):
+        employee_id = request.data.get("employee")
+        deductions = request.data.get("deductions", [])
+
+        if not employee_id:
+            return Response({"detail": "employee is required"}, status=400)
+
+        if not isinstance(deductions, list) or not deductions:
+            return Response({"detail": "deductions list is required"}, status=400)
+
+        with transaction.atomic():
+            # 1. Deactivate all active deductions
+            Employee_Deduction.objects.filter(
+                employee_id=employee_id,
+                status="Active"
+            ).update(status="Inactive")
+
+            # 2. Create new deductions
+            created = []
+            for item in deductions:
+                serializer = EmployeeDeductionCreateSerializer(
+                    data=item
+                )
+                serializer.is_valid(raise_exception=True)
+                obj = serializer.save(_current_user=request.user)
+                created.append(serializer.data)
+
+        return Response(
+            {"detail": "Deductions replaced successfully", "data": created},
+            status=status.HTTP_201_CREATED,
+        )
 #done logs
 #--------------------- ALLOWANCE
 class EmployeeAllowanceViewSet(viewsets.ModelViewSet):

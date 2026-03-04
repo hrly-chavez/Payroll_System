@@ -27,6 +27,8 @@ interface Props {
   onClose: () => void;
 }
 
+const MIN_DAILY_WAGE = 500; // Cebu reference minimum daily wage
+
 const EditEmployeeSalaryModal: React.FC<Props> = ({
   open,
   employeeId,
@@ -36,10 +38,28 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [existingSalary, setExistingSalary] = useState<any | null>(null);
-
   const [contributionsOpen, setContributionsOpen] = useState(false);
   const [newSalaryBase, setNewSalaryBase] = useState<number | null>(null);
   const [initialDeductions, setInitialDeductions] = useState<any[]>([]);
+
+  const payType = Form.useWatch("pay_type", form);
+  const baseRate = Form.useWatch("base_rate", form);
+
+  // Function to calculate wage_type dynamically
+  const calculateWageType = (pay_type: string, base_rate: number) => {
+    if (!pay_type || !base_rate) return undefined;
+    let dailyEquivalent = 0;
+    if (pay_type === "Monthly") dailyEquivalent = base_rate / 20;
+    else if (pay_type === "Daily") dailyEquivalent = base_rate;
+    else if (pay_type === "Hourly") dailyEquivalent = base_rate * 8;
+    return dailyEquivalent >= MIN_DAILY_WAGE ? "ABOVE_MINIMUM" : "MINIMUM";
+  };
+
+  // Auto-update wage_type whenever pay_type or base_rate changes
+  useEffect(() => {
+    const wageType = calculateWageType(payType, baseRate);
+    if (wageType) form.setFieldsValue({ wage_type: wageType });
+  }, [payType, baseRate]);
 
   // Fetch latest salary on open
   useEffect(() => {
@@ -56,6 +76,7 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
         form.setFieldsValue({
           pay_type: res.data.pay_type,
           base_rate: res.data.base_rate,
+          wage_type: calculateWageType(res.data.pay_type, res.data.base_rate),
           effective_from: dayjs(res.data.effective_from),
         });
       } catch (err: any) {
@@ -75,46 +96,35 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
       const values = await form.validateFields();
       setLoading(true);
 
-      if (existingSalary) {
-        // 🔥 1️⃣ Update salary
-        await api.post("/employees/salaries/edit/", {
-          employee: employeeId,
-          pay_type: values.pay_type,
-          base_rate: values.base_rate,
-          effective_from: values.effective_from.format("YYYY-MM-DD"),
-          reason: values.reason,
-        });
+      const payload = {
+        employee: employeeId,
+        pay_type: values.pay_type,
+        base_rate: values.base_rate,
+        wage_type: values.wage_type, // include auto-calculated wage_type
+        effective_from: values.effective_from.format("YYYY-MM-DD"),
+        reason: values.reason,
+      };
 
+      if (existingSalary) {
+        await api.post("/employees/salaries/edit/", payload);
         message.success("Salary updated successfully");
 
-        // 🔥 2️⃣ Fetch current active deductions
+        // Fetch current active deductions
         const deductionsRes = await api.get(
           `/employees/deductions/?employee=${employeeId}`
         );
 
         setInitialDeductions(deductionsRes.data);
         setNewSalaryBase(values.base_rate);
-
-        // 🔥 3️⃣ Open contributions modal
         setContributionsOpen(true);
-
       } else {
-        // 🔥 First salary creation
-        const res = await api.post("/employees/salaries/", {
-          employee: employeeId,
-          pay_type: values.pay_type,
-          base_rate: values.base_rate,
-          effective_from: values.effective_from.format("YYYY-MM-DD"),
-          reason: values.reason,
-        });
-
+        const res = await api.post("/employees/salaries/", payload);
         message.success("Salary saved successfully");
 
         setNewSalaryBase(res.data.base_rate);
         setInitialDeductions([]);
         setContributionsOpen(true);
       }
-
     } catch (err: any) {
       message.error(err.response?.data?.message || "Failed to save salary");
     } finally {
@@ -132,11 +142,7 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
         destroyOnClose
       >
         <Form layout="vertical" form={form}>
-          <Form.Item
-            name="pay_type"
-            label="Pay Type"
-            rules={[{ required: true }]}
-          >
+          <Form.Item name="pay_type" label="Pay Type" rules={[{ required: true }]}>
             <Select
               options={[
                 { label: "Monthly", value: "Monthly" },
@@ -146,12 +152,17 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
             />
           </Form.Item>
 
-          <Form.Item
-            name="base_rate"
-            label="Base Rate"
-            rules={[{ required: true }]}
-          >
+          <Form.Item name="base_rate" label="Base Rate" rules={[{ required: true }]}>
             <InputNumber style={{ width: "100%" }} min={0} />
+          </Form.Item>
+
+          <Form.Item name="wage_type" label="Wage Type" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { label: "Minimum Wage", value: "MINIMUM" },
+                { label: "Above Minimum Wage", value: "ABOVE_MINIMUM" },
+              ]}
+            />
           </Form.Item>
 
           <Form.Item
@@ -165,14 +176,9 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
           <Form.Item
             label="Reason for Change"
             name="reason"
-            rules={[
-              { required: true, message: "Please provide a reason for this change" },
-            ]}
+            rules={[{ required: true, message: "Please provide a reason for this change" }]}
           >
-            <Input.TextArea
-              rows={3}
-              placeholder="Why are you making these changes?"
-            />
+            <Input.TextArea rows={3} placeholder="Why are you making these changes?" />
           </Form.Item>
 
           <Button type="primary" block loading={loading} onClick={handleSubmit}>
@@ -181,7 +187,7 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
         </Form>
       </Modal>
 
-      {/* 🔥 Contributions Modal (for BOTH create & edit) */}
+      {/* Contributions Modal */}
       {newSalaryBase !== null && (
         <EditEmployeeContributionsModal
           open={contributionsOpen}
@@ -196,18 +202,12 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
                 employee: employeeId,
                 deductions: deductions,
               });
-
               message.success("Contributions updated successfully");
-
               setContributionsOpen(false);
               onSuccess();
               onClose();
-
             } catch (err: any) {
-              message.error(
-                err.response?.data?.detail ||
-                "Failed to save contributions"
-              );
+              message.error(err.response?.data?.detail || "Failed to save contributions");
             }
           }}
         />

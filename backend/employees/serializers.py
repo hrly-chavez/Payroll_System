@@ -337,11 +337,23 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
         return instance
   
 #for salary
+MIN_DAILY_WAGE = 500
+
+def calculate_wage_type(pay_type, base_rate):
+    daily_equivalent = 0
+    if pay_type == "Monthly":
+        daily_equivalent = base_rate / 20
+    elif pay_type == "Daily":
+        daily_equivalent = base_rate
+    elif pay_type == "Hourly":
+        daily_equivalent = base_rate * 8
+    return "ABOVE_MINIMUM" if daily_equivalent >= MIN_DAILY_WAGE else "MINIMUM"
+
 class EmployeeSalarySerializer(serializers.ModelSerializer):
     reason = serializers.CharField(write_only=True, required=False)
     class Meta:
         model = Employee_Salary
-        fields = ["id", "employee", "pay_type", "base_rate", "effective_from", "created_at", "reason", ]
+        fields = ["id", "employee", "pay_type", "base_rate", "wage_type", "effective_from", "created_at", "reason", ]
 
     def validate(self, attrs):
         # Ensure unique salary per employee per effective_from
@@ -352,28 +364,35 @@ class EmployeeSalarySerializer(serializers.ModelSerializer):
                 "A salary for this employee starting from this date already exists."
             )
         return attrs
-    
+
     def create(self, validated_data):
-        # Get current user from context
         user = self.context.get("_current_user")
         reason = validated_data.pop("reason", None)
+
+        # Calculate wage_type based on pay_type and base_rate
+        pay_type = validated_data.get("pay_type")
+        base_rate = validated_data.get("base_rate")
+        validated_data["wage_type"] = calculate_wage_type(pay_type, base_rate)
+
         instance = Employee_Salary(**validated_data)
         if user:
-            instance._current_user = user  # attach for AuditLog
-            instance._audit_reason = reason or f"Salary created by {user.user_name}" if user else None
-        # Attach reason for audit , optional just checking if theres a reason
+            instance._current_user = user
+            instance._audit_reason = reason or f"Salary created by {user.user_name}"
         if reason:
             setattr(instance, "_audit_reason", reason)
         
         instance.save()
-
-        
         return instance
 
     def update(self, instance, validated_data):
         user = self.context.get("_current_user")
         reason = validated_data.pop("reason", None)
-        
+
+        # Recalculate wage_type if pay_type or base_rate changed
+        pay_type = validated_data.get("pay_type", instance.pay_type)
+        base_rate = validated_data.get("base_rate", instance.base_rate)
+        validated_data["wage_type"] = calculate_wage_type(pay_type, base_rate)
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         if user:

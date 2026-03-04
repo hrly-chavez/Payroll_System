@@ -221,10 +221,16 @@ class Employee_Salary(models.Model):
         ("Hourly","Hourly"),
     ]
 
+    WAGE_TYPES = [
+        ("MINIMUM", "Minimum Wage"),
+        ("ABOVE_MINIMUM", "Above Minimum Wage"),
+    ]
+
     id = models.AutoField(primary_key=True)
     pay_type =  models.CharField(max_length=20, choices=PAY_TYPES)
     #per_day = models.IntegerField()
     base_rate = models.DecimalField(max_digits=12, decimal_places=2)
+    wage_type = models.CharField(max_length=20, choices=WAGE_TYPES, default="ABOVE_MINIMUM", help_text="Indicates if employee is minimum wage or above minimum wage")
     effective_from = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True,null=True,
     blank=True)

@@ -8,6 +8,11 @@ urlpatterns = [
     path("superadmin/pay-rules/", SuperAdminPayRuleListCreateView.as_view(), name="superadmin-payrule-list-create"),
     path("superadmin/pay-rules/<int:pk>/", SuperAdminPayRuleRetrieveUpdateView.as_view(), name="superadmin-payrule-detail"),
     
+    # Payroll Tax Bracket
+    path("superadmin/payroll-tax-brackets/", SuperAdminPayrollTaxBracketListCreateView.as_view()),
+    path("superadmin/payroll-tax-brackets/<int:pk>/", SuperAdminPayrollTaxBracketRetrieveUpdateView.as_view()),
+    path("superadmin/payroll-tax-brackets/choices/", PayrollTaxBracketChoicesView.as_view()),
+    
     # Commission Rules (Pay_Rule)
     path("superadmin/commission-tax-rules/", SuperAdminCommissionTaxRuleListCreateView.as_view()),
     path("superadmin/commission-tax-rules/<int:pk>/", SuperAdminCommissionTaxRuleRetrieveUpdateView.as_view()),

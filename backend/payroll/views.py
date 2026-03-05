@@ -92,14 +92,12 @@ def _set_payroll_approved_at(payroll: Payroll, now_dt):
         payroll.approved_at = now_dt.date()
 #==========================================DEDUCTIONS========================================
 # List and Create
-#done logs
 class DeductionListCreateView(generics.ListCreateAPIView):
     queryset = Deduction_Type.objects.all().order_by('-create_at')
     serializer_class = DeductionTypeSerializer
     permission_classes = [IsAuthenticated]
 
 # Retrieve, Update, Delete
-#done logs
 class DeductionDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Deduction_Type.objects.all()
     serializer_class = DeductionTypeSerializer
@@ -216,7 +214,6 @@ class DeductionDetailView(generics.RetrieveUpdateDestroyAPIView):
                     print(f"[DEBUG] Deactivated deduction for {employee.fname}")
 
 # Optional: Update only 'is_active' status
-#done logs
 class DeductionUpdateStatusView(APIView):
     def patch(self, request, pk):
         try:
@@ -656,6 +653,70 @@ class CommissionTaxRuleChoicesView(APIView):
             ],
         }, status=http_status.HTTP_200_OK)
 
+#==========================================PAYROLL TAX RULE========================================
+
+class SuperAdminPayrollTaxBracketListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PayrollTaxBracketSerializer
+
+    def get_queryset(self):
+        return Payroll_Tax_Bracket.objects.all().order_by("-id")
+
+    def perform_create(self, serializer):
+        # Extra guard (model.clean + serializer.validate already cover this)
+        effective_from = serializer.validated_data.get("effective_from")
+        effective_to = serializer.validated_data.get("effective_to")
+        if effective_to and effective_from and effective_to < effective_from:
+            raise ValidationError({"detail": "effective_to cannot be earlier than effective_from."})
+
+        min_amount = serializer.validated_data.get("min_amount")
+        max_amount = serializer.validated_data.get("max_amount")
+        if max_amount is not None and min_amount is not None and max_amount < min_amount:
+            raise ValidationError({"detail": "max_amount cannot be less than min_amount."})
+
+        serializer.save()
+
+class SuperAdminPayrollTaxBracketRetrieveUpdateView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PayrollTaxBracketSerializer
+    queryset = Payroll_Tax_Bracket.objects.all()
+
+    def perform_update(self, serializer):
+        effective_from = serializer.validated_data.get("effective_from", serializer.instance.effective_from)
+        effective_to = serializer.validated_data.get("effective_to", serializer.instance.effective_to)
+
+        if effective_to and effective_from and effective_to < effective_from:
+            raise ValidationError({"detail": "effective_to cannot be earlier than effective_from."})
+
+        min_amount = serializer.validated_data.get("min_amount", serializer.instance.min_amount)
+        max_amount = serializer.validated_data.get("max_amount", serializer.instance.max_amount)
+
+        if max_amount is not None and min_amount is not None and max_amount < min_amount:
+            raise ValidationError({"detail": "max_amount cannot be less than min_amount."})
+
+        serializer.save()
+
+class PayrollTaxBracketChoicesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        rate_type_choices = [
+            {"value": value, "label": label}
+            for value, label in Payroll_Tax_Bracket.RATE_TYPE_CHOICES
+        ]
+
+        apply_mode_choices = [
+            {"value": value, "label": label}
+            for value, label in Payroll_Tax_Bracket.APPLY_MODE_CHOICES
+        ]
+
+        return Response(
+            {
+                "rate_type_choices": rate_type_choices,
+                "apply_mode_choices": apply_mode_choices,
+            }
+        )
+
 #======================================PAYROLL GENERATION========================================
 
 class GeneratePayrollForPeriodView(APIView):
@@ -767,6 +828,7 @@ class PayrollEmployeeResultView(APIView):
             "basic_pay": payroll.basic_pay,
             "total_earnings": payroll.total_earnings,
             "total_deductions": payroll.total_deductions,
+            "net_before_excess_tax": payroll.net_before_excess_tax,
             "net_pay": payroll.net_pay,
 
             "lines": lines_qs,

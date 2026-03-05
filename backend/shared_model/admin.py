@@ -469,3 +469,5 @@ class CommissionTaxRuleAdmin(admin.ModelAdmin):
     list_filter = ("commission_type", "rate_type", "is_active", "effective_from", "applies_to")
     search_fields = ("name", "commission_type__name", "employee__fname", "employee__lname", "applies_to__name")
     ordering = ("-id",)
+
+admin.site.register(Payroll_Tax_Bracket)

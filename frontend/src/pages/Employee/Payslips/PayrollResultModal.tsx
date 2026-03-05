@@ -58,6 +58,7 @@ type PayrollResult = {
   basic_pay: string;
   total_earnings: string;
   total_deductions: string;
+  net_before_excess_tax: string; 
   net_pay: string;
 
   lines: PayslipLine[];
@@ -401,6 +402,21 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
                 <Descriptions.Item label="Basic Pay">{money(result?.basic_pay)}</Descriptions.Item>
                 <Descriptions.Item label="Total Earnings">{money(result?.total_earnings)}</Descriptions.Item>
                 <Descriptions.Item label="Total Deductions">{money(result?.total_deductions)}</Descriptions.Item>
+                {(() => {
+                const nbet = Number(result?.net_before_excess_tax ?? 0);
+                const net = Number(result?.net_pay ?? 0);
+
+                // show ONLY if excess tax affected net pay
+                if (!Number.isFinite(nbet) || !Number.isFinite(net)) return null;
+                if (Math.abs(nbet - net) < 0.0001) return null;
+
+                return (
+                  <Descriptions.Item label="Net Before Excess Tax">
+                    {money(result?.net_before_excess_tax)}
+                  </Descriptions.Item>
+                );
+              })()}
+
                 <Descriptions.Item label="Net Pay">
                   <span style={{ fontWeight: 700 }}>{money(result?.net_pay)}</span>
                 </Descriptions.Item>

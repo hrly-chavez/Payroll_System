@@ -15,6 +15,10 @@
         Payslip
 
         Reports & analytics
+        
+        Commission Rule
+
+        Tax bracket
 
 Rule:
 

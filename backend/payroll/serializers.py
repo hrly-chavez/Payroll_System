@@ -7,7 +7,7 @@ from rest_framework.validators import UniqueValidator
 from rest_framework.exceptions import ValidationError
 from decimal import Decimal
 from django.db import models
-
+from decimal import Decimal
 
 #  salary/amount numeric-like: must contain at least 1 digit, and only digits/comma/dot
 NUMERIC_LIKE_REGEX = re.compile(r"^(?=.*\d)[0-9.,]+$")
@@ -330,8 +330,6 @@ class PayrollPeriodEmployeeCommissionCreateSerializer(serializers.ModelSerialize
 
 #==========================================PAYRULE ========================================
 
-from decimal import Decimal
-
 class PayRuleSerializer(serializers.ModelSerializer):
     #  override name field validator + message here
     name = serializers.CharField(
@@ -516,12 +514,114 @@ class CommissionTaxRuleSerializer(serializers.ModelSerializer):
                 })
 
         return attrs
+
+#==========================================PAYROLL TAX RULE========================================
+
+class PayrollTaxBracketSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(
+        max_length=100,
+        validators=[
+            UniqueValidator(
+                queryset=Payroll_Tax_Bracket.objects.all(),
+                message="A payroll tax bracket with this name already exists. Please choose a different name.",
+            )
+        ],
+    )
+
+    applies_to_name = serializers.CharField(source="applies_to.name", read_only=True)
+    employee_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Payroll_Tax_Bracket
+        fields = "__all__"
+
+    def validate(self, attrs):
+        # Use incoming values, fall back to instance values on update
+        applies_to = attrs.get("applies_to", getattr(self.instance, "applies_to", None))
+        employee = attrs.get("employee", getattr(self.instance, "employee", None))
+
+        min_amount = attrs.get("min_amount", getattr(self.instance, "min_amount", None))
+        max_amount = attrs.get("max_amount", getattr(self.instance, "max_amount", None))
+
+        effective_from = attrs.get("effective_from", getattr(self.instance, "effective_from", None))
+        effective_to = attrs.get("effective_to", getattr(self.instance, "effective_to", None))
+
+        rate_type = attrs.get("rate_type", getattr(self.instance, "rate_type", None))
+        rate_value = attrs.get("rate_value", getattr(self.instance, "rate_value", None))
+
+        # Scope validation
+        if applies_to and employee:
+            raise ValidationError(
+                {
+                    "applies_to": ["Choose either Department or Employee, not both."],
+                    "employee": ["Choose either Department or Employee, not both."],
+                }
+            )
+
+        # Amount range validation
+        if max_amount is not None and min_amount is not None and max_amount < min_amount:
+            raise ValidationError({"max_amount": ["max_amount cannot be less than min_amount."]})
+
+        # Date validation
+        if effective_to and effective_from and effective_to < effective_from:
+            raise ValidationError({"effective_to": ["effective_to cannot be earlier than effective_from."]})
+
+        # Rate validation
+        if rate_value is not None:
+            try:
+                rv = Decimal(str(rate_value))
+            except Exception:
+                raise ValidationError({"rate_value": ["Invalid rate value."]})
+
+            if rv < 0:
+                raise ValidationError({"rate_value": ["Rate value cannot be negative."]})
+
+            # Since your percent is stored as "15" for 15%, we only enforce non-negative.
+            # If you want, you can add an upper bound later (e.g. <= 100).
+            if rate_type == "PERCENT":
+                if rv < 0:
+                    raise ValidationError({"rate_value": ["Percent rate_value cannot be negative."]})
+                if rv > Decimal("1"):
+                    raise ValidationError({"rate_value": ["Percent rate_value cannot be greater than 1.00 (100%)."]})
+
+        return attrs
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
+        instance = Payroll_Tax_Bracket(**validated_data)
+
+        if user:
+            instance._current_user = user
+
+        # Runs model.clean() too because your model save() calls full_clean()
+        instance.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        if user:
+            instance._current_user = user
+
+        instance.save()
+        return instance
+
+    def get_employee_name(self, obj):
+        if obj.employee:
+            return f"{obj.employee.fname} {obj.employee.lname}".strip()
+        return None
+    
 #==========================================PAYROLL GENERATION===========================
 
 class GeneratePayrollPeriodResponseSerializer(serializers.Serializer):
     detail = serializers.CharField()
     generated = serializers.IntegerField()
-
 
 class GeneratePayrollEmployeeResponseSerializer(serializers.Serializer):
     detail = serializers.CharField()
@@ -680,3 +780,5 @@ class PayrollPeriodEmployeeSerializer(serializers.ModelSerializer):
 
     def get_approved_by_name(self, obj):
         return str(obj.approved_by) if obj.approved_by else ""
+
+        

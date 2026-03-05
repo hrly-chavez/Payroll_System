@@ -543,13 +543,14 @@ class EmployeeAllowanceCreateSerializer(serializers.ModelSerializer):
         return data
     
     def create(self, validated_data):
-        user = self.context.get("_current_user")
+        user = validated_data.pop("_current_user", None)
 
-        instance = Employee_Allowance.objects.create(**validated_data)
+        instance = Employee_Allowance(**validated_data)
 
-        # attach user for audit logging
         if user:
             instance._current_user = user
+
+        instance.save()
 
         return instance
 

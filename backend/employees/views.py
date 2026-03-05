@@ -549,12 +549,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
         for a in allowances_data:
             a["employee"] = employee.id
-            serializer = EmployeeAllowanceCreateSerializer(
-                data=a,
-                context={"_current_user": signed_in_user}
-            )
+            serializer = EmployeeAllowanceCreateSerializer(data=a)
             serializer.is_valid(raise_exception=True)
-            serializer.save()
+            serializer.save(_current_user=signed_in_user)
             
         return Response({
             "message": "Employee created successfully",

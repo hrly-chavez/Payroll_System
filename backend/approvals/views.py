@@ -22,7 +22,7 @@ class HolidayListView(generics.ListAPIView):
     serializer_class = HolidaySerializer
     # public access → no permission_classes
 
-#done logs
+
 class HolidayCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Holiday.objects.all()
@@ -64,7 +64,7 @@ class HolidayCreateView(generics.CreateAPIView):
             )
         Notification.objects.bulk_create(notifications)
 
-#done logs
+
 class HolidayUpdateStatusView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -135,7 +135,7 @@ class LeaveTypeListView(generics.ListAPIView):
     serializer_class = LeaveTypeSerializer
 
 
-# views.py
+
 class LeaveTypeCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Leave_Type.objects.all()

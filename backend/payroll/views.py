@@ -818,6 +818,7 @@ class PayrollEmployeeResultView(APIView):
             "basic_pay": payroll.basic_pay,
             "total_earnings": payroll.total_earnings,
             "total_deductions": payroll.total_deductions,
+            "net_before_excess_tax": payroll.net_before_excess_tax,
             "net_pay": payroll.net_pay,
 
             "lines": lines_qs,

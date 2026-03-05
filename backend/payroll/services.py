@@ -192,6 +192,167 @@ class PayrollGenerationService:
 
         return best
 
+    def _get_payroll_tax_brackets(self, employee: Employee, department: Department, period: Payroll_Period) -> list[Payroll_Tax_Bracket]:
+        """
+        Load ACTIVE payroll tax brackets overlapping the payroll period.
+
+        We will select the best match during computation:
+        - priority: employee-specific > department-specific > global
+        - within same priority: newest effective_from wins (via ordering)
+        """
+        qs = Payroll_Tax_Bracket.objects.filter(is_active=True)
+
+        # overlaps payroll period
+        qs = qs.filter(effective_from__lte=period.end_date).filter(
+            Q(effective_to__isnull=True) | Q(effective_to__gte=period.start_date)
+        )
+
+        # scope candidates only (employee/department/global)
+        qs = qs.filter(
+            Q(employee=employee) |
+            Q(employee__isnull=True, applies_to=department) |
+            Q(employee__isnull=True, applies_to__isnull=True)
+        )
+
+        return list(qs.select_related("applies_to", "employee").order_by("-effective_from", "-id"))
+
+
+    def _pick_payroll_tax_bracket(self,brackets: list[Payroll_Tax_Bracket],taxable_amount: Decimal,employee: Employee,department: Department,) -> Payroll_Tax_Bracket | None:
+        """
+        Pick the single best matching bracket for the taxable_amount.
+
+        Range match:
+        - min_amount <= amount <= max_amount (max null = infinity)
+
+        Priority:
+        3) employee
+        2) department
+        1) global
+
+        Tie-break:
+        - newest effective_from wins (brackets already ordered by -effective_from, -id)
+        """
+        INF = Decimal("999999999999")
+        amt = _safe_decimal(taxable_amount, "taxable_amount")
+
+        best = None
+        best_pr = -1
+
+        for b in brackets:
+            b_min = _safe_decimal(b.min_amount or 0, "min_amount")
+            b_max = _safe_decimal(b.max_amount, "max_amount") if b.max_amount is not None else INF
+
+            if amt < b_min or amt > b_max:
+                continue
+
+            if b.employee_id == employee.id:
+                pr = 3
+            elif b.employee_id is None and b.applies_to_id == department.id:
+                pr = 2
+            elif b.employee_id is None and b.applies_to_id is None:
+                pr = 1
+            else:
+                pr = 0
+
+            if pr <= 0:
+                continue
+
+            if pr > best_pr:
+                best = b
+                best_pr = pr
+
+        return best
+
+
+    def _compute_payroll_tax_amount(self, bracket: Payroll_Tax_Bracket, taxable_amount: Decimal) -> tuple[Decimal, Decimal]:
+        """
+        Compute payroll tax from a chosen bracket.
+
+        - rate_type:
+            PERCENT: stored as fraction (0.15 means 15%)
+            FIXED: peso amount
+        - apply_mode:
+            EXCESS_ONLY: tax applies only to (taxable_amount - min_amount)
+            ALWAYS: tax applies to full taxable_amount
+        Returns: (tax_amount, rate_applied)
+        """
+        amt = _safe_decimal(taxable_amount, "taxable_amount")
+        rv = _safe_decimal(bracket.rate_value, "rate_value")
+        min_amt = _safe_decimal(bracket.min_amount or 0, "min_amount")
+
+        if bracket.apply_mode == "EXCESS_ONLY":
+            base = amt - min_amt
+            if base < 0:
+                base = DEC_0
+        elif bracket.apply_mode == "ALWAYS":
+            base = amt
+        else:
+            raise ValidationError({"detail": f"Unsupported apply_mode: {bracket.apply_mode}"})
+
+        if bracket.rate_type == "PERCENT":
+            tax = _d2(base * rv)   # IMPORTANT: rv already fraction (0.15)
+            return tax, rv
+
+        if bracket.rate_type == "FIXED":
+            tax = _d2(rv)
+            return tax, rv
+
+        raise ValidationError({"detail": f"Unsupported rate_type: {bracket.rate_type}"})
+
+
+    def _compute_net_before_tax(self, payroll: Payroll) -> Decimal:
+        """
+        Compute net BEFORE payroll tax is applied (used for bracket matching).
+
+        We exclude any existing PAYROLL_TAX_BRACKET lines (defensive),
+        so regeneration / re-run doesn't double-tax if you ever call apply twice.
+        """
+        lines = payroll.payslip_lines.exclude(source_type="PAYROLL_TAX_BRACKET")
+        earnings = DEC_0
+        deductions = DEC_0
+
+        for ln in lines:
+            if ln.line_type == "EARNING":
+                earnings += ln.amount
+            elif ln.line_type == "DEDUCTION":
+                deductions += ln.amount
+
+        return _d2(earnings - deductions)
+
+
+    def _apply_payroll_tax(self, payroll: Payroll, ctx, taxable_amount: Decimal):
+        """
+        Apply payroll tax bracket as a DEDUCTION payslip line.
+
+        - chooses bracket by priority + range match
+        - creates a line linked to payroll_tax_bracket FK
+        """
+        employee = ctx["employee"]
+        department = ctx["department"]
+        period = ctx["period"]
+
+        brackets = self._get_payroll_tax_brackets(employee, department, period)
+        if not brackets:
+            return
+
+        bracket = self._pick_payroll_tax_bracket(brackets, taxable_amount, employee, department)
+        if not bracket:
+            return
+
+        tax_amount, rate_applied = self._compute_payroll_tax_amount(bracket, taxable_amount)
+        if tax_amount <= 0:
+            return
+
+        self._create_line(
+            payroll,
+            "DEDUCTION",
+            f"Withholding Tax ({bracket.name})",
+            tax_amount,
+            source_type="PAYROLL_TAX_BRACKET",
+            source_id=bracket.id,
+            rate_applied=rate_applied,
+            payroll_tax_bracket=bracket,
+        )    
 
     def _compute_commission_tax_amount(self, rule: Commission_Tax_Rule, commission_amount: Decimal) -> tuple[Decimal, Decimal]:
         """
@@ -552,6 +713,20 @@ class PayrollGenerationService:
         self._apply_commissions(payroll=payroll,commissions=ctx["commissions"],employee=ctx["employee"],department=ctx["department"],commission_tax_rules=ctx["commission_tax_rules"],)
         self._apply_deductions(payroll, ctx["deductions"], period)
 
+        # 8.5 compute base BEFORE payroll tax (this is your bracket base)
+        net_before_tax = self._compute_net_before_tax(payroll)
+        payroll.net_before_excess_tax = net_before_tax
+        payroll.save(update_fields=["net_before_excess_tax"])
+
+        # 8.6 apply payroll tax bracket deduction
+        self._apply_payroll_tax(payroll, ctx, net_before_tax)
+
+        # 9 totals (final net_pay includes withholding)
+        self._finalize_totals(payroll)
+
+        # 10 lifecycle
+        self._update_ppe_status(ppe, generated_by_user)
+        
         # 9 totals
         self._finalize_totals(payroll)
 
@@ -1300,66 +1475,6 @@ class PayrollGenerationService:
 
         raise ValidationError({"detail": f"Unknown rate_type: {rule.rate_type}"})
 
-    # -------------------------
-    # Night differential (time overlap 22:00–06:00)
-    #CREATES PER-DAY LINES
-    # -------------------------
-    # def _apply_night_differential(self, payroll, attendance_map, rule_map, rates: Rates, late_dates: set[date]):
-    #     """
-    #     Apply night differential earnings for PRESENT attendance days.
-
-    #     Rule:
-    #     - Uses Pay_Rule ("Night Differential", "Earning")
-    #     - Computes overlap minutes with night window (22:00–06:00)
-    #     - If rule is PER_DAY or FIXED:
-    #         - Voids night diff for that date if the employee was late (late_dates)
-    #     - Otherwise:
-    #         - Uses _compute_rule_amount with minutes as quantity
-    #     """
-    #     rule = rule_map.get(("Night Differential", "Earning"))
-    #     if not rule:
-    #         return
-
-    #     for d, att in attendance_map.items():
-    #         if att.status != "PRESENT":
-    #             continue
-
-    #         minutes = self._night_diff_minutes(att)
-    #         if minutes <= 0:
-    #             continue
-
-    #         # VOID per-day night diff if late on that day
-    #         if rule.rate_type in ("PER_DAY", "FIXED"):
-    #             if d in late_dates:
-    #                 continue
-
-    #             amount = _d2(rule.rate_value)
-    #             self._create_line(
-    #                 payroll,
-    #                 "EARNING",
-    #                 f"Night Differential ({d})",
-    #                 amount,
-    #                 rule=rule,
-    #                 source_type="ATTENDANCE",
-    #                 source_id=att.id,
-    #                 quantity_min=minutes,
-    #                 rate_applied=_safe_decimal(rule.rate_value),
-    #             )
-    #             continue
-
-    #         amount, rate_applied = self._compute_rule_amount(rule, minutes, rates)
-    #         if amount > 0:
-    #             self._create_line(
-    #                 payroll,
-    #                 "EARNING",
-    #                 f"Night Differential ({minutes} min)",
-    #                 amount,
-    #                 rule=rule,
-    #                 source_type="ATTENDANCE",
-    #                 source_id=att.id,
-    #                 quantity_min=minutes,
-    #                 rate_applied=rate_applied,
-    #             )
     def _apply_night_differential(self, payroll, attendance_map, rule_map, rates: Rates, late_dates: set[date]):
         rule = rule_map.get(("Night Differential", "Earning"))
         if not rule:
@@ -1812,6 +1927,7 @@ class PayrollGenerationService:
                 source_id=rule.id,
                 quantity_min=None,
                 rate_applied=rate_applied,
+                commission_tax_rule=rule,
             )
     def _apply_deductions(self, payroll: Payroll, deductions, period: Payroll_Period):
         """
@@ -2007,7 +2123,16 @@ class PayrollGenerationService:
     # -------------------------
     # payslip line creator
     # -------------------------
-    def _create_line(self,payroll: Payroll,line_type: str,description: str,amount: Decimal,rule: Pay_Rule | None = None,source_type: str | None = None,source_id: int | None = None,quantity_min: int | None = None,rate_applied: Decimal | None = None,):
+    def _create_line(self,payroll: Payroll,line_type: str,description: str,
+        amount: Decimal,
+        rule: Pay_Rule | None = None,
+        source_type: str | None = None,
+        source_id: int | None = None,
+        quantity_min: int | None = None,
+        rate_applied: Decimal | None = None,
+        commission_tax_rule: Commission_Tax_Rule | None = None,
+        payroll_tax_bracket: Payroll_Tax_Bracket | None = None,
+    ):
         """
         Compute payable work minutes for the day, clamped to the shift window.
 
@@ -2030,6 +2155,8 @@ class PayrollGenerationService:
             source_id=source_id,
             quantity_min=quantity_min,
             rate_applied=rate_applied,
+            commission_tax_rule=commission_tax_rule,
+            payroll_tax_bracket=payroll_tax_bracket,
         )
 
     def _stringify_error(self, e: ValidationError) -> str:

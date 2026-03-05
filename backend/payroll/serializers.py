@@ -670,6 +670,7 @@ class PayrollResultSerializer(serializers.Serializer):
     basic_pay = serializers.DecimalField(max_digits=12, decimal_places=2)
     total_earnings = serializers.DecimalField(max_digits=12, decimal_places=2)
     total_deductions = serializers.DecimalField(max_digits=12, decimal_places=2)
+    net_before_excess_tax = serializers.DecimalField(max_digits=12, decimal_places=2)
     net_pay = serializers.DecimalField(max_digits=12, decimal_places=2)
 
     lines = PayslipLineSerializer(many=True)

@@ -231,6 +231,7 @@ class Employee_Salary(models.Model):
     #             name="unique_salary_start_per_employee"
     #         )
     #     ]
+ 
        
 class Deduction_Type(models.Model):
    
@@ -871,8 +872,11 @@ class Payslip(models.Model):
     SOURCE_TYPES = [
         ("ATTENDANCE_EVENT", "Attendance Event"),
         ("ATTENDANCE", "Attendance"),
+        ("LEAVE_DAY", "Leave Day"),
         ("MANUAL", "Manual"),
         ("ADJUSTMENT", "Adjustment"),
+        ("COMMISSION_TAX_RULE", "Commission Tax Rule"),
+        ("PAYROLL_TAX_BRACKET", "Payroll Tax Bracket"),
     ]
 
     id = models.AutoField(primary_key=True)

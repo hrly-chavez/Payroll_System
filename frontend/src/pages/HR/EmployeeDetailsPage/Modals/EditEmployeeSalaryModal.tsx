@@ -126,7 +126,27 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
         setContributionsOpen(true);
       }
     } catch (err: any) {
-      message.error(err.response?.data?.message || "Failed to save salary");
+      // DRF error handling
+      let errorMsg = "Failed to save salary";
+
+      if (err.response?.data) {
+        const data = err.response.data;
+
+        if (typeof data === "string") {
+          errorMsg = data;
+        } else if (data.detail) {
+          errorMsg = data.detail;
+        } else if (data.non_field_errors) {
+          errorMsg = data.non_field_errors.join(", ");
+        } else {
+          // Combine field-specific errors
+          errorMsg = Object.entries(data)
+            .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(", ") : value}`)
+            .join("; ");
+        }
+      }
+
+      message.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -170,7 +190,13 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
             label="Effective From"
             rules={[{ required: true }]}
           >
-            <DatePicker style={{ width: "100%" }} />
+            <DatePicker
+              style={{ width: "100%" }}
+              disabledDate={(current) => {
+                // Disable all dates before today
+                return current && current < dayjs().startOf("day");
+              }}
+            />
           </Form.Item>
 
           <Form.Item
@@ -196,19 +222,13 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
           initialValues={initialDeductions}
           onBack={() => setContributionsOpen(false)}
           onClose={() => setContributionsOpen(false)}
-          onNext={async (deductions: any[]) => {
-            try {
-              await api.post("/employees/deductions/replace/", {
-                employee: employeeId,
-                deductions: deductions,
-              });
-              message.success("Contributions updated successfully");
-              setContributionsOpen(false);
-              onSuccess();
-              onClose();
-            } catch (err: any) {
-              message.error(err.response?.data?.detail || "Failed to save contributions");
-            }
+          // Keep onNext only to close the modal or notify parent
+          onNext={(deductions: any[]) => {
+            // Do NOT call API here anymore
+            message.success("Contributions updated successfully");
+            setContributionsOpen(false);
+            onSuccess();
+            onClose();
           }}
         />
       )}

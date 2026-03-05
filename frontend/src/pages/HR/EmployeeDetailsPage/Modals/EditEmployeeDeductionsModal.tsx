@@ -51,6 +51,7 @@ const EditEmployeeContributionsModal: React.FC<Props> = ({
         const res = await api.get(
           `/employees/deductions/deduction-types?salary=${salaryBase}`
         );
+
         const computed = res.data.map((d: any) => ({
           ...d,
           computed_amount: Number(d.amount),
@@ -67,38 +68,23 @@ const EditEmployeeContributionsModal: React.FC<Props> = ({
 
         setEnabledDeductions(Array.from(new Set([...mandatoryIds, ...initialEnabledIds])));
 
-        // map initialValues into correct indexes
-        const indexed: any[] = new Array(computed.length).fill(null).map(() => ({
-          amount: undefined,
-          frequency: undefined,
-        }));
+        // Map initialValues into correct indexes, pre-filling mandatory deductions only
+        const indexed: any[] = computed.map((d: any) => {
+          const saved = initialValues?.find((x) => x.deduction_type === d.id);
+          const mandatory = isMandatoryCode(d.code);
 
-        if (initialValues?.length) {
-          for (const saved of initialValues) {
-            const idx = computed.findIndex((d: any) => d.id === saved.deduction_type);
-            if (idx !== -1) {
-              indexed[idx] = { 
-                amount: saved.amount ?? computed[idx].computed_amount, // fallback
-                frequency: saved.frequency ?? "Per Period" // fallback
-              };
-            }
-          }
-        } else {
-          computed.forEach((d: any, idx: number) => {
-            if (isMandatoryCode(d.code)) {
-              indexed[idx] = {
-                amount: indexed[idx]?.amount ?? d.computed_amount,
-                frequency: indexed[idx]?.frequency ?? "Per Period",
-              };
-            }
-          });
-        }
+          return {
+            amount: saved?.amount ?? (mandatory ? d.computed_amount : undefined),
+            frequency: saved?.frequency ?? (mandatory ? "Per Period" : undefined),
+          };
+        });
 
         form.setFieldsValue({ system_deductions: indexed });
       } catch {
         message.error("Failed to load deductions");
       }
     };
+
     load();
   }, [open, salaryBase, initialValues, form]);
 
@@ -117,7 +103,6 @@ const EditEmployeeContributionsModal: React.FC<Props> = ({
       const values = form.getFieldsValue();
       if (!values.effective_from) throw new Error("Please select Effective From date");
 
-      // Build the deductions payload
       const deductions = deductionTypes
         .map((d, index) => {
           const mandatory = isMandatoryCode(d.code);
@@ -126,6 +111,7 @@ const EditEmployeeContributionsModal: React.FC<Props> = ({
 
           const amount = values.system_deductions?.[index]?.amount;
           const frequency = values.system_deductions?.[index]?.frequency;
+
           if (amount === undefined || frequency === undefined)
             throw new Error(`Please complete amount and frequency for ${d.code}`);
 
@@ -140,13 +126,43 @@ const EditEmployeeContributionsModal: React.FC<Props> = ({
         })
         .filter(Boolean);
 
-      // Pass back selected deductions to parent
-      onNext(deductions as any[]);
+      // Post to backend directly
+      const res = await api.post("/employees/deductions/replace/", {
+        employee: employeeId,
+        deductions,
+      });
+
+      message.success(res.data.detail || "Deductions updated successfully");
+
+      // Call parent onNext if needed
+      onNext(deductions);
     } catch (err: any) {
-      message.error(err.message || "Please complete required fields");
+      // Extract backend errors
+      let errorMsg = "Please complete required fields";
+
+      if (err.response?.data) {
+        const data = err.response.data;
+
+        if (data.non_field_errors && data.non_field_errors.length) {
+          errorMsg = data.non_field_errors.join("; ");
+        } else if (data.detail) {
+          errorMsg = data.detail;
+        } else if (typeof data === "string") {
+          errorMsg = data;
+        } else {
+          errorMsg = Object.entries(data)
+            .map(([key, value]) =>
+              `${key}: ${Array.isArray(value) ? value.join(", ") : value}`
+            )
+            .join("; ");
+        }
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+
+      message.error(errorMsg);
     }
   };
-
   return (
     <Modal
       open={open}

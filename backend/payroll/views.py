@@ -1027,7 +1027,7 @@ class PayrollApproveEmployeeView(APIView):
 
         notifications = []
 
-        # 1️ Notify SUPER_ADMIN
+        # Notify ADMIN
         super_admins = User.objects.filter(role="ADMIN")
         for admin in super_admins:
             notifications.append(
@@ -1121,14 +1121,14 @@ class PayrollDeclineEmployeeView(APIView):
         _recompute_period_status(period)
 
         # Notify HR about declined payroll
-        hr_users = User.objects.filter(role="HR")
+        hr_users = User.objects.filter(role="ADMIN")
         notifications = [
             Notification(
                 user=hr,
                 title="Payroll Declined",
                 description=f"{ppe.employee} payroll for period {period} has been declined. Reason: {reason}",
                 category="payroll",
-                redirect_url="/hr/payrolls",
+                redirect_url="/admin/calendar",
             )
             for hr in hr_users
         ]

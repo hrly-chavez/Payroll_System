@@ -32,6 +32,8 @@ urlpatterns = [
 
     #forgot pass
     path("forgot-password/", ForgotPasswordView.as_view()),
+    #check token
+    path("check-reset-token/<token>/", CheckResetTokenView.as_view()),
     #reset pass
     path("reset-password-confirm/", ResetPasswordConfirmView.as_view()),
 

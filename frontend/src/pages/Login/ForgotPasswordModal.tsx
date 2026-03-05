@@ -23,18 +23,18 @@ const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
     setLoading(true);
 
     try {
-      await api.post("/employees/forgot-password/", {
+      const response = await api.post("/employees/forgot-password/", {
         username: values.username.trim(),
       });
 
-      // 🔐 Always show same message (security)
-      message.success(
-        "If the username exists, a password reset link has been sent."
-      );
-
+      message.success(response.data.detail); // show actual backend message
       onClose();
-    } catch (err) {
-      message.error("Something went wrong. Please try again.");
+    } catch (err: any) {
+      if (err.response?.status === 400) {
+        message.error(err.response.data.detail); // show backend validation
+      } else {
+        message.error("Something went wrong. Please try again.");
+      }
     } finally {
       setLoading(false);
     }

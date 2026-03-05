@@ -5,6 +5,8 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseU
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+import uuid
+from datetime import timedelta
 
 class Province(models.Model):
     name = models.CharField(max_length=100)
@@ -960,4 +962,33 @@ class Notification(models.Model):
     redirect_url = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+class PasswordResetToken(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="password_reset_tokens"
+    )
+
+    token = models.CharField(max_length=255, unique=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    expires_at = models.DateTimeField()
+
+    is_used = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "password_reset_tokens"
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    @classmethod
+    def cleanup_expired(cls):
+        """Delete expired or used tokens to keep the table clean."""
+        cls.objects.filter(
+            expires_at__lt=timezone.now()
+        ).delete()
     

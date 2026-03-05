@@ -239,13 +239,13 @@ class Employee_Salary(models.Model):
     def __str__(self):
         return f"{self.pay_type} {self.base_rate}"
     
-    # class Meta:
-    #     constraints = [
-    #         models.UniqueConstraint(
-    #             fields=["employee", "effective_from"],
-    #             name="unique_salary_start_per_employee"
-    #         )
-    #     ]
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employee", "effective_from"],
+                name="unique_salary_start_per_employee"
+            )
+        ]
        
 class Deduction_Type(models.Model):
    

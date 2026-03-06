@@ -695,31 +695,9 @@ const adminOrderedChartData = [...adminChartData].sort(
         className={styles.mainSection}
         align="top"
       >
-        {/* PENDING REQUESTS */}
-        <Col xs={24} md={16}>
-          <Card title="Pending Request(s)" className={styles.pendingCard}>
-            <Tabs
-              defaultActiveKey="holiday"
-              size="small"
-              className={styles.pendingTabs}
-              items={[
-                {
-                  key: "holiday",
-                  label: "Holiday",
-                  children: <div>Holiday requests here</div>,
-                },
-                {
-                  key: "leave",
-                  label: "Leave",
-                  children: <div>Leave requests here</div>,
-                },
-              ]}
-            />
-              </Card>
-      </Col>
 
       {/* CALENDAR */}
-      <Col xs={24} md={8}>
+      <Col xs={24} md={24}>
         <Card title="Calendar" className={`${styles.compactCard} ${styles.calendarCard}`}>
           <SharedCalendar events={calendarEvents} />
           <CalendarLegendDisplay />

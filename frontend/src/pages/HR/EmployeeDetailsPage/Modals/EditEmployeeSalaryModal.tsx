@@ -42,24 +42,67 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
   const [newSalaryBase, setNewSalaryBase] = useState<number | null>(null);
   const [initialDeductions, setInitialDeductions] = useState<any[]>([]);
 
+  const [divisor, setDivisor] = useState<number>(22);
+
   const payType = Form.useWatch("pay_type", form);
   const baseRate = Form.useWatch("base_rate", form);
 
-  // Function to calculate wage_type dynamically
+  /*
+  --------------------------------
+  FETCH PAYROLL SETTINGS
+  --------------------------------
+  */
+  useEffect(() => {
+    const fetchPayrollSetting = async () => {
+      try {
+        const res = await api.get("/employees/settings/");
+        if (res.data.daily_rate_divisor) {
+          setDivisor(res.data.daily_rate_divisor);
+        }
+      } catch {
+        console.error("Failed to load payroll settings");
+      }
+    };
+
+    fetchPayrollSetting();
+  }, []);
+
+  /*
+  --------------------------------
+  WAGE TYPE CALCULATION
+  --------------------------------
+  */
   const calculateWageType = (pay_type: string, base_rate: number) => {
     if (!pay_type || !base_rate) return undefined;
-    let dailyEquivalent = 0;
-    if (pay_type === "Monthly") dailyEquivalent = base_rate / 20;
-    else if (pay_type === "Daily") dailyEquivalent = base_rate;
-    else if (pay_type === "Hourly") dailyEquivalent = base_rate * 8;
-    return dailyEquivalent >= MIN_DAILY_WAGE ? "ABOVE_MINIMUM" : "MINIMUM";
+
+    let monthlyEquivalent = 0;
+
+    if (pay_type === "Monthly") {
+      monthlyEquivalent = base_rate;
+    } else if (pay_type === "Daily") {
+      monthlyEquivalent = base_rate * divisor;
+    } else if (pay_type === "Hourly") {
+      monthlyEquivalent = base_rate * 8 * divisor;
+    }
+
+    const dailyEquivalent = monthlyEquivalent / divisor;
+
+    return dailyEquivalent >= MIN_DAILY_WAGE
+      ? "ABOVE_MINIMUM"
+      : "MINIMUM";
   };
 
-  // Auto-update wage_type whenever pay_type or base_rate changes
+  /*
+  --------------------------------
+  AUTO UPDATE WAGE TYPE
+  --------------------------------
+  */
   useEffect(() => {
     const wageType = calculateWageType(payType, baseRate);
-    if (wageType) form.setFieldsValue({ wage_type: wageType });
-  }, [payType, baseRate]);
+    if (wageType) {
+      form.setFieldsValue({ wage_type: wageType });
+    }
+  }, [payType, baseRate, divisor]);
 
   // Fetch latest salary on open
   useEffect(() => {
@@ -89,7 +132,7 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
     };
 
     fetchLatest();
-  }, [open, employeeId, form]);
+  }, [open, employeeId]);
 
   const handleSubmit = async () => {
     try {
@@ -218,6 +261,7 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
         <EditEmployeeContributionsModal
           open={contributionsOpen}
           salaryBase={newSalaryBase}
+          payType={payType}
           employeeId={employeeId}
           initialValues={initialDeductions}
           onBack={() => setContributionsOpen(false)}

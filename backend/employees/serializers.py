@@ -337,6 +337,25 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
         return instance
   
 #for salary
+def get_salary_for_deduction(pay_type, base_rate):
+    """
+    Converts the employee's salary to the equivalent monthly amount
+    for deduction lookup based on Payroll Setting.
+    """
+    payroll_setting = Payroll_Setting.objects.first()  # assuming 1 row
+    divisor = payroll_setting.daily_rate_divisor if payroll_setting else 22
+
+    if pay_type == "Monthly":
+        salary_for_deduction = base_rate
+    elif pay_type == "Daily":
+        salary_for_deduction = base_rate * divisor
+    elif pay_type == "Hourly":
+        salary_for_deduction = base_rate * 8 * divisor
+    else:
+        salary_for_deduction = base_rate
+
+    return salary_for_deduction
+
 MIN_DAILY_WAGE = 540
 
 def calculate_wage_type(pay_type, base_rate):
@@ -441,7 +460,8 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
         if not salary:
             raise serializers.ValidationError("Employee has no active salary")
 
-        base_salary = salary.base_rate
+        # Convert employee salary to monthly equivalent for deduction range check
+        base_salary = get_salary_for_deduction(salary.pay_type, salary.base_rate)
 
         # Validate salary range
         deduction_type = Deduction_Type.objects.filter(

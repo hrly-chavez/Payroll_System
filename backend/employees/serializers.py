@@ -337,12 +337,12 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
         return instance
   
 #for salary
-MIN_DAILY_WAGE = 500
+MIN_DAILY_WAGE = 540
 
 def calculate_wage_type(pay_type, base_rate):
     daily_equivalent = 0
     if pay_type == "Monthly":
-        daily_equivalent = base_rate / 20
+        daily_equivalent = base_rate / 20 #gamiton ang divisor sa payroll setting ari dapat
     elif pay_type == "Daily":
         daily_equivalent = base_rate
     elif pay_type == "Hourly":

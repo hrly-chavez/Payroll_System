@@ -3,7 +3,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { Table, Button, Space, Tag, message } from "antd";
 import dayjs from "dayjs";
 import api from "api/axios";
-import PayrollResultModal from "../../../Employee/Payslips/PayrollResultModal";
+import EmployeePayrollResultModal from "../Modals/EmployeePayrollResultModal";
 
 interface PayslipsTabProps {
   employeeId: number;
@@ -141,7 +141,7 @@ const PayslipsTab: React.FC<PayslipsTabProps> = ({ employeeId }) => {
         locale={{ emptyText: "No payroll records found." }}
       />
 
-      <PayrollResultModal
+      <EmployeePayrollResultModal
         open={payrollModalOpen}
         onClose={() => {
           setPayrollModalOpen(false);

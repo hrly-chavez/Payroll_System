@@ -389,10 +389,22 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
             .prefetch_related("events")
             .order_by("date")
         )
-
+        leave_days = (
+            Leave_Day.objects
+            .filter(
+                employee=employee,
+                date__gte=period.start_date,
+                date__lte=period.end_date,
+                leave_request__status="Approved",
+            )
+            .select_related("leave_request", "leave_request__leave_type")
+            .order_by("date")
+        )
         if not attendances.exists():
             warnings.append("No attendance records found within this payroll period.")
-
+        print("PERIOD:", period.start_date, period.end_date)
+        print("LEAVES COUNT:", leave_days.count())
+        print(list(leave_days.values_list("date", "leave_request__status")))
         payload = {
             "period_id": period.id,
             "employee_id": employee.id,
@@ -404,7 +416,8 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
             "taxes": taxes,
             "loans": loans,
             "allowances": in_period_allowances,
-            "attendances": attendances,  # NEW
+            "attendances": attendances,  
+            "leaves": leave_days,
             "warnings": warnings,
         }
 
@@ -741,7 +754,6 @@ class GeneratePayrollForPeriodView(APIView):
 
         serializer = GeneratePayrollPeriodResponseSerializer(result)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
 
 class GeneratePayrollForEmployeeView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1840,7 +1852,416 @@ class EmployeePayrollDownloadPDFView(APIView):
 
         filename = f"Payslip_{period.code}.pdf"
         return FileResponse(buffer, as_attachment=True, filename=filename, content_type="application/pdf")
-    
+
+class AdminEmployeePayrollDownloadPDFView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, period_id: int, employee_id: int):
+        # Optional role protection
+        role = (getattr(request.user, "role", "") or "").strip().upper()
+        if role not in {"ADMIN", "SUPER_ADMIN"} and not getattr(request.user, "is_superuser", False):
+            raise PermissionDenied("You are not allowed to download this employee's payslip.")
+
+        emp = get_object_or_404(Employee, id=employee_id)
+
+        payroll = get_latest_active_payroll(period_id=period_id, employee_id=emp.id)
+        if payroll:
+            payroll = (
+                Payroll.objects
+                .filter(id=payroll.id)
+                .select_related("payroll_period", "employee", "employee__department")
+                .prefetch_related("payslip_lines", "payslip_lines__rule")
+                .first()
+            )
+
+        if not payroll:
+            return Response(
+                {"detail": "Payroll has not been generated for this employee in this period."},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+
+        period = payroll.payroll_period
+
+        # working days: count PRESENT attendance inside the period
+        working_days = Attendance.objects.filter(
+            employee=emp,
+            date__gte=period.start_date,
+            date__lte=period.end_date,
+            status="PRESENT",
+        ).count()
+
+        # ---- formatting helpers ----
+        def _money(v):
+            try:
+                x = Decimal(str(v or "0"))
+            except Exception:
+                x = Decimal("0")
+            return f"{x:,.2f}"
+
+        def _php(v):
+            return f"PHP {_money(v)}"
+
+        def _fmt_date(d):
+            if not d:
+                return "-"
+            return d.strftime("%b-%d-%Y")
+
+        def _fmt_period_range(s, e):
+            if not s or not e:
+                return "-"
+            return f"{s.strftime('%b %d')} - {e.strftime('%b %d')}"
+
+        lines = list(payroll.payslip_lines.all().order_by("id"))
+        filtered_lines = []
+        for ln in lines:
+            if ln.line_type == "INFORMATION":
+                desc = (ln.description or "").lower()
+                if desc.startswith("night differential days:"):
+                    continue
+            filtered_lines.append(ln)
+
+        earnings = [l for l in filtered_lines if l.line_type == "EARNING"]
+        deductions = [l for l in filtered_lines if l.line_type == "DEDUCTION"]
+
+        def _sum_amount(rows):
+            total = Decimal("0.00")
+            for r in rows:
+                try:
+                    total += Decimal(str(r.amount or "0"))
+                except Exception:
+                    continue
+            return total
+
+        def _to_dec(v):
+            try:
+                return Decimal(str(v or "0"))
+            except Exception:
+                return Decimal("0")
+
+        def _clean_label(s: str) -> str:
+            return (s or "").strip()
+
+        def _is_basic_pay(desc: str) -> bool:
+            d = (desc or "").lower()
+            return "basic pay" in d
+
+        def _is_commission(desc: str) -> bool:
+            d = (desc or "").lower()
+            return d.startswith("commission:") or "commission" in d
+
+        def _is_allowance(desc: str) -> bool:
+            d = (desc or "").lower()
+            return d.startswith("allowance:") or "allowance" in d
+
+        def _is_night_diff(desc: str) -> bool:
+            d = (desc or "").lower()
+            return "night differential" in d
+
+        def _ded_label(desc: str) -> str:
+            s = _clean_label(desc)
+            low = s.lower()
+            if low.startswith("deduction:"):
+                return _clean_label(s.split(":", 1)[1])
+            return s
+
+        def _is_lates_absences(desc: str) -> bool:
+            d = (desc or "").lower()
+            return d.startswith("late") or d.startswith("undertime") or d.startswith("absent")
+
+        pay_period_pay = _sum_amount([l for l in earnings if _is_basic_pay(l.description)])
+
+        earn_rows = []
+        earn_rows.append(["Pay Period Pay", _php(pay_period_pay)])
+
+        commission_map = {}
+        for l in earnings:
+            if _is_commission(l.description):
+                label = _clean_label(l.description)
+                commission_map[label] = commission_map.get(label, Decimal("0.00")) + _to_dec(l.amount)
+
+        for label, amt in sorted(commission_map.items(), key=lambda x: x[0].lower()):
+            if amt != Decimal("0.00"):
+                earn_rows.append([label, _php(amt)])
+
+        allow_map = {}
+        for l in earnings:
+            if _is_allowance(l.description):
+                label = _clean_label(l.description)
+                allow_map[label] = allow_map.get(label, Decimal("0.00")) + _to_dec(l.amount)
+
+        for label, amt in sorted(allow_map.items(), key=lambda x: x[0].lower()):
+            if amt != Decimal("0.00"):
+                earn_rows.append([label, _php(amt)])
+
+        night_diff_amt = _sum_amount([l for l in earnings if _is_night_diff(l.description)])
+        if night_diff_amt != Decimal("0.00"):
+            earn_rows.append(["Night Differential", _php(night_diff_amt)])
+
+        captured_ids = set()
+        for l in earnings:
+            if _is_basic_pay(l.description) or _is_commission(l.description) or _is_allowance(l.description) or _is_night_diff(l.description):
+                captured_ids.add(l.id)
+
+        adjustments_amt = _sum_amount([l for l in earnings if l.id not in captured_ids])
+        if adjustments_amt != Decimal("0.00"):
+            earn_rows.append(["Adjustments", _php(adjustments_amt)])
+
+        ded_rows = []
+        ded_rows.append(["Deductions", ""])
+
+        lates_absences_amt = _sum_amount([d for d in deductions if _is_lates_absences(d.description)])
+        if lates_absences_amt != Decimal("0.00"):
+            ded_rows.append(["Lates & Absences", _php(lates_absences_amt)])
+
+        ded_map = {}
+        for d in deductions:
+            if _is_lates_absences(d.description):
+                continue
+            label = _ded_label(d.description)
+            ded_map[label] = ded_map.get(label, Decimal("0.00")) + _to_dec(d.amount)
+
+        def _normalize_ded_label(label: str) -> str:
+            low = (label or "").lower().strip()
+            if "cash" in low and "advance" in low:
+                return "Cash Advance"
+            if low == "sss":
+                return "SSS"
+            if low in {"philhealth", "phil health"}:
+                return "Philhealth"
+            if low in {"pag-ibig", "pagibig", "hdmf"}:
+                return "Pag-ibig"
+            if low in {"income tax", "withholding tax", "tax"}:
+                return "Income Tax"
+            return label
+
+        normalized_map = {}
+        for label, amt in ded_map.items():
+            new_label = _normalize_ded_label(label)
+            normalized_map[new_label] = normalized_map.get(new_label, Decimal("0.00")) + amt
+
+        for label, amt in sorted(normalized_map.items(), key=lambda x: x[0].lower()):
+            if amt != Decimal("0.00"):
+                ded_rows.append([label, _php(amt)])
+
+        buffer = BytesIO()
+
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=landscape(letter),
+            leftMargin=0.5 * inch,
+            rightMargin=0.5 * inch,
+            topMargin=0.35 * inch,
+            bottomMargin=0.35 * inch,
+            title="Payslip",
+        )
+
+        usable_w = doc.width
+
+        styles = getSampleStyleSheet()
+        base = styles["Normal"]
+        base.fontSize = 9
+        base.leading = 11
+
+        blue = colors.HexColor("#1F4E79")
+        light_blue = colors.HexColor("#9DC3E6")
+        yellow = colors.HexColor("#FFF2CC")
+        black = colors.black
+        white = colors.white
+
+        header_style = ParagraphStyle(
+            "header_style",
+            parent=base,
+            fontName="Helvetica-Bold",
+            fontSize=11,
+            alignment=1,
+            textColor=white,
+        )
+        small_center_white = ParagraphStyle(
+            "small_center_white",
+            parent=base,
+            fontName="Helvetica-Oblique",
+            fontSize=9,
+            alignment=1,
+            textColor=white,
+        )
+        section_style = ParagraphStyle(
+            "section_style",
+            parent=base,
+            fontName="Helvetica-Bold",
+            fontSize=10,
+            alignment=1,
+            textColor=black,
+        )
+        label_style = ParagraphStyle(
+            "label_style",
+            parent=base,
+            fontName="Helvetica",
+            fontSize=9,
+            alignment=0,
+            textColor=black,
+        )
+        amount_style = ParagraphStyle(
+            "amount_style",
+            parent=base,
+            fontName="Helvetica",
+            fontSize=9,
+            alignment=2,
+            textColor=black,
+        )
+
+        elements = []
+
+        header_tbl = Table(
+            [
+                [Paragraph("PAYSLIP", header_style)],
+                [Paragraph("ATTI_TECH", ParagraphStyle("h2", parent=header_style, fontSize=16))],
+                [Paragraph("EMPLOYEE PAYSLIP", header_style)],
+            ],
+            colWidths=[usable_w],
+        )
+        header_tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), blue),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        elements.append(header_tbl)
+        elements.append(Spacer(1, 8))
+
+        emp_name = f"{emp.fname} {emp.lname}".strip()
+        dept_name = emp.department.name if emp.department else "-"
+        role_name = (getattr(emp, "position", "") or "-")
+        ssn_like = getattr(emp, "id_no", None) or "-"
+        pay_date = period.pay_date or None
+
+        col1 = 1.8 * inch
+        col3 = 2.0 * inch
+        col4 = 2.7 * inch
+        col2 = usable_w - (col1 + col3 + col4)
+
+        info_tbl = Table(
+            [
+                ["Employee Name", emp_name, "", Paragraph(_fmt_date(pay_date), base)],
+                ["SSN:", ssn_like, "Pay Period", _fmt_period_range(period.start_date, period.end_date)],
+                ["Department", dept_name, "Basic Gross Pay", f"PHP {_money(payroll.total_earnings)}"],
+                ["Role", role_name, "# of working days", str(working_days)],
+            ],
+            colWidths=[col1, col2, col3, col4],
+        )
+        info_tbl.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 1, black),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTNAME", (2, 1), (2, -1), "Helvetica-Bold"),
+            ("FONTNAME", (2, 0), (2, 0), "Helvetica-Bold"),
+            ("FONTNAME", (3, 0), (3, 0), "Helvetica-Bold"),
+            ("BACKGROUND", (3, 0), (3, 0), yellow),
+            ("ALIGN", (3, 0), (3, 0), "CENTER"),
+        ]))
+        elements.append(info_tbl)
+        elements.append(Spacer(1, 10))
+
+        earn_items = earn_rows[:]
+        ded_items = ded_rows[1:]
+
+        max_len = max(len(earn_items), len(ded_items))
+        grid_data = []
+
+        grid_data.append([
+            Paragraph("EARNINGS", section_style), "",
+            Paragraph("DEDUCTIONS", section_style), ""
+        ])
+
+        for i in range(max_len):
+            e = earn_items[i] if i < len(earn_items) else ["", ""]
+            d = ded_items[i] if i < len(ded_items) else ["", ""]
+
+            e_label = Paragraph(e[0] if e[0] else "", label_style)
+            e_amt = Paragraph(e[1] if e[1] else "", amount_style)
+            d_label = Paragraph(d[0] if d[0] else "", label_style)
+            d_amt = Paragraph(d[1] if d[1] else "", amount_style)
+
+            grid_data.append([e_label, e_amt, d_label, d_amt])
+
+        col_amt = 1.6 * inch
+        col_label = (usable_w - (2 * col_amt)) / 2
+
+        grid_tbl = Table(
+            grid_data,
+            colWidths=[col_label, col_amt, col_label, col_amt],
+            repeatRows=1,
+        )
+
+        grid_tbl.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 1, black),
+            ("SPAN", (0, 0), (1, 0)),
+            ("SPAN", (2, 0), (3, 0)),
+            ("BACKGROUND", (0, 0), (1, 0), colors.lightgrey),
+            ("BACKGROUND", (2, 0), (3, 0), colors.lightgrey),
+            ("ALIGN", (0, 0), (3, 0), "CENTER"),
+            ("VALIGN", (0, 0), (3, 0), "MIDDLE"),
+            ("ALIGN", (1, 1), (1, -1), "RIGHT"),
+            ("ALIGN", (3, 1), (3, -1), "RIGHT"),
+            ("VALIGN", (0, 1), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(grid_tbl)
+        elements.append(Spacer(1, 10))
+
+        totals_tbl = Table(
+            [
+                ["Total Earnings", _php(payroll.total_earnings), "Total Deductions", _php(payroll.total_deductions)],
+                ["Net Pay =", _php(payroll.net_pay), "", ""],
+            ],
+            colWidths=[col_label, col_amt, col_label, col_amt],
+        )
+        totals_tbl.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 1, black),
+            ("FONTNAME", (0, 0), (0, 0), "Helvetica-Bold"),
+            ("FONTNAME", (2, 0), (2, 0), "Helvetica-Bold"),
+            ("FONTNAME", (0, 1), (1, 1), "Helvetica-Bold"),
+            ("ALIGN", (1, 0), (1, 1), "RIGHT"),
+            ("ALIGN", (3, 0), (3, 0), "RIGHT"),
+            ("BACKGROUND", (0, 1), (3, 1), light_blue),
+            ("SPAN", (2, 1), (3, 1)),
+            ("ALIGN", (0, 1), (0, 1), "RIGHT"),
+        ]))
+        elements.append(totals_tbl)
+        elements.append(Spacer(1, 12))
+
+        footer_tbl = Table(
+            [[Paragraph("If you have any questions about your payslip, please contact: Human Resource", small_center_white)]],
+            colWidths=[usable_w],
+        )
+        footer_tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), blue),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ]))
+        elements.append(footer_tbl)
+
+        doc.build(elements)
+        buffer.seek(0)
+
+        filename = f"Payslip_{period.code}_{emp.id}.pdf"
+        return FileResponse(
+            buffer,
+            as_attachment=True,
+            filename=filename,
+            content_type="application/pdf",
+        )
+
+
+
+
+
+
 #payroll logs
 class PayrollPeriodReportListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
@@ -1870,7 +2291,6 @@ class PayrollPeriodReportListView(generics.ListAPIView):
             )
 
         return qs
-
 
 class PayrollPeriodEmployeeReportListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
@@ -2069,3 +2489,4 @@ class PayrollPeriodReleaseLogsPDFView(APIView):
             filename=filename,
             content_type="application/pdf"
         )
+

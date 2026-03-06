@@ -1,12 +1,15 @@
 // src/pages/HR/Calendar/Payroll/VerifyEmployeeModal.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Modal, Descriptions, Tag, Table, Button, Alert, Spin, message } from "antd";
+import React, { useEffect, useMemo, useState } from "react";
+import { Modal, Descriptions, Tag, Table, Button, Alert, Spin, message, Row, Col, Space, Divider, Typography, Card } from "antd";
 import api from "../../../../api/axios";
 import AddCommission from "./AddCommission";
 import { formatBackendTime } from "../../../helpers";
 import dayjs from "dayjs";
+
+const { Text } = Typography;
+
 type EligibleEmployee = {
   id: number;
   full_name: string;
@@ -30,7 +33,7 @@ type Shift = {
   end_time: string;
   break_minutes: number;
   grace_minutes: number;
-  is_overnight: boolean; // night differential enabled
+  is_overnight: boolean;
   crosses_midnight?: boolean;
   workdays: { day_of_week: number; day: string; is_workday: boolean }[];
 };
@@ -81,6 +84,7 @@ type Allowance = {
   status: "Active" | "Inactive";
   allowance_type: AllowanceType;
 };
+
 type CommissionType = {
   id: number;
   name: string;
@@ -117,6 +121,27 @@ type AttendanceRow = {
   events: AttendanceEvent[];
 };
 
+type LeaveTypeMini = {
+  id: number;
+  name?: string;
+  code?: string;
+};
+
+type LeaveRequestMini = {
+  id: number;
+  status: string;
+  leave_type?: LeaveTypeMini | null;
+};
+
+type LeaveDayRow = {
+  id: number;
+  date: string;
+  units: string | number;
+  is_paid: boolean;
+  pay_rate: string | number;
+  leave_request?: LeaveRequestMini | null;
+};
+
 type Snapshot = {
   period_id: number;
   employee_id: number;
@@ -128,11 +153,10 @@ type Snapshot = {
   taxes: Deduction[];
   loans: Deduction[];
   allowances: Allowance[];
-  attendances: AttendanceRow[]; 
+  attendances: AttendanceRow[];
+  leaves: LeaveDayRow[];
   warnings?: string[];
 };
-
-
 
 type Props = {
   open: boolean;
@@ -153,31 +177,28 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
     Declined: { text: "Declined", color: "red" },
   };
 
-    const [loading, setLoading] = useState(false);
-    const [verifying, setVerifying] = useState(false);
-    const [generating, setGenerating] = useState(false);
-    const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
 
-    // commissions
-    const [commissionLoading, setCommissionLoading] = useState(false);
-    const [commissions, setCommissions] = useState<Commission[]>([]);
-    const [openCommissionModal, setOpenCommissionModal] = useState(false);
+  // commissions
+  const [commissionLoading, setCommissionLoading] = useState(false);
+  const [commissions, setCommissions] = useState<Commission[]>([]);
+  const [openCommissionModal, setOpenCommissionModal] = useState(false);
 
-    const canVerify = status === "Pending";
-    const canAddCommission = status === "Pending";
+  const canVerify = status === "Pending";
+  const canAddCommission = status === "Pending";
 
-    const canGenerateEmployee =
-      status === "Verified" && (period?.status === "Open" || period?.status === "Processing");
-
+  const canGenerateEmployee =
+    status === "Verified" && (period?.status === "Open" || period?.status === "Processing");
 
   const loadSnapshot = async () => {
     if (!open || !employee || !period) return;
     setSnapshot(null);
     setLoading(true);
     try {
-      const res = await api.get(
-        `/payroll/periods/${period.id}/employees/${employee.id}/verify-snapshot/`
-      );
+      const res = await api.get(`/payroll/periods/${period.id}/employees/${employee.id}/verify-snapshot/`);
       setSnapshot(res.data);
     } catch (err: any) {
       const msg =
@@ -194,9 +215,7 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
     if (!open || !employee || !period) return;
     setCommissionLoading(true);
     try {
-      const res = await api.get(
-        `/payroll/periods/${period.id}/employees/${employee.id}/commissions/`
-      );
+      const res = await api.get(`/payroll/periods/${period.id}/employees/${employee.id}/commissions/`);
       setCommissions(res.data || []);
     } catch (err: any) {
       const msg =
@@ -209,16 +228,13 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
     }
   };
 
-
   const handleVerify = async () => {
     if (!employee || !period) return;
     if (!canVerify) return;
 
     setVerifying(true);
     try {
-      const res = await api.post(
-        `/payroll/periods/${period.id}/employees/${employee.id}/verify/`
-      );
+      const res = await api.post(`/payroll/periods/${period.id}/employees/${employee.id}/verify/`);
       message.success(res?.data?.detail || "Employee verified.");
       onVerified();
       onClose();
@@ -242,12 +258,8 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
 
     setGenerating(true);
     try {
-      const res = await api.post(
-        `/payroll/periods/${period.id}/employees/${employee.id}/generate/`
-      );
+      const res = await api.post(`/payroll/periods/${period.id}/employees/${employee.id}/generate/`);
       message.success(res?.data?.detail || "Payroll generated for this employee.");
-
-      // refresh parent table + close modal
       onVerified();
       onClose();
     } catch (err: any) {
@@ -261,223 +273,152 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
     }
   };
 
+  useEffect(() => {
+    if (open && employee?.id && period?.id) {
+      loadSnapshot();
+      loadCommissions();
+    } else if (!open) {
+      setSnapshot(null);
+      setCommissions([]);
+    }
+  }, [open, employee?.id, period?.id]);
 
- useEffect(() => {
-  if (open && employee?.id && period?.id) {
-    loadSnapshot();
-    loadCommissions();
-  } else if (!open) {
-    setSnapshot(null);
-    setCommissions([]);
-  }
-}, [open, employee?.id, period?.id]);
+  const tableBoxStyle: React.CSSProperties = {
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 10,
+    overflow: "hidden",
+  };
+
+  const sectionCardStyle: React.CSSProperties = {
+    borderRadius: 12,
+    marginBottom: 12,
+  };
 
   const allowanceColumns = [
-    {
-      title: "Allowance",
-      dataIndex: ["allowance_type", "name"],
-      render: (v: string) => v || "-",
-    },
-    
-    {
-      title: "Amount",
-      dataIndex: "amount",
-      render: (v: string) => v || "0.00",
-    },
-    {
-      title: "Frequency",
-      dataIndex: "frequency",
-      render: (v: string) => v || "-",
-    },
+    { title: "Allowance", dataIndex: ["allowance_type", "name"], render: (v: string) => v || "-" },
+    { title: "Amount", dataIndex: "amount", render: (v: string) => v || "0.00" },
+    { title: "Frequency", dataIndex: "frequency", render: (v: string) => v || "-" },
   ];
+
   const taxColumns = [
-    {
-      title: "Tax Type",
-      dataIndex: ["deduction_type", "code"],
-      render: (v: string) => v || "-",
-    },
-    {
-      title: "Amount",
-      dataIndex: "amount",
-      render: (v: string) => v || "0.00",
-    },
-    {
-      title: "Frequency",
-      dataIndex: "frequency",
-      render: (v: string) => v || "-",
-    },
+    { title: "Tax Type", dataIndex: ["deduction_type", "code"], render: (v: string) => v || "-" },
+    { title: "Amount", dataIndex: "amount", render: (v: string) => v || "0.00" },
+    { title: "Frequency", dataIndex: "frequency", render: (v: string) => v || "-" },
   ];
+
   const loanColumns = [
     {
       title: "Loan",
       dataIndex: ["deduction_type", "code"],
       render: (_: any, row: Deduction) => row?.deduction_type?.code || "Loan",
     },
-    {
-      title: "Amort/Period",
-      dataIndex: "amortization_per_period",
-      render: (v: string) => v || "-",
-    },
-    {
-      title: "Balance",
-      dataIndex: "balance",
-      render: (v: string) => v || "-",
-    },
+    { title: "Amort/Period", dataIndex: "amortization_per_period", render: (v: string) => v || "-" },
+    { title: "Balance", dataIndex: "balance", render: (v: string) => v || "-" },
   ];
+
   const commissionColumns = [
-    {
-      title: "Type",
-      dataIndex: ["commission_type", "name"],
-      render: (v: string) => v || "-",
-    },
-    {
-      title: "Code",
-      dataIndex: ["commission_type", "code"],
-      render: (v: string) => v || "-",
-    },
-    {
-      title: "Amount",
-      dataIndex: "amount",
-      render: (v: string) => v || "0.00",
-    },
-    {
-      title: "Remarks",
-      dataIndex: "remarks",
-      render: (v: string) => v || "-",
-    },
+    { title: "Type", dataIndex: ["commission_type", "name"], render: (v: string) => v || "-" },
+    // { title: "Code", dataIndex: ["commission_type", "code"], render: (v: string) => v || "-" },
+    { title: "Amount", dataIndex: "amount", render: (v: string) => v || "0.00" },
+    { title: "Remarks", dataIndex: "remarks", render: (v: string) => v || "-" },
   ];
+
   const attendanceColumns = [
-    {
-      title: "Date",
-      dataIndex: "date",
-      render: (v: string) => v || "-",
-    },
-    {
-      title: "Status",
-      dataIndex: "status",
-      render: (v: string) => v || "-",
-    },
-    {
-      title: "Time In",
-      dataIndex: "time_in",
-      render: (v: string | null) =>
-        v ? formatBackendTime(v) : "-",
-    },
-    {
-      title: "Time Out",
-      dataIndex: "time_out",
-      render: (v: string | null) =>
-        v ? formatBackendTime(v) : "-",
-    },
-    
+    { title: "Date", dataIndex: "date", render: (v: string) => v || "-" },
+    { title: "Status", dataIndex: "status", render: (v: string) => v || "-" },
+    { title: "Time In", dataIndex: "time_in", render: (v: string | null) => (v ? formatBackendTime(v) : "-") },
+    { title: "Time Out", dataIndex: "time_out", render: (v: string | null) => (v ? formatBackendTime(v) : "-") },
   ];
 
   const attendanceEventColumns = [
-    {
-      title: "Type",
-      dataIndex: "type",
-      render: (v: string) => v || "-",
-    },
-    {
-      title: "Minutes",
-      dataIndex: "minutes",
-      render: (v: number) => (v ?? 0),
-    },
-    {
-     title: "Start",
-    dataIndex: "start_time",
-    render: (v: string | null) =>
-      v ? formatBackendTime(v) : "-",
-    },
-    {
-      title: "End",
-      dataIndex: "end_time",
-      render: (v: string | null) =>
-        v ? formatBackendTime(v) : "-",
-    },
-    {
-      title: "Approval",
-      dataIndex: "approval_status",
-      render: (v: string) => v || "-",
-    },
-    {
-      title: "Remarks",
-      dataIndex: "event_remarks",
-      render: (v: string) => v || "-",
-    },
+    { title: "Type", dataIndex: "type", render: (v: string) => v || "-" },
+    { title: "Minutes", dataIndex: "minutes", render: (v: number) => v ?? 0 },
+    { title: "Start", dataIndex: "start_time", render: (v: string | null) => (v ? formatBackendTime(v) : "-") },
+    { title: "End", dataIndex: "end_time", render: (v: string | null) => (v ? formatBackendTime(v) : "-") },
+    { title: "Approval", dataIndex: "approval_status", render: (v: string) => v || "-" },
+    { title: "Remarks", dataIndex: "event_remarks", render: (v: string) => v || "-" },
   ];
+
+  const leaveColumns = [
+    {
+      title: "Date",
+      dataIndex: "date",
+      render: (v: string) => {
+        if (!v) return "-";
+        const d = dayjs(v);
+        return d.isValid() ? d.format("YYYY-MM-DD") : v;
+      },
+    },
+    { title: "Leave Type", dataIndex: ["leave_request", "leave_type", "name"], render: (v: string) => v || "-" },
+    { title: "Units", dataIndex: "units", render: (v: any) => v ?? "-" },
+    {
+      title: "Paid?",
+      dataIndex: "is_paid",
+      render: (v: boolean) => <Tag color={v ? "green" : "default"}>{v ? "Paid" : "Unpaid"}</Tag>,
+    },
+    { title: "Pay Rate", dataIndex: "pay_rate", render: (v: any) => v ?? "-" },
+  ];
+
+  const headerPeriodText = useMemo(() => {
+    if (!period) return "-";
+    return `${dayjs(period.start_date).format("YYYY-MM-DD")} to ${dayjs(period.end_date).format("YYYY-MM-DD")}`;
+  }, [period]);
 
   return (
     <Modal
       open={open}
       onCancel={onClose}
       footer={null}
-      width={820}
+      width={980}
       title={employee ? `Verify Employee: ${employee.full_name}` : "Verify Employee"}
-      style={{ top: 60 }}
+      style={{ top: 40 }}
       destroyOnClose
     >
       {!employee ? null : (
         <>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
-            <div style={{ flex: 1 }}>
-              <Descriptions bordered size="small" column={1}>
-                <Descriptions.Item label="Employee ID">{employee.id}</Descriptions.Item>
-                <Descriptions.Item label="Department">{employee.department_name || "-"}</Descriptions.Item>
-                <Descriptions.Item label="Payroll Period">
-                  {period ? `${dayjs(period.start_date).format("MM/DD/YYYY")} - ${dayjs(period.end_date).format("MM/DD/YYYY")}` : "-"}
-                </Descriptions.Item>
-                <Descriptions.Item label="Status">
-                  <Tag color={map[status].color}>{map[status].text}</Tag>
-                </Descriptions.Item>
-              </Descriptions>
-            </div>
+          {/* Header */}
+          <Card style={{ ...sectionCardStyle, marginBottom: 14 }} bodyStyle={{ padding: 16 }}>
+            <Row gutter={[12, 12]} align="middle">
+              <Col xs={24} md={16}>
+                <Descriptions bordered size="small" column={2} labelStyle={{ width: 140 }}>
+                  <Descriptions.Item label="Employee ID">{employee.id}</Descriptions.Item>
+                  <Descriptions.Item label="Status">
+                    <Tag color={map[status].color}>{map[status].text}</Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Department">{employee.department_name || "-"}</Descriptions.Item>
+                  <Descriptions.Item label="Payroll Period">{headerPeriodText}</Descriptions.Item>
+                </Descriptions>
+              </Col>
 
-            <div style={{ width: 220 }}>
-              <Button
-                type="primary"
-                block
-                onClick={handleVerify}
-                disabled={!canVerify}
-                loading={verifying}
-              >
-                Verify Employee
-              </Button>
+              <Col xs={24} md={8}>
+                <Space direction="vertical" style={{ width: "100%" }} size={8}>
+                  <Button type="primary" block onClick={handleVerify} disabled={!canVerify} loading={verifying}>
+                    Verify Employee
+                  </Button>
 
-              <Button
-                style={{ marginTop: 8 }}
-                block
-                onClick={() => setOpenCommissionModal(true)}
-                disabled={!canAddCommission || !period}
-              >
-                Add Commission
-              </Button>
+                  <Button block onClick={() => setOpenCommissionModal(true)} disabled={!canAddCommission || !period}>
+                    Add Commission
+                  </Button>
 
-              <Button
-                style={{ marginTop: 8 }}
-                type="primary"
-                block
-                onClick={handleGenerateEmployeePayroll}
-                disabled={!canGenerateEmployee || verifying}
-                loading={generating}
-              >
-                Generate Payroll (Employee)
-              </Button>
+                  <Button
+                    type="primary"
+                    block
+                    onClick={handleGenerateEmployeePayroll}
+                    disabled={!canGenerateEmployee || verifying}
+                    loading={generating}
+                  >
+                    Generate Payroll (Employee)
+                  </Button>
 
-              {status !== "Pending" ? (
-                <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>
-                  Commissions are locked once the employee is Verified.
-                </div>
-              ) : null}
-
-
-
-              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 8 }}>
-                {canVerify ? "This will mark the employee as Verified for this payroll period." : "Employee is not in Pending status."}
-              </div>
-
-            </div>
-          </div>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {status !== "Pending"
+                      ? "Commissions are locked once the employee is Verified."
+                      : "This will mark the employee as Verified for this payroll period."}
+                  </Text>
+                </Space>
+              </Col>
+            </Row>
+          </Card>
 
           {loading ? (
             <div style={{ padding: 18, display: "flex", justifyContent: "center" }}>
@@ -501,114 +442,144 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
                 />
               ) : null}
 
-              <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <Descriptions bordered size="small" column={1} title="Shift">
-                    <Descriptions.Item label="Shift">
-                      {snapshot?.shift?.name || "-"}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Time">
-                      {snapshot?.shift ? `${snapshot.shift.start_time} - ${snapshot.shift.end_time}` : "-"}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Break / Grace">
-                      {snapshot?.shift
-                        ? `${snapshot.shift.break_minutes} mins break, ${snapshot.shift.grace_minutes} mins grace`
-                        : "-"}
-                    </Descriptions.Item>
-                  </Descriptions>
-                </div>
+              {/* Shift + Salary */}
+              <Row gutter={[12, 12]}>
+                <Col xs={24} md={12}>
+                  <Card title="Shift" style={sectionCardStyle} bodyStyle={{ padding: 14 }}>
+                    <Descriptions bordered size="small" column={1}>
+                      <Descriptions.Item label="Shift">{snapshot?.shift?.name || "-"}</Descriptions.Item>
+                      <Descriptions.Item label="Time">
+                        {snapshot?.shift ? `${snapshot.shift.start_time} - ${snapshot.shift.end_time}` : "-"}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Break / Grace">
+                        {snapshot?.shift
+                          ? `${snapshot.shift.break_minutes} mins break, ${snapshot.shift.grace_minutes} mins grace`
+                          : "-"}
+                      </Descriptions.Item>
+                    </Descriptions>
+                  </Card>
+                </Col>
 
-                <div style={{ flex: 1 }}>
-                  <Descriptions bordered size="small" column={1} title="Salary">
-                    <Descriptions.Item label="Pay Type">
-                      {snapshot?.salary?.pay_type || "-"}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Base Rate">
-                      {snapshot?.salary?.base_rate || "-"}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Effective From">
-                      {snapshot?.salary?.effective_from || "-"}
-                    </Descriptions.Item>
-                  </Descriptions>
-                </div>
-              </div>
+                <Col xs={24} md={12}>
+                  <Card title="Salary" style={sectionCardStyle} bodyStyle={{ padding: 14 }}>
+                    <Descriptions bordered size="small" column={1}>
+                      <Descriptions.Item label="Pay Type">{snapshot?.salary?.pay_type || "-"}</Descriptions.Item>
+                      <Descriptions.Item label="Base Rate">{snapshot?.salary?.base_rate || "-"}</Descriptions.Item>
+                      <Descriptions.Item label="Effective From">
+                        {snapshot?.salary?.effective_from ? dayjs(snapshot.salary.effective_from).format("YYYY-MM-DD") : "-"}
+                      </Descriptions.Item>
+                    </Descriptions>
+                  </Card>
+                </Col>
+              </Row>
 
-              <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 6 }}>Taxes</div>
+              {/* Taxes + Loans */}
+              <Row gutter={[12, 12]}>
+                <Col xs={24} md={12}>
+                  <Card title="Taxes" style={sectionCardStyle} bodyStyle={{ padding: 14 }}>
+                    <div style={tableBoxStyle}>
+                      <Table
+                        columns={taxColumns}
+                        dataSource={snapshot?.taxes || []}
+                        rowKey="id"
+                        pagination={false}
+                        size="small"
+                        locale={{ emptyText: "No tax deductions found" }}
+                      />
+                    </div>
+                  </Card>
+                </Col>
+
+                <Col xs={24} md={12}>
+                  <Card title="Loans" style={sectionCardStyle} bodyStyle={{ padding: 14 }}>
+                    <div style={tableBoxStyle}>
+                      <Table
+                        columns={loanColumns}
+                        dataSource={snapshot?.loans || []}
+                        rowKey="id"
+                        pagination={false}
+                        size="small"
+                        locale={{ emptyText: "No loans found" }}
+                      />
+                    </div>
+                  </Card>
+                </Col>
+              </Row>
+
+              {/* Commissions */}
+              <Card title="Commissions" style={sectionCardStyle} bodyStyle={{ padding: 14 }}>
+                <div style={tableBoxStyle}>
                   <Table
-                    columns={taxColumns}
-                    dataSource={snapshot?.taxes || []}
+                    columns={commissionColumns}
+                    dataSource={commissions}
                     rowKey="id"
                     pagination={false}
                     size="small"
-                    locale={{ emptyText: "No tax deductions found" }}
+                    loading={commissionLoading}
+                    locale={{ emptyText: "No commissions added" }}
                   />
                 </div>
+              </Card>
 
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 6 }}>Loans</div>
+              {/* Allowances */}
+              <Card title="Allowances" style={sectionCardStyle} bodyStyle={{ padding: 14 }}>
+                <div style={tableBoxStyle}>
                   <Table
-                    columns={loanColumns}
-                    dataSource={snapshot?.loans || []}
+                    columns={allowanceColumns}
+                    dataSource={snapshot?.allowances || []}
                     rowKey="id"
                     pagination={false}
                     size="small"
-                    locale={{ emptyText: "No loans found" }}
+                    locale={{ emptyText: "No allowances found" }}
                   />
                 </div>
-              </div>
+              </Card>
 
-              <div style={{ marginBottom: 12 }}>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>Allowances</div>
-              <Table
-                columns={allowanceColumns}
-                dataSource={snapshot?.allowances || []}
-                rowKey="id"
-                pagination={false}
-                size="small"
-                locale={{ emptyText: "No allowances found" }}
-              />
-            </div>
+              {/* Leaves */}
+              <Card title="Approved Leaves (This Payroll Period)" style={sectionCardStyle} bodyStyle={{ padding: 14 }}>
+                <div style={tableBoxStyle}>
+                  <Table
+                    columns={leaveColumns as any}
+                    dataSource={snapshot?.leaves || []}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    locale={{ emptyText: "No approved leaves in this period" }}
+                  />
+                </div>
+              </Card>
 
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>Attendance (This Payroll Period)</div>
-              <Table
-                columns={attendanceColumns}
-                dataSource={snapshot?.attendances || []}
-                rowKey="id"
-                pagination={false}
-                size="small"
-                locale={{ emptyText: "No attendance found in this period" }}
-                expandable={{
-                  expandedRowRender: (row: AttendanceRow) => (
-                    <Table
-                      columns={attendanceEventColumns}
-                      dataSource={row.events || []}
-                      rowKey="id"
-                      pagination={false}
-                      size="small"
-                      locale={{ emptyText: "No events" }}
-                    />
-                  ),
-                  rowExpandable: (row: AttendanceRow) => (row.events?.length || 0) > 0,
-                }}
-              />
-            </div>
-
-            <div>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>Commissions</div>
-              <Table
-                columns={commissionColumns}
-                dataSource={commissions}
-                rowKey="id"
-                pagination={false}
-                size="small"
-                loading={commissionLoading}
-                locale={{ emptyText: "No commissions added" }}
-              />
-            </div>
-
+              {/* Attendance */}
+              <Card title="Attendance (This Payroll Period)" style={sectionCardStyle} bodyStyle={{ padding: 14 }}>
+                <div style={tableBoxStyle}>
+                  <Table
+                    columns={attendanceColumns}
+                    dataSource={snapshot?.attendances || []}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    locale={{ emptyText: "No attendance found in this period" }}
+                    expandable={{
+                      expandedRowRender: (row: AttendanceRow) => (
+                        <div style={{ padding: 10 }}>
+                          <Divider style={{ margin: "0 0 10px 0" }} />
+                          <div style={tableBoxStyle}>
+                            <Table
+                              columns={attendanceEventColumns}
+                              dataSource={row.events || []}
+                              rowKey="id"
+                              pagination={false}
+                              size="small"
+                              locale={{ emptyText: "No events" }}
+                            />
+                          </div>
+                        </div>
+                      ),
+                      rowExpandable: (row: AttendanceRow) => (row.events?.length || 0) > 0,
+                    }}
+                  />
+                </div>
+              </Card>
 
               <AddCommission
                 open={openCommissionModal}
@@ -619,8 +590,6 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
                   loadCommissions();
                 }}
               />
-
-
             </>
           )}
         </>

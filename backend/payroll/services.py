@@ -1041,25 +1041,37 @@ class PayrollGenerationService:
         - effective_from <= period.end_date
         - effective_to is null OR effective_to >= period.start_date
         """
-        rules = Pay_Rule.objects.filter(is_active=True)
+        rules = Pay_Rule.objects.filter(
+            is_active=True
+        ).filter(
+            Q(employee_id=employee.id) |
+            Q(applies_to_id=department.id) |
+            Q(employee__isnull=True, applies_to__isnull=True)
+        )
 
         # only rules that overlap this period (effective_from <= period_end and (effective_to is null or >= period_start))
         rules = rules.filter(
             effective_from__lte=period.end_date
         ).filter(
             Q(effective_to__isnull=True) | Q(effective_to__gte=period.start_date)
-        )
+        ).order_by("-effective_from", "-id")
 
         # fetch all candidates, then choose by priority per (event_type, category)
         candidates = list(rules)
 
         def priority(rule: Pay_Rule):
+            # Employee specific rule
             if rule.employee_id == employee.id:
                 return 3
-            if rule.applies_to_id == department.id:
+
+            # Department rule (ONLY if not employee rule)
+            if rule.employee_id is None and rule.applies_to_id == department.id:
                 return 2
+
+            # Global rule
             if rule.employee_id is None and rule.applies_to_id is None:
                 return 1
+
             return 0
 
         rule_map = {}

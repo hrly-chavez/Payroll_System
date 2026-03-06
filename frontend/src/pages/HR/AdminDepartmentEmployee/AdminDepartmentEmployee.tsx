@@ -92,9 +92,6 @@ const AdminDepartmentEmployee: React.FC = () => {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              <Button icon={<SlidersOutlined />} className={styles.filterBtn}>
-                Filter
-              </Button>
             </div>
 
             <Button

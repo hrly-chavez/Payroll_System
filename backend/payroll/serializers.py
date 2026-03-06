@@ -272,6 +272,28 @@ class AttendanceMiniSerializer(serializers.ModelSerializer):
             "events",
         ]
 
+class LeaveTypeMiniSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Leave_Type
+        fields = ["id", "name", "is_paid"]
+
+
+class LeaveRequestMiniSerializer(serializers.ModelSerializer):
+    leave_type = LeaveTypeMiniSerializer(read_only=True)
+
+    class Meta:
+        model = Leave_Request
+        fields = ["id", "status", "leave_type"]
+
+
+class LeaveDayMiniSerializer(serializers.ModelSerializer):
+    leave_request = LeaveRequestMiniSerializer(read_only=True)
+
+    class Meta:
+        model = Leave_Day
+        fields = ["id", "date", "units", "is_paid", "pay_rate", "leave_request"]
+
+
 # Aggregated snapshot shown in Verify Employee modal before payroll generation
 class PayrollVerifySnapshotSerializer(serializers.Serializer):
     # Aggregated snapshot shown in Verify Employee modal
@@ -287,8 +309,10 @@ class PayrollVerifySnapshotSerializer(serializers.Serializer):
     taxes = EmployeeDeductionMiniSerializer(many=True)   # SSS/PAGIBIG/PHILHEALTH...
     loans = EmployeeDeductionMiniSerializer(many=True)   # loan deductions only
     allowances = EmployeeAllowanceMiniSerializer(many=True)
-    attendances = AttendanceMiniSerializer(many=True)  
+    attendances = AttendanceMiniSerializer(many=True) 
+    leaves = LeaveDayMiniSerializer(many=True)  
     warnings = serializers.ListField(child=serializers.CharField(), required=False)
+
 
 
 #==================================COMMISION================================

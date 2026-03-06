@@ -134,8 +134,6 @@ class LeaveTypeListView(generics.ListAPIView):
     queryset = Leave_Type.objects.all().order_by('-created_at')
     serializer_class = LeaveTypeSerializer
 
-
-
 class LeaveTypeCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Leave_Type.objects.all()
@@ -417,7 +415,7 @@ class CommissionTypeListView(generics.ListAPIView):
 # CREATE
 # /superadmin/commission-types/create/
 # ----------------------------
-#done logs
+
 class CommissionTypeCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated, IsRole]
     allowed_roles = ["SUPER_ADMIN"]
@@ -429,7 +427,7 @@ class CommissionTypeCreateView(generics.CreateAPIView):
 # UPDATE
 # /superadmin/commission-types/<id>/
 # ----------------------------
-#done logs
+
 class CommissionTypeUpdateView(generics.UpdateAPIView):
     permission_classes = [IsAuthenticated, IsRole]
     allowed_roles = ["SUPER_ADMIN"]
@@ -437,7 +435,7 @@ class CommissionTypeUpdateView(generics.UpdateAPIView):
     queryset = Commission_Type.objects.all()
     serializer_class = CommissionTypeSerializer
 
-#done logs
+
 class AllowanceTypeCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Allowance_Type.objects.all()
@@ -456,7 +454,7 @@ class AllowanceTypeListView(generics.ListAPIView):
     queryset = Allowance_Type.objects.all()
     serializer_class = AllowanceTypeSerializer
 
-#done logs
+
 class AllowanceTypeUpdateView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Allowance_Type.objects.all()
@@ -470,13 +468,13 @@ class AllowanceTypeUpdateView(generics.RetrieveUpdateAPIView):
         serializer.save()
 
 #holiday policy
-#done logs
+
 class HolidayPolicyListCreateView(generics.ListCreateAPIView):
     queryset = HolidayPolicy.objects.all().order_by("-created_at")  # adjust ordering
     serializer_class = HolidayPolicySerializer
     permission_classes = [IsAuthenticated]
 
-#done logs
+
 class HolidayPolicyRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = HolidayPolicy.objects.all()
     serializer_class = HolidayPolicySerializer

@@ -54,6 +54,7 @@ urlpatterns = [
     path("periods/<int:period_id>/mark-paid/", PayrollPeriodMarkPaidView.as_view(), name="payroll-period-mark-paid"),
     #Download Payroll
     path("my-payrolls/<int:period_id>/download/", EmployeePayrollDownloadPDFView.as_view(), name="employee-my-payrolls-download"),
+    path("periods/<int:period_id>/employees/<int:employee_id>/download/",AdminEmployeePayrollDownloadPDFView.as_view(),name="admin-employee-payroll-download",),
 
     #payroll logs
     path("reports/payroll-periods/", PayrollPeriodReportListView.as_view()),

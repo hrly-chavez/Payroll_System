@@ -1790,6 +1790,7 @@ class EmployeePayrollDownloadPDFView(APIView):
         return FileResponse(buffer, as_attachment=True, filename=filename, content_type="application/pdf")
     
 #payroll logs
+#list of payroll periods
 class PayrollPeriodReportListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = PayrollPeriodListSerializer
@@ -1819,7 +1820,7 @@ class PayrollPeriodReportListView(generics.ListAPIView):
 
         return qs
 
-
+#list sa employee
 class PayrollPeriodEmployeeReportListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = PayrollPeriodEmployeeSerializer
@@ -1849,6 +1850,7 @@ class PayrollPeriodEmployeeReportListView(generics.ListAPIView):
 
         return qs
     
+#para sa generated nga pdf sa payroll logs
 class PayrollPeriodReleaseLogsPDFView(APIView):
     permission_classes = [IsAuthenticated]
 

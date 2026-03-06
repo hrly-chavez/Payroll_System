@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     #Third Party 
     'rest_framework',
     'corsheaders',
+    "rest_framework_simplejwt.token_blacklist",
 
     #Apps
     'accounts',
@@ -156,8 +157,12 @@ SIMPLE_JWT = {
     "TOKEN_OBTAIN_SERIALIZER": "accounts.serializers.MyTokenObtainPairSerializer",
 
     # optional
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+
+    # Token rotation & blacklist
+    "ROTATE_REFRESH_TOKENS": True,       # Issue new refresh token every time
+    "BLACKLIST_AFTER_ROTATION": True,    # Automatically blacklist used refresh tokens
 }
 
 # NOTE: FRONTEND AND BACKEND CAN CONNECT

@@ -25,7 +25,7 @@ const Topbar: React.FC<TopbarProps> = ({
 
   const handleLogout = async () => {
     try {
-      await api.post("/auth/logout/"); // call backend
+      await api.post("/accounts/logout/"); // call backend
 
       message.success("You have been logged out successfully");
 

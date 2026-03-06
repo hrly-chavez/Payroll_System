@@ -4,6 +4,10 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from shared_model.models import *
 from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+
 
 @api_view(["GET"])
 def me(request):
@@ -42,9 +46,44 @@ class CookieTokenObtainPairView(TokenObtainPairView):
             key="refresh_token",
             value=refresh,
             httponly=True,
-            secure=False,
+            secure=False,   #True if HTTPS
+            samesite="Lax", #Strict para prevent CSRF
+        )
+
+        return res
+
+class CookieTokenRefreshView(TokenRefreshView):
+    def post(self, request, *args, **kwargs):
+        # Get refresh token from cookie
+        refresh_token = request.COOKIES.get("refresh_token")
+        if not refresh_token:
+            return Response({"detail": "Refresh token missing"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Pass the refresh token to the serializer directly
+        serializer = TokenRefreshSerializer(data={"refresh": refresh_token})
+        serializer.is_valid(raise_exception=True)
+
+        access = serializer.validated_data.get("access")
+        refresh = serializer.validated_data.get("refresh")  # Only if ROTATE_REFRESH_TOKENS=True
+
+        # Return cookies instead of JSON
+        res = Response({"message": "Token refreshed"}, status=status.HTTP_200_OK)
+        res.set_cookie(
+            key="access_token",
+            value=access,
+            httponly=True,
+            secure=False,  # True in production
             samesite="Lax",
         )
+
+        if refresh:
+            res.set_cookie(
+                key="refresh_token",
+                value=refresh,
+                httponly=True,
+                secure=False,
+                samesite="Lax",
+            )
 
         return res
 
@@ -52,6 +91,14 @@ class CookieTokenObtainPairView(TokenObtainPairView):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def logout_view(request):
+    refresh_token = request.COOKIES.get("refresh_token")
+    if refresh_token:
+        try:
+            token = RefreshToken(refresh_token)
+            token.blacklist()  # This revokes it
+        except Exception:
+            pass
+
     response = Response({"message": "Logged out successfully"})
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")

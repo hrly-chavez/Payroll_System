@@ -359,14 +359,22 @@ def get_salary_for_deduction(pay_type, base_rate):
 MIN_DAILY_WAGE = 540
 
 def calculate_wage_type(pay_type, base_rate):
+
+    payroll_setting = Payroll_Setting.objects.first()
+    divisor = payroll_setting.daily_rate_divisor if payroll_setting else 22
+
     daily_equivalent = 0
+
     if pay_type == "Monthly":
-        daily_equivalent = base_rate / 20 #gamiton ang divisor sa payroll setting ari dapat
+        daily_equivalent = base_rate / divisor
+
     elif pay_type == "Daily":
         daily_equivalent = base_rate
+
     elif pay_type == "Hourly":
         daily_equivalent = base_rate * 8
-    return "ABOVE_MINIMUM" if daily_equivalent >= MIN_DAILY_WAGE else "MINIMUM"
+
+    return "ABOVE_MINIMUM" if daily_equivalent > MIN_DAILY_WAGE else "MINIMUM"
 
 class EmployeeSalarySerializer(serializers.ModelSerializer):
     reason = serializers.CharField(write_only=True, required=False)

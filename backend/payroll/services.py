@@ -304,24 +304,80 @@ class PayrollGenerationService:
         raise ValidationError({"detail": f"Unsupported rate_type: {bracket.rate_type}"})
 
 
-    def _compute_net_before_tax(self, payroll: Payroll) -> Decimal:
+    def _is_mwe_exempt_earning_line(self, line: Payslip) -> bool:
         """
-        Compute net BEFORE payroll tax is applied (used for bracket matching).
+        Return True if an earning line is exempt from payroll tax for a
+        Minimum Wage Earner (MWE).
 
-        We exclude any existing PAYROLL_TAX_BRACKET lines (defensive),
-        so regeneration / re-run doesn't double-tax if you ever call apply twice.
+        Current business rule for MWE-exempt earnings:
+        - Basic Pay
+        - Overtime
+        - Night Differential
+        - Holiday earnings
+
+        Taxable even for MWE (therefore NOT exempt here):
+        - Allowances
+        - Commissions
+        - other extra taxable earnings
         """
+        desc = (line.description or "").strip().lower()
+
+        if "basic pay" in desc:
+            return True
+
+        if "night differential" in desc:
+            return True
+
+        if desc.startswith("overtime"):
+            return True
+
+        holiday_keywords = (
+            "regular holiday",
+            "special holiday",
+            "special non working holiday",
+            "company holiday",
+        )
+        if any(k in desc for k in holiday_keywords):
+            return True
+
+        return False
+
+    def _compute_taxable_income(self, payroll: Payroll, ctx) -> Decimal:
+        """
+        Compute taxable income base BEFORE payroll tax bracket is applied.
+
+        Rules:
+        - Exclude PAYROLL_TAX_BRACKET lines defensively
+        - For ABOVE_MINIMUM:
+            taxable earnings = all earning lines
+        - For MINIMUM:
+            taxable earnings = only earning lines that are NOT MWE-exempt
+        - Deductions are still subtracted the same way as before
+          (except payroll-tax-bracket lines, which are excluded)
+        """
+        salary = ctx["salary"]
+        wage_type = (getattr(salary, "wage_type", "") or "").strip().upper()
+
         lines = payroll.payslip_lines.exclude(source_type="PAYROLL_TAX_BRACKET")
-        earnings = DEC_0
+
+        taxable_earnings = DEC_0
         deductions = DEC_0
 
         for ln in lines:
             if ln.line_type == "EARNING":
-                earnings += ln.amount
-            elif ln.line_type == "DEDUCTION":
-                deductions += ln.amount
+                if wage_type == "MINIMUM":
+                    if self._is_mwe_exempt_earning_line(ln):
+                        continue
+                taxable_earnings += _safe_decimal(ln.amount, "amount")
 
-        return _d2(earnings - deductions)
+            elif ln.line_type == "DEDUCTION":
+                deductions += _safe_decimal(ln.amount, "amount")
+
+        taxable_income = taxable_earnings - deductions
+        if taxable_income < DEC_0:
+            taxable_income = DEC_0
+
+        return _d2(taxable_income)
 
 
     def _apply_payroll_tax(self, payroll: Payroll, ctx, taxable_amount: Decimal):
@@ -747,13 +803,13 @@ class PayrollGenerationService:
         self._apply_commissions(payroll=payroll,commissions=ctx["commissions"],employee=ctx["employee"],department=ctx["department"],commission_tax_rules=ctx["commission_tax_rules"],)
         self._apply_deductions(payroll, ctx["deductions"], period)
 
-        # 8.5 compute base BEFORE payroll tax (this is your bracket base)
-        net_before_tax = self._compute_net_before_tax(payroll)
-        payroll.net_before_excess_tax = net_before_tax
+        # 8.5 compute TAXABLE income base before payroll tax
+        taxable_income = self._compute_taxable_income(payroll, ctx)
+        payroll.net_before_excess_tax = taxable_income
         payroll.save(update_fields=["net_before_excess_tax"])
 
         # 8.6 apply payroll tax bracket deduction
-        self._apply_payroll_tax(payroll, ctx, net_before_tax)
+        self._apply_payroll_tax(payroll, ctx, taxable_income)
 
         # 9 totals (final net_pay includes withholding)
         self._finalize_totals(payroll)

@@ -43,6 +43,20 @@ type AttendanceStatus =
 
 type RangeMode = "Day" | "Week" | "Month" | "Year";
 
+type AttendanceAnalyticsResponse = {
+  mode: RangeMode;
+  date: string;        // YYYY-MM-DD (anchor)
+  start_date: string;  // YYYY-MM-DD
+  end_date: string;    // YYYY-MM-DD
+
+  present: number;
+  late: number;
+  absent: number;
+  leave: number;
+  undertime: number;
+  overtime: number;
+};
+
 type CalendarEvent = {
     type: "holiday" | "payroll";
     start_date: string;
@@ -102,7 +116,7 @@ const Dashboard: React.FC = () => {
   /* ------------------ Chart state ------------------ */
   const [chartOption, setChartOption] =
     useState<echarts.ComposeOption<echarts.BarSeriesOption>>();
-  const [chartHeight, setChartHeight] = useState<number>(280);
+  
 
 /* ================= OVERTIME STATE ================= */
   const [overtimeData, setOvertimeData] = useState<OverTimeRequest[]>([]);
@@ -183,118 +197,66 @@ const Dashboard: React.FC = () => {
       }
     };
 
-    
+     
+const fetchAttendanceAnalytics = async (d?: Dayjs, mode?: RangeMode) => {
+  setAttendanceLoading(true);
+  try {
+    const anchor = d ?? selectedDate;
+    const m = mode ?? rangeMode;
 
-  /* ================= ATTENDANCE COUNT FUNCTION ================= */
-  const countFromRows = (list: any[], totalEmployees: number) => {
-    let present = 0,
-      late = 0,
-      overtime = 0,
-      undertime = 0;
+    const params = {
+      mode: m,
+      date: anchor.format("YYYY-MM-DD"),
+    };
 
-    list.forEach((r: any) => {
-      if (r.status === "PRESENT") present++;
-      const types = (r.event_types || "")
-        .split(",")
-        .map((x: string) => x.trim())
-        .filter(Boolean);
+    // Use the new backend endpoint (same rules as pie charts)
+    const res = await api.get<AttendanceAnalyticsResponse>(
+      "/attendance/super_admin/analytics/",
+      { params }
+    );
 
-      if (types.includes("Late")) late++;
-      if (types.includes("Overtime")) overtime++;
-      if (types.includes("Undertime")) undertime++;
+    setAttendanceData({
+      PRESENT: res.data.present ?? 0,
+      ABSENT: res.data.absent ?? 0,
+      LATE: res.data.late ?? 0,
+      OVERTIME: res.data.overtime ?? 0,
+      UNDERTIME: res.data.undertime ?? 0,
     });
-
-    const absent = totalEmployees - present;
-
-    return { PRESENT: present, ABSENT: absent, LATE: late, OVERTIME: overtime, UNDERTIME: undertime };
-  };
-
-  const fetchMonthRows = async (y: number, m: number) => {
-    const params = { year: y, month: m };
-    const res = await api.get("/attendance/admin/logs/", { params });
-    return res.data.results || [];
-  };
-
-  const filterRowsByRange = (rows: any[], mode: RangeMode, anchor: Dayjs) => {
-    if (mode === "Month") {
-      const start = anchor.startOf("month");
-      const end = anchor.endOf("month");
-      return rows.filter((r) => {
-        const d = dayjs(r.date);
-        return (d.isAfter(start, "day") || d.isSame(start, "day")) &&
-          (d.isBefore(end, "day") || d.isSame(end, "day"));
-      });
-    }
-    if (mode === "Day") {
-      const target = anchor.format("YYYY-MM-DD");
-      return rows.filter((r) => r.date === target);
-    }
-    if (mode === "Week") {
-      const start = anchor.startOf("week");
-      const end = anchor.endOf("week");
-      return rows.filter((r) => {
-        const d = dayjs(r.date);
-        return (d.isAfter(start, "day") || d.isSame(start, "day")) &&
-          (d.isBefore(end, "day") || d.isSame(end, "day"));
-      });
-    }
-    return rows;
-  };
-
-  
-  const fetchAttendanceAnalytics = async (d?: Dayjs, mode?: RangeMode) => {
-    setAttendanceLoading(true);
-    try {
-      const anchor = d ?? selectedDate;
-      const m = mode ?? rangeMode;
-
-      // TODO: replace with real total employees count
-      const totalEmployees = 10;
-
-      if (m === "Year") {
-        const y = anchor.year();
-        const all: any[] = [];
-        for (let mm = 1; mm <= 12; mm++) {
-          const rows = await fetchMonthRows(y, mm);
-          all.push(...rows);
-        }
-        setAttendanceData(countFromRows(all, totalEmployees));
-        return;
-      }
-
-      const y = anchor.year();
-      const month = anchor.month() + 1;
-      const monthRows = await fetchMonthRows(y, month);
-      const filtered = filterRowsByRange(monthRows, m, anchor);
-      setAttendanceData(countFromRows(filtered, totalEmployees));
-    } catch {
-      message.error("Failed to load attendance analytics");
-    } finally {
-      setAttendanceLoading(false);
-    }
-  };
+  } catch (err: any) {
+    const msg =
+      err?.response?.data?.detail ||
+      err?.response?.data?.message ||
+      "Failed to load attendance analytics";
+    message.error(msg);
+  } finally {
+    setAttendanceLoading(false);
+  }
+};
+  useEffect(() => {
+    fetchAttendanceAnalytics(selectedDate, rangeMode);
+  }, [selectedDate, rangeMode]);
 
   useEffect(() => {
     fetchOverTimeRequests();
     loadCalendarEvents();
-    fetchAttendanceAnalytics(selectedDate, rangeMode);
   }, []);
 
   /* ================= CHART ================= */
+
   const computeSettings = (width: number) => {
-    if (width >= 1400) return { barWidth: 72, height: 400 };
-    if (width >= 1200) return { barWidth: 56, height: 360 };
-    if (width >= 992) return { barWidth: 44, height: 320 };
-    if (width >= 768) return { barWidth: 36, height: 280 };
-    return { barWidth: "40%", height: 220 };
+    if (width >= 1400) return { barWidth: 72 };
+    if (width >= 1200) return { barWidth: 56 };
+    if (width >= 992) return { barWidth: 44 };
+    if (width >= 768) return { barWidth: 36 };
+    return { barWidth: "40%" as const };
   };
 
   const updateChart = (width: number) => {
     const s = computeSettings(width);
-    setChartHeight(s.height);
     setChartOption({
-      xAxis: { type: "category", data: ["PRESENT", "ABSENT", "LATE", "OVERTIME", "UNDERTIME"] },
-      yAxis: { type: "value" },
+      grid: { left: 40, right: 16, top: 18, bottom: 40, containLabel: true },
+      xAxis: { type: "category", data: ["PRESENT", "ABSENT", "LATE", "OVERTIME", "UNDERTIME"], axisLabel: { interval: 0 } },
+      yAxis: { type: "value", min: 0 },
       series: [
         {
           type: "bar",
@@ -421,18 +383,23 @@ const Dashboard: React.FC = () => {
                       fetchAttendanceAnalytics(selectedDate, mode);
                     }}
                   />
+
                   <DatePicker
                     value={selectedDate}
                     onChange={(d) => {
                       if (!d) return;
                       setSelectedDate(d);
-                      fetchAttendanceAnalytics(d);
+                      fetchAttendanceAnalytics(d, rangeMode);
                     }}
                   />
                 </div>
-                <Spin spinning={attendanceLoading}>
-                  {chartOption && <Chart option={chartOption} style={{ height: chartHeight }} />}
-                </Spin>
+              <div className="chart-area">
+              <Spin spinning={attendanceLoading} style={{ width: "100%", height: "100%" }}>
+                <div className="chart-fill">
+                  {chartOption && <Chart option={chartOption} />}
+                </div>
+              </Spin>
+            </div>
               </div>
             </Col>
 

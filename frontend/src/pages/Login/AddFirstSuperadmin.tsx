@@ -59,18 +59,26 @@ const AddFirstSuperadmin: React.FC<Props> = ({ open, onNext, onClose, mode }) =>
   const sanitizeInput = (value: string) => {
     if (!value) return "";
 
-    // Trim
+    // Trim spaces
     let sanitized = value.trim();
 
-    // Block HTML tags
+    // Remove HTML tags
     sanitized = sanitized.replace(/<[^>]*>/g, "");
 
-    // Block < and >
+    // Remove < and >
     sanitized = sanitized.replace(/[<>]/g, "");
 
     // Normalize spaces
     sanitized = sanitized.replace(/\s+/g, " ");
 
+    return sanitized;
+  };
+
+  const validateContactNo = (value: string) => {
+    const sanitized = sanitizeInput(value);
+    if (!/^\d{11}$/.test(sanitized)) {
+      throw new Error("Contact number must be exactly 11 digits.");
+    }
     return sanitized;
   };
 
@@ -89,7 +97,7 @@ const AddFirstSuperadmin: React.FC<Props> = ({ open, onNext, onClose, mode }) =>
         lname: sanitizeInput(values.lname),
         initial: sanitizeInput(values.initial || ""),
         suffix: sanitizeInput(values.suffix || ""),
-        contact_no: sanitizeInput(values.contact_no),
+        contact_no: validateContactNo(values.contact_no),
         email: sanitizeInput(values.email),
         hired_date: values.hired_date.format("YYYY-MM-DD"),
         position: sanitizeInput(values.position),
@@ -161,7 +169,11 @@ const AddFirstSuperadmin: React.FC<Props> = ({ open, onNext, onClose, mode }) =>
     }
   };
 
-  
+  // Helper function to sanitize input on typing
+  const handleSanitizeInput = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = e.target.value.replace(/[<>]/g, ""); // remove < >
+    form.setFieldsValue({ [field]: sanitized });
+  };
 
   return (
     <Modal
@@ -179,31 +191,37 @@ const AddFirstSuperadmin: React.FC<Props> = ({ open, onNext, onClose, mode }) =>
           {/* Employee Info */}
           <Col xs={24} md={12}>
             <Form.Item name="fname" label="First Name" rules={[{ required: true }]}>
-              <Input />
+              <Input onChange={handleSanitizeInput("fname")} />
             </Form.Item>
           </Col>
 
           <Col xs={24} md={12}>
             <Form.Item name="initial" label="Middle Initial">
-              <Input maxLength={1} />
+              <Input maxLength={1} onChange={handleSanitizeInput("initial")} />
             </Form.Item>
           </Col>
 
           <Col xs={24} md={12}>
             <Form.Item name="lname" label="Last Name" rules={[{ required: true }]}>
-              <Input />
+              <Input onChange={handleSanitizeInput("lname")} />
             </Form.Item>
           </Col>
 
           <Col xs={24} md={12}>
             <Form.Item name="suffix" label="Suffix">
-              <Input />
+              <Input onChange={handleSanitizeInput("suffix")} />
             </Form.Item>
           </Col>
 
           <Col xs={24} md={12}>
             <Form.Item name="contact_no" label="Contact Number" rules={[{ required: true }]}>
-              <Input />
+              <Input
+                maxLength={11}
+                onChange={(e) => {
+                  const sanitized = e.target.value.replace(/\D/g, ""); // digits only
+                  form.setFieldsValue({ contact_no: sanitized });
+                }}
+              />
             </Form.Item>
           </Col>
 
@@ -224,7 +242,7 @@ const AddFirstSuperadmin: React.FC<Props> = ({ open, onNext, onClose, mode }) =>
 
           <Col xs={24} md={12}>
             <Form.Item name="position" label="Position" rules={[{ required: true }]}>
-              <Input />
+              <Input onChange={handleSanitizeInput("position")} />
             </Form.Item>
           </Col>
 
@@ -273,8 +291,14 @@ const AddFirstSuperadmin: React.FC<Props> = ({ open, onNext, onClose, mode }) =>
           </Col>
 
           <Col xs={24} md={12}>
-            <Form.Item name={["address", "zip_code"]} label="Zip Code" >
-              <Input maxLength={4} />
+            <Form.Item name={["address", "zip_code"]} label="Zip Code">
+              <Input
+                maxLength={4} // optional: limit to 4 digits
+                onChange={(e) => {
+                  const sanitized = e.target.value.replace(/\D/g, ""); // remove all non-digits
+                  form.setFieldsValue({ address: { ...form.getFieldValue("address"), zip_code: sanitized } });
+                }}
+              />
             </Form.Item>
           </Col>
         </Row>

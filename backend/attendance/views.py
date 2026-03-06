@@ -17,6 +17,7 @@ from rest_framework.exceptions import PermissionDenied, NotFound,ValidationError
 from datetime import timedelta
 from io import BytesIO
 from .serializers import *
+from .services import (punch_in,punch_out,get_today_status,_get_employee_or_400,_month_date_range,punch_in_eligibility,get_monthly_attendance_stats,get_admin_attendance_analytics_for_range)
 from .services import (punch_in,punch_out,get_today_status,_get_employee_or_400,_month_date_range,punch_in_eligibility,get_monthly_attendance_stats)
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, landscape
@@ -257,7 +258,6 @@ class ShiftRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
 
 #==========================================ATTENDANCE REQUEST==============================
 
-#done logs
 class EmployeeAttendanceCorrectionCreateView(APIView):
     """
     Employee creates a correction request (multipart for attachment).
@@ -327,7 +327,6 @@ class EmployeeAttendanceCorrectionCreateView(APIView):
             status=http_status.HTTP_201_CREATED,
         )
 
-
 class EmployeeAttendanceCorrectionListView(APIView):
     """
     Employee lists their own correction requests.
@@ -347,7 +346,6 @@ class EmployeeAttendanceCorrectionListView(APIView):
                 "results": AttendanceCorrectionListSerializer(qs, many=True).data,
             }
         )
-
 
 class AdminPendingAttendanceCorrectionsView(APIView):
     """
@@ -371,7 +369,6 @@ class AdminPendingAttendanceCorrectionsView(APIView):
             }
         )
 
-#done logs
 class AdminReviewAttendanceCorrectionView(APIView):
     """
     HR/Admin or SuperAdmin verifies/declines a request.
@@ -494,7 +491,7 @@ class AdminAttendanceCorrectionDetailView(APIView):
 
         return Response(AttendanceCorrectionDetailSerializer(obj).data)
 
-#done logs
+
 class AdminApplyAttendanceCorrectionView(APIView):
     """
     HR/Admin applies the correction by editing the Attendance record,
@@ -622,8 +619,6 @@ class AdminApplyAttendanceCorrectionView(APIView):
                 "created_event_count": len(created_events),
             }
         )  
-
-
 
 
 #==============PIE CHART DISPLAY============================
@@ -825,13 +820,135 @@ class AttendanceAdminMonthlyStatsView(APIView):
         payload = {"year": year, "month": month, **counts}
         return Response(AttendanceAdminMonthlyStatsSerializer(payload).data, status=200)
 
+
+class AttendanceAdminAnalyticsView(APIView):
+    """
+    Admin/SuperAdmin attendance analytics for bar chart.
+
+    GET /api/attendance/admin/analytics/?mode=Day|Week|Month|Year&date=YYYY-MM-DD(optional)
+
+    Uses the SAME rules as admin monthly pie stats:
+    - expected workdays
+    - leave override
+    - approved events only
+    - absent computed (missing attendance row OR ABSENT)
+    - clamp to today, future => zeros
+    """
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["ADMIN", "SUPER_ADMIN"]
+
+    def get(self, request):
+        ser = AttendanceAnalyticsQuerySerializer(data=request.query_params)
+        ser.is_valid(raise_exception=True)
+
+        mode = ser.validated_data["mode"]
+        anchor = ser.validated_data.get("date") or timezone.localdate()
+
+        if mode == "Day":
+            start = anchor
+            end = anchor
+
+        elif mode == "Week":
+            # Monday start
+            start = anchor - timedelta(days=anchor.weekday())
+            end = start + timedelta(days=6)
+
+        elif mode == "Month":
+            last_day = monthrange(anchor.year, anchor.month)[1]
+            start = date(anchor.year, anchor.month, 1)
+            end = date(anchor.year, anchor.month, last_day)
+
+        elif mode == "Year":
+            start = date(anchor.year, 1, 1)
+            end = date(anchor.year, 12, 31)
+
+        else:
+            raise ValidationError({"mode": "Invalid mode."})
+
+        counts = get_admin_attendance_analytics_for_range(start, end)
+
+        payload = {
+            "mode": mode,
+            "date": anchor,
+            "start_date": counts["start_date"],
+            "end_date": counts["end_date"],
+            "present": counts["present"],
+            "late": counts["late"],
+            "absent": counts["absent"],
+            "leave": counts["leave"],
+            "undertime": counts["undertime"],
+            "overtime": counts["overtime"],
+        }
+        return Response(AttendanceAnalyticsRangeSerializer(payload).data, status=200)
+    
+
+class AttendanceAdminAnalyticsView(APIView):
+    """
+    Admin/SuperAdmin attendance analytics for bar chart.
+
+    GET /api/attendance/admin/analytics/?mode=Day|Week|Month|Year&date=YYYY-MM-DD(optional)
+
+    Uses the SAME rules as admin monthly pie stats:
+    - expected workdays
+    - leave override
+    - approved events only
+    - absent computed (missing attendance row OR ABSENT)
+    - clamp to today, future => zeros
+    """
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["ADMIN", "SUPER_ADMIN"]
+
+    def get(self, request):
+        ser = AttendanceAnalyticsQuerySerializer(data=request.query_params)
+        ser.is_valid(raise_exception=True)
+
+        mode = ser.validated_data["mode"]
+        anchor = ser.validated_data.get("date") or timezone.localdate()
+
+        if mode == "Day":
+            start = anchor
+            end = anchor
+
+        elif mode == "Week":
+            # Monday start
+            start = anchor - timedelta(days=anchor.weekday())
+            end = start + timedelta(days=6)
+
+        elif mode == "Month":
+            last_day = monthrange(anchor.year, anchor.month)[1]
+            start = date(anchor.year, anchor.month, 1)
+            end = date(anchor.year, anchor.month, last_day)
+
+        elif mode == "Year":
+            start = date(anchor.year, 1, 1)
+            end = date(anchor.year, 12, 31)
+
+        else:
+            raise ValidationError({"mode": "Invalid mode."})
+
+        counts = get_admin_attendance_analytics_for_range(start, end)
+
+        payload = {
+            "mode": mode,
+            "date": anchor,
+            "start_date": counts["start_date"],
+            "end_date": counts["end_date"],
+            "present": counts["present"],
+            "late": counts["late"],
+            "absent": counts["absent"],
+            "leave": counts["leave"],
+            "undertime": counts["undertime"],
+            "overtime": counts["overtime"],
+        }
+        return Response(AttendanceAnalyticsRangeSerializer(payload).data, status=200)
+    
+#==============PDF NI(?) butang comment Please============================
 class AttendanceEmployeesDropdownView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = EmployeeDropdownSerializer
 
     def get_queryset(self):
         return Employee.objects.filter(is_active=True).order_by("lname", "fname")
-
 
 class AttendanceLogsPDFView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1166,3 +1283,4 @@ class AttendanceLogsView(APIView):
             "count": len(results),
             "results": results
         })
+

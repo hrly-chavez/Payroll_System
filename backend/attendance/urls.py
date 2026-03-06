@@ -28,6 +28,10 @@ urlpatterns = [
     path("admin/stats/", AttendanceAdminMonthlyStatsView.as_view(), name="attendance-admin-stats"),
     path("attendance/admin/stats/", AttendanceAdminMonthlyStatsView.as_view()),
 
+    # Bar Chart Analytics (Day/Week/Month/Year)
+    path("admin/analytics/", AttendanceAdminAnalyticsView.as_view(), name="attendance-admin-analytics"),
+    path("super_admin/analytics/", AttendanceAdminAnalyticsView.as_view(), name="attendance-super_admin-analytics"),
+
     #pdf generation
     path("attendance-logs/pdf/", AttendanceLogsPDFView.as_view(), name="attendance_logs_pdf"),
     path("attendance-logs/employees/dropdown/", AttendanceEmployeesDropdownView.as_view(), name="attendance_logs_employee_dropdown"),

@@ -26,18 +26,7 @@ const BaseSalaryTab: React.FC<Props> = ({
   const [selectedSalary, setSelectedSalary] = useState<Salary | undefined>(undefined);
 
   const openModal = () => {
-    if (!salaries.length) {
-      message.warning("No salary record found");
-      return;
-    }
-
-    const latest = [...salaries].sort(
-      (a, b) =>
-        new Date(b.effective_from).getTime() -
-        new Date(a.effective_from).getTime()
-    )[0];
-
-    setSelectedSalary(latest);
+    setSelectedSalary(undefined); // always fresh form
     setIsModalOpen(true);
   };
 
@@ -60,12 +49,16 @@ const BaseSalaryTab: React.FC<Props> = ({
     },
   ];
 
+  // Determine button label dynamically
+  const hasSalary = salaries.length > 0;
+  const buttonLabel = hasSalary ? "Update Base Salary" : "Add Base Salary";
+
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h3>Base Salary</h3>
         <Button type="primary" onClick={openModal}>
-          Edit Base Salary
+          {buttonLabel}
         </Button>
       </div>
 
@@ -75,16 +68,17 @@ const BaseSalaryTab: React.FC<Props> = ({
         loading={loading}
         pagination={false}
         scroll={{ x: "max-content" }}
+        rowKey="id"
       />
 
       <EditEmployeeSalaryModal
         open={isModalOpen}
         employeeId={employeeId}
-        salary={selectedSalary}
+        salary={selectedSalary} // always undefined here so modal opens as a fresh form
         onClose={() => setIsModalOpen(false)}
         onSuccess={() => {
           setIsModalOpen(false);
-          onSuccess(); // tell parent to refresh salaries & deductions
+          onSuccess(); // refresh salaries & deductions in parent
         }}
       />
     </>

@@ -56,7 +56,7 @@ const Router: React.FC = () => {
         </Route>
         <Route path="/unauthorized" element={<Unauthorized />} />
         <Route path="/notification" element={<NotificationPage />} />
-        <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
 
         {/* ================= EMPLOYEE ROUTES ================= */}
         <Route element={<ProtectedRoute allowedRoles={["EMPLOYEE"]} />}>

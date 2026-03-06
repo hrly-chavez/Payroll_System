@@ -7,20 +7,17 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from accounts.permissions import IsRole;
 import random, string
 from rest_framework.views import APIView
-from decimal import Decimal
 from django.db import transaction
 from django.db.models import Q
 from django.utils.timezone import now
 from django.core.mail import send_mail
-from django.contrib.auth.hashers import make_password
-from shared_model.signals import create_audit_log
+from django.contrib.auth.password_validation import validate_password
 from datetime import timedelta
 from django.utils.http import urlsafe_base64_encode
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_bytes
 from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
-from django.template.loader import render_to_string
 from django.contrib.auth import get_user_model
 from django.utils.http import urlsafe_base64_decode
 from reportlab.lib import colors
@@ -30,6 +27,8 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from io import BytesIO
 from django.http import FileResponse
+from accounts.tokens import short_lived_token_generator
+from django.shortcuts import redirect
 
 import logging
 import secrets
@@ -312,6 +311,30 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
     
     # -------------------
+    # CHECKING EXISTING EMAIL EMPLOYEE
+    # ------------------- 
+    @action(detail=False, methods=["get"], url_path="check-email")
+    def check_email(self, request):
+        email = request.query_params.get("email")
+        employee_id = request.query_params.get("employee_id")
+
+        if not email:
+            return Response({"error": "Email parameter is required."}, status=400)
+
+        queryset = Employee.objects.filter(
+            email__iexact=email,
+            is_active=True
+        )
+
+        # EXCLUDE CURRENT EMPLOYEE (for update)
+        if employee_id:
+            queryset = queryset.exclude(id=employee_id)
+
+        exists = queryset.exists()
+
+        return Response({"exists": exists})
+        
+    # -------------------
     # CREATE FIRST SUPER ADMIN EMPLOYEE
     # ------------------- 
     @action(detail=False, methods=["post"], url_path="create-first-superadmin")
@@ -525,12 +548,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
         for a in allowances_data:
             a["employee"] = employee.id
-            serializer = EmployeeAllowanceCreateSerializer(
-                data=a,
-                context={"_current_user": signed_in_user}
-            )
+            serializer = EmployeeAllowanceCreateSerializer(data=a)
             serializer.is_valid(raise_exception=True)
-            serializer.save()
+            serializer.save(_current_user=signed_in_user)
             
         return Response({
             "message": "Employee created successfully",
@@ -566,53 +586,66 @@ class ForgotPasswordView(APIView):
         username = request.data.get("username")
 
         if not username:
-            return Response(
-                {"detail": "Username is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"detail": "Username is required."}, status=400)
 
         try:
             user = User.objects.select_related("employee").get(user_name=username)
         except User.DoesNotExist:
-            return Response(
-                {"detail": "If the account exists, a reset link has been sent."},
-                status=status.HTTP_200_OK
-            )
+            # <-- now return a real 400 for invalid username
+            return Response({"detail": "Username does not exist."}, status=400)
 
-        #  Make sure user has linked employee + email
         if not user.employee or not user.employee.email:
-            return Response(
-                {"detail": "If the account exists, a reset link has been sent."},
-                status=status.HTTP_200_OK
-            )
+            return Response({"detail": "User does not have a valid email."}, status=400)
 
         email = user.employee.email
 
-        # Generate token
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
-        token = default_token_generator.make_token(user)
+        # Cleanup old tokens first
+        PasswordResetToken.cleanup_expired()
+        # Invalidate old unused tokens
+        PasswordResetToken.objects.filter(user=user, is_used=False).update(is_used=True)
 
-        reset_url = f"http://localhost:3000/reset-password/{uid}/{token}/"
+        token = secrets.token_urlsafe(32)
+
+        reset_token = PasswordResetToken.objects.create(
+            user=user,
+            token=token,
+            expires_at=timezone.now() + timedelta(minutes=5)
+        )
+
+        reset_url = f"http://localhost:3000/reset-password/{token}/"
 
         send_mail(
             subject="Payroll System Password Reset",
             message=f"""
-                        Hello {user.user_name},
+Hello {user.user_name},
 
-                        Click the link below to reset your password:
+Click the link below to reset your password:
 
-                        {reset_url}
+{reset_url}
 
-                        If you did not request this, please ignore this email.
-                        """,
+This link expires in 5 minutes.
+""",
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[email],
         )
 
-        return Response(
-            {"detail": "If the account exists, a reset link has been sent."},
-            status=status.HTTP_200_OK
-        )
+        return Response({"detail": "Password reset link sent."}, status=200)
+    
+User = get_user_model()
+
+class CheckResetTokenView(APIView):
+    permission_classes = []
+
+    def get(self, request, token):
+        try:
+            reset_token = PasswordResetToken.objects.select_related("user").get(token=token)
+        except PasswordResetToken.DoesNotExist:
+            return Response({"detail": "Invalid link"}, status=401)
+
+        if reset_token.is_used or reset_token.is_expired():
+            return Response({"detail": "Token expired"}, status=401)
+
+        return Response({"detail": "Token valid"}, status=200)
 
 User = get_user_model()
 
@@ -620,38 +653,31 @@ class ResetPasswordConfirmView(APIView):
     permission_classes = []
 
     def post(self, request):
-        uid = request.data.get("uid")
         token = request.data.get("token")
         password = request.data.get("password")
 
-        if not uid or not token or not password:
-            return Response(
-                {"detail": "Invalid request."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        try:
+            reset_token = PasswordResetToken.objects.select_related("user").get(token=token)
+        except PasswordResetToken.DoesNotExist:
+            return Response({"detail": "Invalid link"}, status=401)
+
+        if reset_token.is_used or reset_token.is_expired():
+            return Response({"detail": "Token expired"}, status=401)
+
+        user = reset_token.user
 
         try:
-            user_id = urlsafe_base64_decode(uid).decode()
-            user = User.objects.get(pk=user_id)
-        except Exception:
-            return Response(
-                {"detail": "Invalid link."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if not default_token_generator.check_token(user, token):
-            return Response(
-                {"detail": "Token expired or invalid."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            validate_password(password, user=user)
+        except ValidationError as e:
+            return Response({"detail": e.messages}, status=400)
 
         user.set_password(password)
         user.save()
 
-        return Response(
-            {"detail": "Password reset successful."},
-            status=status.HTTP_200_OK
-        )
+        reset_token.is_used = True
+        reset_token.save()
+
+        return Response({"detail": "Password reset successful"})
 
 #done logs
 #employee salary
@@ -894,6 +920,39 @@ class EmployeeDeductionViewSet(viewsets.ModelViewSet):
         ]
 
         return Response(data)
+
+    @action(detail=False, methods=["post"], url_path="replace")
+    def replace_deductions(self, request):
+        employee_id = request.data.get("employee")
+        deductions = request.data.get("deductions", [])
+
+        if not employee_id:
+            return Response({"detail": "employee is required"}, status=400)
+
+        if not isinstance(deductions, list) or not deductions:
+            return Response({"detail": "deductions list is required"}, status=400)
+
+        with transaction.atomic():
+            # 1. Deactivate all active deductions
+            Employee_Deduction.objects.filter(
+                employee_id=employee_id,
+                status="Active"
+            ).update(status="Inactive")
+
+            # 2. Create new deductions
+            created = []
+            for item in deductions:
+                serializer = EmployeeDeductionCreateSerializer(
+                    data=item
+                )
+                serializer.is_valid(raise_exception=True)
+                obj = serializer.save(_current_user=request.user)
+                created.append(serializer.data)
+
+        return Response(
+            {"detail": "Deductions replaced successfully", "data": created},
+            status=status.HTTP_201_CREATED,
+        )
 #done logs
 #--------------------- ALLOWANCE
 class EmployeeAllowanceViewSet(viewsets.ModelViewSet):

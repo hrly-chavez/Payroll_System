@@ -121,19 +121,29 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
     try {
       const values = await form.validateFields();
 
+      // 🔥 Check email first before proceeding
+      const response = await api.get(
+        `/employees/employees/check-email/?email=${values.email}`
+      );
+
+      if (response.data.exists) {
+        message.error("Email already exists.");
+        return; // stop here
+      }
+
       const formattedData = {
         ...values,
         hired_date: values.hired_date.format("YYYY-MM-DD"),
         role: values.role || "EMPLOYEE",
       };
 
-      onNext(formattedData); // just send data upward
-    } catch (err) {
+      onNext(formattedData);
+
+    } catch (err: any) {
       message.error("Please complete required fields");
     }
   };
-
-
+  
   return (
     <Modal
       title="Employee Details"
@@ -340,13 +350,13 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
           </Col>
 
           <Col xs={24} md={12}>
-            <Form.Item name={["address", "street"]} label="Street" rules={[{ required: true, pattern: /^[A-Za-z0-9\s]+$/, message: "No special characters allowed" }]}>
+            <Form.Item name={["address", "street"]} label="Street" rules={[{ pattern: /^[A-Za-z0-9\s]+$/, message: "No special characters allowed" }]}>
               <Input />
             </Form.Item>
           </Col>
 
           <Col xs={24} md={12}>
-            <Form.Item name={["address", "zip_code"]} label="Zip Code" rules={[{ required: true, pattern: /^[0-9]+$/, message: "Numbers only" }]}>
+            <Form.Item name={["address", "zip_code"]} label="Zip Code" rules={[{ pattern: /^[0-9]+$/, message: "Numbers only" }]}>
               <Input maxLength={4} />
             </Form.Item>
           </Col>

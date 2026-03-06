@@ -1,8 +1,18 @@
-//src/pages/HR/EmployeeDetailPage/Modals/EditEmployeeSalaryModal.tsx
-import { Modal, Form, Select, InputNumber, DatePicker, Button, message, Input } from "antd";
+// src/pages/HR/EmployeeDetailPage/Modals/EditEmployeeSalaryModal.tsx
+import {
+  Modal,
+  Form,
+  Select,
+  InputNumber,
+  DatePicker,
+  Button,
+  message,
+  Input,
+} from "antd";
 import api from "api/axios";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
+import EditEmployeeContributionsModal from "./EditEmployeeDeductionsModal";
 
 interface Props {
   open: boolean;
@@ -17,103 +27,212 @@ interface Props {
   onClose: () => void;
 }
 
+const MIN_DAILY_WAGE = 500; // Cebu reference minimum daily wage
+
 const EditEmployeeSalaryModal: React.FC<Props> = ({
   open,
   employeeId,
-  salary,
   onSuccess,
   onClose,
 }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [existingSalary, setExistingSalary] = useState<any | null>(null);
+  const [contributionsOpen, setContributionsOpen] = useState(false);
+  const [newSalaryBase, setNewSalaryBase] = useState<number | null>(null);
+  const [initialDeductions, setInitialDeductions] = useState<any[]>([]);
 
-  /* =========================
-     PREFILL FORM ON EDIT
-  ========================== */
+  const payType = Form.useWatch("pay_type", form);
+  const baseRate = Form.useWatch("base_rate", form);
+
+  // Function to calculate wage_type dynamically
+  const calculateWageType = (pay_type: string, base_rate: number) => {
+    if (!pay_type || !base_rate) return undefined;
+    let dailyEquivalent = 0;
+    if (pay_type === "Monthly") dailyEquivalent = base_rate / 20;
+    else if (pay_type === "Daily") dailyEquivalent = base_rate;
+    else if (pay_type === "Hourly") dailyEquivalent = base_rate * 8;
+    return dailyEquivalent >= MIN_DAILY_WAGE ? "ABOVE_MINIMUM" : "MINIMUM";
+  };
+
+  // Auto-update wage_type whenever pay_type or base_rate changes
   useEffect(() => {
-    if (open && salary) {
-      form.setFieldsValue({
-        pay_type: salary.pay_type,
-        base_rate: salary.base_rate,
-        effective_from: dayjs(salary.effective_from),
-      });
-    }
+    const wageType = calculateWageType(payType, baseRate);
+    if (wageType) form.setFieldsValue({ wage_type: wageType });
+  }, [payType, baseRate]);
 
-    if (!open) {
-      form.resetFields();
-    }
-  }, [open, salary]);
+  // Fetch latest salary on open
+  useEffect(() => {
+    if (!open) return;
 
-  /* =========================
-     SUBMIT
-  ========================== */
+    const fetchLatest = async () => {
+      try {
+        const res = await api.get(
+          `/employees/salaries/latest?employee=${employeeId}`
+        );
+
+        setExistingSalary(res.data);
+
+        form.setFieldsValue({
+          pay_type: res.data.pay_type,
+          base_rate: res.data.base_rate,
+          wage_type: calculateWageType(res.data.pay_type, res.data.base_rate),
+          effective_from: dayjs(res.data.effective_from),
+        });
+      } catch (err: any) {
+        if (err.response?.status === 404) {
+          setExistingSalary(null);
+        } else {
+          message.error("Failed to fetch latest salary");
+        }
+      }
+    };
+
+    fetchLatest();
+  }, [open, employeeId, form]);
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
       setLoading(true);
 
-      await api.post("/employees/salaries/edit/", {
+      const payload = {
         employee: employeeId,
         pay_type: values.pay_type,
         base_rate: values.base_rate,
+        wage_type: values.wage_type, // include auto-calculated wage_type
         effective_from: values.effective_from.format("YYYY-MM-DD"),
         reason: values.reason,
-      });
+      };
 
-      message.success("Salary updated successfully");
-      onSuccess();
+      if (existingSalary) {
+        await api.post("/employees/salaries/edit/", payload);
+        message.success("Salary updated successfully");
+
+        // Fetch current active deductions
+        const deductionsRes = await api.get(
+          `/employees/deductions/?employee=${employeeId}`
+        );
+
+        setInitialDeductions(deductionsRes.data);
+        setNewSalaryBase(values.base_rate);
+        setContributionsOpen(true);
+      } else {
+        const res = await api.post("/employees/salaries/", payload);
+        message.success("Salary saved successfully");
+
+        setNewSalaryBase(res.data.base_rate);
+        setInitialDeductions([]);
+        setContributionsOpen(true);
+      }
     } catch (err: any) {
-      message.error(err.response?.data?.message || "Failed to save salary");
+      // DRF error handling
+      let errorMsg = "Failed to save salary";
+
+      if (err.response?.data) {
+        const data = err.response.data;
+
+        if (typeof data === "string") {
+          errorMsg = data;
+        } else if (data.detail) {
+          errorMsg = data.detail;
+        } else if (data.non_field_errors) {
+          errorMsg = data.non_field_errors.join(", ");
+        } else {
+          // Combine field-specific errors
+          errorMsg = Object.entries(data)
+            .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(", ") : value}`)
+            .join("; ");
+        }
+      }
+
+      message.error(errorMsg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Modal
-      open={open}
-      title="Edit Base Salary"
-      onCancel={onClose}
-      footer={null}
-      destroyOnClose
-    >
-      <Form layout="vertical" form={form}>
-        <Form.Item name="pay_type" label="Pay Type" rules={[{ required: true }]}>
-          <Select
-            options={[
-              { label: "Monthly", value: "Monthly" },
-              { label: "Per Period", value: "Per Period" },
-              { label: "Daily", value: "Daily" },
-              { label: "Hourly", value: "Hourly" },
-            ]}
-          />
-        </Form.Item>
+    <>
+      <Modal
+        open={open}
+        title="Edit Base Salary"
+        onCancel={onClose}
+        footer={null}
+        destroyOnClose
+      >
+        <Form layout="vertical" form={form}>
+          <Form.Item name="pay_type" label="Pay Type" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { label: "Monthly", value: "Monthly" },
+                { label: "Daily", value: "Daily" },
+                { label: "Hourly", value: "Hourly" },
+              ]}
+            />
+          </Form.Item>
 
-        <Form.Item name="base_rate" label="Base Rate" rules={[{ required: true }]}>
-          <InputNumber style={{ width: "100%" }} min={0} />
-        </Form.Item>
+          <Form.Item name="base_rate" label="Base Rate" rules={[{ required: true }]}>
+            <InputNumber style={{ width: "100%" }} min={0} />
+          </Form.Item>
 
-        <Form.Item
-          name="effective_from"
-          label="Effective From"
-          rules={[{ required: true }]}
-        >
-          <DatePicker style={{ width: "100%" }} />
-        </Form.Item>
+          <Form.Item name="wage_type" label="Wage Type" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { label: "Minimum Wage", value: "MINIMUM" },
+                { label: "Above Minimum Wage", value: "ABOVE_MINIMUM" },
+              ]}
+            />
+          </Form.Item>
 
-        <Form.Item
-          label="Reason for Change"
-          name="reason"
-          rules={[{ required: true, message: "Please provide a reason for this change" }]}
-        >
-          <Input.TextArea rows={3} placeholder="Why are you making these changes?" />
-        </Form.Item>
+          <Form.Item
+            name="effective_from"
+            label="Effective From"
+            rules={[{ required: true }]}
+          >
+            <DatePicker
+              style={{ width: "100%" }}
+              disabledDate={(current) => {
+                // Disable all dates before today
+                return current && current < dayjs().startOf("day");
+              }}
+            />
+          </Form.Item>
 
-        <Button type="primary" block loading={loading} onClick={handleSubmit}>
-          Save Salary
-        </Button>
-      </Form>
-    </Modal>
+          <Form.Item
+            label="Reason for Change"
+            name="reason"
+            rules={[{ required: true, message: "Please provide a reason for this change" }]}
+          >
+            <Input.TextArea rows={3} placeholder="Why are you making these changes?" />
+          </Form.Item>
+
+          <Button type="primary" block loading={loading} onClick={handleSubmit}>
+            Save Salary
+          </Button>
+        </Form>
+      </Modal>
+
+      {/* Contributions Modal */}
+      {newSalaryBase !== null && (
+        <EditEmployeeContributionsModal
+          open={contributionsOpen}
+          salaryBase={newSalaryBase}
+          employeeId={employeeId}
+          initialValues={initialDeductions}
+          onBack={() => setContributionsOpen(false)}
+          onClose={() => setContributionsOpen(false)}
+          // Keep onNext only to close the modal or notify parent
+          onNext={(deductions: any[]) => {
+            // Do NOT call API here anymore
+            message.success("Contributions updated successfully");
+            setContributionsOpen(false);
+            onSuccess();
+            onClose();
+          }}
+        />
+      )}
+    </>
   );
 };
 

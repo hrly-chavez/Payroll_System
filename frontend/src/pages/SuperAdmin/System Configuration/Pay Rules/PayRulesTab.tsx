@@ -2,16 +2,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  Button,
-  Form,
-  Spin,
-  message,
-  Switch,
-  Tooltip,
-  Modal,
-  Input,
-} from "antd";
+import {Button,Form,Spin,message,Switch,Tooltip,Modal,Input,} from "antd";
 import { EditOutlined, SearchOutlined } from "@ant-design/icons";
 import API from "../../../../api/axios";
 import "../SystemConfiguration.css";
@@ -23,7 +14,7 @@ type Props = {
   active: boolean;
 };
 
-// ✅ Extract exact DRF error message (and field errors)
+//  Extract exact DRF error message (and field errors)
 const extractDRFError = (
   err: any
 ): { text: string; fieldErrors?: Record<string, string[]> } => {
@@ -86,7 +77,7 @@ export default function PayRulesTab({ active }: Props) {
   const [departments, setDepartments] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
 
-  // ✅ Search
+  //  Search
   const [search, setSearch] = useState("");
 
   const [payrollForm] = Form.useForm();
@@ -113,7 +104,7 @@ export default function PayRulesTab({ active }: Props) {
     }
   };
 
-  // ✅ newest first (latest on top)
+  //  newest first (latest on top)
   const fetchPayRules = async () => {
     setLoading(true);
     try {
@@ -164,7 +155,7 @@ export default function PayRulesTab({ active }: Props) {
     payrollForm.setFieldsValue({ is_active: undefined });
   };
 
-  // ✅ Confirm modal + status patch
+  //  Confirm modal + status patch
   const confirmToggleStatus = (rule: any, nextStatus: boolean) => {
     const actionText = nextStatus ? "activate" : "deactivate";
 
@@ -191,7 +182,7 @@ export default function PayRulesTab({ active }: Props) {
         } catch (error: any) {
           console.error(error);
           const parsed = extractDRFError(error);
-          message.error(parsed.text); // ✅ exact error
+          message.error(parsed.text); //  exact error
         }
       },
     });
@@ -251,11 +242,11 @@ export default function PayRulesTab({ active }: Props) {
     } catch (error: any) {
       console.error(error);
 
-      // ✅ show exact backend error message
+      //  show exact backend error message
       const parsed = extractDRFError(error);
       message.error(parsed.text);
 
-      // ✅ show errors under fields (EXACT from backend)
+      //  show errors under fields (EXACT from backend)
       if (parsed.fieldErrors) {
         const fields = Object.entries(parsed.fieldErrors).map(([name, errors]) => ({
           name,
@@ -290,7 +281,7 @@ export default function PayRulesTab({ active }: Props) {
     return value;
   };
 
-  // ✅ Search filter (keeps newest-first)
+  //  Search filter (keeps newest-first)
   const filteredPayRules = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return payRules;
@@ -319,7 +310,7 @@ export default function PayRulesTab({ active }: Props) {
 
   return (
     <div className="table-wrapper">
-      {/* ✅ Search (left) + Add button (right) */}
+      {/*  Search (left) + Add button (right) */}
       <div
         style={{
           display: "flex",

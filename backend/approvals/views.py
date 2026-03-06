@@ -22,7 +22,7 @@ class HolidayListView(generics.ListAPIView):
     serializer_class = HolidaySerializer
     # public access → no permission_classes
 
-#done logs
+
 class HolidayCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Holiday.objects.all()
@@ -64,7 +64,7 @@ class HolidayCreateView(generics.CreateAPIView):
             )
         Notification.objects.bulk_create(notifications)
 
-#done logs
+
 class HolidayUpdateStatusView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -128,20 +128,18 @@ class HolidayUpdateStatusView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-#Leave Type    
+ 
 class LeaveTypeListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Leave_Type.objects.all().order_by('-created_at')
     serializer_class = LeaveTypeSerializer
 
-#done logs
-# views.py
 class LeaveTypeCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Leave_Type.objects.all()
     serializer_class = LeaveTypeSerializer
 
-#done logs
+
 class LeaveTypeUpdateView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Leave_Type.objects.all()
@@ -157,7 +155,7 @@ class LeaveTypeUpdateView(generics.RetrieveUpdateAPIView):
         # Perform the update (post_save will handle audit logs)
         serializer.save()
 
-#done logs
+
 #Leave Request
 class LeaveRequestListCreateView(generics.ListCreateAPIView):
     serializer_class = LeaveRequestSerializer
@@ -243,7 +241,7 @@ class AdminLeaveRequestListView(generics.ListAPIView):
 
         return queryset
 
-#done logs
+
 # -----------------------------
 # Admin action to approve or decline leave
 # -----------------------------
@@ -417,7 +415,7 @@ class CommissionTypeListView(generics.ListAPIView):
 # CREATE
 # /superadmin/commission-types/create/
 # ----------------------------
-#done logs
+
 class CommissionTypeCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated, IsRole]
     allowed_roles = ["SUPER_ADMIN"]
@@ -429,7 +427,7 @@ class CommissionTypeCreateView(generics.CreateAPIView):
 # UPDATE
 # /superadmin/commission-types/<id>/
 # ----------------------------
-#done logs
+
 class CommissionTypeUpdateView(generics.UpdateAPIView):
     permission_classes = [IsAuthenticated, IsRole]
     allowed_roles = ["SUPER_ADMIN"]
@@ -437,7 +435,7 @@ class CommissionTypeUpdateView(generics.UpdateAPIView):
     queryset = Commission_Type.objects.all()
     serializer_class = CommissionTypeSerializer
 
-#done logs
+
 class AllowanceTypeCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Allowance_Type.objects.all()
@@ -456,7 +454,7 @@ class AllowanceTypeListView(generics.ListAPIView):
     queryset = Allowance_Type.objects.all()
     serializer_class = AllowanceTypeSerializer
 
-#done logs
+
 class AllowanceTypeUpdateView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Allowance_Type.objects.all()
@@ -470,13 +468,13 @@ class AllowanceTypeUpdateView(generics.RetrieveUpdateAPIView):
         serializer.save()
 
 #holiday policy
-#done logs
+
 class HolidayPolicyListCreateView(generics.ListCreateAPIView):
     queryset = HolidayPolicy.objects.all().order_by("-created_at")  # adjust ordering
     serializer_class = HolidayPolicySerializer
     permission_classes = [IsAuthenticated]
 
-#done logs
+
 class HolidayPolicyRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = HolidayPolicy.objects.all()
     serializer_class = HolidayPolicySerializer

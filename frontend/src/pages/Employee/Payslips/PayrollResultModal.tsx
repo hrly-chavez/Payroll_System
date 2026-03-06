@@ -58,6 +58,7 @@ type PayrollResult = {
   basic_pay: string;
   total_earnings: string;
   total_deductions: string;
+  net_before_excess_tax: string; 
   net_pay: string;
 
   lines: PayslipLine[];
@@ -78,69 +79,159 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
   const status = (employee?.status || "Processing") as EmployeeMini["status"];
 
 
-  
- const downloadPayslipPDF = async () => {
-    if (!period?.id) return;
+  const formatNightDiffInfoDescription = (text: string) => {
+    // Supports:
+    // "Night Differential days: 2026-01-01, 2026-01-02"
+    // "Night Differential days (cont.): 2026-02-03, 2026-02-04"
+    const m = (text || "").match(/^Night Differential days(?:\s*\(cont\.\))?:\s*(.*)$/);
+    if (!m) return null;
 
-    if (!result || employee?.status !== "Approved" || period?.status !== "Closed") {
-      message.warning("Payslip download is available only when Employee is Approved and Payroll Period is Closed.");
-      return;
-    }
+    const title = "Night Differential days:";
+    const raw = (m[1] || "").trim();
 
-    setDownloading(true);
+    if (!raw) return { title, formatted: [], rawDates: [] as string[] };
 
-    try {
-      const res = await api.get(`/payroll/my-payrolls/${period.id}/download/`, {
-        responseType: "blob",
+    const rawDates = raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const formatted = rawDates.map((d) => {
+      const parsed = dayjs(d, "YYYY-MM-DD", true);
+      return parsed.isValid() ? parsed.format("MMM DD, YYYY") : d;
+    });
+
+    return { title, formatted, rawDates };
+  };
+    const formatAllowanceInfoDescription = (text: string) => {
+    // Supports:
+    // "Allowance days: 2026-01-22, 2026-01-24"
+    // "Allowance days (cont.): ..."
+    // "Allowance: Meal days: 2026-01-22, ..."
+    // "Allowance: Transportation days (cont.): ..."
+    const t = (text || "").trim();
+
+    // Allowance: <name> days...
+    let m = t.match(/^Allowance:\s*(.+?)\s+days(?:\s*\(cont\.\))?:\s*(.*)$/);
+    if (m) {
+      const name = (m[1] || "").trim();
+      const raw = (m[2] || "").trim();
+
+      const rawDates = raw
+        ? raw.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
+
+      const formatted = rawDates.map((d) => {
+        const parsed = dayjs(d, "YYYY-MM-DD", true);
+        return parsed.isValid() ? parsed.format("MMM DD, YYYY") : d;
       });
 
-      const contentDisposition =
-        (res.headers?.["content-disposition"] || res.headers?.["Content-Disposition"]) as string | undefined;
-
-      const serverFilename = extractFilename(contentDisposition || null);
-
-      const safeFilename = (serverFilename || `Payslip_${period.code || period.id}.pdf`)
-        .replace(/[\\/:*?"<>|]+/g, "_");
-
-      // Axios already returns Blob when responseType="blob"
-      const blob: Blob = res.data;
-      const url = window.URL.createObjectURL(blob);
-
-      // 1) Force download
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = safeFilename;
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-
-      // 2) Also open preview in new tab (no file:///)
-      // (If pop-up blocked, user can still open from Downloads folder)
-      window.open(url, "_blank", "noopener,noreferrer");
-
-      // Delay revoke
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-      }, 5000);
-
-      message.success("Payslip downloaded.");
-    } catch (err: any) {
-      const msg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        "Failed to download payslip PDF";
-      message.error(msg);
-    } finally {
-      setDownloading(false);
+      const title = name ? `Allowance days: ${name}` : "Allowance days:";
+      return { title, formatted, rawDates };
     }
+
+    // Allowance days...
+    m = t.match(/^Allowance days(?:\s*\(cont\.\))?:\s*(.*)$/);
+    if (!m) return null;
+
+    const raw = (m[1] || "").trim();
+    const rawDates = raw
+      ? raw.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+
+    const formatted = rawDates.map((d) => {
+      const parsed = dayjs(d, "YYYY-MM-DD", true);
+      return parsed.isValid() ? parsed.format("MMM DD, YYYY") : d;
+    });
+
+    return { title: "Allowance days:", formatted, rawDates };
   };
 
-    const canDownload =
-      !!result &&
-      (employee?.status === "Approved") &&
-      (period?.status === "Closed");
+  const formatTaxBracketInfoDescription = (text: string) => {
+    // Example:
+    // Tax Bracket Info (250k range): taxable=25603.52; min=20833.33; excess=4770.19; apply_mode=EXCESS_ONLY; base_used=4770.19; rate_type=PERCENT; rate=0.1500; tax=715.53
+    const t = (text || "").trim();
 
+    const m = t.match(/^Tax Bracket Info\s*\((.+?)\):\s*(.*)$/i);
+    if (!m) return null;
+
+    const bracketLabel = (m[1] || "").trim();
+    const raw = (m[2] || "").trim();
+
+    const title = bracketLabel
+      ? `Tax Bracket Breakdown (${bracketLabel})`
+      : "Tax Bracket Breakdown";
+
+    if (!raw) {
+      return { title, items: [] as Array<{ label: string; value: string }> };
+    }
+
+    const toMoney = (v: string) => {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return v;
+      return n.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    };
+
+    const toPercent = (v: string) => {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return v;
+      return `${(n * 100).toFixed(2)}%`;
+    };
+
+    const prettyKey: Record<string, string> = {
+      taxable: "Taxable Amount",
+      min: "Bracket Minimum",
+      excess: "Excess Over Minimum",
+      apply_mode: "Apply Mode",
+      base_used: "Tax Base Used",
+      rate_type: "Rate Type",
+      rate: "Rate",
+      tax: "Withholding Tax",
+    };
+
+    const moneyKeys = new Set(["taxable", "min", "excess", "base_used", "tax"]);
+    const percentKeys = new Set(["rate"]);
+
+    const parts = raw
+      .split(";")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const kvMap: Record<string, string> = {};
+    for (const p of parts) {
+      const idx = p.indexOf("=");
+      if (idx === -1) continue;
+      const k = p.slice(0, idx).trim();
+      const v = p.slice(idx + 1).trim();
+      kvMap[k] = v;
+    }
+
+    const order = ["taxable", "min", "excess", "apply_mode", "base_used", "rate_type", "rate", "tax"];
+
+    const items = order
+      .filter((k) => kvMap[k] !== undefined)
+      .map((k) => {
+        const label = prettyKey[k] || k;
+        const rawVal = kvMap[k];
+
+        let value = rawVal;
+        if (moneyKeys.has(k)) value = `₱ ${toMoney(rawVal)}`;
+        if (percentKeys.has(k)) value = toPercent(rawVal);
+
+        if (k === "apply_mode" && rawVal === "EXCESS_ONLY") value = "Excess only (over minimum)";
+        if (k === "apply_mode" && rawVal === "ALWAYS") value = "Always (full taxable)";
+        if (k === "rate_type" && rawVal === "PERCENT") value = "Percent";
+        if (k === "rate_type" && rawVal === "FIXED") value = "Fixed";
+
+        return { label, value };
+      });
+
+    return { title, items };
+  };
+ 
       
   const statusMap: Record<EmployeeMini["status"], { text: string; color: string }> = {
     Pending: { text: "Pending", color: "default" },
@@ -201,28 +292,19 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
   const lines = useMemo(() => {
     const raw = result?.lines || [];
 
-    // Hide Night Differential INFO line(s) for employee view
-    const filtered = raw.filter((l) => {
-      if (l.line_type !== "INFORMATION") return true;
-      const desc = (l.description || "").toLowerCase();
-      // matches: "Night Differential days: ..."
-      if (desc.startsWith("night differential days:")) return false;
-      return true;
-    });
-
     const typeOrder: Record<PayslipLine["line_type"], number> = {
       EARNING: 1,
       DEDUCTION: 2,
       INFORMATION: 3,
     };
-  
+
     const extractDate = (desc?: string) => {
       if (!desc) return null;
       const m = desc.match(/\b\d{4}-\d{2}-\d{2}\b/);
       return m ? m[0] : null;
     };
 
-    return [...filtered].sort((a, b) => {
+    return [...raw].sort((a, b) => {
       const ta = typeOrder[a.line_type] ?? 99;
       const tb = typeOrder[b.line_type] ?? 99;
       if (ta !== tb) return ta - tb;
@@ -236,7 +318,6 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
       return (a.id ?? 0) - (b.id ?? 0);
     });
   }, [result]);
-
   const lineColumns = [
     {
       title: "Type",
@@ -252,11 +333,54 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
         return <Tag color={meta.color}>{meta.text}</Tag>;
       },
     },
-    {
+        {
       title: "Description",
       dataIndex: "description",
       render: (v: string, row: PayslipLine) => {
         const ruleLabel = row.rule_name ? ` (${row.rule_name})` : "";
+
+        if (row.line_type === "INFORMATION") {
+          const info =
+            formatNightDiffInfoDescription(v || "") ||
+            formatAllowanceInfoDescription(v || "") ||
+            formatTaxBracketInfoDescription(v || "");
+
+          if (info) {
+            return (
+              <div>
+                <div style={{ fontWeight: 600 }}>{info.title}</div>
+
+                {"items" in info ? (
+                  info.items.length > 0 ? (
+                    <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {info.items.map((it, idx) => (
+                        <Tag key={`${it.label}-${idx}`}>
+                          <span style={{ marginRight: 6 }}>{it.label}:</span>
+                          <span>{it.value}</span>
+                        </Tag>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, opacity: 0.75 }}>-</div>
+                  )
+                ) : info.formatted.length > 0 ? (
+                  <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {info.formatted.map((label, idx) => (
+                      <Tag key={`${info.rawDates[idx] || "x"}-${idx}`}>{label}</Tag>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, opacity: 0.75 }}>-</div>
+                )}
+
+                {ruleLabel ? (
+                  <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>{ruleLabel}</div>
+                ) : null}
+              </div>
+            );
+          }
+        }
+
         return (
           <div>
             <div>{v || "-"}</div>
@@ -286,8 +410,12 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
       dataIndex: "rate_applied",
       width: 120,
       align: "right" as const,
-      render: (v: string | null | undefined) => (v ? v : "-"),
+      render: (v: string | null | undefined, row: PayslipLine) => {
+        if (row.line_type === "INFORMATION") return "-";
+        return v ? v : "-";
+      },
     },
+    
     {
       title: "Amount",
       dataIndex: "amount",
@@ -313,15 +441,23 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
       open={open}
       onCancel={onClose}
       footer={null}
-      width={980}
       title={employee ? `Payslip: ${employee.full_name}` : "Payslip"}
-      style={{ top: 60 }}
+      centered
       destroyOnClose
+      width="min(1100px, calc(100vw - 24px))"
+      style={{ top: 12 }}
+      styles={{
+        body: {
+          padding: 12,
+          maxHeight: "calc(100vh - 120px)",
+          overflow: "auto",
+        },
+      }}
     >
       {!employee || !period ? null : (
         <>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
-            <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 12 }}>
+              <div style={{ flex: "1 1 360px", minWidth: 280 }}>
               <Descriptions bordered size="small" column={1}>
                 <Descriptions.Item label="Employee ID">{employee.id}</Descriptions.Item>
                 <Descriptions.Item label="Department">{employee.department_name || "-"}</Descriptions.Item>
@@ -339,7 +475,7 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
               </Descriptions>
             </div>
 
-            <div style={{ flex: 1 }}>
+              <div style={{ flex: "1 1 360px", minWidth: 280 }}>
               <Descriptions bordered size="small" column={1} title="Totals">
                 <Descriptions.Item label="Payroll ID">{result?.payroll_id ?? "-"}</Descriptions.Item>
                 <Descriptions.Item label="Payroll Status">
@@ -352,27 +488,27 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
                 <Descriptions.Item label="Basic Pay">{money(result?.basic_pay)}</Descriptions.Item>
                 <Descriptions.Item label="Total Earnings">{money(result?.total_earnings)}</Descriptions.Item>
                 <Descriptions.Item label="Total Deductions">{money(result?.total_deductions)}</Descriptions.Item>
+                {(() => {
+                const nbet = Number(result?.net_before_excess_tax ?? 0);
+                const net = Number(result?.net_pay ?? 0);
+
+                // show ONLY if excess tax affected net pay
+                if (!Number.isFinite(nbet) || !Number.isFinite(net)) return null;
+                if (Math.abs(nbet - net) < 0.0001) return null;
+
+                return (
+                  <Descriptions.Item label="Net Before Excess Tax">
+                    {money(result?.net_before_excess_tax)}
+                  </Descriptions.Item>
+                );
+              })()}
+
                 <Descriptions.Item label="Net Pay">
                   <span style={{ fontWeight: 700 }}>{money(result?.net_pay)}</span>
                 </Descriptions.Item>
               </Descriptions>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-                <Space>
-                  <Button onClick={loadPayrollResult} disabled={loading}>
-                    Refresh
-                  </Button>
-                  <Button
-                    type="primary"
-                    onClick={downloadPayslipPDF}
-                    loading={downloading}
-                    disabled={loading || downloading || !canDownload}
-                  >
-                    Download Payslip (PDF)
-                  </Button>
-                </Space>
-             
-              </div>
+              
             </div>
           </div>
 
@@ -407,8 +543,8 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
                   rowKey="id"
                   pagination={false}
                   size="small"
-                  scroll={{ y: 420 }}
                   locale={{ emptyText: "No payslip lines found" }}
+                  
                 />
               </div>
 

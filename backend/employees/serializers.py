@@ -160,10 +160,25 @@ class AddressSerializer(serializers.ModelSerializer):
             "zip_code",
         ]
 
+    # -------------------------
+    # CUSTOM VALIDATORS
+    # -------------------------
+    def validate_street(self, value):
+        if value and re.search(r"[<>]", value):
+            raise ValidationError("Street cannot contain < or > characters.")
+        return value
 
-# =========================
-# Employee Create Serializer
-# =========================
+    def validate_sitio(self, value):
+        if value and re.search(r"[<>]", value):
+            raise ValidationError("Sitio cannot contain < or > characters.")
+        return value
+
+    def validate_zip_code(self, value):
+        if value and not value.isdigit():
+            raise ValidationError("Zip code must contain numbers only.")
+        return value
+
+
 class EmployeeCreateSerializer(serializers.ModelSerializer):
     address = AddressSerializer()
 
@@ -181,18 +196,15 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
     def sanitize_string(self, value):
         if not value:
             return value
-
         value = value.strip()
-        value = strip_tags(value)          # remove html tags
+        value = strip_tags(value)          # remove HTML tags
         value = re.sub(r"[<>]", "", value) # remove < >
         value = re.sub(r"\s+", " ", value) # normalize spaces
-
         return value
 
     # -------------------------
     # FIELD VALIDATIONS
     # -------------------------
-
     def validate_fname(self, value):
         return self.sanitize_string(value)
 
@@ -209,55 +221,65 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
         return self.sanitize_string(value)
 
     def validate_bank_info(self, value):
+        if not value:
+            return value
         return self.sanitize_string(value)
 
     def validate_contact_no(self, value):
         value = self.sanitize_string(value)
-
-        if not re.match(r"^[0-9]{10,12}$", value):
-            raise serializers.ValidationError(
-                "Contact number must be 10-12 digits."
-            )
+        if not re.match(r"^\d{11}$", value):
+            raise serializers.ValidationError("Contact number must be exactly 11 digits.")
         return value
 
+    def validate_hired_date(self, value):
+        if value < date.today():
+            raise serializers.ValidationError("Hired date cannot be in the past.")
+        return value
+
+    # -------------------------
+    # EMAIL VALIDATION
+    # -------------------------
     def validate_email(self, value):
         value = self.sanitize_string(value)
 
         if "<" in value or ">" in value:
             raise serializers.ValidationError("Invalid email format.")
 
+        if Employee.objects.filter(email__iexact=value, is_active=True).exists():
+            raise serializers.ValidationError("An employee with this email already exists.")
+
         return value.lower()
 
-    def validate_hired_date(self, value):
-        if value < date.today():
-            raise serializers.ValidationError(
-                "Hired date cannot be in the past."
-            )
+    # -------------------------
+    # ADDRESS VALIDATION
+    # -------------------------
+    def validate_address(self, value):
+        for key, val in value.items():
+            if isinstance(val, str):
+                sanitized = self.sanitize_string(val)
+                # Additional numeric validation for zip code
+                if key == "zip_code" and sanitized and not sanitized.isdigit():
+                    raise serializers.ValidationError({"zip_code": "Zip code must contain digits only."})
+                value[key] = sanitized
         return value
 
     # -------------------------
     # CREATE METHOD
     # -------------------------
     def create(self, validated_data):
-        # extract _current_user if passed from view
         user = validated_data.pop("_current_user", None)
         address_data = validated_data.pop("address")
 
-        # Create Address instance manually
         address = Address(**address_data)
         if user:
-            address._current_user = user  # attach user for audit
-        address.save()  # triggers post_save, AuditLog sees _current_user
+            address._current_user = user
+        address.save()
 
-        # Instantiate Employee manually
         employee = Employee(**validated_data)
         employee.address = address
-
         if user:
             employee._current_user = user
-
-        employee.save()  # triggers post_save, AuditLog sees _current_user
-
+        employee.save()
         return employee
    
 class EmployeeUpdateSerializer(serializers.ModelSerializer):
@@ -271,6 +293,20 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
             "email", "hired_date", "position", "bank_info", "shift",
             "department", "address", "is_active", "reason",
         ]
+
+    # -------------------------
+    # EMAIL VALIDATION
+    # -------------------------
+    def validate_email(self, value):
+        employee = self.instance
+
+        if Employee.objects.filter(
+            email__iexact=value,
+            is_active=True
+        ).exclude(id=employee.id).exists():
+            raise serializers.ValidationError("An employee with this email already exists.")
+
+        return value
 
     def update(self, instance, validated_data):
         user = validated_data.pop("_current_user", None)
@@ -301,11 +337,23 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
         return instance
   
 #for salary
+MIN_DAILY_WAGE = 500
+
+def calculate_wage_type(pay_type, base_rate):
+    daily_equivalent = 0
+    if pay_type == "Monthly":
+        daily_equivalent = base_rate / 20
+    elif pay_type == "Daily":
+        daily_equivalent = base_rate
+    elif pay_type == "Hourly":
+        daily_equivalent = base_rate * 8
+    return "ABOVE_MINIMUM" if daily_equivalent >= MIN_DAILY_WAGE else "MINIMUM"
+
 class EmployeeSalarySerializer(serializers.ModelSerializer):
     reason = serializers.CharField(write_only=True, required=False)
     class Meta:
         model = Employee_Salary
-        fields = ["id", "employee", "pay_type", "base_rate", "effective_from", "created_at", "reason", ]
+        fields = ["id", "employee", "pay_type", "base_rate", "wage_type", "effective_from", "created_at", "reason", ]
 
     def validate(self, attrs):
         # Ensure unique salary per employee per effective_from
@@ -316,27 +364,35 @@ class EmployeeSalarySerializer(serializers.ModelSerializer):
                 "A salary for this employee starting from this date already exists."
             )
         return attrs
+
     def create(self, validated_data):
-        # Get current user from context
         user = self.context.get("_current_user")
         reason = validated_data.pop("reason", None)
+
+        # Calculate wage_type based on pay_type and base_rate
+        pay_type = validated_data.get("pay_type")
+        base_rate = validated_data.get("base_rate")
+        validated_data["wage_type"] = calculate_wage_type(pay_type, base_rate)
+
         instance = Employee_Salary(**validated_data)
         if user:
-            instance._current_user = user  # attach for AuditLog
-            instance._audit_reason = reason or f"Salary created by {user.user_name}" if user else None
-        # Attach reason for audit , optional just checking if theres a reason
+            instance._current_user = user
+            instance._audit_reason = reason or f"Salary created by {user.user_name}"
         if reason:
             setattr(instance, "_audit_reason", reason)
         
         instance.save()
-
-        
         return instance
 
     def update(self, instance, validated_data):
         user = self.context.get("_current_user")
         reason = validated_data.pop("reason", None)
-        
+
+        # Recalculate wage_type if pay_type or base_rate changed
+        pay_type = validated_data.get("pay_type", instance.pay_type)
+        base_rate = validated_data.get("base_rate", instance.base_rate)
+        validated_data["wage_type"] = calculate_wage_type(pay_type, base_rate)
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         if user:
@@ -360,13 +416,19 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
-        employee = data["employee"]
-        deduction_type = data.get("deduction_type")
+        # Support PATCH (partial update)
+        employee = data.get("employee") or getattr(self.instance, "employee", None)
+        deduction_type = data.get("deduction_type") or getattr(self.instance, "deduction_type", None)
+
+        if not employee:
+            raise serializers.ValidationError("employee is required")
 
         if not deduction_type:
-            raise serializers.ValidationError(
-                "deduction_type is required"
-            )
+            raise serializers.ValidationError("deduction_type is required")
+
+        # If only status is being updated → skip salary recalculation
+        if set(data.keys()) == {"status"}:
+            return data
 
         # Get latest salary
         salary = (
@@ -391,7 +453,7 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
 
         if not deduction_type:
             raise serializers.ValidationError(
-                f"Salary not valid for {data['deduction_type'].code}"
+                f"Salary not valid for {deduction_type.code}"
             )
 
         # Compute amount
@@ -481,13 +543,14 @@ class EmployeeAllowanceCreateSerializer(serializers.ModelSerializer):
         return data
     
     def create(self, validated_data):
-        user = self.context.get("_current_user")
+        user = validated_data.pop("_current_user", None)
 
-        instance = Employee_Allowance.objects.create(**validated_data)
+        instance = Employee_Allowance(**validated_data)
 
-        # attach user for audit logging
         if user:
             instance._current_user = user
+
+        instance.save()
 
         return instance
 

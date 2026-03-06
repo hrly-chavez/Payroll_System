@@ -367,7 +367,7 @@ class Commission_Type(models.Model):
 
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=50, unique=True)
-    is_taxable = models.BooleanField(default=True)
+    is_taxable = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=timezone.now)
 
@@ -773,6 +773,7 @@ class Payroll(models.Model):
     basic_pay = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     total_earnings = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     total_deductions = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    net_before_excess_tax = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     net_pay = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     generated_at = models.DateField(auto_now_add=True)
     approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_payrolls",)
@@ -803,6 +804,80 @@ class Payroll(models.Model):
             )
         ]
 
+class Payroll_Tax_Bracket(models.Model):
+    RATE_TYPE_CHOICES = [
+        ("PERCENT", "Percent"),  # rate_value stored like 0.1500 meaning 15%
+        ("FIXED", "Fixed"),
+    ]
+
+    APPLY_MODE_CHOICES = [
+        ("EXCESS_ONLY", "Excess Only"),  # default
+        ("ALWAYS", "Always"),            # tax whole amount when bracket matches
+    ]
+
+    id = models.AutoField(primary_key=True)
+
+    name = models.CharField(max_length=100, unique=True)
+
+    min_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    max_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+
+    rate_type = models.CharField(max_length=20, choices=RATE_TYPE_CHOICES)
+    rate_value = models.DecimalField(max_digits=10, decimal_places=4, default=0.0000)
+
+    apply_mode = models.CharField(
+        max_length=20,
+        choices=APPLY_MODE_CHOICES,
+        default="EXCESS_ONLY",
+    )
+
+    effective_from = models.DateField(default=timezone.now)
+    effective_to = models.DateField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    # optional scoping (same pattern as Commission_Tax_Rule)
+    applies_to = models.ForeignKey(
+        "Department",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="payroll_tax_brackets",
+    )
+    employee = models.ForeignKey(
+        "Employee",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="payroll_tax_brackets",
+    )
+
+    def clean(self):
+        if self.max_amount is not None and self.max_amount < self.min_amount:
+            raise ValidationError({"max_amount": "max_amount cannot be less than min_amount."})
+
+        if self.effective_to and self.effective_to < self.effective_from:
+            raise ValidationError({"effective_to": "effective_to cannot be earlier than effective_from."})
+
+        if self.applies_to and self.employee:
+            raise ValidationError({
+                "applies_to": "Choose either Department or Employee, not both.",
+                "employee": "Choose either Department or Employee, not both.",
+            })
+
+        # percent safety: 0 to 1000% (adjust if you want stricter)
+        if self.rate_type == "PERCENT" and self.rate_value < 0:
+            raise ValidationError({"rate_value": "Percent rate_value cannot be negative."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        rng = f"{self.min_amount} - {self.max_amount}" if self.max_amount is not None else f"{self.min_amount}+"
+        scope = "Employee" if self.employee_id else ("Department" if self.applies_to_id else "Global")
+        return f"{self.name} [{scope}] ({rng}) {self.rate_type} {self.rate_value} {self.apply_mode}"
+
 class Payslip(models.Model):
     LINE_TYPES = [
         ("EARNING", "Earning"),
@@ -813,8 +888,11 @@ class Payslip(models.Model):
     SOURCE_TYPES = [
         ("ATTENDANCE_EVENT", "Attendance Event"),
         ("ATTENDANCE", "Attendance"),
+        ("LEAVE_DAY", "Leave Day"),
         ("MANUAL", "Manual"),
         ("ADJUSTMENT", "Adjustment"),
+        ("COMMISSION_TAX_RULE", "Commission Tax Rule"),
+        ("PAYROLL_TAX_BRACKET", "Payroll Tax Bracket"),
     ]
 
     id = models.AutoField(primary_key=True)
@@ -845,6 +923,7 @@ class Payslip(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     commission_tax_rule = models.ForeignKey("Commission_Tax_Rule",on_delete=models.SET_NULL,null=True,blank=True,related_name="payslip_lines")
+    payroll_tax_bracket = models.ForeignKey("Payroll_Tax_Bracket",on_delete=models.SET_NULL,null=True,blank=True,related_name="payslip_lines")
     
     class Meta:
         ordering = ["id"]

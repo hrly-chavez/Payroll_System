@@ -13,7 +13,7 @@ import CommissionTypeTab from "./CommissionType/CommissionTypeTab";
 import ShiftTab from "./Workshifts/ShiftTab";
 import AllowanceTypeTab from "./AllowanceType/AllowanceType";
 import HolidayPolicy from "./HolidayPolicy/HolidayPolicy";
-
+import TaxRulesTab from "./TaxRules/TaxRulesTab";
 
 import CommissionRuleTab from "./Commission Rules/CommissionRuleTab";
 
@@ -24,7 +24,8 @@ type TabType =
   | "payroll"
   | "leave"
   | "commission"          
-  | "commission_rules"    
+  | "commission_rules" 
+  | "tax_rules"
   | "workshifts"
   | "allowance"
   | "holiday";
@@ -44,6 +45,8 @@ const SystemConfiguration: React.FC = () => {
       ? "Contribution Table"
       : activeTab === "payroll"
       ? "Payroll Rules"
+      : activeTab === "tax_rules"
+      ? "Payroll Tax Brackets"
       : activeTab === "leave"
       ? "Leave Types"
       : activeTab === "holiday"
@@ -77,6 +80,13 @@ const SystemConfiguration: React.FC = () => {
               >
                 Payroll Rules
               </button>
+              
+                <button
+                  className={activeTab === "tax_rules" ? "active" : ""}
+                  onClick={() => setActiveTab("tax_rules")}
+                >
+                  Tax Brackets
+                </button>
 
               <button
                 className={activeTab === "leave" ? "active" : ""}
@@ -92,13 +102,12 @@ const SystemConfiguration: React.FC = () => {
                 Commission Types
               </button>
 
-          
-              <button
+              {/* <button
                 className={activeTab === "commission_rules" ? "active" : ""}
                 onClick={() => setActiveTab("commission_rules")}
               >
                 Commission Rules
-              </button>
+              </button> */}
 
               <button
                 className={activeTab === "workshifts" ? "active" : ""}
@@ -128,13 +137,11 @@ const SystemConfiguration: React.FC = () => {
 
             {activeTab === "contribution" && <ContributionTab active />}
             {activeTab === "payroll" && <PayRulesTab active />}
+            {activeTab === "tax_rules" && <TaxRulesTab active />}
             {activeTab === "leave" && <LeaveTab active />}
             {activeTab === "holiday" && <HolidayPolicy active />}
             {activeTab === "commission" && <CommissionTypeTab active />}
-
-            {/* NEW */}
             {activeTab === "commission_rules" && <CommissionRuleTab active />}
-
             {activeTab === "workshifts" && <ShiftTab active />}
             {activeTab === "allowance" && <AllowanceTypeTab active />}
           </div>

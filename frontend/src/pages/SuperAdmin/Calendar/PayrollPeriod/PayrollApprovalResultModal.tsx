@@ -534,16 +534,15 @@ export default function PayrollApprovalResultModal({ open, periodId, employeeId,
                   <Descriptions.Item label="Total Earnings">{money(result.total_earnings)}</Descriptions.Item>
                   <Descriptions.Item label="Total Deductions">{money(result.total_deductions)}</Descriptions.Item>
                   {(() => {
-                    const nbet = Number(result?.net_before_excess_tax ?? 0);
-                    const net = Number(result?.net_pay ?? 0);
+                    const hasPayrollTaxBracket = (result?.lines || []).some(
+                      (line) => line.source_type === "PAYROLL_TAX_BRACKET"
+                    );
 
-                    // show ONLY if there is an actual excess tax effect
-                    if (!Number.isFinite(nbet) || !Number.isFinite(net)) return null;
-                    if (Math.abs(nbet - net) < 0.0001) return null;
+                    if (!hasPayrollTaxBracket) return null;
 
                     return (
                       <Descriptions.Item label="Net Before Excess Tax">
-                        {money(result.net_before_excess_tax)}
+                        {money(result?.net_before_excess_tax)}
                       </Descriptions.Item>
                     );
                   })()}

@@ -48,6 +48,8 @@ urlpatterns = [
     path("periods/<int:period_id>/approval-queue/",PayrollPeriodApprovalQueueView.as_view(),name="payroll-period-approval-queue",),
     path("periods/<int:period_id>/employees/<int:employee_id>/approve/",PayrollApproveEmployeeView.as_view(),name="payroll-approve-employee",),
     path("periods/<int:period_id>/employees/<int:employee_id>/decline/",PayrollDeclineEmployeeView.as_view(),name="payroll-decline-employee",),
+    #Bulk Approve
+    path("periods/<int:period_id>/bulk-decision/", PayrollBulkDecisionView.as_view(), name="payroll-bulk-decision"),
     #Reset Payroll
     path("periods/<int:period_id>/employees/<int:employee_id>/reset-after-decline/",PayrollResetAfterDeclineView.as_view(),name="payroll-reset-after-decline",),
     # Mark period as Paid (only Closed -> Paid)

@@ -329,50 +329,7 @@ const Dashboard: React.FC = () => {
         <Topbar title="Dashboard" />
         <Content className="dashboard-content">
           <Row gutter={[16, 16]} className="equalHeightRow">
-            <Col xs={25} md={7}>
-              <Card className="stat-tile primary" hoverable>
-                <div className="tile-title">Off Set (Coming Soon)</div>
 
-                <div className="tile-body">
-                  <HourglassOutlined className="tile-icon" />
-                  <div className="tile-value">—</div>
-                </div>
-              </Card>
-            </Col>
-
-            <Col xs={25} md={7}>
-            
-              <Card
-                className="stat-tile"
-                hoverable
-                onClick={async () => {
-                  const latest = await fetchExcessTimeRequests();
-                  const pending = latest.filter((r) => r.status === "Pending");
-
-                  if (pending.length === 1) {
-                    setSelectedExcessTime(pending[0]);
-                    setIsExcessTimeDetailModalOpen(true);
-                  } else {
-                    setIsExcessTimeModalOpen(true);
-                  }
-                }}
-              >
-                <div className="tile-title">Excess Time Pending(s)</div>
-                <div className="tile-body">
-                  <HourglassOutlined className="tile-icon" />
-                  <div className="tile-value">
-                    {excessTimeData.filter((r) => r.status === "Pending").length}
-                  </div>
-                </div>
-              </Card>
-            </Col>
-
-            <Col xs={24} md={10}>
-              <CompanyNote role="SUPER_ADMIN" />
-            </Col>
-          </Row>
-
-          <Row gutter={[16, 16]} className="equalHeightRow">
             <Col xs={24} lg={16}>
               <div className="card analytics-card">
                 <div className="filter-row">
@@ -405,7 +362,40 @@ const Dashboard: React.FC = () => {
               </div>
             </Col>
 
-            <Col xs={24} lg={8}>
+            <Col xs={24} md={8}>
+              <CompanyNote role="SUPER_ADMIN" />
+            </Col>
+          </Row>
+
+          <Row gutter={[16, 16]} className="equalHeightRow">
+            <Col xs={24} md={8}>
+            
+              <Card
+                className="stat-tile"
+                hoverable
+                onClick={async () => {
+                  const latest = await fetchExcessTimeRequests();
+                  const pending = latest.filter((r) => r.status === "Pending");
+
+                  if (pending.length === 1) {
+                    setSelectedExcessTime(pending[0]);
+                    setIsExcessTimeDetailModalOpen(true);
+                  } else {
+                    setIsExcessTimeModalOpen(true);
+                  }
+                }}
+              >
+                <div className="tile-title">Excess Time Pending(s)</div>
+                <div className="tile-body">
+                  <HourglassOutlined className="tile-icon" />
+                  <div className="tile-value">
+                    {excessTimeData.filter((r) => r.status === "Pending").length}
+                  </div>
+                </div>
+              </Card>
+            </Col>
+
+            <Col xs={24} lg={16}>
               <div className="card calendar-card">
                 <SharedCalendar events={calendarEvents} />
                 <CalendarLegendDisplay />

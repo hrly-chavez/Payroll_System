@@ -88,6 +88,53 @@ export default function SharedCalendar({
     const backgroundColor =
       holidayEvent?.color || payrollEvent?.color;
 
+
+    const popoverContent =
+      holidayEvent || payrollEvent || attendanceEvent ? (
+        <div>
+          {/* ADDED: Holiday title on hover */}
+          {holidayEvent && (
+            <div>
+              <strong>{holidayEvent.title || "Holiday"}</strong>
+            </div>
+          )}
+
+          {/* ADDED: Payroll title on hover */}
+          {payrollEvent && (
+            <div>
+              <strong>{payrollEvent.title || "Payroll Period"}</strong>
+            </div>
+          )}
+
+          {/* Existing attendance hover details, slightly expanded */}
+          {attendanceEvent && (
+            <>
+              {/* ADDED: Optional attendance title */}
+              {attendanceEvent.title && (
+                <div>
+                  <strong>{attendanceEvent.title}</strong>
+                </div>
+              )}
+
+              {attendanceEvent.time_in && (
+                <div>
+                  Punched in at{" "}
+                  {dayjs(attendanceEvent.time_in, "HH:mm:ss").format("h:mm A")}
+                </div>
+              )}
+
+              {attendanceEvent.time_out && (
+                <div>
+                  Punched out at{" "}
+                  {dayjs(attendanceEvent.time_out, "HH:mm:ss").format("h:mm A")}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      ) : null;
+
+
     const content = (
       <div
         className={`${styles.fullCellWrapper} ${
@@ -118,24 +165,7 @@ export default function SharedCalendar({
 
     return (
       <Popover
-        content={
-          attendanceEvent ? (
-            <div>
-              {attendanceEvent.time_in && (
-                <div>
-                  Punched in at{" "}
-                  {dayjs(attendanceEvent.time_in, "HH:mm:ss").format("h:mm A")}
-                </div>
-              )}
-              {attendanceEvent.time_out && (
-                <div>
-                  Punched out at{" "}
-                  {dayjs(attendanceEvent.time_out, "HH:mm:ss").format("h:mm A")}
-                </div>
-              )}
-            </div>
-          ) : null
-        }
+        content={popoverContent} // CHANGED: was attendance-only before
         trigger="hover"
         placement="top"
       >
@@ -169,7 +199,7 @@ export default function SharedCalendar({
         </div>
       </Popover>
     );
-      }
+  };
 
   return (
     <Calendar

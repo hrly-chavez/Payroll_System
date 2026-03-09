@@ -181,7 +181,9 @@ export default function PayrollPeriodTab({
         onClose={() => {
           setOpenEmployeesModal(false);
           setSelectedPeriodId(null);
+          loadPayrollPeriods(); // refresh table immediately
         }}
+        onChanged={loadPayrollPeriods}
       />
     </>
   );

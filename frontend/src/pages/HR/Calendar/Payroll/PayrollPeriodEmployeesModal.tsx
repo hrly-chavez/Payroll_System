@@ -9,6 +9,14 @@ import dayjs from "dayjs";
 import VerifyEmployeeModal from "./VerifyEmployeeModal";
 import PayrollResultModal from "./PayrollResultModal";
 
+
+type Props = {
+  open: boolean;
+  periodId: number | null;
+  onClose: () => void;
+  onChanged?: () => void;
+};
+
 type PayrollPeriod = {
   id: number;
   code: string;
@@ -25,11 +33,6 @@ type EligibleEmployee = {
   status: "Pending" | "Verified" | "Processing" | "Approved" | "Declined";
 };
 
-type Props = {
-  open: boolean;
-  periodId: number | null;
-  onClose: () => void;
-};
 
 export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }: Props) {
   const [loading, setLoading] = useState(false);

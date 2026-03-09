@@ -640,10 +640,16 @@ class Payroll_Period(models.Model):
         ("Closed","Closed"),
         ("Paid","Paid"),
     ]
+    period_type_choices = [
+        ("FIRST", "First Cutoff"),
+        ("SECOND", "Second Cutoff"),
+        ]
+
     id = models.AutoField(primary_key=True)
     code = models.CharField(max_length=100,unique=True)
     start_date = models.DateField()
     end_date = models.DateField()
+    cutoff_type = models.CharField(max_length=10,choices=period_type_choices)
     pay_date = models.DateField(null=True, blank=True)
     color = models.CharField(max_length=20, default="#ff4d4f")
     status = models.CharField(max_length=20, choices=period_status_choices, default="Open")

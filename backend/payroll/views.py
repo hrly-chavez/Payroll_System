@@ -32,6 +32,31 @@ def _overlaps_period(eff_from, eff_to, period_start, period_end):
     eff_to = eff_to or date.max
     return eff_from <= period_end and eff_to >= period_start
 
+def _recompute_period_status(period: Payroll_Period):
+    """
+    Single source of truth for Payroll_Period.status.
+    - If any PPE is Processing -> period Processing
+    - Else if all PPE are Approved/Declined (and at least 1 exists) -> period Closed
+    - Else -> period Processing (because there are Pending/Verified remaining)
+    """
+    qs = PayrollPeriodEmployee.objects.filter(period=period)
+
+    if qs.filter(status="Processing").exists():
+        if period.status != "Processing":
+            period.status = "Processing"
+            period.save(update_fields=["status"])
+        return
+
+    if qs.exists() and not qs.exclude(status__in=["Approved", "Declined"]).exists():
+        if period.status != "Closed":
+            period.status = "Closed"
+            period.save(update_fields=["status"])
+        return
+
+    # If there are still Pending/Verified (or anything else), it should remain Processing for approvals to continue.
+    if period.status != "Processing":
+        period.status = "Processing"
+        period.save(update_fields=["status"])
 
 def _require_approver(user):
     role = (getattr(user, "role", "") or "").strip().upper()
@@ -76,33 +101,6 @@ def _decline_single_ppe_and_payroll(*, request_user, ppe, payroll, reason, now_d
     ppe.approved_by = request_user
     ppe.approved_at = now_dt
     ppe.save(update_fields=["status", "declined_reason", "approved_by", "approved_at", "updated_at"])
-
-def _recompute_period_status(period: Payroll_Period):
-    """
-    Single source of truth for Payroll_Period.status.
-    - If any PPE is Processing -> period Processing
-    - Else if all PPE are Approved/Declined (and at least 1 exists) -> period Closed
-    - Else -> period Processing (because there are Pending/Verified remaining)
-    """
-    qs = PayrollPeriodEmployee.objects.filter(period=period)
-
-    if qs.filter(status="Processing").exists():
-        if period.status != "Processing":
-            period.status = "Processing"
-            period.save(update_fields=["status"])
-        return
-
-    if qs.exists() and not qs.exclude(status__in=["Approved", "Declined"]).exists():
-        if period.status != "Closed":
-            period.status = "Closed"
-            period.save(update_fields=["status"])
-        return
-
-    # If there are still Pending/Verified (or anything else), it should remain Processing for approvals to continue.
-    if period.status != "Processing":
-        period.status = "Processing"
-        period.save(update_fields=["status"])
-
 
 def _set_payroll_approved_at(payroll: Payroll, now_dt):
     """

@@ -141,15 +141,28 @@ class DeductionTypeSerializer(serializers.ModelSerializer):
 class PayrollPeriodCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payroll_Period
-        fields = '__all__'
+        fields = "__all__"
         read_only_fields = ["id", "code", "status", "created_at"]
 
     def validate(self, attrs):
         start_date = attrs.get("start_date")
         end_date = attrs.get("end_date")
+        cutoff_type = attrs.get("cutoff_type")
 
         if start_date and end_date and start_date > end_date:
-            raise serializers.ValidationError({"detail": "Start date must be before or equal to end date."})
+            raise serializers.ValidationError({
+                "detail": "Start date must be before or equal to end date."
+            })
+
+        if not cutoff_type:
+            raise serializers.ValidationError({
+                "cutoff_type": "Cutoff type is required."
+            })
+
+        if cutoff_type not in ["FIRST", "SECOND"]:
+            raise serializers.ValidationError({
+                "cutoff_type": "Invalid cutoff type."
+            })
 
         # overlap check:
         # new period overlaps an existing one if:
@@ -159,11 +172,13 @@ class PayrollPeriodCreateSerializer(serializers.ModelSerializer):
                 start_date__lte=end_date,
                 end_date__gte=start_date,
             ).exists()
+
             if overlaps:
-                raise serializers.ValidationError({"detail": "This payroll period overlaps with an existing payroll period."})
+                raise serializers.ValidationError({
+                    "detail": "This payroll period overlaps with an existing payroll period."
+                })
 
         return attrs
-
 # Used to list employees inside a payroll period modal (name, department, status)
 class EligibleEmployeeSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source="employee_id", read_only=True)

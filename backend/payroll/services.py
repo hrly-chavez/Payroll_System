@@ -816,12 +816,6 @@ class PayrollGenerationService:
 
         # 10 lifecycle
         self._update_ppe_status(ppe, generated_by_user)
-        
-        # 9 totals
-        self._finalize_totals(payroll)
-
-        # 10 lifecycle
-        self._update_ppe_status(ppe, generated_by_user)
 
     # -------------------------
     # 3) Build Context
@@ -1891,27 +1885,22 @@ class PayrollGenerationService:
 
         return eligible_dates
 
-    def _apply_allowances(self,payroll: Payroll,allowances,period: Payroll_Period,employee: Employee,shift: Shift,leave_map: dict[date, Leave_Day],):
+    def _apply_allowances(self, payroll: Payroll, allowances, period: Payroll_Period, employee: Employee, shift: Shift, leave_map: dict[date, Leave_Day]):
         """
         Apply allowances into payslip lines.
 
-        Special behavior for frequency="Per Day":
-        - Compute totals per MONTH
-        - Pay only on payroll period that contains that month-end
-        - Eligibility is computed by _compute_allowance_eligible_days_for_month()
-
-        For other frequencies:
-        - Uses _resolve_frequency_amount (Per Period / Monthly / One Time)
-        - Creates one EARNING line per allowance row
+        Rules:
+        - Per Day:
+            compute eligible allowance days within the relevant month-end logic
+        - Monthly / Per Period / One Time:
+            only apply if this payroll period overlaps the allowance row
+            use the stored amount directly (no cutoff-based split)
         """
         for a in allowances:
             at = a.allowance_type
             name = at.name if at else "Allowance"
 
-            # ------------------------------------------------------
-            # ALL Per Day allowances -> compute per MONTH,
-            # pay ONLY on payroll period that contains month-end
-            # ------------------------------------------------------
+            # Per Day allowance logic
             if a.frequency == "Per Day":
                 per_day_amt = _d2(a.amount)
                 if per_day_amt <= 0:
@@ -1919,46 +1908,48 @@ class PayrollGenerationService:
 
                 for month_start, month_end in self._month_ends_within(period.start_date, period.end_date):
                     eligible_dates = self._compute_allowance_eligible_days_for_month(
-                    employee=employee,
-                    shift=shift,
-                    month_start=month_start,
-                    month_end=month_end,
-                    leave_map=leave_map,
-                )
-                eligible_days = len(eligible_dates)
-                if eligible_days <= 0:
-                    continue
+                        employee=employee,
+                        shift=shift,
+                        month_start=month_start,
+                        month_end=month_end,
+                        leave_map=leave_map,
+                    )
 
-                amount = _d2(Decimal(eligible_days) * per_day_amt)
+                    eligible_days = len(eligible_dates)
+                    if eligible_days <= 0:
+                        continue
 
-                # EARNING line (same as before)
-                self._create_line(
-                    payroll,
-                    "EARNING",
-                    f"Allowance: {name} ({month_start.strftime('%b %Y')}) ({eligible_days} day(s))",
-                    amount,
-                    source_type="MANUAL",
-                    source_id=a.id,
-                )
+                    amount = _d2(Decimal(eligible_days) * per_day_amt)
 
-                # INFORMATION line (for UI date tags)
-                dates_str = ", ".join([d.isoformat() for d in sorted(eligible_dates)])
-                self._create_line(
-                    payroll,
-                    "INFORMATION",
-                    f"Allowance: {name} days: {dates_str}",
-                    DEC_0,
-                    source_type="MANUAL",
-                    source_id=a.id,
-                )
+                    self._create_line(
+                        payroll,
+                        "EARNING",
+                        f"Allowance: {name} ({month_start.strftime('%b %Y')}) ({eligible_days} day(s))",
+                        amount,
+                        source_type="MANUAL",
+                        source_id=a.id,
+                    )
+
+                    dates_str = ", ".join([d.isoformat() for d in sorted(eligible_dates)])
+                    self._create_line(
+                        payroll,
+                        "INFORMATION",
+                        f"Allowance: {name} days: {dates_str}",
+                        DEC_0,
+                        source_type="MANUAL",
+                        source_id=a.id,
+                    )
                 continue
 
-            # ------------------------------------------------------
-            # Non-Per-Day allowances remain your current behavior
-            # ------------------------------------------------------
-            amt = self._resolve_frequency_amount(a.amount, a.frequency, a.effective_from, a.effective_to, period)
+            # Non-Per-Day allowances:
+            # count only within this payroll period, use stored amount directly
+            amt = _d2(a.amount)
             if amt <= 0:
                 continue
+
+            if a.frequency == "One Time":
+                if not (a.effective_from and period.start_date <= a.effective_from <= period.end_date):
+                    continue
 
             self._create_line(
                 payroll,
@@ -1968,7 +1959,6 @@ class PayrollGenerationService:
                 source_type="MANUAL",
                 source_id=a.id
             )
-
     def _apply_commissions(
         self,
         payroll: Payroll,
@@ -2045,22 +2035,32 @@ class PayrollGenerationService:
         """
         Apply employee deductions into DEDUCTION payslip lines.
 
-        Special handling:
-        - If a deduction row represents a loan, use amortization_per_period when available.
-          Otherwise, use d.amount.
-
-        Amount is then resolved by frequency (Per Period / Monthly / One Time).
+        Rules:
+        - Loan rows with amortization_per_period:
+            use amortization_per_period directly (already per payroll period)
+        - Other deductions:
+            resolve amount using frequency + cutoff type
         """
         for d in deductions:
-            # If this deduction is a loan row, prefer amortization_per_period (per payroll period)
-            base_amount = d.amortization_per_period if d.amortization_per_period is not None else d.amount
+            is_loan = d.amortization_per_period is not None
 
-            amt = self._resolve_frequency_amount(base_amount, d.frequency, d.effective_from, d.effective_to, period)
+            if is_loan:
+                amt = _d2(d.amortization_per_period)
+            else:
+                amt = self._resolve_deduction_frequency_amount(
+                    d.amount,
+                    d.frequency,
+                    d.effective_from,
+                    d.effective_to,
+                    period,
+                )
+
             if amt <= 0:
                 continue
 
             code = d.deduction_type.code if d.deduction_type else "Deduction"
             desc = f"Deduction: {code}"
+
             self._create_line(
                 payroll,
                 "DEDUCTION",
@@ -2070,27 +2070,42 @@ class PayrollGenerationService:
                 source_id=d.id
             )
 
-    def _resolve_frequency_amount(self, amount, frequency, eff_from, eff_to, period: Payroll_Period) -> Decimal:
+    def _resolve_deduction_frequency_amount(self, amount, frequency, eff_from, eff_to, period: Payroll_Period) -> Decimal:
         """
-        Apply employee deductions into DEDUCTION payslip lines.
+        Resolve how much of the base amount should be applied in THIS payroll period.
 
-        Special handling:
-        - If a deduction row represents a loan, use amortization_per_period when available.
-          Otherwise, use d.amount.
-
-        Amount is then resolved by frequency (Per Period / Monthly / One Time).
+        Business rules:
+        - Monthly:
+            full amount on FIRST cutoff only
+        - Per Period:
+            split amount across FIRST and SECOND
+            FIRST gets rounded half
+            SECOND gets the remainder
+        - One Time:
+            apply once only if effective_from falls inside this payroll period
+        - Per Day:
+            handled elsewhere
         """
         amt = _d2(amount)
+        cutoff_type = (getattr(period, "cutoff_type", "") or "").strip().upper()
 
         if frequency == "Per Day":
-            # handled per-attendance day in _apply_allowances
+            return DEC_0
+
+        if frequency == "Monthly":
+            if cutoff_type == "FIRST":
+                return amt
             return DEC_0
 
         if frequency == "Per Period":
-            return amt
+            first_half = _d2(amt / Decimal("2"))
+            second_half = _d2(amt - first_half)
 
-        if frequency == "Monthly":
-            return _d2(amt / Decimal("2"))
+            if cutoff_type == "FIRST":
+                return first_half
+            if cutoff_type == "SECOND":
+                return second_half
+            return DEC_0
 
         if frequency == "One Time":
             if eff_from and period.start_date <= eff_from <= period.end_date:
@@ -2098,7 +2113,6 @@ class PayrollGenerationService:
             return DEC_0
 
         return amt
-
 
     # -------------------------
     # 9) Totals

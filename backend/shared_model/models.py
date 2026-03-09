@@ -1094,9 +1094,10 @@ class AuditLog(models.Model):
 
     user = models.ForeignKey(
         User, 
-        on_delete=models.SET_NULL, 
+        on_delete=models.CASCADE, 
         null=True,  # allow null for AnonymousUser
-        blank=True
+        blank=True,
+        related_name="audit_logs"
     )
     action = models.CharField(
         max_length=50,

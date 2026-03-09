@@ -681,6 +681,26 @@ class ResetPasswordConfirmView(APIView):
 
 #done logs
 #employee salary
+# Helper function to compute salary for deduction
+def get_salary_for_deduction(pay_type, base_rate):
+    """
+    Converts the employee's salary to the equivalent monthly amount
+    for deduction lookup based on Payroll Setting.
+    """
+    payroll_setting = Payroll_Setting.objects.first()  # assuming 1 row
+    divisor = payroll_setting.daily_rate_divisor if payroll_setting else 22
+
+    if pay_type == "Monthly":
+        salary_for_deduction = base_rate
+    elif pay_type == "Daily":
+        salary_for_deduction = base_rate * divisor
+    elif pay_type == "Hourly":
+        salary_for_deduction = base_rate * 8 * divisor
+    else:
+        salary_for_deduction = base_rate
+
+    return salary_for_deduction
+
 class EmployeeSalaryViewSet(viewsets.ModelViewSet):
     queryset = Employee_Salary.objects.all().order_by("-effective_from")
     serializer_class = EmployeeSalarySerializer
@@ -751,19 +771,20 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
         # Recompute percent-based deductions linked to this employee and effective_from
         self._recompute_percentage_deductions(
             employee_id=new_salary.employee_id,
-            salary_amount=new_salary.base_rate,
+            salary_obj=new_salary,
             effective_from=new_salary.effective_from,
             user=request.user
         )
 
         return Response(self.get_serializer(new_salary).data, status=status.HTTP_201_CREATED)
 
-    def _recompute_percentage_deductions(self, employee_id, salary_amount, effective_from, user):
+    def _recompute_percentage_deductions(self, employee_id, salary_obj, effective_from, user):
         from shared_model.models import Employee_Deduction, Deduction_Type
         from decimal import Decimal
         from datetime import timedelta
 
-        salary_amount = Decimal(str(salary_amount))
+        # Convert salary to "monthly equivalent" for deduction lookup
+        salary_amount = Decimal(str(get_salary_for_deduction(salary_obj.pay_type, salary_obj.base_rate)))
 
         # Get ALL deduction codes this employee has ever had
         existing_codes = (
@@ -852,6 +873,25 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
                     active_deduction._current_user = user
                     active_deduction.save(update_fields=["status", "effective_to"])
                     print(f"[DEBUG] Fully inactivated {code}")
+
+class PayrollSettingView(APIView):
+    """
+    Returns payroll setting like daily_rate_divisor
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        payroll_setting = Payroll_Setting.objects.first()
+        if not payroll_setting:
+            # fallback default
+            return Response({"daily_rate_divisor": 22, "is_semi_monthly": True})
+
+        return Response({
+            "daily_rate_divisor": payroll_setting.daily_rate_divisor,
+            "is_semi_monthly": payroll_setting.is_semi_monthly,
+        })
+    
+    
 #done logs
 #employee deduction
 class EmployeeDeductionViewSet(viewsets.ModelViewSet):

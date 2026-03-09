@@ -141,15 +141,28 @@ class DeductionTypeSerializer(serializers.ModelSerializer):
 class PayrollPeriodCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payroll_Period
-        fields = '__all__'
+        fields = "__all__"
         read_only_fields = ["id", "code", "status", "created_at"]
 
     def validate(self, attrs):
         start_date = attrs.get("start_date")
         end_date = attrs.get("end_date")
+        cutoff_type = attrs.get("cutoff_type")
 
         if start_date and end_date and start_date > end_date:
-            raise serializers.ValidationError({"detail": "Start date must be before or equal to end date."})
+            raise serializers.ValidationError({
+                "detail": "Start date must be before or equal to end date."
+            })
+
+        if not cutoff_type:
+            raise serializers.ValidationError({
+                "cutoff_type": "Cutoff type is required."
+            })
+
+        if cutoff_type not in ["FIRST", "SECOND"]:
+            raise serializers.ValidationError({
+                "cutoff_type": "Invalid cutoff type."
+            })
 
         # overlap check:
         # new period overlaps an existing one if:
@@ -159,11 +172,13 @@ class PayrollPeriodCreateSerializer(serializers.ModelSerializer):
                 start_date__lte=end_date,
                 end_date__gte=start_date,
             ).exists()
+
             if overlaps:
-                raise serializers.ValidationError({"detail": "This payroll period overlaps with an existing payroll period."})
+                raise serializers.ValidationError({
+                    "detail": "This payroll period overlaps with an existing payroll period."
+                })
 
         return attrs
-
 # Used to list employees inside a payroll period modal (name, department, status)
 class EligibleEmployeeSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source="employee_id", read_only=True)
@@ -806,4 +821,67 @@ class PayrollPeriodEmployeeSerializer(serializers.ModelSerializer):
     def get_approved_by_name(self, obj):
         return str(obj.approved_by) if obj.approved_by else ""
 
-        
+# ===================== BULK CEO / SUPERADMIN APPROVAL =====================
+
+class BulkPayrollDeclineItemSerializer(serializers.Serializer):
+    employee_id = serializers.IntegerField()
+    declined_reason = serializers.CharField()
+
+    def validate_declined_reason(self, v: str):
+        v = (v or "").strip()
+        if not v:
+            raise serializers.ValidationError("Decline reason is required.")
+        if len(v) < 3:
+            raise serializers.ValidationError("Decline reason is too short.")
+        return v
+
+
+class BulkPayrollDecisionInputSerializer(serializers.Serializer):
+    approve_employee_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        allow_empty=True,
+        default=list,
+    )
+    declines = BulkPayrollDeclineItemSerializer(
+        many=True,
+        required=False,
+        default=list,
+    )
+
+    def validate(self, attrs):
+        approve_ids = attrs.get("approve_employee_ids") or []
+        declines = attrs.get("declines") or []
+
+        decline_ids = [item["employee_id"] for item in declines]
+
+        if not approve_ids and not declines:
+            raise serializers.ValidationError({
+                "detail": "At least one approve or decline action is required."
+            })
+
+        if len(approve_ids) != len(set(approve_ids)):
+            raise serializers.ValidationError({
+                "approve_employee_ids": "Duplicate employee IDs are not allowed."
+            })
+
+        if len(decline_ids) != len(set(decline_ids)):
+            raise serializers.ValidationError({
+                "declines": "Duplicate decline employee IDs are not allowed."
+            })
+
+        overlap = set(approve_ids) & set(decline_ids)
+        if overlap:
+            raise serializers.ValidationError({
+                "detail": f"Employees cannot be both approved and declined: {sorted(list(overlap))}"
+            })
+
+        return attrs
+
+
+class BulkPayrollDecisionResultSerializer(serializers.Serializer):
+    approved_employee_ids = serializers.ListField(child=serializers.IntegerField())
+    declined_employee_ids = serializers.ListField(child=serializers.IntegerField())
+    skipped_employee_ids = serializers.ListField(child=serializers.IntegerField(), required=False)
+    detail = serializers.CharField()        
+

@@ -38,6 +38,54 @@ class PayrollAdmin(admin.ModelAdmin):
     ordering = ("-generated_at",)
 
     readonly_fields = ("basic_pay","total_earnings","total_deductions","net_pay","generated_at","approved_at",)
+@admin.register(Excess_Time_Request)
+class ExcessTimeRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "employee",
+        "date",
+        "minutes",
+        "status",
+        "resolution_type",
+        "approved_by",
+        "approved_at",
+        "created_at",
+    )
+    list_filter = ("status", "resolution_type", "date", "created_at")
+    search_fields = (
+        "employee__fname",
+        "employee__lname",
+        "remarks",
+        "declined_reason",
+    )
+    readonly_fields = ("created_at", "approved_at")
+    date_hierarchy = "date"
+
+
+@admin.register(Offset_Credit)
+class OffsetCreditAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "employee",
+        "target_date",
+        "approved_minutes",
+        "used_minutes",
+        "remaining_minutes",
+        "status",
+        "approved_by",
+        "approved_at",
+        "consumed_at",
+        "expired_at",
+        "created_at",
+    )
+    list_filter = ("status", "target_date", "created_at")
+    search_fields = (
+        "employee__fname",
+        "employee__lname",
+        "remarks",
+    )
+    readonly_fields = ("created_at", "approved_at", "consumed_at", "expired_at")
+    date_hierarchy = "target_date"
 @admin.register(Payslip)
 class PayslipAdmin(admin.ModelAdmin):
     list_display = (

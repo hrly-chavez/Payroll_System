@@ -132,6 +132,7 @@ const AddEmployeeFlow: React.FC<Props> = ({ open, departmentId, onClose }) => {
           open
           initialValues={contributionsData}
           salaryBase={salaryData?.base_rate}
+          payType={salaryData?.pay_type}
           onBack={() => setStep(2)}
           onNext={(data) => {
             setContributionsData(data);

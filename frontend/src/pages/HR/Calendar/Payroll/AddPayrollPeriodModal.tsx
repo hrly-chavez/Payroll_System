@@ -1,9 +1,8 @@
 "use client";
-import { Modal, Form, DatePicker, Button, message } from "antd";
+import { Modal, Form, DatePicker, Button, message, Select } from "antd";
 import api from "../../../../api/axios";
 import styles from "./../calendar.module.css";
 import React, { useState } from "react";
-
 
 const { RangePicker } = DatePicker;
 
@@ -22,15 +21,24 @@ export default function AddPayrollPeriodModal({ open, onClose, onSuccess }: Prop
       setLoading(true);
 
       const period = values?.period;
+      const cutoff_type = values?.cutoff_type;
+
       if (!period || period.length !== 2) {
         message.error("Please select a payroll period");
         return;
       }
+
+      if (!cutoff_type) {
+        message.error("Please select a cutoff type");
+        return;
+      }
+
       const [start, end] = period;
 
       await api.post("/payroll/periods/", {
         start_date: start.format("YYYY-MM-DD"),
         end_date: end.format("YYYY-MM-DD"),
+        cutoff_type,
       });
 
       message.success("Payroll period created");
@@ -45,31 +53,45 @@ export default function AddPayrollPeriodModal({ open, onClose, onSuccess }: Prop
         "Failed to create payroll period";
       message.error(msg);
     } finally {
-    setLoading(false);
-  }
+      setLoading(false);
+    }
   };
 
   return (
-    <Modal open={open} onCancel={onClose} footer={null} title="Add Payroll Period"  centered>
-         <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          <Form.Item
-            name="period"
-            label="Select Period"
-            rules={[{ required: true, message: "Please select a payroll period" }]}
-          >
-            <RangePicker style={{ width: "100%" }} />
-          </Form.Item>
+    <Modal open={open} onCancel={onClose} footer={null} title="Add Payroll Period" centered>
+      <Form form={form} layout="vertical" onFinish={handleSubmit}>
+        <Form.Item
+          name="period"
+          label="Select Period"
+          rules={[{ required: true, message: "Please select a payroll period" }]}
+        >
+          <RangePicker style={{ width: "100%" }} />
+        </Form.Item>
 
-          <Button
-            type="primary"
-            block
-            htmlType="submit"
-            loading={loading}
-            className={styles.submitBtn}
-          >
-              Save
-          </Button>
-        </Form>
-      </Modal>
-    );
-  }
+        <Form.Item
+          name="cutoff_type"
+          label="Cutoff Type"
+          rules={[{ required: true, message: "Please select a cutoff type" }]}
+        >
+          <Select
+            placeholder="Select cutoff type"
+            options={[
+              { label: "First Cutoff", value: "FIRST" },
+              { label: "Second Cutoff", value: "SECOND" },
+            ]}
+          />
+        </Form.Item>
+
+        <Button
+          type="primary"
+          block
+          htmlType="submit"
+          loading={loading}
+          className={styles.submitBtn}
+        >
+          Save
+        </Button>
+      </Form>
+    </Modal>
+  );
+}

@@ -337,17 +337,44 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
         return instance
   
 #for salary
-MIN_DAILY_WAGE = 500
+def get_salary_for_deduction(pay_type, base_rate):
+    """
+    Converts the employee's salary to the equivalent monthly amount
+    for deduction lookup based on Payroll Setting.
+    """
+    payroll_setting = Payroll_Setting.objects.first()  # assuming 1 row
+    divisor = payroll_setting.daily_rate_divisor if payroll_setting else 22
+
+    if pay_type == "Monthly":
+        salary_for_deduction = base_rate
+    elif pay_type == "Daily":
+        salary_for_deduction = base_rate * divisor
+    elif pay_type == "Hourly":
+        salary_for_deduction = base_rate * 8 * divisor
+    else:
+        salary_for_deduction = base_rate
+
+    return salary_for_deduction
+
+MIN_DAILY_WAGE = 540
 
 def calculate_wage_type(pay_type, base_rate):
+
+    payroll_setting = Payroll_Setting.objects.first()
+    divisor = payroll_setting.daily_rate_divisor if payroll_setting else 22
+
     daily_equivalent = 0
+
     if pay_type == "Monthly":
-        daily_equivalent = base_rate / 20
+        daily_equivalent = base_rate / divisor
+
     elif pay_type == "Daily":
         daily_equivalent = base_rate
+
     elif pay_type == "Hourly":
         daily_equivalent = base_rate * 8
-    return "ABOVE_MINIMUM" if daily_equivalent >= MIN_DAILY_WAGE else "MINIMUM"
+
+    return "ABOVE_MINIMUM" if daily_equivalent > MIN_DAILY_WAGE else "MINIMUM"
 
 class EmployeeSalarySerializer(serializers.ModelSerializer):
     reason = serializers.CharField(write_only=True, required=False)
@@ -441,7 +468,8 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
         if not salary:
             raise serializers.ValidationError("Employee has no active salary")
 
-        base_salary = salary.base_rate
+        # Convert employee salary to monthly equivalent for deduction range check
+        base_salary = get_salary_for_deduction(salary.pay_type, salary.base_rate)
 
         # Validate salary range
         deduction_type = Deduction_Type.objects.filter(

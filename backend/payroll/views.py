@@ -32,20 +32,6 @@ def _overlaps_period(eff_from, eff_to, period_start, period_end):
     eff_to = eff_to or date.max
     return eff_from <= period_end and eff_to >= period_start
 
-
-def _require_approver(user):
-    role = (getattr(user, "role", "") or "").strip().upper()
-    if role == "SUPER_ADMIN" or getattr(user, "is_superuser", False):
-        return
-
-    emp = getattr(user, "employee", None)
-    if emp and (getattr(emp, "position", "") or "").strip().upper() == "CEO":
-        return
-
-    raise PermissionDenied("You are not allowed to approve/decline payroll.")
-
-
-
 def _recompute_period_status(period: Payroll_Period):
     """
     Single source of truth for Payroll_Period.status.
@@ -72,6 +58,49 @@ def _recompute_period_status(period: Payroll_Period):
         period.status = "Processing"
         period.save(update_fields=["status"])
 
+def _require_approver(user):
+    role = (getattr(user, "role", "") or "").strip().upper()
+    if role == "SUPER_ADMIN" or getattr(user, "is_superuser", False):
+        return
+
+    emp = getattr(user, "employee", None)
+    if emp and (getattr(emp, "position", "") or "").strip().upper() == "CEO":
+        return
+
+    raise PermissionDenied("You are not allowed to approve/decline payroll.")
+
+    payroll.status = "Approved"
+    payroll.approved_by = request_user
+    _set_payroll_approved_at(payroll, now_dt)
+    payroll.save(update_fields=["status", "approved_by", "approved_at"])
+
+    ppe.status = "Approved"
+    ppe.approved_by = request_user
+    ppe.approved_at = now_dt
+    ppe.save(update_fields=["status", "approved_by", "approved_at", "updated_at"])
+
+def _approve_single_ppe_and_payroll(*, request_user, ppe, payroll, now_dt):
+    payroll.status = "Approved"
+    payroll.approved_by = request_user
+    _set_payroll_approved_at(payroll, now_dt)
+    payroll.save(update_fields=["status", "approved_by", "approved_at"])
+
+    ppe.status = "Approved"
+    ppe.approved_by = request_user
+    ppe.approved_at = now_dt
+    ppe.save(update_fields=["status", "approved_by", "approved_at", "updated_at"])
+
+def _decline_single_ppe_and_payroll(*, request_user, ppe, payroll, reason, now_dt):
+    payroll.status = "Disapproved"
+    payroll.approved_by = request_user
+    _set_payroll_approved_at(payroll, now_dt)
+    payroll.save(update_fields=["status", "approved_by"])
+
+    ppe.status = "Declined"
+    ppe.declined_reason = reason
+    ppe.approved_by = request_user
+    ppe.approved_at = now_dt
+    ppe.save(update_fields=["status", "declined_reason", "approved_by", "approved_at", "updated_at"])
 
 def _set_payroll_approved_at(payroll: Payroll, now_dt):
     """
@@ -1209,6 +1238,132 @@ class PayrollDeclineEmployeeView(APIView):
         Notification.objects.bulk_create(notifications)
 
         return Response({"detail": "Payroll declined."}, status=http_status.HTTP_200_OK)
+
+
+# ===================== BULK CEO / SUPERADMIN APPROVAL =====================
+class PayrollBulkDecisionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, period_id: int):
+        _require_approver(request.user)
+
+        period = get_object_or_404(Payroll_Period, id=period_id)
+
+        serializer = BulkPayrollDecisionInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        approve_ids = serializer.validated_data.get("approve_employee_ids") or []
+        declines = serializer.validated_data.get("declines") or []
+
+        decline_reason_by_employee = {
+            item["employee_id"]: item["declined_reason"].strip()
+            for item in declines
+        }
+
+        target_ids = list(approve_ids) + list(decline_reason_by_employee.keys())
+
+        ppe_rows = (
+            PayrollPeriodEmployee.objects
+            .select_for_update()
+            .filter(period=period, employee_id__in=target_ids)
+            .select_related("employee")
+        )
+        ppe_by_employee = {row.employee_id: row for row in ppe_rows}
+
+        payroll_rows = (
+            Payroll.objects
+            .select_for_update()
+            .filter(payroll_period=period, employee_id__in=target_ids)
+            .exclude(status="Void")
+            .order_by("employee_id", "-run_no", "-id")
+        )
+
+        latest_payroll_by_employee = {}
+        for pr in payroll_rows:
+            if pr.employee_id not in latest_payroll_by_employee:
+                latest_payroll_by_employee[pr.employee_id] = pr
+
+        approved_employee_ids = []
+        declined_employee_ids = []
+        skipped_employee_ids = []
+
+        now_dt = timezone.now()
+
+        # ---------- APPROVE ----------
+        for employee_id in approve_ids:
+            ppe = ppe_by_employee.get(employee_id)
+            payroll = latest_payroll_by_employee.get(employee_id)
+
+            if not ppe or not payroll:
+                skipped_employee_ids.append(employee_id)
+                continue
+
+            if ppe.status != "Processing":
+                skipped_employee_ids.append(employee_id)
+                continue
+
+            if payroll.status != "Generated":
+                skipped_employee_ids.append(employee_id)
+                continue
+
+            _approve_single_ppe_and_payroll(
+                request_user=request.user,
+                
+                ppe=ppe,
+                payroll=payroll,
+                now_dt=now_dt,
+            )
+            approved_employee_ids.append(employee_id)
+
+        # ---------- DECLINE ----------
+        for employee_id, reason in decline_reason_by_employee.items():
+            ppe = ppe_by_employee.get(employee_id)
+            payroll = latest_payroll_by_employee.get(employee_id)
+
+            if not ppe or not payroll:
+                skipped_employee_ids.append(employee_id)
+                continue
+
+            if ppe.status != "Processing":
+                skipped_employee_ids.append(employee_id)
+                continue
+
+            if payroll.status != "Generated":
+                skipped_employee_ids.append(employee_id)
+                continue
+
+            _decline_single_ppe_and_payroll(
+                request_user=request.user,
+                ppe=ppe,
+                payroll=payroll,
+                reason=reason,
+                now_dt=now_dt,
+            )
+            declined_employee_ids.append(employee_id)
+
+        _recompute_period_status(period)
+
+        detail_parts = []
+        if approved_employee_ids:
+            detail_parts.append(f"{len(approved_employee_ids)} approved")
+        if declined_employee_ids:
+            detail_parts.append(f"{len(declined_employee_ids)} declined")
+        if skipped_employee_ids:
+            detail_parts.append(f"{len(skipped_employee_ids)} skipped")
+
+        detail = "Bulk payroll decision completed."
+        if detail_parts:
+            detail = f"Bulk payroll decision completed: {', '.join(detail_parts)}."
+
+        payload = {
+            "approved_employee_ids": approved_employee_ids,
+            "declined_employee_ids": declined_employee_ids,
+            "skipped_employee_ids": skipped_employee_ids,
+            "detail": detail,
+        }
+        return Response(BulkPayrollDecisionResultSerializer(payload).data, status=http_status.HTTP_200_OK)
+
 
 #============================RESETING PAYROLL===========================
 class PayrollResetAfterDeclineView(APIView):

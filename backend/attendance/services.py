@@ -622,25 +622,65 @@ def punch_out(user):
 
 def get_today_status(user):
     """
-    For frontend: show today's attendance.
-    Note: for true overnight shifts, if the record is on yesterday, we return it
-    (so the user can still punch out after midnight).
+    Returns the attendance record that is currently relevant for the dashboard.
+
+    Goals:
+    - Normal same-day shift:
+        show today's attendance
+    - True overnight shift after midnight:
+        show yesterday's attendance so punch-out still works
+    - Midnight-start next-day shift (e.g. 00:00-09:00 at 11:30 PM today):
+        if the early-in window for tomorrow is already open,
+        do NOT let today's completed attendance block the next shift.
+        In that case:
+          - return tomorrow's attendance if it already exists
+          - otherwise return None
     """
     employee = _get_employee_or_400(user)
-    shift = employee.shift
+    shift = getattr(employee, "shift", None)
     today = _get_today_local_date()
+    now_dt = _get_now_local_dt()
 
+    # No shift assigned -> plain today lookup
+    if not shift:
+        return Attendance.objects.filter(employee=employee, date=today).first()
+
+    # Resolve the punch-in target work date using the same shared logic
+    target_work_date = _resolve_work_date_for_punch_in(shift, now_dt, today)
+    shift_start_dt, _shift_end_dt = _get_shift_start_end_dt(shift, target_work_date)
+    earliest_allowed_dt = shift_start_dt - timedelta(minutes=EARLY_PUNCH_IN_MINUTES)
+
+    # If we are already inside the target shift's early-in window,
+    # prioritize that target work date.
+    #
+    # This is the key fix for midnight-start shifts:
+    # March 17 11:30 PM should target March 18, not return March 17's old row.
+    if now_dt >= earliest_allowed_dt:
+        target_att = Attendance.objects.filter(
+            employee=employee,
+            date=target_work_date
+        ).first()
+
+        if target_att:
+            return target_att
+
+        # Important:
+        # If target work date is NOT today and we are already in that shift window,
+        # return None so today's completed row does not block punch-in.
+        if target_work_date != today:
+            return None
+
+    # Fallback 1: today's row
     att_today = Attendance.objects.filter(employee=employee, date=today).first()
     if att_today:
         return att_today
 
-    if shift and _is_true_overnight(shift):
+    # Fallback 2: true overnight yesterday row for after-midnight punch-out
+    if _is_true_overnight(shift):
         yesterday = today - timedelta(days=1)
         return Attendance.objects.filter(employee=employee, date=yesterday).first()
 
     return None
-
-
 
 # ====================== PUNCH-IN ELIGIBILITY ======================
 def punch_in_eligibility(user):

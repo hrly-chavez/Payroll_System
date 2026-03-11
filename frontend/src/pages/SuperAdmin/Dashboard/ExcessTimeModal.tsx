@@ -1,18 +1,18 @@
-//src/pages/SuperAdmin/Dashboard/OverTimeModal.tsx
+//src/pages/SuperAdmin/Dashboard/ExcessTimeModal.tsx
 import React from "react";
 import { Modal, Table, Button } from "antd";
-import type { OverTimeRequest } from "./types";
+import type { ExcessTimeRequest } from "./types";
 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onRowClick: (row: OverTimeRequest) => void;
-  data: OverTimeRequest[];
+  onRowClick: (row: ExcessTimeRequest) => void;
+  data: ExcessTimeRequest[];
   loading: boolean;
   navigateToAll: () => void;
 }
 
-const OverTimeModal: React.FC<Props> = ({
+const ExcessTimeModal: React.FC<Props> = ({
   visible,
   onClose,
   onRowClick,
@@ -24,7 +24,7 @@ const OverTimeModal: React.FC<Props> = ({
 
   return (
     <Modal
-      title="OverTime Pending(s)"
+      title="Excess Time Pending(s)"
       open={visible}
       onCancel={onClose}
       footer={[
@@ -52,4 +52,4 @@ const OverTimeModal: React.FC<Props> = ({
   );
 };
 
-export default OverTimeModal;
+export default ExcessTimeModal;

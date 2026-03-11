@@ -374,34 +374,6 @@ class Commission_Type(models.Model):
     def __str__(self):
         return self.name
 
-class Attendance(models.Model):
-    STATUS_CHOICES = [
-        ("PRESENT", "Present"),
-        ("ABSENT", "Absent"),
-        ("HALF_DAY", "Half Day"),
-        ("REST_DAY", "Rest Day"),
-        ("HOLIDAY", "Holiday"),
-    ]
-   
-    id = models.AutoField(primary_key=True)
-    date = models.DateField()
-    status = models.CharField(max_length=20,choices=STATUS_CHOICES,default="PRESENT")
-    time_in = models.DateTimeField(null=True, blank=True)
-    time_out = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="attendances")
-
-    def __str__(self):
-        return f"{self.date} - {self.employee}"
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["employee", "date"],
-                name="unique_attendance_per_employee_per_day"
-            )
-        ]
-
 class Holiday(models.Model):
     holiday_types = [
         ("Regular","Regular"),
@@ -489,7 +461,36 @@ class DepartmentHolidayCalendar(models.Model):
                  models.UniqueConstraint(fields=["department", "base"],
                                           name="unique_dept_holiday_base") 
                                           ]
-        
+  
+
+class Attendance(models.Model):
+    STATUS_CHOICES = [
+        ("PRESENT", "Present"),
+        ("ABSENT", "Absent"),
+        ("HALF_DAY", "Half Day"),
+        ("REST_DAY", "Rest Day"),
+        ("HOLIDAY", "Holiday"),
+    ]
+   
+    id = models.AutoField(primary_key=True)
+    date = models.DateField()
+    status = models.CharField(max_length=20,choices=STATUS_CHOICES,default="PRESENT")
+    time_in = models.DateTimeField(null=True, blank=True)
+    time_out = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="attendances")
+
+    def __str__(self):
+        return f"{self.date} - {self.employee}"
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employee", "date"],
+                name="unique_attendance_per_employee_per_day"
+            )
+        ]
+  
 class Attendance_Event(models.Model): 
     TYPE_CHOICES = [
         ("Night Differential","Night Differential"),
@@ -521,6 +522,86 @@ class Attendance_Event(models.Model):
 
     def __str__(self):
         return self.type
+
+class Excess_Time_Request(models.Model):
+    STATUS_CHOICES = [
+        ("Pending", "Pending"),
+        ("Approved", "Approved"),
+        ("Declined", "Declined"),
+    ]
+
+    RESOLUTION_TYPE_CHOICES = [
+        ("Overtime", "Overtime"),
+        ("Offset", "Offset"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    attendance = models.ForeignKey(Attendance,on_delete=models.CASCADE,related_name="excess_time_requests")
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="excess_time_requests")
+    date = models.DateField(help_text="Work date / shift start date of the source attendance.")
+    minutes = models.PositiveIntegerField(default=0)
+    # Excess time window
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
+    status = models.CharField(max_length=20,choices=STATUS_CHOICES,default="Pending")
+
+    # Final resolution chosen by SuperAdmin:
+    # Overtime / Offset / null (while still pending or declined before choosing)
+    resolution_type = models.CharField(max_length=20,choices=RESOLUTION_TYPE_CHOICES,null=True,blank=True)
+    remarks = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_excess_time_requests")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    declined_reason = models.TextField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        constraints = [
+            # One active excess-time request per attendance for now.
+            # This keeps the source record unique and prevents duplicate auto-created pending requests.
+            models.UniqueConstraint(
+                fields=["attendance"],
+                name="unique_excess_time_request_per_attendance"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.employee} - {self.date} - {self.minutes} min ({self.status})"
+
+class Offset_Credit(models.Model):
+    STATUS_CHOICES = [
+        ("Active", "Active"),
+        ("Used", "Used"),
+        ("Expired", "Expired"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="offset_credits")
+    source_request = models.OneToOneField(Excess_Time_Request,on_delete=models.CASCADE,related_name="offset_credit")
+    attendance = models.ForeignKey(Attendance,on_delete=models.CASCADE,related_name="offset_credits")
+    approved_minutes = models.PositiveIntegerField(default=0)
+    used_minutes = models.PositiveIntegerField(default=0)
+    remaining_minutes = models.PositiveIntegerField(default=0)
+
+    # Next shift only:
+    # this is the work_date where the offset may be consumed
+    target_date = models.DateField()
+    status = models.CharField(max_length=20,choices=STATUS_CHOICES,default="Active")
+    approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_offset_credits")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    expired_at = models.DateTimeField(null=True, blank=True)
+    remarks = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-target_date", "-created_at"]
+        indexes = [
+            models.Index(fields=["employee", "target_date", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.employee} - Offset {self.remaining_minutes}/{self.approved_minutes} min for {self.target_date}"
 
 class Attendance_Correction(models.Model):
     issue_choices = [

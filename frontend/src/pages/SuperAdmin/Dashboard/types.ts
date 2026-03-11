@@ -1,13 +1,10 @@
-//src/pages/SuperAdmin/Dashboard/types.ts
-export interface OverTimeRequest {
-  id: number; // Attendance_Event.id
+export interface ExcessTimeRequest {
+  id: number; // Excess_Time_Request.id
   employee_id: number;
   name: string;
 
   attendance_id: number;
   attendance_date: string;
-
-   type: string; 
 
   minutes: number;
   start_time: string | null;
@@ -17,24 +14,26 @@ export interface OverTimeRequest {
   time_out: string | null;
 
   status: "Pending" | "Approved" | "Declined";
-  event_remarks: string;
+  resolution_type: "Overtime" | "Offset" | null;
+  remarks: string;
+  created_at: string;
 
   department_name?: string | null;
   shift_name?: string | null;
 }
 
-export type PendingOTResponse = {
+export type PendingExcessTimeResponse = {
   year: number;
   month: number;
   count: number;
   results: Array<{
     id: number;
-    type: string;
     minutes: number;
     start_time: string | null;
     end_time: string | null;
-    approval_status: "Pending" | "Approved" | "Declined";
-    event_remarks: string;
+    status: "Pending" | "Approved" | "Declined";
+    resolution_type: "Overtime" | "Offset" | null;
+    remarks: string;
     created_at: string;
 
     attendance_id: number;

@@ -375,7 +375,7 @@ class ShiftRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ShiftSerializer
     permission_classes = [IsAuthenticated]
 
-#==========================================ATTENDANCE REQUEST==============================
+#==========================================ATTENDANCE CORRECTION REQUEST==============================
 
 class EmployeeAttendanceCorrectionCreateView(APIView):
     """
@@ -441,7 +441,10 @@ class EmployeeAttendanceCorrectionCreateView(APIView):
         return Response(
             {
                 "detail": "Attendance correction request submitted.",
-                "correction": AttendanceCorrectionListSerializer(obj).data,
+                "correction": AttendanceCorrectionListSerializer(
+                    obj,
+                    context={"request": request},
+                ).data,
             },
             status=http_status.HTTP_201_CREATED,
         )
@@ -462,7 +465,11 @@ class EmployeeAttendanceCorrectionListView(APIView):
         return Response(
             {
                 "count": qs.count(),
-                "results": AttendanceCorrectionListSerializer(qs, many=True).data,
+                "results": AttendanceCorrectionListSerializer(
+                    qs,
+                    many=True,
+                    context={"request": request},
+                ).data,
             }
         )
 
@@ -484,7 +491,11 @@ class AdminPendingAttendanceCorrectionsView(APIView):
         return Response(
             {
                 "count": qs.count(),
-                "results": AttendanceCorrectionListSerializer(qs, many=True).data,
+                "results": AttendanceCorrectionListSerializer(
+                    qs,
+                    many=True,
+                    context={"request": request},
+                ).data,
             }
         )
 
@@ -608,7 +619,12 @@ class AdminAttendanceCorrectionDetailView(APIView):
         except Attendance_Correction.DoesNotExist:
             raise NotFound("Attendance correction request not found.")
 
-        return Response(AttendanceCorrectionDetailSerializer(obj).data)
+        return Response(
+            AttendanceCorrectionDetailSerializer(
+                obj,
+                context={"request": request},
+            ).data
+        )
 
 
 class AdminApplyAttendanceCorrectionView(APIView):
@@ -733,7 +749,10 @@ class AdminApplyAttendanceCorrectionView(APIView):
         return Response(
             {
                 "detail": "Attendance correction applied and verified.",
-                "correction": AttendanceCorrectionListSerializer(obj).data,
+                "correction": AttendanceCorrectionListSerializer(
+                    obj,
+                    context={"request": request},
+                ).data,
                 "attendance": AttendanceMiniSerializer(attendance).data,
                 "created_event_count": len(created_events),
             }

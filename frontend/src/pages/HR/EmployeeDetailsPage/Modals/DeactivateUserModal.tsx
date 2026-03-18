@@ -1,6 +1,5 @@
-// src/pages/HR/EmployeeDetailPage/Modals/DeactivateUserModal.tsx
 import React, { useState } from "react";
-import { Modal, Form, Input, Button, message, Select } from "antd";
+import { Modal, Form, Input, Button, message } from "antd";
 import api from "api/axios";
 
 interface Props {
@@ -30,10 +29,11 @@ const DeactivateUserModal: React.FC<Props> = ({
 
       await api.post(`/employees/users/${userId}/deactivate/`, {
         reason: values.reason,
-        user_status: values.user_status,
       });
 
-      message.success(`User ${isActive ? "deactivated" : "reactivated"} successfully`);
+      message.success(
+        `User ${isActive ? "deactivated" : "reactivated"} successfully`
+      );
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -53,25 +53,27 @@ const DeactivateUserModal: React.FC<Props> = ({
         <Button key="cancel" onClick={onClose}>
           Cancel
         </Button>,
-        <Button key="submit" type="primary" loading={loading} onClick={handleSubmit}>
+        <Button
+          key="submit"
+          type="primary"
+          loading={loading}
+          onClick={handleSubmit}
+        >
           {isActive ? "Deactivate" : "Reactivate"}
         </Button>,
       ]}
       destroyOnClose
     >
       <Form layout="vertical" form={form}>
-        <Form.Item label="New User Status" name="user_status" rules={[{ required: true }]}>
-            <Select>
-                <Select.Option value="ACTIVE">Active</Select.Option>
-                <Select.Option value="INACTIVE">Inactive</Select.Option>
-                <Select.Option value="SUSPENDED">Suspended</Select.Option>
-                <Select.Option value="TERMINATED">Terminated</Select.Option>
-            </Select>
-        </Form.Item>
         <Form.Item
           label="Reason for Change"
           name="reason"
-          rules={[{ required: true, message: "Please provide a reason for this action" }]}
+          rules={[
+            {
+              required: true,
+              message: "Please provide a reason for this action",
+            },
+          ]}
         >
           <Input.TextArea rows={3} placeholder="Provide a reason..." />
         </Form.Item>

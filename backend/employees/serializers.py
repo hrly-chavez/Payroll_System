@@ -81,6 +81,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
         model = Employee
         fields = [
             "id",
+            "id_no",
             "role",
             "fname",
             "lname",
@@ -90,6 +91,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "department_name",
             "position",
             "status",
+            "employment_status",
             "shift_info",
             "hired_date",
             "bank_info",
@@ -185,7 +187,7 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee
         fields = [
-            "id_no", "fname", "initial", "lname", "suffix", "status",
+            "id_no", "fname", "initial", "lname", "suffix", "status", "employment_status",
             "contact_no", "email", "hired_date", "position", "bank_info",
             "shift", "department", "address",
         ]
@@ -289,7 +291,7 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee
         fields = [
-            "fname", "initial", "lname", "suffix", "status", "contact_no",
+            "fname", "initial", "lname", "suffix", "status", "employment_status", "contact_no",
             "email", "hired_date", "position", "bank_info", "shift",
             "department", "address", "is_active", "reason",
         ]

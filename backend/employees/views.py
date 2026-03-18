@@ -575,6 +575,45 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             "message": "Employee updated successfully",
             "employee": EmployeeSerializer(updated_employee).data
         })
+
+    @action(detail=True, methods=["post"], url_path="update-employment-status")
+    def update_employment_status(self, request, pk=None):
+        employee = self.get_object()
+
+        new_status = request.data.get("employment_status")
+        reason = request.data.get("reason")
+
+        if not new_status:
+            return Response(
+                {"detail": "Employment status is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Save old value for audit
+        old_status = employee.employment_status
+
+        # Update
+        employee.employment_status = new_status
+        employee.save()
+
+        # Optional Audit Log
+        AuditLog.objects.create(
+            user=request.user,
+            action="UPDATE_EMPLOYMENT_STATUS",
+            model_name="Employee",
+            object_id=str(employee.pk),
+            old_data=old_status,
+            new_data=new_status,
+            reason=reason,
+        )
+
+        return Response(
+            {
+                "detail": "Employment status updated successfully.",
+                "employment_status": employee.employment_status
+            },
+            status=status.HTTP_200_OK
+        )
 #forgot pass
 #undone logs
 User = get_user_model()
@@ -1106,30 +1145,30 @@ def employee_audit_logs(request, employee_id):
 
     serialized_logs = []
     for log in all_logs:
-        old_data = ""
-        new_data = ""
+        message_text = ""
 
-        # UPDATE logs: convert dicts to formatted strings
-        if log.action == "UPDATE":
-            if isinstance(log.old_data, dict):
-                old_data = ", ".join([f'{k}: "{v}"' for k, v in log.old_data.items()])
-            else:
-                old_data = str(log.old_data)
+        if log.action == "UPDATE_EMPLOYMENT_STATUS":
+            message_text = f"Updated employment status"
 
-            if isinstance(log.new_data, dict):
-                new_data = ", ".join([f'{k}: "{v}"' for k, v in log.new_data.items()])
-            else:
-                new_data = str(log.new_data)
+        elif log.action == "CREATE":
+            message_text = f"Created {log.model_name}"
+
+        elif log.action == "UPDATE":
+            message_text = f"Updated {log.model_name}"
+
+        elif log.action == "DELETE":
+            message_text = f"Deleted {log.model_name}"
+
+        else:
+            message_text = log.action
 
         user_name = log.user.user_name if log.user else ""
 
         serialized_logs.append({
             "id": log.id,
             "user": user_name,
-            "action": log.action,
-            "model_name": log.model_name,
-            "old_data": old_data,
-            "new_data": new_data,
+            "action": message_text,
+            "reason": log.reason or "No reason provided",
             "timestamp": log.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
         })
 

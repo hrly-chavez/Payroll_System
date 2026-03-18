@@ -1,82 +1,58 @@
 import pandas as pd
 from django.core.management.base import BaseCommand
 from django.utils.timezone import make_aware
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from shared_model.models import Employee, Attendance, Shift, Department
-import os
+from django.contrib.auth import get_user_model
 import re
+import os
+
+User = get_user_model()
+
 
 class Command(BaseCommand):
-    help = "Seed employees and attendance from Excel (.xls or .xlsx) with packed string rows"
+    help = "Import employees and attendance from biometric Excel"
 
     def add_arguments(self, parser):
         parser.add_argument("file_path", type=str)
 
     def handle(self, *args, **kwargs):
+
         file_path = kwargs["file_path"]
 
-        # -------------------------
-        # Detect engine based on file extension
-        # -------------------------
         ext = os.path.splitext(file_path)[1].lower()
-        if ext == ".xls":
-            engine = "xlrd"
-        elif ext == ".xlsx":
-            engine = "openpyxl"
-        else:
-            self.stdout.write(self.style.ERROR("Unsupported file type. Use .xls or .xlsx"))
-            return
+        engine = "xlrd" if ext == ".xls" else "openpyxl"
 
-        # -------------------------
-        # Fetch shift and department once
-        # -------------------------
-        try:
-            shift = Shift.objects.get(id=1)
-            department = Department.objects.get(id=2)
-        except Shift.DoesNotExist:
-            self.stdout.write(self.style.ERROR("Shift with ID 1 does not exist"))
-            return
-        except Department.DoesNotExist:
-            self.stdout.write(self.style.ERROR("Department with ID 2 does not exist"))
-            return
+        df = pd.read_excel(file_path, engine=engine, header=None)
 
-        # -------------------------
-        # Read Excel file
-        # -------------------------
-        try:
-            df = pd.read_excel(file_path, engine=engine, header=None)
-        except FileNotFoundError:
-            self.stdout.write(self.style.ERROR(f"File not found: {file_path}"))
-            return
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f"Failed to read Excel file: {e}"))
-            return
+        shift = Shift.objects.get(id=1)
+        department = Department.objects.get(id=2)
 
-        # -------------------------
-        # Parse each row (packed string)
-        # -------------------------
-        for _, row in df.iterrows():
-            raw = str(row[0]).strip()  # assume the first column has the packed string
+        i = 0
+
+        IMPORT_YEAR = 2026
+        IMPORT_MONTH = 2
+
+        while i < len(df):
+
+            raw = str(df.iloc[i, 0])
+
+            if "ID:" not in raw:
+                i += 1
+                continue
+
             match = re.search(r"ID:(\S+)\s+Name:(.*?)\s+Dept:(\S+)\s+Shift:(\S+)", raw)
+
             if not match:
-                self.stdout.write(self.style.WARNING(f"Skipping invalid row: {raw}"))
+                i += 1
                 continue
 
             id_no, full_name, dept_name, shift_name = match.groups()
 
-            # -------------------------
-            # Handle missing name safely
-            # -------------------------
-            full_name = full_name.strip()
-            if not full_name:
-                self.stdout.write(self.style.WARNING(f"Row with ID {id_no} has empty name. Using 'Unknown'."))
-            name_parts = full_name.split() if full_name else []
-            fname = name_parts[0] if len(name_parts) >= 1 else "Unknown"
-            lname = name_parts[-1] if len(name_parts) >= 2 else "Unknown"
+            name_parts = full_name.split()
+            fname = name_parts[0] if name_parts else "Unknown"
+            lname = name_parts[-1] if len(name_parts) > 1 else "Unknown"
 
-            # -------------------------
-            # CREATE EMPLOYEE IF NOT EXISTS
-            # -------------------------
             employee, created = Employee.objects.get_or_create(
                 id_no=id_no,
                 defaults={
@@ -91,26 +67,125 @@ class Command(BaseCommand):
                     "is_active": True,
                 },
             )
-            if created:
-                self.stdout.write(self.style.SUCCESS(f"Created employee {id_no}"))
 
             # -------------------------
-            # ATTENDANCE
+            # CREATE USER ACCOUNT
             # -------------------------
-            # For now, just mark as PRESENT today
-            att_date = date.today()
-            time_in = None
-            time_out = None
-            status = "PRESENT"
+            if not hasattr(employee, "user"):
 
-            Attendance.objects.update_or_create(
-                employee=employee,
-                date=att_date,
-                defaults={
-                    "time_in": time_in,
-                    "time_out": time_out,
-                    "status": status,
-                },
-            )
+                base_username = fname.lower()
+                username = base_username
+                counter = 1
 
-        self.stdout.write(self.style.SUCCESS("Seeding completed!"))
+                # ensure username uniqueness
+                while User.objects.filter(user_name=username).exists():
+                    username = f"{base_username}{counter}"
+                    counter += 1
+
+                User.objects.create_user(
+                    user_name=username,
+                    password=f"{fname.lower()}123",
+                    role="EMPLOYEE",
+                    employee=employee,
+                    is_active=True,
+                )
+
+                self.stdout.write(self.style.SUCCESS(f"Created user account: {username}"))
+
+            # -------------------------
+            # ATTENDANCE IMPORT
+            # -------------------------
+
+            dates_row = df.iloc[i + 1]
+            times_row = df.iloc[i + 2]
+
+            previous_attendance = None
+
+            for col in range(1, len(dates_row)):
+
+                day = dates_row[col]
+
+                if pd.isna(day):
+                    continue
+
+                raw_times = str(times_row[col]).strip()
+
+                if raw_times == "0":
+                    continue
+
+                times = re.findall(r"\d{2}:\d{2}", raw_times)
+
+                if not times:
+                    continue
+
+                parsed = sorted([datetime.strptime(t, "%H:%M").time() for t in times])
+
+                attendance_date = date(IMPORT_YEAR, IMPORT_MONTH, int(day))
+
+                for t in parsed:
+
+                    # -------------------------
+                    # MIDNIGHT PUNCH (TIME IN)
+                    # -------------------------
+                    if 0 <= t.hour < 6:
+
+                        attendance, created = Attendance.objects.update_or_create(
+                            employee=employee,
+                            date=attendance_date,
+                            defaults={"status": "PRESENT"},
+                        )
+
+                        if not attendance.time_in:
+                            attendance.time_in = make_aware(
+                                datetime.combine(attendance_date, t)
+                            )
+                            attendance.save()
+
+                        previous_attendance = attendance
+
+
+                    # -------------------------
+                    # MORNING PUNCH (TIME OUT)
+                    # -------------------------
+                    elif t.hour <= shift.end_time.hour:
+
+                        if previous_attendance and not previous_attendance.time_out:
+
+                            previous_attendance.time_out = make_aware(
+                                datetime.combine(previous_attendance.date + timedelta(days=1), t)
+                            )
+                            previous_attendance.save()
+
+                        else:
+
+                            Attendance.objects.update_or_create(
+                                employee=employee,
+                                date=attendance_date,
+                                defaults={
+                                    "time_out": make_aware(datetime.combine(attendance_date, t)),
+                                    "status": "PRESENT",
+                                },
+                            )
+
+
+                    # -------------------------
+                    # NIGHT PUNCH (TIME IN)
+                    # -------------------------
+                    else:
+
+                        attendance, created = Attendance.objects.update_or_create(
+                            employee=employee,
+                            date=attendance_date,
+                            defaults={"status": "PRESENT"},
+                        )
+
+                        if not attendance.time_in:
+                            attendance.time_in = make_aware(
+                                datetime.combine(attendance_date, t)
+                            )
+                            attendance.save()
+
+                        previous_attendance = attendance
+            i += 3
+
+        self.stdout.write(self.style.SUCCESS("Attendance import completed"))

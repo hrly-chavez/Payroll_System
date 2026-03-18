@@ -5,8 +5,9 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseU
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-import uuid
-from datetime import timedelta
+import uuid, re
+from datetime import datetime
+
 
 class Province(models.Model):
     name = models.CharField(max_length=100)
@@ -118,7 +119,13 @@ class Employee(models.Model):
     ("WIDOWED", "Widowed"),
     ("SEPARATED", "Separated"),
     ]
-    #TODO: Optional: Add EMP_STATUS (Regular, Probationary, Resigned),EMP_TERMINATION_DATE
+
+    EMPLOYMENT_STATUS_CHOICES = [
+        ("REGULAR", "Regular"),
+        ("PROBATION", "Probation"),
+        ("NEW_HIRE", "New Hire"),
+        ("OJT", "OJT"),
+    ]
 
     id = models.AutoField(primary_key=True)
     id_no = models.CharField(max_length=50,unique=True,null=True,blank=True)
@@ -127,6 +134,7 @@ class Employee(models.Model):
     initial = models.CharField(max_length=1,null=True,blank=True)
     suffix = models.CharField(max_length=20,null=True,blank=True)
     status = models.CharField(max_length=15, choices=EMP_STATUS,default="Single")
+    employment_status = models.CharField(max_length=20,choices=EMPLOYMENT_STATUS_CHOICES,default="NEW_HIRE")
     address = models.ForeignKey(Address, on_delete=models.CASCADE, null=True, blank=True, related_name="residents")
     contact_no = models.CharField(max_length=12)
     hired_date = models.DateField()
@@ -140,6 +148,26 @@ class Employee(models.Model):
     
     def __str__(self):
         return f"{self.fname} {self.lname}"
+
+    def save(self, *args, **kwargs):
+        if not self.id_no:
+            last_employee = Employee.objects.filter(id_no__isnull=False).order_by("-id").first()
+
+            if last_employee and last_employee.id_no:
+                # Extract number from last ID (e.g., EMP-0005 → 5)
+                match = re.search(r"(\d+)$", last_employee.id_no)
+                if match:
+                    last_number = int(match.group(1))
+                    new_number = last_number + 1
+                else:
+                    new_number = 1
+            else:
+                new_number = 1
+
+            year = datetime.now().year
+            self.id_no = f"EMP-{year}-{new_number:04d}" # EMP-year-0001 format
+
+        super().save(*args, **kwargs)
     
     class Meta:
         constraints = [
@@ -178,9 +206,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     STATUS_CHOICES = (
         ("ACTIVE", "Active"),
-        ("INACTIVE", "Inactive"),
-        ("SUSPENDED", "Suspended"),  # optional
-        ("TERMINATED", "Terminated"),
+        ("INACTIVE", "Inactive")
     )
 
     user_id = models.AutoField(primary_key=True)

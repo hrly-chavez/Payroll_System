@@ -118,7 +118,13 @@ class Employee(models.Model):
     ("WIDOWED", "Widowed"),
     ("SEPARATED", "Separated"),
     ]
-    #TODO: Optional: Add EMP_STATUS (Regular, Probationary, Resigned),EMP_TERMINATION_DATE
+
+    EMPLOYMENT_STATUS_CHOICES = [
+        ("REGULAR", "Regular"),
+        ("PROBATION", "Probation"),
+        ("NEW_HIRE", "New Hire"),
+        ("OJT", "OJT"),
+    ]
 
     id = models.AutoField(primary_key=True)
     id_no = models.CharField(max_length=50,unique=True,null=True,blank=True)
@@ -127,6 +133,7 @@ class Employee(models.Model):
     initial = models.CharField(max_length=1,null=True,blank=True)
     suffix = models.CharField(max_length=20,null=True,blank=True)
     status = models.CharField(max_length=15, choices=EMP_STATUS,default="Single")
+    employment_status = models.CharField(max_length=20,choices=EMPLOYMENT_STATUS_CHOICES,default="NEW_HIRE")
     address = models.ForeignKey(Address, on_delete=models.CASCADE, null=True, blank=True, related_name="residents")
     contact_no = models.CharField(max_length=12)
     hired_date = models.DateField()
@@ -178,9 +185,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     STATUS_CHOICES = (
         ("ACTIVE", "Active"),
-        ("INACTIVE", "Inactive"),
-        ("SUSPENDED", "Suspended"),  # optional
-        ("TERMINATED", "Terminated"),
+        ("INACTIVE", "Inactive")
     )
 
     user_id = models.AutoField(primary_key=True)

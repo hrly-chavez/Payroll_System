@@ -575,6 +575,45 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             "message": "Employee updated successfully",
             "employee": EmployeeSerializer(updated_employee).data
         })
+
+    @action(detail=True, methods=["post"], url_path="update-employment-status")
+    def update_employment_status(self, request, pk=None):
+        employee = self.get_object()
+
+        new_status = request.data.get("employment_status")
+        reason = request.data.get("reason")
+
+        if not new_status:
+            return Response(
+                {"detail": "Employment status is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Save old value for audit
+        old_status = employee.employment_status
+
+        # Update
+        employee.employment_status = new_status
+        employee.save()
+
+        # Optional Audit Log
+        AuditLog.objects.create(
+            user=request.user,
+            action="UPDATE_EMPLOYMENT_STATUS",
+            model_name="Employee",
+            object_id=str(employee.pk),
+            old_data=old_status,
+            new_data=new_status,
+            reason=reason,
+        )
+
+        return Response(
+            {
+                "detail": "Employment status updated successfully.",
+                "employment_status": employee.employment_status
+            },
+            status=status.HTTP_200_OK
+        )
 #forgot pass
 #undone logs
 User = get_user_model()

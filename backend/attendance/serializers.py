@@ -301,6 +301,7 @@ class AttendanceCorrectionListSerializer(serializers.ModelSerializer):
     attendance_id = serializers.IntegerField(source="attendance.id", read_only=True)
     employee_name = serializers.SerializerMethodField()
     department_name = serializers.SerializerMethodField()
+    file_attached = serializers.SerializerMethodField()
 
     class Meta:
         model = Attendance_Correction
@@ -326,7 +327,17 @@ class AttendanceCorrectionListSerializer(serializers.ModelSerializer):
         if obj.requested_by.department:
             return obj.requested_by.department.name
         return None
+    def get_file_attached(self, obj):
+        if not obj.file_attached:
+            return None
 
+        request = self.context.get("request")
+        url = obj.file_attached.url
+
+        if request:
+            return request.build_absolute_uri(url)
+
+        return url
 
 class AttendanceCorrectionReviewSerializer(serializers.Serializer):
     """
@@ -357,7 +368,8 @@ class AttendanceCorrectionDetailSerializer(serializers.ModelSerializer):
     attendance = AttendanceMiniSerializer(read_only=True)
     employee_name = serializers.SerializerMethodField()
     department_name = serializers.SerializerMethodField()
-
+    file_attached = serializers.SerializerMethodField()
+    
     class Meta:
         model = Attendance_Correction
         fields = [
@@ -380,6 +392,18 @@ class AttendanceCorrectionDetailSerializer(serializers.ModelSerializer):
     def get_department_name(self, obj):
         dept = getattr(obj.requested_by, "department", None)
         return getattr(dept, "name", None)
+    
+    def get_file_attached(self, obj):
+        if not obj.file_attached:
+            return None
+
+        request = self.context.get("request")
+        url = obj.file_attached.url
+
+        if request:
+            return request.build_absolute_uri(url)
+
+        return url
 
 # =========================
 # Attendance Event (Create)

@@ -33,6 +33,10 @@ urlpatterns = [
     path("periods/<int:period_id>/employees/<int:employee_id>/verify-snapshot/",PayrollVerifyEmployeeSnapshotView.as_view(),name="payroll-verify-employee-snapshot"),
     path("periods/<int:period_id>/employees/<int:employee_id>/verify/",PayrollVerifyEmployeeView.as_view(),name="payroll-verify-employee"),
 
+    # Run-specific input exclusion (Verify stage)
+    path("periods/<int:period_id>/employees/<int:employee_id>/exclude-input/",PayrollRunExcludeInputView.as_view(),name="payroll-exclude-input",),
+    path("periods/<int:period_id>/employees/<int:employee_id>/include-input/",PayrollRunIncludeInputView.as_view(),name="payroll-include-input",),
+
     # Commissions
     path("commission-types/", CommissionTypeListView.as_view(), name="commission-types"),
     path("periods/<int:period_id>/employees/<int:employee_id>/commissions/",PayrollPeriodEmployeeCommissionListCreateView.as_view(),name="payroll-period-employee-commissions"),

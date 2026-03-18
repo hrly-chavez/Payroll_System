@@ -67,6 +67,11 @@ type Deduction = {
   total_loan_amount?: string | null;
   balance?: string | null;
   amortization_per_period?: string | null;
+
+  // NEW (run-specific)
+  is_excluded_for_run?: boolean;
+  exclusion_id?: number | null;
+  exclusion_remarks?: string | null;
 };
 
 type AllowanceType = {
@@ -99,6 +104,11 @@ type Commission = {
   amount: string;
   remarks?: string | null;
   created_at: string;
+
+  // NEW
+  is_excluded_for_run?: boolean;
+  exclusion_id?: number | null;
+  exclusion_remarks?: string | null;
 };
 
 type AttendanceEvent = {
@@ -250,26 +260,116 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
   };
 
   const handleGenerateEmployeePayroll = async () => {
-    if (!employee || !period) return;
-    if (!canGenerateEmployee) {
-      message.error("Generate is allowed only when employee is Verified and period is Open.");
-      return;
-    }
+      if (!employee || !period) return;
+      if (!canGenerateEmployee) {
+        message.error("Generate is allowed only when employee is Verified and period is Open.");
+        return;
+      }
 
-    setGenerating(true);
+      setGenerating(true);
+      try {
+        const res = await api.post(`/payroll/periods/${period.id}/employees/${employee.id}/generate/`);
+        message.success(res?.data?.detail || "Payroll generated for this employee.");
+        onVerified();
+        onClose();
+      } catch (err: any) {
+        const msg =
+          err?.response?.data?.detail ||
+          err?.response?.data?.message ||
+          "Generate payroll failed";
+        message.error(msg);
+      } finally {
+        setGenerating(false);
+      }
+    };
+    const handleExcludeTax = async (row: Deduction) => {
+    if (!employee || !period) return;
+
     try {
-      const res = await api.post(`/payroll/periods/${period.id}/employees/${employee.id}/generate/`);
-      message.success(res?.data?.detail || "Payroll generated for this employee.");
-      onVerified();
-      onClose();
+      await api.post(
+        `/payroll/periods/${period.id}/employees/${employee.id}/exclude-input/`,
+        {
+          source_type: "DEDUCTION",
+          source_id: row.id,
+        }
+      );
+
+      message.success("Tax excluded for this payroll run.");
+      loadSnapshot(); // refresh UI
     } catch (err: any) {
       const msg =
         err?.response?.data?.detail ||
         err?.response?.data?.message ||
-        "Generate payroll failed";
+        "Failed to exclude tax";
       message.error(msg);
-    } finally {
-      setGenerating(false);
+    }
+  };
+
+  const handleIncludeTax = async (row: Deduction) => {
+    if (!employee || !period) return;
+
+    try {
+      await api.post(
+        `/payroll/periods/${period.id}/employees/${employee.id}/include-input/`,
+        {
+          source_type: "DEDUCTION",
+          source_id: row.id,
+        }
+      );
+
+      message.success("Tax restored for this payroll run.");
+      loadSnapshot();
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to restore tax";
+      message.error(msg);
+    }
+  };
+  const handleExcludeCommission = async (row: Commission) => {
+  if (!employee || !period) return;
+
+  try {
+    await api.post(
+      `/payroll/periods/${period.id}/employees/${employee.id}/exclude-input/`,
+      {
+        source_type: "COMMISSION",
+        source_id: row.id,
+      }
+    );
+
+    message.success("Commission excluded for this payroll run.");
+    loadCommissions();
+  } catch (err: any) {
+    const msg =
+      err?.response?.data?.detail ||
+      err?.response?.data?.message ||
+      "Failed to exclude commission";
+    message.error(msg);
+  }
+};
+
+  const handleIncludeCommission = async (row: Commission) => {
+    if (!employee || !period) return;
+
+    try {
+      await api.post(
+        `/payroll/periods/${period.id}/employees/${employee.id}/include-input/`,
+        {
+          source_type: "COMMISSION",
+          source_id: row.id,
+        }
+      );
+
+      message.success("Commission restored for this payroll run.");
+      loadCommissions();
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to restore commission";
+      message.error(msg);
     }
   };
 
@@ -301,9 +401,48 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
   ];
 
   const taxColumns = [
-    { title: "Tax Type", dataIndex: ["deduction_type", "code"], render: (v: string) => v || "-" },
-    { title: "Amount", dataIndex: "amount", render: (v: string) => v || "0.00" },
-    { title: "Frequency", dataIndex: "frequency", render: (v: string) => v || "-" },
+    {
+      title: "Tax Type",
+      dataIndex: ["deduction_type", "code"],
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Amount",
+      dataIndex: "amount",
+      render: (v: string) => v || "0.00",
+    },
+    {
+      title: "Frequency",
+      dataIndex: "frequency",
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Status",
+      render: (_: any, row: Deduction) =>
+        row.is_excluded_for_run ? (
+          <Tag color="red">Excluded</Tag>
+        ) : (
+          <Tag color="green">Included</Tag>
+        ),
+    },
+    {
+      title: "Action",
+      render: (_: any, row: Deduction) => {
+        if (row.is_excluded_for_run) {
+          return (
+            <Button size="small" onClick={() => handleIncludeTax(row)}>
+              Restore
+            </Button>
+          );
+        }
+
+        return (
+          <Button danger size="small" onClick={() => handleExcludeTax(row)}>
+            X
+          </Button>
+        );
+      },
+    },
   ];
 
   const loanColumns = [
@@ -317,10 +456,57 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
   ];
 
   const commissionColumns = [
-    { title: "Type", dataIndex: ["commission_type", "name"], render: (v: string) => v || "-" },
-    // { title: "Code", dataIndex: ["commission_type", "code"], render: (v: string) => v || "-" },
-    { title: "Amount", dataIndex: "amount", render: (v: string) => v || "0.00" },
-    { title: "Remarks", dataIndex: "remarks", render: (v: string) => v || "-" },
+    {
+      title: "Type",
+      dataIndex: ["commission_type", "name"],
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Amount",
+      dataIndex: "amount",
+      render: (v: string) => v || "0.00",
+    },
+    {
+      title: "Remarks",
+      dataIndex: "remarks",
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Status",
+      render: (_: any, row: Commission) =>
+        row.is_excluded_for_run ? (
+          <Tag color="red">Excluded</Tag>
+        ) : (
+          <Tag color="green">Included</Tag>
+        ),
+    },
+    {
+      title: "Action",
+      render: (_: any, row: Commission) => {
+        if (row.is_excluded_for_run) {
+          return (
+            <Button
+              size="small"
+              onClick={() => handleIncludeCommission(row)}
+              disabled={status !== "Pending"}
+            >
+              Restore
+            </Button>
+          );
+        }
+
+        return (
+          <Button
+            danger
+            size="small"
+            onClick={() => handleExcludeCommission(row)}
+            disabled={status !== "Pending"}
+          >
+            X
+          </Button>
+        );
+      },
+    },
   ];
 
   const attendanceColumns = [

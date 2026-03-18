@@ -1084,6 +1084,77 @@ class PayrollPeriodEmployeeCommission(models.Model):
     def __str__(self):
         return f"{self.employee} -({self.amount}) [{self.period.code}]"
 
+class PayrollRunInputExclusion(models.Model):
+    """
+    Run-specific payroll input exclusion decided before generation.
+
+    Purpose:
+    - lets HR exclude one payroll input ONLY for one upcoming/current payroll run
+    - does NOT modify the original master/source record
+    - after reset/regenerate, the next run_no starts fresh unless excluded again
+
+    Reusable for:
+    - DEDUCTION  -> Employee_Deduction.id
+    - COMMISSION -> PayrollPeriodEmployeeCommission.id
+    - ALLOWANCE  -> Employee_Allowance.id
+    """
+
+    SOURCE_TYPE_CHOICES = [
+        ("DEDUCTION", "Deduction"),
+        ("COMMISSION", "Commission"),
+        ("ALLOWANCE", "Allowance"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+
+    period = models.ForeignKey(
+        Payroll_Period,
+        on_delete=models.CASCADE,
+        related_name="run_input_exclusions",
+    )
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name="payroll_run_input_exclusions",
+    )
+
+    target_run_no = models.PositiveIntegerField()
+
+    source_type = models.CharField(max_length=20, choices=SOURCE_TYPE_CHOICES)
+    source_id = models.PositiveIntegerField()
+
+    is_excluded = models.BooleanField(default=True)
+    remarks = models.TextField(null=True, blank=True)
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_payroll_run_input_exclusions",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["period", "employee", "target_run_no", "source_type", "source_id"],
+                name="unique_payroll_run_input_exclusion",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["period", "employee", "target_run_no"]),
+            models.Index(fields=["source_type", "source_id"]),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return (
+            f"{self.employee} | {self.period.code} | run {self.target_run_no} | "
+            f"{self.source_type}:{self.source_id} | excluded={self.is_excluded}"
+        )
+
 #audit logs
 class AuditLog(models.Model):
     ACTION_CHOICES = [

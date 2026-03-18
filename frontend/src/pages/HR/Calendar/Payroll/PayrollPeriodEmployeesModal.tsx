@@ -2,13 +2,79 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Modal, Table, Button, message, Tag} from "antd";
+import { Modal, Table, Button, message, Tag } from "antd";
 import api from "../../../../api/axios";
 import dayjs from "dayjs";
 
 import VerifyEmployeeModal from "./VerifyEmployeeModal";
 import PayrollResultModal from "./PayrollResultModal";
 
+function extractErrorMessage(err: any, fallback = "Something went wrong.") {
+  const data = err?.response?.data;
+
+  if (!data) {
+    return fallback;
+  }
+
+  // plain string response
+  if (typeof data === "string") {
+    return data;
+  }
+
+  // common direct fields
+  if (typeof data.detail === "string") {
+    return data.detail;
+  }
+
+  if (typeof data.message === "string") {
+    return data.message;
+  }
+
+  // detail as array
+  if (Array.isArray(data.detail)) {
+    return data.detail.join(" ");
+  }
+
+  // detail as object
+  if (data.detail && typeof data.detail === "object") {
+    const parts: string[] = [];
+
+    Object.entries(data.detail).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        parts.push(`${key}: ${value.join(" ")}`);
+      } else if (typeof value === "string") {
+        parts.push(`${key}: ${value}`);
+      } else {
+        parts.push(`${key}: ${String(value)}`);
+      }
+    });
+
+    if (parts.length > 0) {
+      return parts.join(" | ");
+    }
+  }
+
+  // generic object fields like { field: ["error"] }
+  if (typeof data === "object") {
+    const parts: string[] = [];
+
+    Object.entries(data).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        parts.push(`${key}: ${value.join(" ")}`);
+      } else if (typeof value === "string") {
+        parts.push(`${key}: ${value}`);
+      } else if (value && typeof value === "object") {
+        parts.push(`${key}: ${JSON.stringify(value)}`);
+      }
+    });
+
+    if (parts.length > 0) {
+      return parts.join(" | ");
+    }
+  }
+
+  return fallback;
+}
 
 type Props = {
   open: boolean;
@@ -169,11 +235,13 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
               message.success(res?.data?.detail || "Payroll generated.");
               await loadEligibleEmployees();
             } catch (err: any) {
-              const msg =
-                err?.response?.data?.detail ||
-                err?.response?.data?.message ||
-                "Payroll generation failed";
-              message.error(msg);
+              const msg = extractErrorMessage(err, "Payroll generation failed");
+
+              Modal.error({
+                title: "Payroll Generation Failed",
+                content: msg,
+                width: 700,
+              });
             } finally {
               setGenerating(false);
             }

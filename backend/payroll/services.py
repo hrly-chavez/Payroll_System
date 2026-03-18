@@ -61,6 +61,27 @@ def get_latest_active_payroll(period_id: int, employee_id: int) -> Payroll | Non
         .first()
     )
 
+def get_next_payroll_run_no(period_id: int, employee_id: int) -> int:
+    """
+    Return the next payroll run number for one employee in one payroll period.
+
+    Example:
+    - no payroll yet -> 1
+    - latest existing run is 1 -> next is 2
+    - latest existing run is 2 (even if run 1 is Void) -> next is 3
+
+    Used by:
+    - Verify Employee snapshot to know which upcoming run HR is editing
+    - run-specific exclusion logic before generation
+    """
+    last = (
+        Payroll.objects
+        .filter(payroll_period_id=period_id, employee_id=employee_id)
+        .order_by("-run_no", "-id")
+        .first()
+    )
+    return (int(last.run_no) + 1) if last else 1
+
 def _d2(x, places="0.01"):
     """
     Quantize/round decimals consistently across payroll computations.
@@ -816,7 +837,37 @@ class PayrollGenerationService:
 
         # 10 lifecycle
         self._update_ppe_status(ppe, generated_by_user)
+    
+    def _get_target_run_no(self, employee: Employee, period: Payroll_Period) -> int:
+        """
+        Compute the run number that is about to be generated.
 
+        This must match _create_payroll() logic so exclusions apply to the correct run.
+        """
+        return get_next_payroll_run_no(period.id, employee.id)
+
+    def _get_run_input_exclusion_map(
+        self,
+        employee: Employee,
+        period: Payroll_Period,
+        target_run_no: int,
+        source_type: str,
+    ) -> dict[int, PayrollRunInputExclusion]:
+        """
+        Return exclusions for one employee/period/run/source_type as:
+            { source_id: PayrollRunInputExclusion }
+
+        Only active excluded rows are included.
+        """
+        rows = PayrollRunInputExclusion.objects.filter(
+            period=period,
+            employee=employee,
+            target_run_no=target_run_no,
+            source_type=source_type,
+            is_excluded=True,
+        )
+
+        return {row.source_id: row for row in rows}
     # -------------------------
     # 3) Build Context
     # -------------------------
@@ -838,6 +889,7 @@ class PayrollGenerationService:
         - holiday map + policy map
         - allowances/deductions/commissions
         - pay rules resolved by priority
+        - upcoming target_run_no + run-specific exclusions
         """
         employee = ppe.employee
         department = employee.department
@@ -857,11 +909,32 @@ class PayrollGenerationService:
         holiday_map = self._get_holiday_map(period, active_bases)
         holiday_policy_map = self._get_holiday_policy_map(department)
 
-        allowances = self._get_allowances(employee, period)
-        deductions = self._get_deductions(employee, period)
-        commissions = self._get_commissions(employee, period)
+        target_run_no = self._get_target_run_no(employee, period)
+
+        deduction_exclusion_map = self._get_run_input_exclusion_map(
+            employee=employee,
+            period=period,
+            target_run_no=target_run_no,
+            source_type="DEDUCTION",
+        )
+        commission_exclusion_map = self._get_run_input_exclusion_map(
+            employee=employee,
+            period=period,
+            target_run_no=target_run_no,
+            source_type="COMMISSION",
+        )
+        allowance_exclusion_map = self._get_run_input_exclusion_map(
+            employee=employee,
+            period=period,
+            target_run_no=target_run_no,
+            source_type="ALLOWANCE",
+        )
+
+        allowances = self._get_allowances(employee, period, allowance_exclusion_map=allowance_exclusion_map)
+        deductions = self._get_deductions(employee, period, deduction_exclusion_map=deduction_exclusion_map)
+        commissions = self._get_commissions(employee, period, commission_exclusion_map=commission_exclusion_map)
         commission_tax_rules = self._get_commission_tax_rules(employee, department, period)
-    
+
         rule_map = self._get_pay_rules(employee, department, period)
 
         warnings = []
@@ -884,7 +957,8 @@ class PayrollGenerationService:
             "shift": shift,
             "salary": salary,
             "payroll_setting": payroll_setting,
-            
+            "target_run_no": target_run_no,
+
             "attendance_map": attendance_map,
             "approved_events": approved_events,
             "leave_map": leave_map,
@@ -896,7 +970,8 @@ class PayrollGenerationService:
             "commission_tax_rules": commission_tax_rules,
             "rule_map": rule_map,
             "warnings": warnings,
-        }
+        }    
+
 
     def _get_employee_shift(self, employee: Employee) -> Shift | None:
        
@@ -1035,8 +1110,11 @@ class PayrollGenerationService:
         rows = HolidayPolicy.objects.filter(department=department)
         return {(r.base, r.holiday_type): bool(r.requires_work) for r in rows}
 
-    def _get_allowances(self, employee: Employee, period: Payroll_Period):
-        # Return all ACTIVE employee allowances that overlap the payroll period.
+    def _get_allowances(self, employee: Employee, period: Payroll_Period, allowance_exclusion_map=None):
+        # Return all ACTIVE employee allowances that overlap the payroll period,
+        # excluding run-specific allowance exclusions when present.
+        allowance_exclusion_map = allowance_exclusion_map or {}
+
         qs = (
             Employee_Allowance.objects
             .filter(employee=employee, status="Active")
@@ -1045,35 +1123,50 @@ class PayrollGenerationService:
 
         rows = []
         for a in qs:
+            if a.id in allowance_exclusion_map:
+                continue
+
             if _overlaps_period(a.effective_from, a.effective_to, period.start_date, period.end_date):
                 rows.append(a)
         return rows
 
-    def _get_deductions(self, employee: Employee, period: Payroll_Period):
-        #Return all ACTIVE employee deductions that overlap the payroll period.
-        qs = (
-            Employee_Deduction.objects
-            .filter(employee=employee, status="Active")
-            .select_related("deduction_type")
-        )
+    def _get_deductions(self, employee: Employee, period: Payroll_Period, deduction_exclusion_map=None):
+            # Return all ACTIVE employee deductions that overlap the payroll period,
+            # excluding run-specific deduction exclusions when present.
+            deduction_exclusion_map = deduction_exclusion_map or {}
 
-        rows = []
-        for d in qs:
-            if _overlaps_period(d.effective_from, d.effective_to, period.start_date, period.end_date):
-                rows.append(d)
-        return rows
+            qs = (
+                Employee_Deduction.objects
+                .filter(employee=employee, status="Active")
+                .select_related("deduction_type")
+            )
+
+            rows = []
+            for d in qs:
+                if d.id in deduction_exclusion_map:
+                    continue
+
+                if _overlaps_period(d.effective_from, d.effective_to, period.start_date, period.end_date):
+                    rows.append(d)
+            return rows
     
-    def _get_commissions(self, employee: Employee, period: Payroll_Period):
+    def _get_commissions(self, employee: Employee, period: Payroll_Period, commission_exclusion_map=None):
         """
         Return commissions stored specifically for:
         - this employee
         - this payroll period
 
-        These are per-period manual entries (modal-based).
+        Excludes run-specific commission exclusions when present.
         """
-        return list(
-            PayrollPeriodEmployeeCommission.objects.filter(period=period, employee=employee).select_related("commission_type")
+        commission_exclusion_map = commission_exclusion_map or {}
+
+        rows = list(
+            PayrollPeriodEmployeeCommission.objects
+            .filter(period=period, employee=employee)
+            .select_related("commission_type")
         )
+
+        return [row for row in rows if row.id not in commission_exclusion_map]
 
     def _get_pay_rules(self, employee: Employee, department, period: Payroll_Period):
         """

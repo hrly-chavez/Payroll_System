@@ -228,6 +228,11 @@ class DeductionTypeMiniSerializer(serializers.ModelSerializer):
 class EmployeeDeductionMiniSerializer(serializers.ModelSerializer):
     deduction_type = DeductionTypeMiniSerializer(read_only=True)
 
+    # run-specific verify state
+    is_excluded_for_run = serializers.SerializerMethodField()
+    exclusion_id = serializers.SerializerMethodField()
+    exclusion_remarks = serializers.SerializerMethodField()
+
     class Meta:
         model = Employee_Deduction
         fields = [
@@ -242,8 +247,27 @@ class EmployeeDeductionMiniSerializer(serializers.ModelSerializer):
             "total_loan_amount",
             "balance",
             "amortization_per_period",
+
+            # run-specific exclusion state
+            "is_excluded_for_run",
+            "exclusion_id",
+            "exclusion_remarks",
         ]
 
+    def get_is_excluded_for_run(self, obj):
+        exclusion_map = self.context.get("deduction_exclusion_map", {})
+        exclusion = exclusion_map.get(obj.id)
+        return bool(exclusion and exclusion.is_excluded)
+
+    def get_exclusion_id(self, obj):
+        exclusion_map = self.context.get("deduction_exclusion_map", {})
+        exclusion = exclusion_map.get(obj.id)
+        return exclusion.id if exclusion else None
+
+    def get_exclusion_remarks(self, obj):
+        exclusion_map = self.context.get("deduction_exclusion_map", {})
+        exclusion = exclusion_map.get(obj.id)
+        return exclusion.remarks if exclusion else None
 # Minimal allowance type details for verification preview
 class AllowanceTypeMiniSerializer(serializers.ModelSerializer):
     class Meta:
@@ -292,14 +316,12 @@ class LeaveTypeMiniSerializer(serializers.ModelSerializer):
         model = Leave_Type
         fields = ["id", "name", "is_paid"]
 
-
 class LeaveRequestMiniSerializer(serializers.ModelSerializer):
     leave_type = LeaveTypeMiniSerializer(read_only=True)
 
     class Meta:
         model = Leave_Request
         fields = ["id", "status", "leave_type"]
-
 
 class LeaveDayMiniSerializer(serializers.ModelSerializer):
     leave_request = LeaveRequestMiniSerializer(read_only=True)
@@ -318,17 +340,67 @@ class PayrollVerifySnapshotSerializer(serializers.Serializer):
     department_name = serializers.CharField(allow_null=True)
     status = serializers.CharField()
 
+    # upcoming/current target run
+    target_run_no = serializers.IntegerField()
+
     shift = ShiftMiniSerializer(allow_null=True)
     salary = EmployeeSalaryMiniSerializer(allow_null=True)
 
     taxes = EmployeeDeductionMiniSerializer(many=True)   # SSS/PAGIBIG/PHILHEALTH...
     loans = EmployeeDeductionMiniSerializer(many=True)   # loan deductions only
     allowances = EmployeeAllowanceMiniSerializer(many=True)
-    attendances = AttendanceMiniSerializer(many=True) 
-    leaves = LeaveDayMiniSerializer(many=True)  
+    attendances = AttendanceMiniSerializer(many=True)
+    leaves = LeaveDayMiniSerializer(many=True)
     warnings = serializers.ListField(child=serializers.CharField(), required=False)
 
+class PayrollRunInputExclusionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PayrollRunInputExclusion
+        fields = [
+            "id",
+            "period",
+            "employee",
+            "target_run_no",
+            "source_type",
+            "source_id",
+            "is_excluded",
+            "remarks",
+            "created_by",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "period",
+            "employee",
+            "target_run_no",
+            "source_type",
+            "source_id",
+            "created_by",
+            "created_at",
+            "updated_at",
+        ]
 
+
+class ExcludePayrollInputSerializer(serializers.Serializer):
+    source_type = serializers.ChoiceField(choices=PayrollRunInputExclusion.SOURCE_TYPE_CHOICES)
+    source_id = serializers.IntegerField()
+    remarks = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    def validate_source_id(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Invalid source ID.")
+        return value
+
+
+class IncludePayrollInputSerializer(serializers.Serializer):
+    source_type = serializers.ChoiceField(choices=PayrollRunInputExclusion.SOURCE_TYPE_CHOICES)
+    source_id = serializers.IntegerField()
+
+    def validate_source_id(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Invalid source ID.")
+        return value
 
 #==================================COMMISION================================
 # Commission type dropdown
@@ -352,10 +424,41 @@ class CommissionTypeSerializer(serializers.ModelSerializer):
 class PayrollPeriodEmployeeCommissionListSerializer(serializers.ModelSerializer):
     commission_type = CommissionTypeSerializer(read_only=True)
 
+    # run-specific exclusion state
+    is_excluded_for_run = serializers.SerializerMethodField()
+    exclusion_id = serializers.SerializerMethodField()
+    exclusion_remarks = serializers.SerializerMethodField()
+
     class Meta:
         model = PayrollPeriodEmployeeCommission
-        fields = ["id", "commission_type", "amount", "remarks", "created_at"]
+        fields = [
+            "id",
+            "commission_type",
+            "amount",
+            "remarks",
+            "created_at",
 
+            # run-specific exclusion state
+            "is_excluded_for_run",
+            "exclusion_id",
+            "exclusion_remarks",
+        ]
+
+    def get_is_excluded_for_run(self, obj):
+        exclusion_map = self.context.get("commission_exclusion_map", {})
+        exclusion = exclusion_map.get(obj.id)
+        return bool(exclusion and exclusion.is_excluded)
+
+    def get_exclusion_id(self, obj):
+        exclusion_map = self.context.get("commission_exclusion_map", {})
+        exclusion = exclusion_map.get(obj.id)
+        return exclusion.id if exclusion else None
+
+    def get_exclusion_remarks(self, obj):
+        exclusion_map = self.context.get("commission_exclusion_map", {})
+        exclusion = exclusion_map.get(obj.id)
+        return exclusion.remarks if exclusion else None
+        
 # Create commission from modal
 class PayrollPeriodEmployeeCommissionCreateSerializer(serializers.ModelSerializer):
     class Meta:

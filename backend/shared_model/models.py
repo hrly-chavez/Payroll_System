@@ -5,8 +5,9 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseU
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-import uuid
-from datetime import timedelta
+import uuid, re
+from datetime import datetime
+
 
 class Province(models.Model):
     name = models.CharField(max_length=100)
@@ -147,6 +148,26 @@ class Employee(models.Model):
     
     def __str__(self):
         return f"{self.fname} {self.lname}"
+
+    def save(self, *args, **kwargs):
+        if not self.id_no:
+            last_employee = Employee.objects.filter(id_no__isnull=False).order_by("-id").first()
+
+            if last_employee and last_employee.id_no:
+                # Extract number from last ID (e.g., EMP-0005 → 5)
+                match = re.search(r"(\d+)$", last_employee.id_no)
+                if match:
+                    last_number = int(match.group(1))
+                    new_number = last_number + 1
+                else:
+                    new_number = 1
+            else:
+                new_number = 1
+
+            year = datetime.now().year
+            self.id_no = f"EMP-{year}-{new_number:04d}" # EMP-year-0001 format
+
+        super().save(*args, **kwargs)
     
     class Meta:
         constraints = [

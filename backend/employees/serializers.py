@@ -81,6 +81,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
         model = Employee
         fields = [
             "id",
+            "id_no",
             "role",
             "fname",
             "lname",

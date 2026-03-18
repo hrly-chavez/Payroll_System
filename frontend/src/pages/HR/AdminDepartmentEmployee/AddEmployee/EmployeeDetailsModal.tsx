@@ -11,7 +11,7 @@ interface Props {
   departmentId: number;
   allowedRoles: ("EMPLOYEE" | "ADMIN" | "SUPER_ADMIN")[];
   initialValues?: any;
-  onNext: (data: any) => void;   // ✅ now just send form data
+  onNext: (data: any) => void;   // now just send form data
   onClose: () => void;
 }
 
@@ -158,44 +158,6 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
       <Form layout="vertical" form={form} className={styles.form}>
         <Row gutter={16}>
           {/* Employee Basic Info */}
-          <Col xs={24} md={8}>
-          <Form.Item
-            name="id_no"
-            label="Employee Number"
-            rules={[
-              { required: true, message: "Employee number is required" },
-              { pattern: /^[0-9]+$/, message: "Numbers only" }
-            ]}
-          >
-            <Input inputMode="numeric" />
-          </Form.Item>
-          </Col>
-
-          <Col xs={24} md={8}>
-            <Form.Item
-              name="employment_status"
-              label="Employment Status"
-              rules={[{ required: true, message: "Employment status is required" }]}
-            >
-              <Select placeholder="Select employment status">
-                <Option value="REGULAR">Regular</Option>
-                <Option value="PROBATION">Probation</Option>
-                <Option value="NEW_HIRE">New Hire</Option>
-                <Option value="OJT">OJT</Option>
-              </Select>
-            </Form.Item>
-          </Col>
-
-          <Col xs={24} md={8}>
-            <Form.Item name="status" label="Marital Status" rules={[{ required: true }]}>
-              <Select>
-                <Option value="SINGLE">Single</Option>
-                <Option value="MARRIED">Married</Option>
-                <Option value="WIDOWED">Widowed</Option>
-                <Option value="SEPARATED">Separated</Option>
-              </Select>
-            </Form.Item>
-          </Col>
 
           <Col xs={24} md={8}>
           <Form.Item
@@ -241,6 +203,32 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
           <Col xs={24} md={8}>
             <Form.Item name="suffix" label="Suffix">
               <Input />
+            </Form.Item>
+          </Col>
+
+          <Col xs={24} md={8}>
+            <Form.Item
+              name="employment_status"
+              label="Employment Status"
+              rules={[{ required: true, message: "Employment status is required" }]}
+            >
+              <Select placeholder="Select employment status">
+                <Option value="REGULAR">Regular</Option>
+                <Option value="PROBATION">Probation</Option>
+                <Option value="NEW_HIRE">New Hire</Option>
+                <Option value="OJT">OJT</Option>
+              </Select>
+            </Form.Item>
+          </Col>
+
+          <Col xs={24} md={8}>
+            <Form.Item name="status" label="Marital Status" rules={[{ required: true }]}>
+              <Select>
+                <Option value="SINGLE">Single</Option>
+                <Option value="MARRIED">Married</Option>
+                <Option value="WIDOWED">Widowed</Option>
+                <Option value="SEPARATED">Separated</Option>
+              </Select>
             </Form.Item>
           </Col>
 

@@ -1145,30 +1145,30 @@ def employee_audit_logs(request, employee_id):
 
     serialized_logs = []
     for log in all_logs:
-        old_data = ""
-        new_data = ""
+        message_text = ""
 
-        # UPDATE logs: convert dicts to formatted strings
-        if log.action == "UPDATE":
-            if isinstance(log.old_data, dict):
-                old_data = ", ".join([f'{k}: "{v}"' for k, v in log.old_data.items()])
-            else:
-                old_data = str(log.old_data)
+        if log.action == "UPDATE_EMPLOYMENT_STATUS":
+            message_text = f"Updated employment status"
 
-            if isinstance(log.new_data, dict):
-                new_data = ", ".join([f'{k}: "{v}"' for k, v in log.new_data.items()])
-            else:
-                new_data = str(log.new_data)
+        elif log.action == "CREATE":
+            message_text = f"Created {log.model_name}"
+
+        elif log.action == "UPDATE":
+            message_text = f"Updated {log.model_name}"
+
+        elif log.action == "DELETE":
+            message_text = f"Deleted {log.model_name}"
+
+        else:
+            message_text = log.action
 
         user_name = log.user.user_name if log.user else ""
 
         serialized_logs.append({
             "id": log.id,
             "user": user_name,
-            "action": log.action,
-            "model_name": log.model_name,
-            "old_data": old_data,
-            "new_data": new_data,
+            "action": message_text,
+            "reason": log.reason or "No reason provided",
             "timestamp": log.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
         })
 

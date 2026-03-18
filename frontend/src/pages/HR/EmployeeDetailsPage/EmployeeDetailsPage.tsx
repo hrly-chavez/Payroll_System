@@ -38,7 +38,7 @@ interface AddressData {
 }
 
 interface EmployeeData {
-  id: number;
+  id_no: number;
   name: string;
   department_name: string;
   position: string;
@@ -266,7 +266,7 @@ const EmployeeDetailsPage: React.FC = () => {
                     />
 
                   </div>
-                  <span className={styles.empId}>ID : {employee.id}</span>
+                  <span className={styles.empId}>ID : {employee.id_no}</span>
                 </div>
               </div>
 

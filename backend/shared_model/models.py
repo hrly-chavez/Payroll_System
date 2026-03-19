@@ -1133,32 +1133,14 @@ class PayrollRunInputExclusion(models.Model):
 
     id = models.AutoField(primary_key=True)
 
-    period = models.ForeignKey(
-        Payroll_Period,
-        on_delete=models.CASCADE,
-        related_name="run_input_exclusions",
-    )
-    employee = models.ForeignKey(
-        Employee,
-        on_delete=models.CASCADE,
-        related_name="payroll_run_input_exclusions",
-    )
-
+    period = models.ForeignKey(Payroll_Period,on_delete=models.CASCADE,related_name="run_input_exclusions",)
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="payroll_run_input_exclusions",)
     target_run_no = models.PositiveIntegerField()
-
     source_type = models.CharField(max_length=20, choices=SOURCE_TYPE_CHOICES)
     source_id = models.PositiveIntegerField()
-
     is_excluded = models.BooleanField(default=True)
     remarks = models.TextField(null=True, blank=True)
-
-    created_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="created_payroll_run_input_exclusions",
-    )
+    created_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="created_payroll_run_input_exclusions",)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1180,6 +1162,7 @@ class PayrollRunInputExclusion(models.Model):
             f"{self.employee} | {self.period.code} | run {self.target_run_no} | "
             f"{self.source_type}:{self.source_id} | excluded={self.is_excluded}"
         )
+
 
 #audit logs
 class AuditLog(models.Model):

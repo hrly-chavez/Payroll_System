@@ -330,7 +330,6 @@ class LeaveDayMiniSerializer(serializers.ModelSerializer):
         model = Leave_Day
         fields = ["id", "date", "units", "is_paid", "pay_rate", "leave_request"]
 
-
 # Aggregated snapshot shown in Verify Employee modal before payroll generation
 class PayrollVerifySnapshotSerializer(serializers.Serializer):
     # Aggregated snapshot shown in Verify Employee modal
@@ -381,7 +380,6 @@ class PayrollRunInputExclusionSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
-
 class ExcludePayrollInputSerializer(serializers.Serializer):
     source_type = serializers.ChoiceField(choices=PayrollRunInputExclusion.SOURCE_TYPE_CHOICES)
     source_id = serializers.IntegerField()
@@ -391,7 +389,6 @@ class ExcludePayrollInputSerializer(serializers.Serializer):
         if value <= 0:
             raise serializers.ValidationError("Invalid source ID.")
         return value
-
 
 class IncludePayrollInputSerializer(serializers.Serializer):
     source_type = serializers.ChoiceField(choices=PayrollRunInputExclusion.SOURCE_TYPE_CHOICES)

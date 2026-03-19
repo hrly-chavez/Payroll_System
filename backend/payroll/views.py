@@ -9,6 +9,7 @@ from django.utils import timezone
 from django.utils.timezone import now
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError, APIException
+from rest_framework import status as http_status
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q
 from datetime import date, timedelta
@@ -954,12 +955,46 @@ class PayrollTaxBracketChoicesView(APIView):
 class GeneratePayrollForPeriodView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def _stringify_error(self, exc) -> str:
+        detail = getattr(exc, "detail", None)
+
+        if isinstance(detail, dict):
+            if "detail" in detail:
+                return str(detail["detail"])
+            return " | ".join(f"{k}: {v}" for k, v in detail.items())
+
+        if isinstance(detail, list):
+            return " ".join(str(x) for x in detail)
+
+        return str(detail or exc)
+
+
     def post(self, request, period_id: int):
         svc = PayrollGenerationService()
-        result = svc.generate_for_period(
-            period_id=period_id,
-            generated_by_user=request.user
-        )
+
+        try:
+            result = svc.generate_for_period(
+                period_id=period_id,
+                generated_by_user=request.user
+            )
+
+        except ValidationError as e:
+            return Response(
+                {"detail": self._stringify_error(e)},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        except APIException as e:
+            return Response(
+                {"detail": self._stringify_error(e)},
+                status=getattr(e, "status_code", http_status.HTTP_400_BAD_REQUEST),
+            )
+
+        except Exception as e:
+            return Response(
+                {"detail": f"Unexpected payroll error: {str(e)}"},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         # Get the period (for title/description context)
         period = Payroll_Period.objects.filter(id=period_id).first()
@@ -989,11 +1024,31 @@ class GeneratePayrollForEmployeeView(APIView):
 
     def post(self, request, period_id: int, employee_id: int):
         svc = PayrollGenerationService()
-        result = svc.generate_for_employee(
-            period_id=period_id,
-            employee_id=employee_id,
-            generated_by_user=request.user
-        )
+
+        try:
+            result = svc.generate_for_employee(
+                period_id=period_id,
+                employee_id=employee_id,
+                generated_by_user=request.user
+            )
+
+        except ValidationError as e:
+            return Response(
+                {"detail": self._stringify_error(e)},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        except APIException as e:
+            return Response(
+                {"detail": self._stringify_error(e)},
+                status=getattr(e, "status_code", http_status.HTTP_400_BAD_REQUEST),
+            )
+
+        except Exception as e:
+            return Response(
+                {"detail": f"Unexpected payroll error: {str(e)}"},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         serializer = GeneratePayrollEmployeeResponseSerializer(result)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -1678,7 +1733,6 @@ class PayrollPeriodMarkPaidView(APIView):
         Payroll.objects.filter(payroll_period=period, status="Approved").update(status="Paid")
 
         return Response({"detail": "Payroll period marked as Paid."}, status=http_status.HTTP_200_OK)
-
 
 #========================DOWNLOAD PAYROLL EACH EMPLOYEE=====================
 
@@ -2611,11 +2665,6 @@ class AdminEmployeePayrollDownloadPDFView(APIView):
             filename=filename,
             content_type="application/pdf",
         )
-
-
-
-
-
 
 #payroll logs
 #list of payroll periods

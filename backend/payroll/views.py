@@ -22,6 +22,7 @@ from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from django.utils.dateformat import DateFormat
 
 # helpers
 def _overlaps_period(eff_from, eff_to, period_start, period_end):
@@ -771,8 +772,12 @@ class GeneratePayrollForPeriodView(APIView):
             generated_by_user=request.user
         )
 
-        # Get the period (for title/description context)
-        period = Payroll_Period.objects.filter(id=period_id).first()
+        # Get the period
+        period = Payroll_Period.objects.get(id=period_id)
+
+        # Format dates nicely (e.g., Feb 01, 2026)
+        start = period.start_date.strftime("%b %d, %Y")
+        end = period.end_date.strftime("%b %d, %Y")     
 
         # Notify all SUPER_ADMIN users
         super_admins = User.objects.filter(role="SUPER_ADMIN")
@@ -783,7 +788,7 @@ class GeneratePayrollForPeriodView(APIView):
                 Notification(
                     user=admin,
                     title="Payroll Period Generated",
-                    description=f"Payroll for period {period} has been successfully generated.",
+                    description=f"Payroll for period {start} - {end} has been successfully generated.",
                     category="payroll",
                     redirect_url="/super-admin/calendar",
                 )
@@ -804,6 +809,33 @@ class GeneratePayrollForEmployeeView(APIView):
             employee_id=employee_id,
             generated_by_user=request.user
         )
+
+        # ----------------------------
+        # Create notification for SUPER_ADMIN
+        # ----------------------------
+        period = Payroll_Period.objects.get(id=period_id)
+        start = period.start_date.strftime("%b %d, %Y")
+        end = period.end_date.strftime("%b %d, %Y")
+        period_label = f"{start} - {end}"
+
+        employee = get_object_or_404(Employee, id=employee_id)
+        employee_name = str(employee)
+
+        super_admins = User.objects.filter(role="SUPER_ADMIN")
+        notifications = []
+
+        for admin in super_admins:
+            notifications.append(
+                Notification(
+                    user=admin,
+                    title="Payroll Generated",
+                    description=f"Payroll for {employee_name} for period {period_label} has been generated.",
+                    category="payroll",
+                    redirect_url="/super-admin/calendar",
+                )
+            )
+
+        Notification.objects.bulk_create(notifications)
 
         serializer = GeneratePayrollEmployeeResponseSerializer(result)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -1128,6 +1160,11 @@ class PayrollApproveEmployeeView(APIView):
         #  Create notifications
         # ----------------------------
 
+        # Format dates
+        start = period.start_date.strftime("%b %d, %Y")
+        end = period.end_date.strftime("%b %d, %Y")
+        period_label = f"{start} - {end}"
+
         notifications = []
 
         # Notify ADMIN
@@ -1137,7 +1174,7 @@ class PayrollApproveEmployeeView(APIView):
                 Notification(
                     user=admin,
                     title="Payroll Approved",
-                    description=f"{ppe.employee} payroll for period {period} has been approved.",
+                    description=f"{ppe.employee} payroll for period {period_label} has been approved.",
                     category="payroll",
                     redirect_url="/admin/calendar",
                 )
@@ -1149,7 +1186,7 @@ class PayrollApproveEmployeeView(APIView):
                 Notification(
                     user=ppe.employee.user,
                     title="Payroll Approved",
-                    description=f"Your payroll for period {period} has been approved.",
+                    description=f"Your payroll for period {period_label} has been approved.",
                     category="payroll",
                     redirect_url="",  # No URL, just visible in their notifications
                 )
@@ -1223,13 +1260,18 @@ class PayrollDeclineEmployeeView(APIView):
 
         _recompute_period_status(period)
 
+        # Format dates
+        start = period.start_date.strftime("%b %d, %Y")
+        end = period.end_date.strftime("%b %d, %Y")
+        period_label = f"{start} - {end}"
+
         # Notify HR about declined payroll
         hr_users = User.objects.filter(role="ADMIN")
         notifications = [
             Notification(
                 user=hr,
                 title="Payroll Declined",
-                description=f"{ppe.employee} payroll for period {period} has been declined. Reason: {reason}",
+                description=f"{ppe.employee} payroll for period {period_label} has been declined. Reason: {reason}",
                 category="payroll",
                 redirect_url="/admin/calendar",
             )
@@ -1290,6 +1332,20 @@ class PayrollBulkDecisionView(APIView):
 
         now_dt = timezone.now()
 
+        # ----------------------------
+        # Notifications (Bulk)
+        # ----------------------------
+
+        # Format period
+        start = period.start_date.strftime("%b %d, %Y")
+        end = period.end_date.strftime("%b %d, %Y")
+        period_label = f"{start} - {end}"
+
+        notifications = []
+
+        # Get admins
+        admins = User.objects.filter(role="ADMIN")
+
         # ---------- APPROVE ----------
         for employee_id in approve_ids:
             ppe = ppe_by_employee.get(employee_id)
@@ -1316,6 +1372,30 @@ class PayrollBulkDecisionView(APIView):
             )
             approved_employee_ids.append(employee_id)
 
+            # Notify admins
+            for admin in admins:
+                notifications.append(
+                    Notification(
+                        user=admin,
+                        title="Payroll Approved",
+                        description=f"{ppe.employee} payroll for period {period_label} has been approved.",
+                        category="payroll",
+                        redirect_url="/admin/calendar",
+                    )
+                )
+
+            # Notify employee
+            if hasattr(ppe.employee, "user") and ppe.employee.user:
+                notifications.append(
+                    Notification(
+                        user=ppe.employee.user,
+                        title="Payroll Approved",
+                        description=f"Your payroll for period {period_label} has been approved.",
+                        category="payroll",
+                        redirect_url="",
+                    )
+                )
+
         # ---------- DECLINE ----------
         for employee_id, reason in decline_reason_by_employee.items():
             ppe = ppe_by_employee.get(employee_id)
@@ -1341,6 +1421,21 @@ class PayrollBulkDecisionView(APIView):
                 now_dt=now_dt,
             )
             declined_employee_ids.append(employee_id)
+
+            # Notify admins
+            for admin in admins:
+                notifications.append(
+                    Notification(
+                        user=admin,
+                        title="Payroll Declined",
+                        description=f"{ppe.employee} payroll for period {period_label} has been declined. Reason: {reason}",
+                        category="payroll",
+                        redirect_url="/admin/calendar",
+                    )
+                )
+
+        # Save all notifications
+        Notification.objects.bulk_create(notifications)
 
         _recompute_period_status(period)
 

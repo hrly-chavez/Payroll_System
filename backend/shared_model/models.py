@@ -1163,6 +1163,42 @@ class PayrollRunInputExclusion(models.Model):
             f"{self.source_type}:{self.source_id} | excluded={self.is_excluded}"
         )
 
+class PayrollPeriodEmployeeAllowance(models.Model):
+    """
+    Manual/additional allowance entered by HR for one employee
+    within one payroll period.
+
+    Purpose:
+    - extra transportation allowance
+    - special same-day allowance adjustments
+    - one-off payroll-period allowance inputs
+
+    This is DIFFERENT from Employee_Allowance:
+    - Employee_Allowance = master/setup recurring allowance
+    - PayrollPeriodEmployeeAllowance = run input / manual payroll-period entry
+    """
+
+    id = models.AutoField(primary_key=True)
+
+    period = models.ForeignKey(Payroll_Period,on_delete=models.CASCADE,related_name="additional_allowances",)
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="period_additional_allowances",)
+    allowance_type = models.ForeignKey(Allowance_Type,on_delete=models.PROTECT,related_name="period_employee_allowances",)
+    allowance_date = models.DateField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    remarks = models.TextField(null=True, blank=True)
+    created_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="created_period_allowances",)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-allowance_date", "-created_at"]
+        indexes = [
+            models.Index(fields=["period", "employee"]),
+            models.Index(fields=["allowance_date"]),
+        ]
+
+    def __str__(self):
+        return f"{self.employee} - {self.allowance_type} ({self.amount}) [{self.period.code}]"
+
 
 #audit logs
 class AuditLog(models.Model):

@@ -820,8 +820,29 @@ class PayrollGenerationService:
         )
 
         # 8 allowances / deductions / commissions
-        self._apply_allowances(payroll=payroll,allowances=ctx["allowances"],period=period,employee=ctx["employee"],shift=ctx["shift"],leave_map=ctx["leave_map"],)
-        self._apply_commissions(payroll=payroll,commissions=ctx["commissions"],employee=ctx["employee"],department=ctx["department"],commission_tax_rules=ctx["commission_tax_rules"],)
+         # 8 allowances / deductions / commissions
+        self._apply_allowances(
+            payroll=payroll,
+            allowances=ctx["allowances"],
+            period=period,
+            employee=ctx["employee"],
+            shift=ctx["shift"],
+            leave_map=ctx["leave_map"],
+        )
+
+        self._apply_additional_allowances(
+            payroll=payroll,
+            additional_allowances=ctx["additional_allowances"],
+        )
+
+        self._apply_commissions(
+            payroll=payroll,
+            commissions=ctx["commissions"],
+            employee=ctx["employee"],
+            department=ctx["department"],
+            commission_tax_rules=ctx["commission_tax_rules"],
+        )
+
         self._apply_deductions(payroll, ctx["deductions"], period)
 
         # 8.5 compute TAXABLE income base before payroll tax
@@ -930,9 +951,26 @@ class PayrollGenerationService:
             source_type="ALLOWANCE",
         )
 
-        allowances = self._get_allowances(employee, period, allowance_exclusion_map=allowance_exclusion_map)
-        deductions = self._get_deductions(employee, period, deduction_exclusion_map=deduction_exclusion_map)
-        commissions = self._get_commissions(employee, period, commission_exclusion_map=commission_exclusion_map)
+        allowances = self._get_allowances(
+            employee,
+            period,
+            allowance_exclusion_map=allowance_exclusion_map,
+        )
+        additional_allowances = self._get_additional_allowances(
+            employee,
+            period,
+            allowance_exclusion_map=allowance_exclusion_map,
+        )
+        deductions = self._get_deductions(
+            employee,
+            period,
+            deduction_exclusion_map=deduction_exclusion_map,
+        )
+        commissions = self._get_commissions(
+            employee,
+            period,
+            commission_exclusion_map=commission_exclusion_map,
+        )
         commission_tax_rules = self._get_commission_tax_rules(employee, department, period)
 
         rule_map = self._get_pay_rules(employee, department, period)
@@ -965,6 +1003,7 @@ class PayrollGenerationService:
             "holiday_map": holiday_map,
             "holiday_policy_map": holiday_policy_map,
             "allowances": allowances,
+            "additional_allowances": additional_allowances,
             "deductions": deductions,
             "commissions": commissions,
             "commission_tax_rules": commission_tax_rules,
@@ -1130,6 +1169,25 @@ class PayrollGenerationService:
                 rows.append(a)
         return rows
 
+    def _get_additional_allowances(self, employee: Employee, period: Payroll_Period, allowance_exclusion_map=None):
+        """
+        Return payroll-period-specific manual/additional allowances for:
+        - this employee
+        - this payroll period
+
+        Excludes run-specific allowance exclusions when present.
+        """
+        allowance_exclusion_map = allowance_exclusion_map or {}
+
+        rows = list(
+            PayrollPeriodEmployeeAllowance.objects
+            .filter(period=period, employee=employee)
+            .select_related("allowance_type")
+            .order_by("allowance_date", "id")
+        )
+
+        return [row for row in rows if row.id not in allowance_exclusion_map]
+    
     def _get_deductions(self, employee: Employee, period: Payroll_Period, deduction_exclusion_map=None):
             # Return all ACTIVE employee deductions that overlap the payroll period,
             # excluding run-specific deduction exclusions when present.
@@ -1937,7 +1995,7 @@ class PayrollGenerationService:
     # -------------------------
     # 8) Allowances, Commissions, Deductions
     # -------------------------
-    def _compute_allowance_eligible_days_for_month(self,employee: Employee,shift: Shift,month_start: date,month_end: date,leave_map: dict[date, Leave_Day],) -> int:
+    def _compute_allowance_eligible_days_for_month(self,employee: Employee,shift: Shift,month_start: date,month_end: date,leave_map: dict[date, Leave_Day],) -> list[date]:
         """
         Compute how many days in a month are eligible for a PER-DAY allowance.
 
@@ -2052,6 +2110,36 @@ class PayrollGenerationService:
                 source_type="MANUAL",
                 source_id=a.id
             )
+    
+    def _apply_additional_allowances(self, payroll: Payroll, additional_allowances):
+        """
+        Apply payroll-period-specific manual/additional allowances.
+
+        These are separate from Employee_Allowance recurring rules.
+        They are direct earning inputs for this specific employee + payroll period.
+        """
+        for a in additional_allowances:
+            amt = _d2(a.amount)
+            if amt <= 0:
+                continue
+
+            allowance_name = a.allowance_type.name if a.allowance_type else "Additional Allowance"
+            allowance_date = a.allowance_date.isoformat() if a.allowance_date else "-"
+
+            desc = f"Additional Allowance: {allowance_name} ({allowance_date})"
+
+            if a.remarks:
+                desc += f" - {a.remarks}"
+
+            self._create_line(
+                payroll,
+                "EARNING",
+                desc,
+                amt,
+                source_type="MANUAL",
+                source_id=a.id,
+            )
+    
     def _apply_commissions(
         self,
         payroll: Payroll,

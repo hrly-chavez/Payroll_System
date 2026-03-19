@@ -41,6 +41,10 @@ urlpatterns = [
     path("commission-types/", CommissionTypeListView.as_view(), name="commission-types"),
     path("periods/<int:period_id>/employees/<int:employee_id>/commissions/",PayrollPeriodEmployeeCommissionListCreateView.as_view(),name="payroll-period-employee-commissions"),
 
+    # Additional Allowances (Payroll-period specific)
+    path("periods/<int:period_id>/employees/<int:employee_id>/allowances/",PayrollPeriodEmployeeAllowanceListCreateView.as_view(),name="payroll-period-employee-allowances"),
+    path("periods/<int:period_id>/employees/<int:employee_id>/allowances/<int:allowance_id>/delete/",PayrollPeriodEmployeeAllowanceDeleteView.as_view(),name="payroll-period-employee-allowance-delete"),
+
     # Payroll Generation
     path("periods/<int:period_id>/generate/", GeneratePayrollForPeriodView.as_view(), name="payroll-generate-period"),
     path("periods/<int:period_id>/employees/<int:employee_id>/generate/", GeneratePayrollForEmployeeView.as_view(), name="payroll-generate-employee"),

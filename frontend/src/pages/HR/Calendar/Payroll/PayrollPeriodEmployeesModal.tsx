@@ -66,38 +66,7 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
       setLoading(false);
     }
   };
-  // const handleGeneratePayroll = async () => {
-  //   if (!periodId) return;
-  //   if (!canGenerate) {
-  //     message.error("Payroll period must be Open to generate payroll.");
-  //     return;
-  //   }
-  //   if (verifiedCount === 0) {
-  //     message.error("No Verified employees to generate payroll for.");
-  //     return;
-  //   }
-
-  //   setGenerating(true);
-  //   try {
-  //     const res = await api.post(`/payroll/payroll/periods/${periodId}/generate/`);
-  //     message.success(res?.data?.detail || "Payroll generated.");
-
-  //     // refresh list & statuses
-  //     await loadEligibleEmployees();
-  //   } catch (err: any) {
-  //     const msg =
-  //       err?.response?.data?.detail ||
-  //       err?.response?.data?.message ||
-  //       "Payroll generation failed";
-  //     message.error(msg);
-
-  //     // refresh anyway (in case something partially changed, though your backend rolls back)
-  //     await loadEligibleEmployees();
-  //   } finally {
-  //     setGenerating(false);
-  //   }
-  // };
-
+ 
   useEffect(() => {
     if (open && periodId) {
       loadEligibleEmployees();
@@ -134,14 +103,25 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
 
   return (
     <Modal
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      width={700}
-      title={period
-    ? `Payroll Period: ${dayjs(period.start_date).format("MM/DD/YYYY")} - ${dayjs(period.end_date).format("MM/DD/YYYY")}`: "Payroll Period"}
-      style={{ top: 50 }}
-    >
+  open={open}
+  onCancel={onClose}
+  footer={null}
+  width={700}
+  title={
+    period
+      ? `Payroll Period: ${dayjs(period.start_date).format("MM/DD/YYYY")} - ${dayjs(period.end_date).format("MM/DD/YYYY")}`
+      : "Payroll Period"
+  }
+  style={{ top: 30 }}
+  destroyOnClose
+  styles={{
+    body: {
+      maxHeight: "calc(100vh - 180px)",
+      overflowY: "auto",
+      overflowX: "hidden",
+    },
+  }}
+>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
         <div>
           {period ? (
@@ -169,10 +149,23 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
               message.success(res?.data?.detail || "Payroll generated.");
               await loadEligibleEmployees();
             } catch (err: any) {
-              const msg =
-                err?.response?.data?.detail ||
-                err?.response?.data?.message ||
-                "Payroll generation failed";
+              let msg = "Payroll generation failed";
+
+              const data = err?.response?.data;
+
+              if (typeof data === "string") {
+                if (data.includes("<html") || data.includes("Django")) {
+                  msg = "Server error occurred. Please contact admin.";
+                } else {
+                  msg = data;
+                }
+              } else if (data?.detail) {
+                msg = data.detail;
+              } else if (data?.message) {
+                msg = data.message;
+              }
+
+              message.error(msg);
               message.error(msg);
             } finally {
               setGenerating(false);

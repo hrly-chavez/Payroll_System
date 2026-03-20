@@ -556,12 +556,12 @@ const adminOrderedChartData = [...adminChartData].sort(
     formatBackendTime
   );
       
-  const punchInDisabled =
+const punchInDisabled =
     loadingStatus ||
     loadingPunchInEligibility ||
     loadingPunchIn ||
-    !!attendance?.time_in ||
     !(punchInEligibility?.can_punch_in ?? false);
+    
   return (
     <Layout style={{ minHeight: "100vh" }}>
       <Sidebar />

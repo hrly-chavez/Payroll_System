@@ -236,8 +236,14 @@ export default function EmployeePayrollResultModal({ open, employee, period, onC
  const downloadPayslipPDF = async () => {
     if (!period?.id || !employee?.id) return;
 
-    if (!result || employee?.status !== "Approved" || period?.status !== "Closed") {
-      message.warning("Payslip download is available only when Employee is Approved and Payroll Period is Closed.");
+    if (
+      !result ||
+      employee?.status !== "Approved" ||
+      !["Closed", "Paid"].includes(period?.status || "")
+    ) {
+      message.warning(
+        "Payslip download is available only when Employee is Approved and Payroll Period is Closed or Paid."
+      );
       return;
     }
 
@@ -290,8 +296,8 @@ export default function EmployeePayrollResultModal({ open, employee, period, onC
 
     const canDownload =
       !!result &&
-      (employee?.status === "Approved") &&
-      (period?.status === "Closed");
+      employee?.status === "Approved" &&
+      ["Closed", "Paid"].includes(period?.status || "");
 
       
   const statusMap: Record<EmployeeMini["status"], { text: string; color: string }> = {
@@ -530,7 +536,19 @@ export default function EmployeePayrollResultModal({ open, employee, period, onC
                   <Tag color={statusMap[status].color}>{statusMap[status].text}</Tag>
                 </Descriptions.Item>
                 <Descriptions.Item label="Payroll Period Status">
-                  <Tag color={period.status === "Open" ? "blue" : period.status === "Processing" ? "gold" : "default"}>
+                  <Tag
+                    color={
+                      period.status === "Open"
+                        ? "blue"
+                        : period.status === "Processing"
+                        ? "gold"
+                        : period.status === "Closed"
+                        ? "green"
+                        : period.status === "Paid"
+                        ? "cyan"
+                        : "default"
+                    }
+                  >
                     {period.status}
                   </Tag>
                 </Descriptions.Item>
@@ -588,7 +606,7 @@ export default function EmployeePayrollResultModal({ open, employee, period, onC
 
             {!canDownload ? (
               <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6, textAlign: "right" }}>
-                Download is available only when employee is Approved and payroll period is Closed.
+                Download is available only when employee is Approved and payroll period is Closed or Paid.
               </div>
             ) : null}
           </div>

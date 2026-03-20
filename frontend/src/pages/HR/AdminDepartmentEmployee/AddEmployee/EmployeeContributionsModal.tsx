@@ -60,7 +60,7 @@ const EmployeeContributionsModal: React.FC<Props> = ({
 
 
   useEffect(() => {
-    if (!settingsLoaded) return;
+    if (!open || !settingsLoaded || salaryBase <= 0) return;
 
     const convertToMonthly = (base: number, type: string) => {
       if (!base) return 0;
@@ -207,7 +207,7 @@ const EmployeeContributionsModal: React.FC<Props> = ({
     };
 
     load();
-  }, [open, monthlySalary, initialValues, form]);
+  }, [open, monthlySalary, salaryBase, payType, initialValues, settingsLoaded, form]);
 
   const enableOptional = (id: number) => {
     setEnabledDeductions((prev) => (prev.includes(id) ? prev : [...prev, id]));

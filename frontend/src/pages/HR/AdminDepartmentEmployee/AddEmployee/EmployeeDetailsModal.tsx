@@ -11,7 +11,7 @@ interface Props {
   departmentId: number;
   allowedRoles: ("EMPLOYEE" | "ADMIN" | "SUPER_ADMIN")[];
   initialValues?: any;
-  onNext: (data: any) => void;   // ✅ now just send form data
+  onNext: (data: any) => void;   // now just send form data
   onClose: () => void;
 }
 
@@ -121,7 +121,7 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
     try {
       const values = await form.validateFields();
 
-      // 🔥 Check email first before proceeding
+      // Check email first before proceeding
       const response = await api.get(
         `/employees/employees/check-email/?email=${values.email}`
       );
@@ -151,38 +151,15 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
       onCancel={onClose}
       footer={null}
       centered
-      width={800}
+      width={1000}
       className={styles.modal}
       closable={false}
     >
       <Form layout="vertical" form={form} className={styles.form}>
         <Row gutter={16}>
           {/* Employee Basic Info */}
-          <Col xs={24} md={12}>
-          <Form.Item
-            name="id_no"
-            label="Employee Number"
-            rules={[
-              { required: true, message: "Employee number is required" },
-              { pattern: /^[0-9]+$/, message: "Numbers only" }
-            ]}
-          >
-            <Input inputMode="numeric" />
-          </Form.Item>
-          </Col>
 
-          <Col xs={24} md={12}>
-            <Form.Item name="status" label="Marital Status" rules={[{ required: true }]}>
-              <Select>
-                <Option value="SINGLE">Single</Option>
-                <Option value="MARRIED">Married</Option>
-                <Option value="WIDOWED">Widowed</Option>
-                <Option value="SEPARATED">Separated</Option>
-              </Select>
-            </Form.Item>
-          </Col>
-
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
           <Form.Item
             name="fname"
             label="First Name"
@@ -198,7 +175,7 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
           </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Form.Item name="initial" label="Middle Initial (Optional)"
             rules={[
               { pattern: /^[A-Za-z]+$/, message: "Alphabet letters only" }
@@ -207,7 +184,7 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
           <Form.Item
             name="lname"
             label="Last Name"
@@ -223,13 +200,39 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
           </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Form.Item name="suffix" label="Suffix">
               <Input />
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
+            <Form.Item
+              name="employment_status"
+              label="Employment Status"
+              rules={[{ required: true, message: "Employment status is required" }]}
+            >
+              <Select placeholder="Select employment status">
+                <Option value="REGULAR">Regular</Option>
+                <Option value="PROBATION">Probation</Option>
+                <Option value="NEW_HIRE">New Hire</Option>
+                <Option value="OJT">OJT</Option>
+              </Select>
+            </Form.Item>
+          </Col>
+
+          <Col xs={24} md={8}>
+            <Form.Item name="status" label="Marital Status" rules={[{ required: true }]}>
+              <Select>
+                <Option value="SINGLE">Single</Option>
+                <Option value="MARRIED">Married</Option>
+                <Option value="WIDOWED">Widowed</Option>
+                <Option value="SEPARATED">Separated</Option>
+              </Select>
+            </Form.Item>
+          </Col>
+
+          <Col xs={24} md={8}>
           <Form.Item
             name="contact_no"
             label="Contact Number"
@@ -245,31 +248,31 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
           </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Form.Item name="email" label="Email" rules={[{ required: true, type: "email" }]}>
               <Input />
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Form.Item name="hired_date" label="Hired Date" rules={[{ required: true }]}>
               <DatePicker style={{ width: "100%" }} />
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Form.Item name="position" label="Position" rules={[{ required: true,pattern: /^[A-Za-z\s]+$/, message: "Alphabet letters only" }]}>
               <Input />
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Form.Item name="bank_info" label="Bank Information">
               <Input />
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Form.Item name="shift" label="Shift">
               <Select>
                 {shifts.map(s => (
@@ -281,7 +284,7 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Form.Item name="department" label="Department" rules={[{ required: true }]}>
               <Select
                 options={departments.map(d => ({
@@ -299,7 +302,7 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
           </Col>
           
           {showRoleField && (
-            <Col xs={24} md={12}>
+            <Col xs={24} md={8}>
               <Form.Item
                 name="role"
                 label="Role"
@@ -319,7 +322,7 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
           {/* Address */}
           <Col span={24}><h3>Address</h3></Col>
 
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Form.Item name={["address", "province"]} label="Province" rules={[{ required: true }]}>
               <Select placeholder="Select Province" onChange={handleProvinceChange}>
                 {provinces.map(p => <Option key={p.id} value={p.id}>{p.name}</Option>)}
@@ -327,7 +330,7 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Form.Item name={["address", "city"]} label="City / Municipality" rules={[{ required: true }]}>
               <Select placeholder="Select City" onChange={handleCityChange} disabled={cities.length === 0}>
                 {cities.map(c => <Option key={c.id} value={c.id}>{c.name}</Option>)}
@@ -335,7 +338,7 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Form.Item name={["address", "barangay"]} label="Barangay" rules={[{ required: true }]}>
               <Select placeholder="Select Barangay" disabled={barangays.length === 0}>
                 {barangays.map(b => <Option key={b.id} value={b.id}>{b.name}</Option>)}
@@ -343,19 +346,19 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Form.Item name={["address", "sitio"]} label="Sitio">
               <Input placeholder="Optional" />
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Form.Item name={["address", "street"]} label="Street" rules={[{ pattern: /^[A-Za-z0-9\s]+$/, message: "No special characters allowed" }]}>
               <Input />
             </Form.Item>
           </Col>
 
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Form.Item name={["address", "zip_code"]} label="Zip Code" rules={[{ pattern: /^[0-9]+$/, message: "Numbers only" }]}>
               <Input maxLength={4} />
             </Form.Item>

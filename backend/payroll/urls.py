@@ -33,9 +33,17 @@ urlpatterns = [
     path("periods/<int:period_id>/employees/<int:employee_id>/verify-snapshot/",PayrollVerifyEmployeeSnapshotView.as_view(),name="payroll-verify-employee-snapshot"),
     path("periods/<int:period_id>/employees/<int:employee_id>/verify/",PayrollVerifyEmployeeView.as_view(),name="payroll-verify-employee"),
 
+    # Run-specific input exclusion (Verify stage)
+    path("periods/<int:period_id>/employees/<int:employee_id>/exclude-input/",PayrollRunExcludeInputView.as_view(),name="payroll-exclude-input",),
+    path("periods/<int:period_id>/employees/<int:employee_id>/include-input/",PayrollRunIncludeInputView.as_view(),name="payroll-include-input",),
+
     # Commissions
     path("commission-types/", CommissionTypeListView.as_view(), name="commission-types"),
     path("periods/<int:period_id>/employees/<int:employee_id>/commissions/",PayrollPeriodEmployeeCommissionListCreateView.as_view(),name="payroll-period-employee-commissions"),
+
+    # Additional Allowances (Payroll-period specific)
+    path("periods/<int:period_id>/employees/<int:employee_id>/allowances/",PayrollPeriodEmployeeAllowanceListCreateView.as_view(),name="payroll-period-employee-allowances"),
+    path("periods/<int:period_id>/employees/<int:employee_id>/allowances/<int:allowance_id>/delete/",PayrollPeriodEmployeeAllowanceDeleteView.as_view(),name="payroll-period-employee-allowance-delete"),
 
     # Payroll Generation
     path("periods/<int:period_id>/generate/", GeneratePayrollForPeriodView.as_view(), name="payroll-generate-period"),

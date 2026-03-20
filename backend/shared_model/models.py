@@ -5,8 +5,9 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseU
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-import uuid
-from datetime import timedelta
+import uuid, re
+from datetime import datetime
+
 
 class Province(models.Model):
     name = models.CharField(max_length=100)
@@ -118,7 +119,13 @@ class Employee(models.Model):
     ("WIDOWED", "Widowed"),
     ("SEPARATED", "Separated"),
     ]
-    #TODO: Optional: Add EMP_STATUS (Regular, Probationary, Resigned),EMP_TERMINATION_DATE
+
+    EMPLOYMENT_STATUS_CHOICES = [
+        ("REGULAR", "Regular"),
+        ("PROBATION", "Probation"),
+        ("NEW_HIRE", "New Hire"),
+        ("OJT", "OJT"),
+    ]
 
     id = models.AutoField(primary_key=True)
     id_no = models.CharField(max_length=50,unique=True,null=True,blank=True)
@@ -127,6 +134,7 @@ class Employee(models.Model):
     initial = models.CharField(max_length=1,null=True,blank=True)
     suffix = models.CharField(max_length=20,null=True,blank=True)
     status = models.CharField(max_length=15, choices=EMP_STATUS,default="Single")
+    employment_status = models.CharField(max_length=20,choices=EMPLOYMENT_STATUS_CHOICES,default="NEW_HIRE")
     address = models.ForeignKey(Address, on_delete=models.CASCADE, null=True, blank=True, related_name="residents")
     contact_no = models.CharField(max_length=12)
     hired_date = models.DateField()
@@ -140,6 +148,26 @@ class Employee(models.Model):
     
     def __str__(self):
         return f"{self.fname} {self.lname}"
+
+    def save(self, *args, **kwargs):
+        if not self.id_no:
+            last_employee = Employee.objects.filter(id_no__isnull=False).order_by("-id").first()
+
+            if last_employee and last_employee.id_no:
+                # Extract number from last ID (e.g., EMP-0005 → 5)
+                match = re.search(r"(\d+)$", last_employee.id_no)
+                if match:
+                    last_number = int(match.group(1))
+                    new_number = last_number + 1
+                else:
+                    new_number = 1
+            else:
+                new_number = 1
+
+            year = datetime.now().year
+            self.id_no = f"EMP-{year}-{new_number:04d}" # EMP-year-0001 format
+
+        super().save(*args, **kwargs)
     
     class Meta:
         constraints = [
@@ -178,9 +206,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     STATUS_CHOICES = (
         ("ACTIVE", "Active"),
-        ("INACTIVE", "Inactive"),
-        ("SUSPENDED", "Suspended"),  # optional
-        ("TERMINATED", "Terminated"),
+        ("INACTIVE", "Inactive")
     )
 
     user_id = models.AutoField(primary_key=True)
@@ -447,7 +473,6 @@ class HolidayPolicy(models.Model):
                 name="unique_holiday_policy_per_dept_base_type"
             )
         ]
-
 
 class DepartmentHolidayCalendar(models.Model):
     HOLIDAY_BASE_CHOICES = [ ("PH", "Philippines"), ("US", "United States"), ("COMPANY", "Company"), ] 
@@ -1084,6 +1109,96 @@ class PayrollPeriodEmployeeCommission(models.Model):
     def __str__(self):
         return f"{self.employee} -({self.amount}) [{self.period.code}]"
 
+class PayrollRunInputExclusion(models.Model):
+    """
+    Run-specific payroll input exclusion decided before generation.
+
+    Purpose:
+    - lets HR exclude one payroll input ONLY for one upcoming/current payroll run
+    - does NOT modify the original master/source record
+    - after reset/regenerate, the next run_no starts fresh unless excluded again
+
+    Reusable for:
+    - DEDUCTION  -> Employee_Deduction.id
+    - COMMISSION -> PayrollPeriodEmployeeCommission.id
+    - ALLOWANCE  -> Employee_Allowance.id
+    """
+
+    SOURCE_TYPE_CHOICES = [
+        ("DEDUCTION", "Deduction"),
+        ("COMMISSION", "Commission"),
+        ("ALLOWANCE", "Allowance"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+
+    period = models.ForeignKey(Payroll_Period,on_delete=models.CASCADE,related_name="run_input_exclusions",)
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="payroll_run_input_exclusions",)
+    target_run_no = models.PositiveIntegerField()
+    source_type = models.CharField(max_length=20, choices=SOURCE_TYPE_CHOICES)
+    source_id = models.PositiveIntegerField()
+    is_excluded = models.BooleanField(default=True)
+    remarks = models.TextField(null=True, blank=True)
+    created_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="created_payroll_run_input_exclusions",)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["period", "employee", "target_run_no", "source_type", "source_id"],
+                name="unique_payroll_run_input_exclusion",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["period", "employee", "target_run_no"]),
+            models.Index(fields=["source_type", "source_id"]),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return (
+            f"{self.employee} | {self.period.code} | run {self.target_run_no} | "
+            f"{self.source_type}:{self.source_id} | excluded={self.is_excluded}"
+        )
+
+class PayrollPeriodEmployeeAllowance(models.Model):
+    """
+    Manual/additional allowance entered by HR for one employee
+    within one payroll period.
+
+    Purpose:
+    - extra transportation allowance
+    - special same-day allowance adjustments
+    - one-off payroll-period allowance inputs
+
+    This is DIFFERENT from Employee_Allowance:
+    - Employee_Allowance = master/setup recurring allowance
+    - PayrollPeriodEmployeeAllowance = run input / manual payroll-period entry
+    """
+
+    id = models.AutoField(primary_key=True)
+
+    period = models.ForeignKey(Payroll_Period,on_delete=models.CASCADE,related_name="additional_allowances",)
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="period_additional_allowances",)
+    allowance_type = models.ForeignKey(Allowance_Type,on_delete=models.PROTECT,related_name="period_employee_allowances",)
+    allowance_date = models.DateField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    remarks = models.TextField(null=True, blank=True)
+    created_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="created_period_allowances",)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-allowance_date", "-created_at"]
+        indexes = [
+            models.Index(fields=["period", "employee"]),
+            models.Index(fields=["allowance_date"]),
+        ]
+
+    def __str__(self):
+        return f"{self.employee} - {self.allowance_type} ({self.amount}) [{self.period.code}]"
+
+
 #audit logs
 class AuditLog(models.Model):
     ACTION_CHOICES = [
@@ -1094,9 +1209,10 @@ class AuditLog(models.Model):
 
     user = models.ForeignKey(
         User, 
-        on_delete=models.SET_NULL, 
+        on_delete=models.CASCADE, 
         null=True,  # allow null for AnonymousUser
-        blank=True
+        blank=True,
+        related_name="audit_logs"
     )
     action = models.CharField(
         max_length=50,

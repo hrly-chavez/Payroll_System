@@ -10,10 +10,8 @@ interface Props {
 const AuditLogsTab: React.FC<Props> = ({ logs, loading }) => {
   const columns = [
     { title: "Action", dataIndex: "action", key: "action" },
-    { title: "User", dataIndex: "user", key: "user" },
-    { title: "Model", dataIndex: "model_name", key: "model_name" },
-    { title: "Old Data", dataIndex: "old_data", key: "old_data" },
-    { title: "New Data", dataIndex: "new_data", key: "new_data" },
+    { title: "Performed by", dataIndex: "user", key: "user" },
+    { title: "Reason", dataIndex: "reason", key: "reason" },
     { title: "Timestamp", dataIndex: "timestamp", key: "timestamp" },
   ];
 

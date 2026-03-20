@@ -1059,6 +1059,81 @@ class CommissionTaxRuleChoicesView(APIView):
             ],
         }, status=http_status.HTTP_200_OK)
 
+#==========================================LOAN RULE========================================
+class LoanRuleListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = LoanRuleSerializer
+
+    def get_queryset(self):
+        return (
+            LoanRule.objects
+            .select_related("department", "employee")
+            .all()
+            .order_by("-id")
+        )
+
+    def perform_create(self, serializer):
+        effective_from = serializer.validated_data.get("effective_from")
+        effective_to = serializer.validated_data.get("effective_to")
+
+        if effective_to and effective_from and effective_to < effective_from:
+            raise ValidationError({"detail": "effective_to cannot be earlier than effective_from."})
+
+        serializer.save()
+
+class LoanRuleRetrieveUpdateView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = LoanRuleSerializer
+    queryset = LoanRule.objects.select_related("department", "employee").all()
+
+    def perform_update(self, serializer):
+        effective_from = serializer.validated_data.get(
+            "effective_from",
+            serializer.instance.effective_from
+        )
+        effective_to = serializer.validated_data.get(
+            "effective_to",
+            serializer.instance.effective_to
+        )
+
+        if effective_to and effective_from and effective_to < effective_from:
+            raise ValidationError({"detail": "effective_to cannot be earlier than effective_from."})
+
+        serializer.save()
+
+class LoanRuleChoicesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({
+            "deduction_mode_choices": [
+                {"value": value, "label": label}
+                for value, label in LoanRule.DEDUCTION_MODE_CHOICES
+            ],
+            "apply_to_cutoff_choices": [
+                {"value": value, "label": label}
+                for value, label in LoanRule.APPLY_TO_CUTOFF_CHOICES
+            ],
+        }, status=http_status.HTTP_200_OK)
+
+class LoanRuleUpdateStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        try:
+            rule = LoanRule.objects.get(pk=pk)
+        except LoanRule.DoesNotExist:
+            return Response(
+                {"error": "Loan rule not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        rule.is_active = request.data.get("is_active", rule.is_active)
+        rule.save()
+
+        serializer = LoanRuleSerializer(rule, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 #==========================================PAYROLL TAX RULE========================================
 
 class SuperAdminPayrollTaxBracketListCreateView(generics.ListCreateAPIView):

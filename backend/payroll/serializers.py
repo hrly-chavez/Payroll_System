@@ -811,7 +811,7 @@ class PayrollTaxBracketSerializer(serializers.ModelSerializer):
             return f"{obj.employee.fname} {obj.employee.lname}".strip()
         return None
 
-#==========================================PAYROLL TAX RULE========================================
+#==========================================LOAN TAX RULE========================================
 
 class LoanRuleSerializer(serializers.ModelSerializer):
     name = serializers.CharField(

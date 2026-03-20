@@ -754,15 +754,19 @@ class Loan(models.Model):
     remaining_balance = models.DecimalField(max_digits=12, decimal_places=2)
 
     # copied snapshot from selected rule at creation time
-    deduction_mode = models.CharField(max_length=20, choices=DEDUCTION_MODE_CHOICES)
-    deduction_value = models.DecimalField(max_digits=12, decimal_places=2)
-    apply_to_cutoff = models.CharField(max_length=10, choices=APPLY_TO_CUTOFF_CHOICES)
+    deduction_mode = models.CharField(max_length=20, choices=DEDUCTION_MODE_CHOICES,null=True,
+    blank=True)
+    deduction_value = models.DecimalField(max_digits=12, decimal_places=2,null=True,
+    blank=True)
+    apply_to_cutoff = models.CharField(max_length=10, choices=APPLY_TO_CUTOFF_CHOICES,null=True,
+    blank=True)
 
     effective_from = models.DateField()
     effective_to = models.DateField(null=True, blank=True)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="Pending")
     remarks = models.TextField(blank=True, default="")
+    declined_reason = models.TextField(null=True, blank=True)
 
     created_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="created_loans",)
     approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_loans",)
@@ -772,8 +776,8 @@ class Loan(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def clean(self):
-        if self.principal_amount < 0:
-            raise ValidationError({"principal_amount": "Principal amount cannot be negative."})
+        if self.principal_amount <= 0:
+            raise ValidationError({"principal_amount": "Principal amount must be greater than 0."})
 
         if self.remaining_balance < 0:
             raise ValidationError({"remaining_balance": "Remaining balance cannot be negative."})
@@ -784,8 +788,22 @@ class Loan(models.Model):
         if self.effective_to and self.effective_to < self.effective_from:
             raise ValidationError({"effective_to": "effective_to cannot be earlier than effective_from."})
 
-        if self.deduction_value < 0:
-            raise ValidationError({"deduction_value": "Deduction value cannot be negative."})
+        # deduction settings required only once approved/active/completed
+        if self.status in ["Approved", "Active", "Completed"]:
+            if not self.rule:
+                raise ValidationError({"rule": "Loan rule is required once the loan is approved."})
+
+            if not self.deduction_mode:
+                raise ValidationError({"deduction_mode": "Deduction mode is required once the loan is approved."})
+
+            if self.deduction_value is None:
+                raise ValidationError({"deduction_value": "Deduction value is required once the loan is approved."})
+
+            if self.deduction_value < 0:
+                raise ValidationError({"deduction_value": "Deduction value cannot be negative."})
+
+            if not self.apply_to_cutoff:
+                raise ValidationError({"apply_to_cutoff": "Apply to cutoff is required once the loan is approved."})
 
     def save(self, *args, **kwargs):
         self.full_clean()

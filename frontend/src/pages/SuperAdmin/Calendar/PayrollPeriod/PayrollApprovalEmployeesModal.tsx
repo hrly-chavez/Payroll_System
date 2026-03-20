@@ -311,8 +311,15 @@ export default function PayrollApprovalEmployeesModal({ open, periodId, onClose 
         footer={null}
         width={980}
         title={title}
-        style={{ top: 50 }}
+        style={{ top: 30 }}
         destroyOnClose
+        styles={{
+          body: {
+            maxHeight: "calc(100vh - 180px)",
+            overflowY: "auto",
+            overflowX: "hidden",
+          },
+        }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
           <Space wrap>

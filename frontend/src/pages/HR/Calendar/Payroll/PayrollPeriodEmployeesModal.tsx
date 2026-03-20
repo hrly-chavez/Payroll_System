@@ -103,14 +103,25 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
 
   return (
     <Modal
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      width={700}
-      title={period
-    ? `Payroll Period: ${dayjs(period.start_date).format("MM/DD/YYYY")} - ${dayjs(period.end_date).format("MM/DD/YYYY")}`: "Payroll Period"}
-      style={{ top: 50 }}
-    >
+  open={open}
+  onCancel={onClose}
+  footer={null}
+  width={700}
+  title={
+    period
+      ? `Payroll Period: ${dayjs(period.start_date).format("MM/DD/YYYY")} - ${dayjs(period.end_date).format("MM/DD/YYYY")}`
+      : "Payroll Period"
+  }
+  style={{ top: 30 }}
+  destroyOnClose
+  styles={{
+    body: {
+      maxHeight: "calc(100vh - 180px)",
+      overflowY: "auto",
+      overflowX: "hidden",
+    },
+  }}
+>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
         <div>
           {period ? (

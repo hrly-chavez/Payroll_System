@@ -474,7 +474,6 @@ class HolidayPolicy(models.Model):
             )
         ]
 
-
 class DepartmentHolidayCalendar(models.Model):
     HOLIDAY_BASE_CHOICES = [ ("PH", "Philippines"), ("US", "United States"), ("COMPANY", "Company"), ] 
     department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name="holiday_calendars") 

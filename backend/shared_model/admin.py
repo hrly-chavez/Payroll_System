@@ -194,7 +194,7 @@ class Employee_SalaryAdmin(admin.ModelAdmin):
 
 @admin.register(Employee_Deduction)
 class EmployeeDeductionAdmin(admin.ModelAdmin):
-    list_display = ("id","deduction_type","amount","frequency","status","effective_from","effective_to","balance","created_at",)
+    list_display = ("id","deduction_type","amount","frequency","status","effective_from","effective_to","created_at",)
 
     list_filter = ("status","frequency","deduction_type","effective_from",)
 

@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Modal, Form, Input, Select, Button, DatePicker, Row, Col, message } from "antd";
+import { Modal, Form, Input, Select, Button, DatePicker, Row, Col, message, Upload } from "antd";
 import api from "api/axios";
 import styles from "../AddAdDeptEmployee.module.css";
 import dayjs from "dayjs";
+import { UploadOutlined, EyeOutlined, DeleteOutlined } from "@ant-design/icons";
+import { RcFile } from "antd/es/upload";
 
 const { Option } = Select;
 
@@ -75,6 +77,47 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
   // Show role selector only if SUPER_ADMIN is allowed
   const showRoleField = allowedRoles.includes("SUPER_ADMIN");
 
+  //photo
+  // Inside your component, before return
+  const [fileList, setFileList] = useState<any[]>([]);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string>("");
+
+  // ------------------------
+  // Handle Upload Change
+  // ------------------------
+  const handleChange = ({ fileList: newFileList }: any) => {
+    const filteredList = newFileList.filter((file: any) => {
+      const isValidType = ["image/jpeg", "image/png", "image/jpg"].includes(file.type);
+      const isValidSize = file.size / 1024 / 1024 < 2;
+      if (!isValidType) message.error(`${file.name} is not a JPG/PNG file`);
+      if (!isValidSize) message.error(`${file.name} exceeds 2MB`);
+      return isValidType && isValidSize;
+    });
+    setFileList(filteredList);
+  };
+
+  // ------------------------
+  // Handle Preview
+  // ------------------------
+  const handlePreview = async (file: any) => {
+    // Generate preview only if it doesn’t exist
+    if (!file.url && !file.preview && file.originFileObj) {
+      file.preview = await getBase64(file.originFileObj);
+    }
+    setPreviewImage(file.url || file.preview || "");
+    setPreviewVisible(true);
+  };
+
+  // Convert file to base64 for preview
+  const getBase64 = (file: RcFile | Blob): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+
   const formatTime = (t: string) => t.slice(0, 5);
 
   // Fetch dropdown data
@@ -119,6 +162,24 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
 
   const handleNext = async () => {
     try {
+      // -----------------------
+      // Validate profile picture
+      // -----------------------
+      if (fileList.length > 0) {
+        const file = fileList[0];
+        if (!["image/jpeg", "image/png", "image/jpg"].includes(file.type)) {
+          message.error("Only JPEG/PNG images allowed.");
+          return; // stop submission
+        }
+        if (file.size > 2 * 1024 * 1024) {
+          message.error("Image size should not exceed 2MB");
+          return; // stop submission
+        }
+      }
+
+      // -----------------------
+      // Validate the rest of the form
+      // -----------------------
       const values = await form.validateFields();
 
       // Check email first before proceeding
@@ -135,6 +196,7 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
         ...values,
         hired_date: values.hired_date.format("YYYY-MM-DD"),
         role: values.role || "EMPLOYEE",
+        profile_picture: fileList[0]?.originFileObj || null,
       };
 
       onNext(formattedData);
@@ -158,6 +220,52 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
       <Form layout="vertical" form={form} className={styles.form}>
         <Row gutter={16}>
           {/* Employee Basic Info */}
+          <Col xs={24} md={8}>
+            <Form.Item
+              name="profile_picture"
+              label="Profile Picture"
+              valuePropName="file"
+              getValueFromEvent={(e) => e.fileList[0]?.originFileObj}
+            >
+              <Upload
+                listType="text"
+                fileList={fileList}
+                beforeUpload={() => false} // prevent auto upload
+                onChange={handleChange}
+                accept=".jpeg,.jpg,.png"
+                maxCount={1}
+                itemRender={(originNode, file) => (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span>{file.name}</span>
+                    <EyeOutlined
+                      style={{ cursor: "pointer" }}
+                      onClick={() => handlePreview(file)}
+                    />
+                    <DeleteOutlined
+                      style={{ cursor: "pointer" }}
+                      onClick={() =>
+                        setFileList(fileList.filter(f => f.uid !== file.uid))
+                      }
+                    />
+                  </div>
+                )}
+              >
+                <Button icon={<UploadOutlined />}>Select File</Button>
+              </Upload>
+            </Form.Item>
+
+            <Modal
+              open={previewVisible}
+              footer={null}
+              onCancel={() => setPreviewVisible(false)}
+            >
+              <img
+                style={{ width: "100%" }}
+                src={previewImage}
+                alt="Preview"
+              />
+            </Modal>
+          </Col>
 
           <Col xs={24} md={8}>
           <Form.Item

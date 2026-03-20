@@ -127,6 +127,12 @@ class Employee(models.Model):
         ("OJT", "OJT"),
     ]
 
+    profile_picture = models.ImageField(
+        upload_to="employees/",  # This will save files in MEDIA_ROOT/employees/
+        null=True,
+        blank=True
+    )
+
     id = models.AutoField(primary_key=True)
     id_no = models.CharField(max_length=50,unique=True,null=True,blank=True)
     fname = models.CharField(max_length=50)
@@ -325,11 +331,6 @@ class Employee_Deduction(models.Model):
     effective_to = models.DateField(null=True,blank=True)
     status = models.CharField(max_length=15, choices=status_choices)
     created_at = models.DateField(auto_now_add=True)
-
-    # Loan-only fields
-    total_loan_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    balance = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    amortization_per_period = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
 
     employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="deductions")
     deduction_type = models.ForeignKey(Deduction_Type,on_delete=models.PROTECT,related_name="employee_deductions", null=True, blank=True) 

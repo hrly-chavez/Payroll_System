@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import *
+from django.conf.urls.static import static
 
 
 #reason nganong wa ga gamit ko router is flexible ang pag add sa urls like naa nani crud
@@ -45,3 +46,6 @@ urlpatterns = [
     path("dropdown/", EmployeeDropdownListView.as_view()), 
 
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

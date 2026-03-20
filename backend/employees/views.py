@@ -5,7 +5,7 @@ from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from accounts.permissions import IsRole;
-import random, string
+import random, string, json
 from rest_framework.views import APIView
 from django.db import transaction
 from django.db.models import Q
@@ -29,6 +29,7 @@ from io import BytesIO
 from django.http import FileResponse
 from accounts.tokens import short_lived_token_generator
 from django.shortcuts import redirect
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 import logging
 import secrets
@@ -260,6 +261,12 @@ class UserViewSet(viewsets.ModelViewSet):
             {"detail": f"User successfully {action_name.lower()}.", "is_active": user.is_active},
             status=status.HTTP_200_OK
         )
+
+#for employee create 
+def parse_json_field(value, default):
+        if isinstance(value, str):
+            return json.loads(value)
+        return value if value is not None else default
         
 #done logs
 #employee details crud
@@ -267,6 +274,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsRole]
     allowed_roles = ["ADMIN", "SUPER_ADMIN"]
     queryset = Employee.objects.filter(is_active=True)
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
     
     def get_serializer_class(self):
         if self.action == "create":
@@ -429,9 +437,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         Create employee + user + salary + contributions + allowances in one atomic transaction
         """
         data = request.data
-        salary_data = data.pop("salary", None)
-        contributions_data = data.pop("contributions", [])
-        allowances_data = data.pop("allowances", [])
+        salary = json.loads(request.POST.get("salary", "{}"))
+        contributions = json.loads(request.POST.get("contributions", "[]"))
+        allowances = json.loads(request.POST.get("allowances", "[]"))
         requested_role = data.get("role", "EMPLOYEE")
 
         # -----------------------------
@@ -524,18 +532,38 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         # -----------------------------
         # 4. Create Salary
         # -----------------------------
-        if salary_data:
+        salary_data = request.data.get("salary")
+        contributions_data = request.data.get("contributions")
+        allowances_data = request.data.get("allowances")
+
+        # Parse JSON if they come as strings
+        if isinstance(salary_data, str):
+            salary_data = json.loads(salary_data)
+
+        if isinstance(contributions_data, str):
+            contributions_data = json.loads(contributions_data)
+
+        if isinstance(allowances_data, str):
+            allowances_data = json.loads(allowances_data)
+            
+            # Add required fields
             salary_data["employee"] = employee.id
-            salary_serializer = EmployeeSalarySerializer(data=salary_data, context={"_current_user": signed_in_user})
+            salary_data.setdefault("status", "Active")  # ensure salary is active
+            
+            # Serialize and save
+            salary_serializer = EmployeeSalarySerializer(
+                data=salary_data, context={"_current_user": signed_in_user}
+            )
             salary_serializer.is_valid(raise_exception=True)
             salary_obj = salary_serializer.save()
-        else:
-            salary_obj = None
 
         # -----------------------------
         # 5. Create Contributions
         # -----------------------------
-        for c in contributions_data:
+        for c in contributions_data or []:
+            if not isinstance(c, dict):
+                continue  # or raise error
+
             c["employee"] = employee.id
             serializer = EmployeeDeductionCreateSerializer(data=c)
             serializer.is_valid(raise_exception=True)
@@ -546,7 +574,10 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         # -----------------------------
         print("ALLOWANCES RECEIVED:", allowances_data)
 
-        for a in allowances_data:
+        for a in allowances_data or []:
+            if not isinstance(a, dict):
+                continue  # or raise error
+
             a["employee"] = employee.id
             serializer = EmployeeAllowanceCreateSerializer(data=a)
             serializer.is_valid(raise_exception=True)

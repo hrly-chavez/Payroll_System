@@ -475,7 +475,6 @@ class HolidayPolicy(models.Model):
             )
         ]
 
-
 class DepartmentHolidayCalendar(models.Model):
     HOLIDAY_BASE_CHOICES = [ ("PH", "Philippines"), ("US", "United States"), ("COMPANY", "Company"), ] 
     department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name="holiday_calendars") 
@@ -731,6 +730,363 @@ class Leave_Day(models.Model):
                 name="unique_leave_day_per_employee_per_date"
             )
         ]
+
+class Loan(models.Model):
+    STATUS_CHOICES = [
+        ("Pending", "Pending"),
+        ("Approved", "Approved"),
+        ("Active", "Active"),
+        ("Completed", "Completed"),
+        ("Cancelled", "Cancelled"),
+    ]
+
+    DEDUCTION_MODE_CHOICES = [
+        ("FIXED", "Fixed"),
+        ("PERCENT", "Percent"),
+    ]
+
+    APPLY_TO_CUTOFF_CHOICES = [
+        ("FIRST", "First Cutoff"),
+        ("SECOND", "Second Cutoff"),
+        ("BOTH", "Both"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="loans",)
+    rule = models.ForeignKey("LoanRule",on_delete=models.SET_NULL,null=True,blank=True,related_name="loans",)
+
+    name = models.CharField(max_length=100)
+    principal_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    remaining_balance = models.DecimalField(max_digits=12, decimal_places=2)
+
+    # copied snapshot from selected rule at creation time
+    deduction_mode = models.CharField(max_length=20, choices=DEDUCTION_MODE_CHOICES)
+    deduction_value = models.DecimalField(max_digits=12, decimal_places=2)
+    apply_to_cutoff = models.CharField(max_length=10, choices=APPLY_TO_CUTOFF_CHOICES)
+
+    effective_from = models.DateField()
+    effective_to = models.DateField(null=True, blank=True)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="Pending")
+    remarks = models.TextField(blank=True, default="")
+
+    created_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="created_loans",)
+    approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_loans",)
+    approved_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def clean(self):
+        if self.principal_amount < 0:
+            raise ValidationError({"principal_amount": "Principal amount cannot be negative."})
+
+        if self.remaining_balance < 0:
+            raise ValidationError({"remaining_balance": "Remaining balance cannot be negative."})
+
+        if self.remaining_balance > self.principal_amount:
+            raise ValidationError({"remaining_balance": "Remaining balance cannot exceed principal amount."})
+
+        if self.effective_to and self.effective_to < self.effective_from:
+            raise ValidationError({"effective_to": "effective_to cannot be earlier than effective_from."})
+
+        if self.deduction_value < 0:
+            raise ValidationError({"deduction_value": "Deduction value cannot be negative."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.employee} - {self.name} - {self.remaining_balance}"
+
+class LoanRule(models.Model):
+    DEDUCTION_MODE_CHOICES = [
+        ("FIXED", "Fixed"),
+        ("PERCENT", "Percent"),
+    ]
+
+    APPLY_TO_CUTOFF_CHOICES = [
+        ("FIRST", "First Cutoff"),
+        ("SECOND", "Second Cutoff"),
+        ("BOTH", "Both"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=100, unique=True)
+
+    # scope pattern:
+    # employee set   => employee-specific
+    # department set => department-specific
+    # both null      => applies to all
+    department = models.ForeignKey(Department,on_delete=models.CASCADE,null=True,blank=True,related_name="loan_rules",)
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,null=True,blank=True,related_name="loan_rules",)
+
+    deduction_mode = models.CharField(max_length=20, choices=DEDUCTION_MODE_CHOICES)
+    deduction_value = models.DecimalField(max_digits=12, decimal_places=2)
+    apply_to_cutoff = models.CharField(max_length=10, choices=APPLY_TO_CUTOFF_CHOICES)
+
+    effective_from = models.DateField()
+    effective_to = models.DateField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def clean(self):
+        if self.department and self.employee:
+            raise ValidationError({
+                "department": "Choose either Department or Employee, not both.",
+                "employee": "Choose either Department or Employee, not both.",
+            })
+
+        if self.effective_to and self.effective_to < self.effective_from:
+            raise ValidationError({
+                "effective_to": "effective_to cannot be earlier than effective_from."
+            })
+
+        if self.deduction_value < 0:
+            raise ValidationError({
+                "deduction_value": "Deduction value cannot be negative."
+            })
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        scope = "Employee" if self.employee_id else ("Department" if self.department_id else "All")
+        return f"{self.name} [{scope}]"
+
+class LoanPayment(models.Model):
+    id = models.AutoField(primary_key=True)
+
+    loan = models.ForeignKey(
+        Loan,
+        on_delete=models.CASCADE,
+        related_name="payments",
+    )
+    payroll = models.ForeignKey(
+        "Payroll",
+        on_delete=models.CASCADE,
+        related_name="loan_payments",
+    )
+    payroll_period = models.ForeignKey(
+        "Payroll_Period",
+        on_delete=models.CASCADE,
+        related_name="loan_payments",
+    )
+
+    deducted_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    previous_balance = models.DecimalField(max_digits=12, decimal_places=2)
+    new_balance = models.DecimalField(max_digits=12, decimal_places=2)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def clean(self):
+        if self.deducted_amount < 0:
+            raise ValidationError({"deducted_amount": "Deducted amount cannot be negative."})
+        if self.previous_balance < 0 or self.new_balance < 0:
+            raise ValidationError({"new_balance": "Balances cannot be negative."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"LoanPayment #{self.id} - {self.deducted_amount}"
+
+class CashAdvance(models.Model):
+    STATUS_CHOICES = [
+        ("Pending", "Pending"),
+        ("Approved", "Approved"),
+        ("Active", "Active"),
+        ("Completed", "Completed"),
+        ("Cancelled", "Cancelled"),
+    ]
+
+    DEDUCTION_MODE_CHOICES = [
+        ("FIXED", "Fixed"),
+        ("PERCENT", "Percent"),
+    ]
+
+    APPLY_TO_CUTOFF_CHOICES = [
+        ("FIRST", "First Cutoff"),
+        ("SECOND", "Second Cutoff"),
+        ("BOTH", "Both"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name="cash_advances",
+    )
+
+    rule = models.ForeignKey(
+        "CashAdvanceRule",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cash_advances",
+    )
+
+    name = models.CharField(max_length=100)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    remaining_balance = models.DecimalField(max_digits=12, decimal_places=2)
+
+    # copied snapshot from selected rule at creation time
+    deduction_mode = models.CharField(max_length=20, choices=DEDUCTION_MODE_CHOICES)
+    deduction_value = models.DecimalField(max_digits=12, decimal_places=2)
+    apply_to_cutoff = models.CharField(max_length=10, choices=APPLY_TO_CUTOFF_CHOICES)
+
+    effective_from = models.DateField()
+    effective_to = models.DateField(null=True, blank=True)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="Pending")
+    remarks = models.TextField(blank=True, default="")
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_cash_advances",
+    )
+    approved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_cash_advances",
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def clean(self):
+        if self.amount < 0:
+            raise ValidationError({"amount": "Amount cannot be negative."})
+
+        if self.remaining_balance < 0:
+            raise ValidationError({"remaining_balance": "Remaining balance cannot be negative."})
+
+        if self.remaining_balance > self.amount:
+            raise ValidationError({"remaining_balance": "Remaining balance cannot exceed amount."})
+
+        if self.effective_to and self.effective_to < self.effective_from:
+            raise ValidationError({"effective_to": "effective_to cannot be earlier than effective_from."})
+
+        if self.deduction_value < 0:
+            raise ValidationError({"deduction_value": "Deduction value cannot be negative."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.employee} - {self.name} - {self.remaining_balance}"
+
+class CashAdvanceRule(models.Model):
+    DEDUCTION_MODE_CHOICES = [
+        ("FIXED", "Fixed"),
+        ("PERCENT", "Percent"),
+    ]
+
+    APPLY_TO_CUTOFF_CHOICES = [
+        ("FIRST", "First Cutoff"),
+        ("SECOND", "Second Cutoff"),
+        ("BOTH", "Both"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=100, unique=True)
+
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="cash_advance_rules",
+    )
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cash_advance_rules",
+    )
+
+    deduction_mode = models.CharField(max_length=20, choices=DEDUCTION_MODE_CHOICES)
+    deduction_value = models.DecimalField(max_digits=12, decimal_places=2)
+    apply_to_cutoff = models.CharField(max_length=10, choices=APPLY_TO_CUTOFF_CHOICES)
+
+    effective_from = models.DateField()
+    effective_to = models.DateField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def clean(self):
+        if self.department and self.employee:
+            raise ValidationError({
+                "department": "Choose either Department or Employee, not both.",
+                "employee": "Choose either Department or Employee, not both.",
+            })
+
+        if self.effective_to and self.effective_to < self.effective_from:
+            raise ValidationError({
+                "effective_to": "effective_to cannot be earlier than effective_from."
+            })
+
+        if self.deduction_value < 0:
+            raise ValidationError({
+                "deduction_value": "Deduction value cannot be negative."
+            })
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        scope = "Employee" if self.employee_id else ("Department" if self.department_id else "All")
+        return f"{self.name} [{scope}]"
+
+class CashAdvancePayment(models.Model):
+    id = models.AutoField(primary_key=True)
+
+    cash_advance = models.ForeignKey(
+        CashAdvance,
+        on_delete=models.CASCADE,
+        related_name="payments",
+    )
+    payroll = models.ForeignKey(
+        "Payroll",
+        on_delete=models.CASCADE,
+        related_name="cash_advance_payments",
+    )
+    payroll_period = models.ForeignKey(
+        "Payroll_Period",
+        on_delete=models.CASCADE,
+        related_name="cash_advance_payments",
+    )
+
+    deducted_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    previous_balance = models.DecimalField(max_digits=12, decimal_places=2)
+    new_balance = models.DecimalField(max_digits=12, decimal_places=2)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def clean(self):
+        if self.deducted_amount < 0:
+            raise ValidationError({"deducted_amount": "Deducted amount cannot be negative."})
+        if self.previous_balance < 0 or self.new_balance < 0:
+            raise ValidationError({"new_balance": "Balances cannot be negative."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"CashAdvancePayment #{self.id} - {self.deducted_amount}"
 
 class Company_Note(models.Model):
     id = models.AutoField(primary_key=True)
@@ -1110,6 +1466,96 @@ class PayrollPeriodEmployeeCommission(models.Model):
 
     def __str__(self):
         return f"{self.employee} -({self.amount}) [{self.period.code}]"
+
+class PayrollRunInputExclusion(models.Model):
+    """
+    Run-specific payroll input exclusion decided before generation.
+
+    Purpose:
+    - lets HR exclude one payroll input ONLY for one upcoming/current payroll run
+    - does NOT modify the original master/source record
+    - after reset/regenerate, the next run_no starts fresh unless excluded again
+
+    Reusable for:
+    - DEDUCTION  -> Employee_Deduction.id
+    - COMMISSION -> PayrollPeriodEmployeeCommission.id
+    - ALLOWANCE  -> Employee_Allowance.id
+    """
+
+    SOURCE_TYPE_CHOICES = [
+        ("DEDUCTION", "Deduction"),
+        ("COMMISSION", "Commission"),
+        ("ALLOWANCE", "Allowance"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+
+    period = models.ForeignKey(Payroll_Period,on_delete=models.CASCADE,related_name="run_input_exclusions",)
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="payroll_run_input_exclusions",)
+    target_run_no = models.PositiveIntegerField()
+    source_type = models.CharField(max_length=20, choices=SOURCE_TYPE_CHOICES)
+    source_id = models.PositiveIntegerField()
+    is_excluded = models.BooleanField(default=True)
+    remarks = models.TextField(null=True, blank=True)
+    created_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="created_payroll_run_input_exclusions",)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["period", "employee", "target_run_no", "source_type", "source_id"],
+                name="unique_payroll_run_input_exclusion",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["period", "employee", "target_run_no"]),
+            models.Index(fields=["source_type", "source_id"]),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return (
+            f"{self.employee} | {self.period.code} | run {self.target_run_no} | "
+            f"{self.source_type}:{self.source_id} | excluded={self.is_excluded}"
+        )
+
+class PayrollPeriodEmployeeAllowance(models.Model):
+    """
+    Manual/additional allowance entered by HR for one employee
+    within one payroll period.
+
+    Purpose:
+    - extra transportation allowance
+    - special same-day allowance adjustments
+    - one-off payroll-period allowance inputs
+
+    This is DIFFERENT from Employee_Allowance:
+    - Employee_Allowance = master/setup recurring allowance
+    - PayrollPeriodEmployeeAllowance = run input / manual payroll-period entry
+    """
+
+    id = models.AutoField(primary_key=True)
+
+    period = models.ForeignKey(Payroll_Period,on_delete=models.CASCADE,related_name="additional_allowances",)
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="period_additional_allowances",)
+    allowance_type = models.ForeignKey(Allowance_Type,on_delete=models.PROTECT,related_name="period_employee_allowances",)
+    allowance_date = models.DateField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    remarks = models.TextField(null=True, blank=True)
+    created_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="created_period_allowances",)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-allowance_date", "-created_at"]
+        indexes = [
+            models.Index(fields=["period", "employee"]),
+            models.Index(fields=["allowance_date"]),
+        ]
+
+    def __str__(self):
+        return f"{self.employee} - {self.allowance_type} ({self.amount}) [{self.period.code}]"
+
 
 #audit logs
 class AuditLog(models.Model):

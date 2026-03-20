@@ -8,11 +8,12 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.utils import timezone
 from django.utils.timezone import now
 from django.shortcuts import get_object_or_404
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, APIException
+from rest_framework import status as http_status
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q
 from datetime import date, timedelta
-from .services import PayrollGenerationService,get_latest_active_payroll
+from .services import PayrollGenerationService, get_latest_active_payroll, get_next_payroll_run_no
 from rest_framework.exceptions import PermissionDenied
 from django.db.models.fields import DateField, DateTimeField
 from io import BytesIO
@@ -120,6 +121,61 @@ def _set_payroll_approved_at(payroll: Payroll, now_dt):
     except Exception:
         # fallback (keeps current behavior safe)
         payroll.approved_at = now_dt.date()
+
+def _validate_payroll_input_source(period, employee, source_type: str, source_id: int):
+    """
+    Ensure the source row really belongs to this employee/period context.
+    Returns the matched object or raises ValidationError.
+    """
+    if source_type == "DEDUCTION":
+        obj = Employee_Deduction.objects.filter(
+            id=source_id,
+            employee=employee,
+            status="Active",
+        ).select_related("deduction_type").first()
+
+        if not obj:
+            raise ValidationError({"detail": "Deduction source not found for this employee."})
+        return obj
+
+    if source_type == "COMMISSION":
+        obj = PayrollPeriodEmployeeCommission.objects.filter(
+            id=source_id,
+            period=period,
+            employee=employee,
+        ).select_related("commission_type").first()
+
+        if not obj:
+            raise ValidationError({"detail": "Commission source not found for this employee and payroll period."})
+        return obj
+
+    if source_type == "ALLOWANCE":
+        # 1) regular/master employee allowance
+        obj = Employee_Allowance.objects.filter(
+            id=source_id,
+            employee=employee,
+            status="Active",
+        ).select_related("allowance_type").first()
+
+        if obj:
+            return obj
+
+        # 2) payroll-period-specific manual/additional allowance
+        obj = PayrollPeriodEmployeeAllowance.objects.filter(
+            id=source_id,
+            period=period,
+            employee=employee,
+        ).select_related("allowance_type").first()
+
+        if obj:
+            return obj
+
+        raise ValidationError({
+            "detail": "Allowance source not found for this employee / payroll period."
+        })
+
+    raise ValidationError({"detail": "Unsupported source_type."})
+
 #==========================================DEDUCTIONS========================================
 # List and Create
 class DeductionListCreateView(generics.ListCreateAPIView):
@@ -366,6 +422,8 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
 
         warnings = []
 
+        target_run_no = get_next_payroll_run_no(period.id, employee.id)
+
         shift = employee.shift or getattr(employee.department, "shift_id", None)
         if not shift:
             warnings.append("No shift assigned (employee.shift and department.shift_id are empty).")
@@ -407,6 +465,16 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
         if not taxes:
             warnings.append("No mandatory tax deductions found for this period (category=TAX).")
 
+        # load exclusion map for this upcoming run
+        deduction_exclusion_rows = PayrollRunInputExclusion.objects.filter(
+            period=period,
+            employee=employee,
+            target_run_no=target_run_no,
+            source_type="DEDUCTION",
+            is_excluded=True,
+        )
+        deduction_exclusion_map = {row.source_id: row for row in deduction_exclusion_rows}
+
         # Allowances active during the payroll period
         allowances_qs = (
             Employee_Allowance.objects
@@ -418,6 +486,37 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
             a for a in allowances_qs
             if _overlaps_period(a.effective_from, a.effective_to, period.start_date, period.end_date)
         ]
+        allowance_exclusion_rows = PayrollRunInputExclusion.objects.filter(
+            period=period,
+            employee=employee,
+            target_run_no=target_run_no,
+            source_type="ALLOWANCE",
+            is_excluded=True,
+        )
+        allowance_exclusion_map = {row.source_id: row for row in allowance_exclusion_rows}
+
+        additional_allowances = (
+            PayrollPeriodEmployeeAllowance.objects
+            .filter(period=period, employee=employee)
+            .select_related("allowance_type")
+            .order_by("-allowance_date", "-created_at")
+        )
+
+        commission_exclusion_rows = PayrollRunInputExclusion.objects.filter(
+            period=period,
+            employee=employee,
+            target_run_no=target_run_no,
+            source_type="COMMISSION",
+            is_excluded=True,
+        )
+        commission_exclusion_map = {row.source_id: row for row in commission_exclusion_rows}
+
+        commissions = (
+            PayrollPeriodEmployeeCommission.objects
+            .filter(period=period, employee=employee)
+            .select_related("commission_type")
+            .order_by("-created_at")
+        )
 
         attendances = (
             Attendance.objects
@@ -442,28 +541,152 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
         )
         if not attendances.exists():
             warnings.append("No attendance records found within this payroll period.")
-        print("PERIOD:", period.start_date, period.end_date)
-        print("LEAVES COUNT:", leave_days.count())
-        print(list(leave_days.values_list("date", "leave_request__status")))
+
         payload = {
             "period_id": period.id,
             "employee_id": employee.id,
             "full_name": f"{employee.fname} {employee.lname}".strip(),
             "department_name": employee.department.name if employee.department else None,
             "status": ppe.status,
+            "target_run_no": target_run_no,
             "shift": shift,
             "salary": salary,
             "taxes": taxes,
             "loans": loans,
             "allowances": in_period_allowances,
-            "attendances": attendances,  
-            "leaves": leave_days,
-            "warnings": warnings,
+            "additional_allowances": additional_allowances,
+            "attendances": attendances,
+            "leave_days": leave_days,
+            "commissions": commissions,
         }
 
+        serializer = PayrollVerifySnapshotSerializer(
+            payload,
+            context={
+                "deduction_exclusion_map": deduction_exclusion_map,
+                "allowance_exclusion_map": allowance_exclusion_map,
+                "commission_exclusion_map": commission_exclusion_map,
+            }
+        )
+
+        return Response(serializer.data, status=http_status.HTTP_200_OK)
+
+class PayrollRunExcludeInputView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, period_id, employee_id):
+        period = get_object_or_404(Payroll_Period, id=period_id)
+        employee = get_object_or_404(Employee, id=employee_id)
+        ppe = get_object_or_404(
+            PayrollPeriodEmployee.objects.select_for_update(),
+            period=period,
+            employee=employee,
+        )
+
+        if ppe.status != "Pending":
+            return Response(
+                {"detail": f"Inputs can only be excluded while employee status is Pending. Current: {ppe.status}."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        if Payroll.objects.filter(payroll_period=period, employee=employee).exclude(status="Void").exists():
+            return Response(
+                {"detail": "Cannot exclude payroll inputs after payroll has already been generated."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = ExcludePayrollInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        source_type = serializer.validated_data["source_type"]
+        source_id = serializer.validated_data["source_id"]
+        remarks = (serializer.validated_data.get("remarks") or "").strip()
+
+        source_obj = _validate_payroll_input_source(period, employee, source_type, source_id)
+
+        target_run_no = get_next_payroll_run_no(period.id, employee.id)
+
+        exclusion, created = PayrollRunInputExclusion.objects.update_or_create(
+            period=period,
+            employee=employee,
+            target_run_no=target_run_no,
+            source_type=source_type,
+            source_id=source_id,
+            defaults={
+                "is_excluded": True,
+                "remarks": remarks,
+                "created_by": request.user,
+            },
+        )
+
         return Response(
-            PayrollVerifySnapshotSerializer(payload).data,
-            status=http_status.HTTP_200_OK
+            {
+                "detail": f"{source_type.title()} excluded for run {target_run_no}.",
+                "target_run_no": target_run_no,
+                "exclusion": PayrollRunInputExclusionSerializer(exclusion).data,
+            },
+            status=http_status.HTTP_201_CREATED if created else http_status.HTTP_200_OK,
+        )
+
+class PayrollRunIncludeInputView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, period_id, employee_id):
+        period = get_object_or_404(Payroll_Period, id=period_id)
+        employee = get_object_or_404(Employee, id=employee_id)
+        ppe = get_object_or_404(
+            PayrollPeriodEmployee.objects.select_for_update(),
+            period=period,
+            employee=employee,
+        )
+
+        if ppe.status != "Pending":
+            return Response(
+                {"detail": f"Inputs can only be restored while employee status is Pending. Current: {ppe.status}."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        if Payroll.objects.filter(payroll_period=period, employee=employee).exclude(status="Void").exists():
+            return Response(
+                {"detail": "Cannot restore payroll inputs after payroll has already been generated."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = IncludePayrollInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        source_type = serializer.validated_data["source_type"]
+        source_id = serializer.validated_data["source_id"]
+
+        _validate_payroll_input_source(period, employee, source_type, source_id)
+
+        target_run_no = get_next_payroll_run_no(period.id, employee.id)
+
+        exclusion = PayrollRunInputExclusion.objects.filter(
+            period=period,
+            employee=employee,
+            target_run_no=target_run_no,
+            source_type=source_type,
+            source_id=source_id,
+        ).first()
+
+        if not exclusion:
+            return Response(
+                {"detail": "No exclusion record found for this payroll input."},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+
+        exclusion.is_excluded = False
+        exclusion.save(update_fields=["is_excluded", "updated_at"])
+
+        return Response(
+            {
+                "detail": f"{source_type.title()} restored for run {target_run_no}.",
+                "target_run_no": target_run_no,
+            },
+            status=http_status.HTTP_200_OK,
         )
 
 # Marks an employee as verified for a payroll period
@@ -551,10 +774,26 @@ class PayrollPeriodEmployeeCommissionListCreateView(APIView):
             employee=employee
         ).select_related("commission_type").order_by("-created_at")
 
-        return Response(
-            PayrollPeriodEmployeeCommissionListSerializer(qs, many=True).data,
-            status=http_status.HTTP_200_OK
+        target_run_no = get_next_payroll_run_no(period.id, employee.id)
+
+        commission_exclusion_rows = PayrollRunInputExclusion.objects.filter(
+            period=period,
+            employee=employee,
+            target_run_no=target_run_no,
+            source_type="COMMISSION",
+            is_excluded=True,
         )
+        commission_exclusion_map = {row.source_id: row for row in commission_exclusion_rows}
+
+        serializer = PayrollPeriodEmployeeCommissionListSerializer(
+            qs,
+            many=True,
+            context={
+                "commission_exclusion_map": commission_exclusion_map,
+            },
+        )
+
+        return Response(serializer.data, status=http_status.HTTP_200_OK)
 
     @transaction.atomic
     def post(self, request, period_id, employee_id):
@@ -591,6 +830,131 @@ class PayrollPeriodEmployeeCommissionListCreateView(APIView):
         )
 
 
+#===========================ADD CUSTOM ALLOWANCE========================
+class PayrollPeriodEmployeeAllowanceListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _guard_locked(self, period, employee):
+        # block when payroll already exists
+        if Payroll.objects.filter(payroll_period=period, employee=employee).exclude(status="Void").exists():
+            return Response(
+                {"detail": "Payroll already generated. Additional allowances are locked for this employee in this period."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        ppe = get_object_or_404(PayrollPeriodEmployee, period=period, employee=employee)
+
+        if ppe.status != "Pending":
+            return Response(
+                {"detail": f"Cannot modify additional allowances when status is {ppe.status}. Additional allowances are only allowed while Pending."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        return None
+
+    def get(self, request, period_id, employee_id):
+        period = get_object_or_404(Payroll_Period, id=period_id)
+        employee = get_object_or_404(Employee, id=employee_id)
+
+        qs = (
+            PayrollPeriodEmployeeAllowance.objects
+            .filter(period=period, employee=employee)
+            .select_related("allowance_type")
+            .order_by("-allowance_date", "-created_at")
+        )
+
+        target_run_no = get_next_payroll_run_no(period.id, employee.id)
+
+        allowance_exclusion_rows = PayrollRunInputExclusion.objects.filter(
+            period=period,
+            employee=employee,
+            target_run_no=target_run_no,
+            source_type="ALLOWANCE",
+            is_excluded=True,
+        )
+        allowance_exclusion_map = {row.source_id: row for row in allowance_exclusion_rows}
+
+        serializer = PayrollPeriodEmployeeAllowanceListSerializer(
+            qs,
+            many=True,
+            context={
+                "allowance_exclusion_map": allowance_exclusion_map,
+            },
+        )
+        return Response(serializer.data, status=http_status.HTTP_200_OK)
+
+    @transaction.atomic
+    def post(self, request, period_id, employee_id):
+        period = get_object_or_404(Payroll_Period, id=period_id)
+        employee = get_object_or_404(Employee, id=employee_id)
+
+        locked = self._guard_locked(period, employee)
+        if locked:
+            return locked
+
+        serializer = PayrollPeriodEmployeeAllowanceCreateSerializer(
+            data=request.data,
+            context={"period": period},
+        )
+        serializer.is_valid(raise_exception=True)
+
+        obj = PayrollPeriodEmployeeAllowance.objects.create(
+            period=period,
+            employee=employee,
+            allowance_type=serializer.validated_data["allowance_type"],
+            allowance_date=serializer.validated_data["allowance_date"],
+            amount=serializer.validated_data["amount"],
+            remarks=serializer.validated_data.get("remarks", ""),
+            created_by=request.user,
+        )
+
+        return Response(
+            {
+                "detail": "Additional allowance saved successfully.",
+                "allowance": PayrollPeriodEmployeeAllowanceListSerializer(obj).data,
+            },
+            status=http_status.HTTP_201_CREATED,
+        )
+
+class PayrollPeriodEmployeeAllowanceDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def delete(self, request, period_id, employee_id, allowance_id):
+        period = get_object_or_404(Payroll_Period, id=period_id)
+        employee = get_object_or_404(Employee, id=employee_id)
+
+        ppe = get_object_or_404(
+            PayrollPeriodEmployee.objects.select_for_update(),
+            period=period,
+            employee=employee,
+        )
+
+        if Payroll.objects.filter(payroll_period=period, employee=employee).exclude(status="Void").exists():
+            return Response(
+                {"detail": "Payroll already generated. Additional allowances are locked for this employee in this period."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        if ppe.status != "Pending":
+            return Response(
+                {"detail": f"Cannot delete additional allowances when status is {ppe.status}. Additional allowances are only allowed while Pending."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        obj = get_object_or_404(
+            PayrollPeriodEmployeeAllowance,
+            id=allowance_id,
+            period=period,
+            employee=employee,
+        )
+
+        obj.delete()
+
+        return Response(
+            {"detail": "Additional allowance deleted successfully."},
+            status=http_status.HTTP_200_OK,
+        )
 #==========================================PAYRULE========================================
 
 class SuperAdminPayRuleListCreateView(generics.ListCreateAPIView):
@@ -696,6 +1060,81 @@ class CommissionTaxRuleChoicesView(APIView):
             ],
         }, status=http_status.HTTP_200_OK)
 
+#==========================================LOAN RULE========================================
+class LoanRuleListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = LoanRuleSerializer
+
+    def get_queryset(self):
+        return (
+            LoanRule.objects
+            .select_related("department", "employee")
+            .all()
+            .order_by("-id")
+        )
+
+    def perform_create(self, serializer):
+        effective_from = serializer.validated_data.get("effective_from")
+        effective_to = serializer.validated_data.get("effective_to")
+
+        if effective_to and effective_from and effective_to < effective_from:
+            raise ValidationError({"detail": "effective_to cannot be earlier than effective_from."})
+
+        serializer.save()
+
+class LoanRuleRetrieveUpdateView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = LoanRuleSerializer
+    queryset = LoanRule.objects.select_related("department", "employee").all()
+
+    def perform_update(self, serializer):
+        effective_from = serializer.validated_data.get(
+            "effective_from",
+            serializer.instance.effective_from
+        )
+        effective_to = serializer.validated_data.get(
+            "effective_to",
+            serializer.instance.effective_to
+        )
+
+        if effective_to and effective_from and effective_to < effective_from:
+            raise ValidationError({"detail": "effective_to cannot be earlier than effective_from."})
+
+        serializer.save()
+
+class LoanRuleChoicesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({
+            "deduction_mode_choices": [
+                {"value": value, "label": label}
+                for value, label in LoanRule.DEDUCTION_MODE_CHOICES
+            ],
+            "apply_to_cutoff_choices": [
+                {"value": value, "label": label}
+                for value, label in LoanRule.APPLY_TO_CUTOFF_CHOICES
+            ],
+        }, status=http_status.HTTP_200_OK)
+
+class LoanRuleUpdateStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        try:
+            rule = LoanRule.objects.get(pk=pk)
+        except LoanRule.DoesNotExist:
+            return Response(
+                {"error": "Loan rule not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        rule.is_active = request.data.get("is_active", rule.is_active)
+        rule.save()
+
+        serializer = LoanRuleSerializer(rule, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 #==========================================PAYROLL TAX RULE========================================
 
 class SuperAdminPayrollTaxBracketListCreateView(generics.ListCreateAPIView):
@@ -765,12 +1204,46 @@ class PayrollTaxBracketChoicesView(APIView):
 class GeneratePayrollForPeriodView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def _stringify_error(self, exc) -> str:
+        detail = getattr(exc, "detail", None)
+
+        if isinstance(detail, dict):
+            if "detail" in detail:
+                return str(detail["detail"])
+            return " | ".join(f"{k}: {v}" for k, v in detail.items())
+
+        if isinstance(detail, list):
+            return " ".join(str(x) for x in detail)
+
+        return str(detail or exc)
+
+
     def post(self, request, period_id: int):
         svc = PayrollGenerationService()
-        result = svc.generate_for_period(
-            period_id=period_id,
-            generated_by_user=request.user
-        )
+
+        try:
+            result = svc.generate_for_period(
+                period_id=period_id,
+                generated_by_user=request.user
+            )
+
+        except ValidationError as e:
+            return Response(
+                {"detail": self._stringify_error(e)},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        except APIException as e:
+            return Response(
+                {"detail": self._stringify_error(e)},
+                status=getattr(e, "status_code", http_status.HTTP_400_BAD_REQUEST),
+            )
+
+        except Exception as e:
+            return Response(
+                {"detail": f"Unexpected payroll error: {str(e)}"},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         # Get the period
         period = Payroll_Period.objects.get(id=period_id)
@@ -804,11 +1277,31 @@ class GeneratePayrollForEmployeeView(APIView):
 
     def post(self, request, period_id: int, employee_id: int):
         svc = PayrollGenerationService()
-        result = svc.generate_for_employee(
-            period_id=period_id,
-            employee_id=employee_id,
-            generated_by_user=request.user
-        )
+
+        try:
+            result = svc.generate_for_employee(
+                period_id=period_id,
+                employee_id=employee_id,
+                generated_by_user=request.user
+            )
+
+        except ValidationError as e:
+            return Response(
+                {"detail": self._stringify_error(e)},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        except APIException as e:
+            return Response(
+                {"detail": self._stringify_error(e)},
+                status=getattr(e, "status_code", http_status.HTTP_400_BAD_REQUEST),
+            )
+
+        except Exception as e:
+            return Response(
+                {"detail": f"Unexpected payroll error: {str(e)}"},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         # ----------------------------
         # Create notification for SUPER_ADMIN
@@ -1583,7 +2076,6 @@ class PayrollPeriodMarkPaidView(APIView):
         Payroll.objects.filter(payroll_period=period, status="Approved").update(status="Paid")
 
         return Response({"detail": "Payroll period marked as Paid."}, status=http_status.HTTP_200_OK)
-
 
 #========================DOWNLOAD PAYROLL EACH EMPLOYEE=====================
 
@@ -2516,11 +3008,6 @@ class AdminEmployeePayrollDownloadPDFView(APIView):
             filename=filename,
             content_type="application/pdf",
         )
-
-
-
-
-
 
 #payroll logs
 #list of payroll periods

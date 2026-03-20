@@ -25,8 +25,6 @@ class ShiftWorkdayAdmin(admin.ModelAdmin):
     search_fields = ("id", "shift__name")
     ordering = ("shift", "day_of_week")
 
-admin.site.register(Employee)
-admin.site.register(Address)
 @admin.register(Payroll)
 class PayrollAdmin(admin.ModelAdmin):
     list_display = ( "id", "employee","payroll_period","status","basic_pay","total_earnings","total_deductions","net_pay","generated_at",)
@@ -38,6 +36,7 @@ class PayrollAdmin(admin.ModelAdmin):
     ordering = ("-generated_at",)
 
     readonly_fields = ("basic_pay","total_earnings","total_deductions","net_pay","generated_at","approved_at",)
+
 @admin.register(Excess_Time_Request)
 class ExcessTimeRequestAdmin(admin.ModelAdmin):
     list_display = (
@@ -60,7 +59,6 @@ class ExcessTimeRequestAdmin(admin.ModelAdmin):
     )
     readonly_fields = ("created_at", "approved_at")
     date_hierarchy = "date"
-
 
 @admin.register(Offset_Credit)
 class OffsetCreditAdmin(admin.ModelAdmin):
@@ -178,7 +176,6 @@ class HolidayAdmin(admin.ModelAdmin):
 
     list_editable = ('is_active',)
 
-
 @admin.register(Employee_Salary)
 class Employee_SalaryAdmin(admin.ModelAdmin):
     list_display = ('pay_type', 'employee_fname')
@@ -216,7 +213,6 @@ class DeductionTypeAdmin(admin.ModelAdmin):
 
     date_hierarchy = "create_at"
 
-
 @admin.register(Allowance_Type)
 class AllowanceTypeAdmin(admin.ModelAdmin):
     list_display = (
@@ -243,7 +239,6 @@ class AllowanceTypeAdmin(admin.ModelAdmin):
         "created_at",
     )
 
-
 @admin.register(Employee_Allowance)
 class Employee_Allowance(admin.ModelAdmin):
     list_display = ('id', )
@@ -253,7 +248,6 @@ class AttendanceEventInline(admin.TabularInline):
     extra = 0
     fields = ("type", "minutes", "start_time", "end_time", "approval_status", "approved_by", "holiday", "created_at")
     readonly_fields = ("created_at",)
-
 
 @admin.register(Attendance)
 class AttendanceAdmin(admin.ModelAdmin):
@@ -345,9 +339,6 @@ class AttendanceEventAdmin(admin.ModelAdmin):
         return getattr(emp, "id_no", "") if emp else ""
     employee_id_no.short_description = "Employee ID No"
 
-
-admin.site.register(Payroll_Period)
-
 @admin.register(Commission_Type)
 class CommissionTypeAdmin(admin.ModelAdmin):
     list_display = (
@@ -434,7 +425,6 @@ class LeaveRequestAdmin(admin.ModelAdmin):
     search_fields = ("employee__user__username", "reason")
     ordering = ("-requested_at",)
     
-
 @admin.register(HolidayPolicy)
 class HolidayPolicyAdmin(admin.ModelAdmin):
     list_display = ("department", "base", "holiday_type", "requires_work", "created_at")
@@ -479,11 +469,6 @@ class AttendanceCorrectionAdmin(admin.ModelAdmin):
 
     ordering = ("-requested_at",)
 
-admin.site.register(AuditLog)
-admin.site.register(Company_Note)
-admin.site.register(Notification)
-admin.site.register(Leave_Day)
-admin.site.register(PayrollPeriodEmployee)
 @admin.register(DepartmentHolidayCalendar)
 class DepartmentHolidayCalendarAdmin(admin.ModelAdmin):
     list_display = (
@@ -518,4 +503,13 @@ class CommissionTaxRuleAdmin(admin.ModelAdmin):
     search_fields = ("name", "commission_type__name", "employee__fname", "employee__lname", "applies_to__name")
     ordering = ("-id",)
 
+admin.site.register(LoanRule)
+admin.site.register(Employee)
+admin.site.register(Address)
+admin.site.register(Payroll_Period)
+admin.site.register(AuditLog)
+admin.site.register(Company_Note)
+admin.site.register(Notification)
+admin.site.register(Leave_Day)
+admin.site.register(PayrollPeriodEmployee)
 admin.site.register(Payroll_Tax_Bracket)

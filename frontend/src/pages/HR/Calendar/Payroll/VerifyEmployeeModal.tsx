@@ -65,14 +65,29 @@ type Deduction = {
   status: "Active" | "Inactive";
   deduction_type?: DeductionType | null;
 
-  total_loan_amount?: string | null;
-  balance?: string | null;
-  amortization_per_period?: string | null;
-
-  // NEW (run-specific)
+  // run-specific
   is_excluded_for_run?: boolean;
   exclusion_id?: number | null;
   exclusion_remarks?: string | null;
+};
+
+type Loan = {
+  id: number;
+  name: string;
+  principal_amount: string;
+  remaining_balance: string;
+  deduction_mode?: "FIXED" | "PERCENT" | null;
+  deduction_value?: string | null;
+  apply_to_cutoff?: "FIRST" | "SECOND" | "BOTH" | null;
+  effective_from: string;
+  effective_to?: string | null;
+  status: "Pending" | "Approved" | "Active" | "Completed" | "Cancelled";
+  remarks?: string | null;
+  declined_reason?: string | null;
+  rule?: number | null;
+  rule_name?: string | null;
+  approved_at?: string | null;
+  created_at?: string | null;
 };
 
 type AllowanceType = {
@@ -174,7 +189,7 @@ type Snapshot = {
   shift: Shift | null;
   salary: Salary | null;
   taxes: Deduction[];
-  loans: Deduction[];
+  loans: Loan[];
   allowances: Allowance[];
   additional_allowances: AdditionalAllowance[];
   attendances: AttendanceRow[];
@@ -522,15 +537,47 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
     },
   ];
 
-  const loanColumns = [
-    {
-      title: "Loan",
-      dataIndex: ["deduction_type", "code"],
-      render: (_: any, row: Deduction) => row?.deduction_type?.code || "Loan",
-    },
-    { title: "Amort/Period", dataIndex: "amortization_per_period", render: (v: string) => v || "-" },
-    { title: "Balance", dataIndex: "balance", render: (v: string) => v || "-" },
-  ];
+   const loanColumns = [
+      {
+        title: "Loan",
+        dataIndex: "name",
+        render: (v: string) => v || "-",
+      },
+      {
+        title: "Rule",
+        dataIndex: "rule_name",
+        render: (v: string | null) => v || "-",
+      },
+      {
+        title: "Deduction",
+        render: (_: any, row: Loan) =>
+          row.deduction_mode ? `${row.deduction_mode} - ${formatLoanDeductionValue(row)}` : "-",
+      },
+      {
+        title: "Cutoff",
+        dataIndex: "apply_to_cutoff",
+        render: (v: Loan["apply_to_cutoff"]) => formatCutoff(v),
+      },
+      {
+        title: "Remaining Balance",
+        dataIndex: "remaining_balance",
+        render: (v: string) => formatMoney(v),
+      },
+      {
+        title: "Status",
+        dataIndex: "status",
+        render: (v: Loan["status"]) => {
+          const colorMap: Record<Loan["status"], string> = {
+            Pending: "gold",
+            Approved: "blue",
+            Active: "green",
+            Completed: "default",
+            Cancelled: "red",
+          };
+          return <Tag color={colorMap[v] || "default"}>{v}</Tag>;
+        },
+      },
+    ];
 
   const commissionColumns = [
     {
@@ -626,6 +673,34 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
     if (!period) return "-";
     return `${dayjs(period.start_date).format("YYYY-MM-DD")} to ${dayjs(period.end_date).format("YYYY-MM-DD")}`;
   }, [period]);
+    const formatMoney = (value?: string | number | null) => {
+    const num = Number(value ?? 0);
+    if (!Number.isFinite(num)) return String(value ?? "-");
+    return `₱${num.toFixed(2)}`;
+  };
+
+  const formatLoanDeductionValue = (loan: Loan) => {
+    if (!loan.deduction_mode || loan.deduction_value === null || loan.deduction_value === undefined) {
+      return "-";
+    }
+
+    const num = Number(loan.deduction_value);
+    if (!Number.isFinite(num)) return String(loan.deduction_value ?? "-");
+
+    if (loan.deduction_mode === "PERCENT") {
+      return `${(num * 100).toFixed(2)}%`;
+    }
+
+    return formatMoney(num);
+  };
+
+  const formatCutoff = (value?: Loan["apply_to_cutoff"]) => {
+    if (!value) return "-";
+    if (value === "FIRST") return "First Cutoff";
+    if (value === "SECOND") return "Second Cutoff";
+    if (value === "BOTH") return "Both";
+    return value;
+  };
 
   return (
     <Modal

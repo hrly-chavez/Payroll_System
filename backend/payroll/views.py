@@ -70,16 +70,6 @@ def _require_approver(user):
 
     raise PermissionDenied("You are not allowed to approve/decline payroll.")
 
-    payroll.status = "Approved"
-    payroll.approved_by = request_user
-    _set_payroll_approved_at(payroll, now_dt)
-    payroll.save(update_fields=["status", "approved_by", "approved_at"])
-
-    ppe.status = "Approved"
-    ppe.approved_by = request_user
-    ppe.approved_at = now_dt
-    ppe.save(update_fields=["status", "approved_by", "approved_at", "updated_at"])
-
 def _approve_single_ppe_and_payroll(*, request_user, ppe, payroll, now_dt):
     payroll.status = "Approved"
     payroll.approved_by = request_user
@@ -174,6 +164,73 @@ def _validate_payroll_input_source(period, employee, source_type: str, source_id
         })
 
     raise ValidationError({"detail": "Unsupported source_type."})
+
+def _reverse_loan_payments_for_voided_payroll(payroll: Payroll):
+    """
+    Reverse the loan-balance effect of all LoanPayment rows tied to one payroll.
+
+    Why this exists:
+    - payroll generation now creates LoanPayment + reduces Loan.remaining_balance
+    - if that payroll run is later voided/reset, we must restore the loan balance
+    - we keep LoanPayment rows for audit history; active logic should ignore rows whose payroll is Void
+
+    Status restoration rule:
+    - if there are other non-void LoanPayment rows for the loan -> status stays Active
+    - otherwise -> status becomes Approved (ready for future payroll deduction)
+    - if restored balance reaches principal_amount, it is still Approved (not Pending)
+    """
+    loan_payments = list(
+        LoanPayment.objects
+        .select_for_update()
+        .filter(payroll=payroll)
+        .select_related("loan")
+        .order_by("id")
+    )
+
+    if not loan_payments:
+        return
+
+    # Group total deducted amount per loan in case a payroll somehow has multiple LoanPayment rows for same loan
+    loan_totals = {}
+    for lp in loan_payments:
+        loan_totals.setdefault(lp.loan_id, Decimal("0.00"))
+        loan_totals[lp.loan_id] += Decimal(str(lp.deducted_amount or "0"))
+
+    for loan_id, total_deducted in loan_totals.items():
+        loan = (
+            Loan.objects
+            .select_for_update()
+            .filter(id=loan_id)
+            .first()
+        )
+        if not loan:
+            continue
+
+        current_remaining = Decimal(str(loan.remaining_balance or "0"))
+        principal_amount = Decimal(str(loan.principal_amount or "0"))
+
+        restored_remaining = current_remaining + Decimal(str(total_deducted or "0"))
+
+        # safety cap: remaining balance should never exceed principal
+        if restored_remaining > principal_amount:
+            restored_remaining = principal_amount
+
+        other_active_payment_exists = LoanPayment.objects.filter(
+            loan=loan
+        ).exclude(
+            payroll=payroll
+        ).exclude(
+            payroll__status="Void"
+        ).exists()
+
+        loan.remaining_balance = restored_remaining
+
+        if restored_remaining <= Decimal("0.00"):
+            loan.status = "Completed"
+        else:
+            loan.status = "Active" if other_active_payment_exists else "Approved"
+
+        loan.save(update_fields=["remaining_balance", "status", "updated_at"])
 
 #==========================================DEDUCTIONS========================================
 # List and Create
@@ -447,10 +504,27 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
             if _overlaps_period(d.effective_from, d.effective_to, period.start_date, period.end_date)
         ]
 
-        # Loans first (so we can exclude them from taxes)
-        loans = [
+        # Taxes stay in Employee_Deduction
+        taxes = [
             d for d in in_period_deductions
-            if (d.amortization_per_period is not None) or (d.total_loan_amount is not None)
+            if d.deduction_type
+            and d.deduction_type.category == "TAX"
+        ]
+
+        # Loans now come from the new Loan model
+        loans_qs = (
+            Loan.objects
+            .select_related("rule")
+            .filter(
+                employee=employee,
+                status__in=["Approved", "Active"],
+            )
+            .order_by("-created_at", "-id")
+        )
+
+        loans = [
+            l for l in loans_qs
+            if _overlaps_period(l.effective_from, l.effective_to, period.start_date, period.end_date)
         ]
 
         # Taxes: category=TAX and not a loan row
@@ -458,7 +532,6 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
             d for d in in_period_deductions
             if d.deduction_type
             and d.deduction_type.category == "TAX"
-            and d not in loans
         ]
 
         if not taxes:
@@ -1864,7 +1937,7 @@ class PayrollResetAfterDeclineView(APIView):
 
     @transaction.atomic
     def post(self, request, period_id: int, employee_id: int):
-        
+
         period = get_object_or_404(Payroll_Period.objects.select_for_update(), id=period_id)
 
         ppe = get_object_or_404(
@@ -1891,14 +1964,23 @@ class PayrollResetAfterDeclineView(APIView):
                 status=http_status.HTTP_404_NOT_FOUND,
             )
 
-        # void it
+        # Lock the exact payroll row for safer reset/void
+        payroll = get_object_or_404(
+            Payroll.objects.select_for_update(),
+            id=payroll.id,
+        )
+
+        # Reverse loan effects first before marking payroll as Void
+        _reverse_loan_payments_for_voided_payroll(payroll)
+
+        # Void payroll
         payroll.status = "Void"
         payroll.voided_by = request.user
         payroll.voided_at = timezone.now()
         payroll.void_reason = void_reason or "Reset after decline"
         payroll.save(update_fields=["status", "voided_by", "voided_at", "void_reason"])
 
-         # reset PPE back to Pending 
+        # Reset PPE back to Pending
         ppe.status = "Pending"
         ppe.declined_reason = None
         ppe.approved_by = None
@@ -1921,7 +2003,10 @@ class PayrollResetAfterDeclineView(APIView):
         # After reset, period should reflect reality (often back to Processing)
         _recompute_period_status(period)
 
-        return Response({"detail": "Employee reset to Pending. Previous payroll voided."}, status=http_status.HTTP_200_OK)
+        return Response(
+            {"detail": "Employee reset to Pending. Previous payroll voided and loan balances restored."},
+            status=http_status.HTTP_200_OK
+        )
 
 #========================UPDATE STATUS OF PAYROLL PERIOD TO PAID=====================
 class PayrollPeriodMarkPaidView(APIView):

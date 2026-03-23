@@ -828,7 +828,7 @@ class LoanRule(models.Model):
     name = models.CharField(max_length=100, unique=True)
 
     # scope pattern:
-    # employee set   => employee-specific
+    # employee set   => employee-specifi
     # department set => department-specific
     # both null      => applies to all
     department = models.ForeignKey(Department,on_delete=models.CASCADE,null=True,blank=True,related_name="loan_rules",)

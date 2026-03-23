@@ -1263,25 +1263,30 @@ class PayrollGenerationService:
 
         return loan_cutoff == period_cutoff
 
-    def _compute_loan_deduction_amount(self, loan: Loan, basic_pay_amount: Decimal) -> Decimal:
+    def _compute_loan_deduction_breakdown(self, loan: Loan, basic_pay_amount: Decimal) -> dict:
         """
-        Compute the scheduled deduction amount for one loan in one payroll run.
+        Compute the scheduled deduction amount for one loan in one payroll run
+        and return a full breakdown for audit/UI clarity.
 
-        Rules:
-        - FIXED   -> fixed deduction_value per eligible cutoff
-        - PERCENT -> basic_pay_amount * deduction_value
-                    (deduction_value is stored fraction-style, e.g. 0.15 = 15%)
-
-        Safety:
-        - cap the deduction to remaining_balance
+        Assumption:
+        - PERCENT is stored fraction-style
+        e.g. 0.30 = 30%
         """
         remaining_balance = _d2(_safe_decimal(loan.remaining_balance, "remaining_balance"))
-        if remaining_balance <= 0:
-            return DEC_0
-
-        mode = (loan.deduction_mode or "").strip().upper()
-        deduction_value = _safe_decimal(loan.deduction_value, "deduction_value")
         basic_pay_amount = _d2(_safe_decimal(basic_pay_amount, "basic_pay_amount"))
+        mode = (loan.deduction_mode or "").strip().upper()
+        deduction_value = _safe_decimal(loan.deduction_value or 0, "deduction_value")
+
+        if remaining_balance <= 0:
+            return {
+                "mode": mode,
+                "deduction_value": deduction_value,
+                "basic_pay_amount": basic_pay_amount,
+                "scheduled_amount": DEC_0,
+                "deducted_amount": DEC_0,
+                "remaining_balance": remaining_balance,
+                "was_capped": False,
+            }
 
         if mode == "FIXED":
             scheduled_amount = _d2(deduction_value)
@@ -1291,26 +1296,45 @@ class PayrollGenerationService:
             raise ValidationError({"detail": f"Unsupported loan deduction_mode: {loan.deduction_mode}"})
 
         if scheduled_amount <= 0:
-            return DEC_0
+            return {
+                "mode": mode,
+                "deduction_value": deduction_value,
+                "basic_pay_amount": basic_pay_amount,
+                "scheduled_amount": DEC_0,
+                "deducted_amount": DEC_0,
+                "remaining_balance": remaining_balance,
+                "was_capped": False,
+            }
 
-        return _d2(min(scheduled_amount, remaining_balance))
+        deducted_amount = _d2(min(scheduled_amount, remaining_balance))
+
+        return {
+            "mode": mode,
+            "deduction_value": deduction_value,
+            "basic_pay_amount": basic_pay_amount,
+            "scheduled_amount": scheduled_amount,
+            "deducted_amount": deducted_amount,
+            "remaining_balance": remaining_balance,
+            "was_capped": deducted_amount < scheduled_amount,
+        }
 
     def _apply_loans(self, payroll: Payroll, loans, period: Payroll_Period, basic_pay_amount: Decimal):
         """
-        Apply new Loan-model deductions into payroll.
+        Apply loan deductions into payroll with a clearer audit trail.
 
-        For every eligible loan:
-        - create one payslip deduction line
-        - create one LoanPayment audit row
-        - reduce Loan.remaining_balance
-        - move Approved -> Active after first successful deduction
-        - move to Completed when balance reaches zero
+        Keeps the same business logic:
+        - only deduct if cutoff applies
+        - amount is still capped by remaining_balance
+        - create LoanPayment
+        - update remaining balance and status
         """
         for loan in loans:
             if not self._loan_applies_to_cutoff(loan, period):
                 continue
 
-            deducted_amount = self._compute_loan_deduction_amount(loan, basic_pay_amount)
+            breakdown = self._compute_loan_deduction_breakdown(loan, basic_pay_amount)
+            deducted_amount = breakdown["deducted_amount"]
+
             if deducted_amount <= 0:
                 continue
 
@@ -1320,22 +1344,40 @@ class PayrollGenerationService:
             if new_balance < 0:
                 new_balance = DEC_0
 
+            deduction_desc = f"Loan: {loan.name}"
+            if loan.rule_id:
+                deduction_desc += f" ({loan.rule.name})"
+
             self._create_line(
                 payroll,
                 "DEDUCTION",
-                f"Loan: {loan.name}",
+                deduction_desc,
                 deducted_amount,
                 source_type="ADJUSTMENT",
                 source_id=loan.id,
+                rate_applied=breakdown["deduction_value"],
             )
 
             self._create_line(
                 payroll,
                 "INFORMATION",
-                f"Loan Balance Info ({loan.name}): previous={previous_balance}; deducted={deducted_amount}; new={new_balance}",
+                (
+                    f"Loan Rule Info ({loan.name}): "
+                    f"rule={loan.rule.name if loan.rule_id else '-'}; "
+                    f"mode={breakdown['mode']}; "
+                    f"value={breakdown['deduction_value']}; "
+                    f"cutoff={loan.apply_to_cutoff}; "
+                    f"basic_pay={breakdown['basic_pay_amount']}; "
+                    f"scheduled={breakdown['scheduled_amount']}; "
+                    f"capped={'YES' if breakdown['was_capped'] else 'NO'}; "
+                    f"deducted={deducted_amount}; "
+                    f"previous={previous_balance}; "
+                    f"new={new_balance}"
+                ),
                 DEC_0,
                 source_type="ADJUSTMENT",
                 source_id=loan.id,
+                rate_applied=breakdown["deduction_value"],
             )
 
             LoanPayment.objects.create(

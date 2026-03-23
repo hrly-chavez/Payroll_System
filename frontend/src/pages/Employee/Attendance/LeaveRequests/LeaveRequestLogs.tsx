@@ -16,8 +16,11 @@ type LeaveRow = {
   date_to: string;
   status: string; // approved | rejected | pending (based on your backend)
 };
+type LeaveRequestLogsProps = {
+  refreshKey?: number;
+};
 
-const LeaveRequestLogs: React.FC = () => {
+const LeaveRequestLogs: React.FC<LeaveRequestLogsProps> = ({ refreshKey }) => {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -38,7 +41,7 @@ const LeaveRequestLogs: React.FC = () => {
 
   useEffect(() => {
     fetchLeaveRequests();
-  }, []);
+  }, [refreshKey]);
 
   const columns = useMemo(
     () => [

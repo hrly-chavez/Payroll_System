@@ -338,7 +338,7 @@ class LeaveDayMiniSerializer(serializers.ModelSerializer):
         model = Leave_Day
         fields = ["id", "date", "units", "is_paid", "pay_rate", "leave_request"]
 
-#==================================COMMISION================================
+#==========COMMISION=========
 # Commission type dropdown
 class CommissionTypeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -422,9 +422,31 @@ class PayrollPeriodEmployeeCommissionCreateSerializer(serializers.ModelSerialize
         if value <= 0:
             raise serializers.ValidationError("Amount must be greater than 0.")
         return value
+#============================
+#Loan
+class LoanMiniSerializer(serializers.ModelSerializer):
+    rule_name = serializers.CharField(source="rule.name", read_only=True)
 
-
-#==================================================================
+    class Meta:
+        model = Loan
+        fields = [
+            "id",
+            "name",
+            "principal_amount",
+            "remaining_balance",
+            "deduction_mode",
+            "deduction_value",
+            "apply_to_cutoff",
+            "effective_from",
+            "effective_to",
+            "status",
+            "remarks",
+            "declined_reason",
+            "rule",
+            "rule_name",
+            "approved_at",
+            "created_at",
+        ]
 
 # Aggregated snapshot shown in Verify Employee modal before payroll generation
 class PayrollVerifySnapshotSerializer(serializers.Serializer):
@@ -442,7 +464,7 @@ class PayrollVerifySnapshotSerializer(serializers.Serializer):
     salary = EmployeeSalaryMiniSerializer(allow_null=True)
 
     taxes = EmployeeDeductionMiniSerializer(many=True)   # SSS/PAGIBIG/PHILHEALTH...
-    loans = EmployeeDeductionMiniSerializer(many=True)   # loan deductions only
+    loans = LoanMiniSerializer(many=True)                # new Loan model preview
 
     # regular/master allowances
     allowances = EmployeeAllowanceMiniSerializer(many=True)
@@ -452,7 +474,7 @@ class PayrollVerifySnapshotSerializer(serializers.Serializer):
 
     attendances = AttendanceMiniSerializer(many=True)
     leave_days = LeaveDayMiniSerializer(many=True)
-    commissions = PayrollPeriodEmployeeCommissionListSerializer(many=True)   
+    commissions = PayrollPeriodEmployeeCommissionListSerializer(many=True)
 
 #NOTE: This is for additional allowance in a particular payroll period
 class PayrollPeriodEmployeeAllowanceCreateSerializer(serializers.ModelSerializer):
@@ -811,7 +833,7 @@ class PayrollTaxBracketSerializer(serializers.ModelSerializer):
             return f"{obj.employee.fname} {obj.employee.lname}".strip()
         return None
 
-#==========================================PAYROLL TAX RULE========================================
+#==========================================LOAN TAX RULE========================================
 
 class LoanRuleSerializer(serializers.ModelSerializer):
     name = serializers.CharField(

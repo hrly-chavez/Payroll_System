@@ -771,7 +771,7 @@ class PayrollGenerationService:
         - This function assumes you are inside a transaction.atomic scope.
         - If anything raises ValidationError, everything rolls back.
         """
-        self._validate_ppe(ppe,period)
+        self._validate_ppe(ppe, period)
 
         ctx = self._build_context(period, ppe)
 
@@ -789,7 +789,7 @@ class PayrollGenerationService:
 
         # 7.3 attendance events (approved)
         self._apply_attendance_events(payroll, ctx["approved_events"], ctx["rule_map"], rates)
-        
+
         late_dates = self._get_late_dates(ctx["approved_events"])
 
         # Compute absences once (shared business rule)
@@ -800,15 +800,13 @@ class PayrollGenerationService:
             holiday_map=ctx["holiday_map"],
             holiday_policy_map=ctx["holiday_policy_map"],
         )
-        
 
         # Night differential (VOID if late-days already; also VOID per-day if has_absent)
         self._apply_night_differential(payroll, ctx["attendance_map"], ctx["rule_map"], rates, late_dates)
 
         # Holiday earnings (auto if worked on approved holiday)
-        self._apply_worked_holidays(payroll, ctx, rates)    
+        self._apply_worked_holidays(payroll, ctx, rates)
 
-        
         # 7.4 absent deduction
         absent_rule = ctx["rule_map"].get(("Absent", "Deduction"))
         self._apply_absent_deduction(
@@ -819,8 +817,7 @@ class PayrollGenerationService:
             rates=rates,
         )
 
-        # 8 allowances / deductions / commissions
-         # 8 allowances / deductions / commissions
+        # 8 allowances / commissions / loans / deductions
         self._apply_allowances(
             payroll=payroll,
             allowances=ctx["allowances"],
@@ -843,6 +840,15 @@ class PayrollGenerationService:
             commission_tax_rules=ctx["commission_tax_rules"],
         )
 
+        # New loan stage (new Loan model is now the source of truth)
+        self._apply_loans(
+            payroll=payroll,
+            loans=ctx["loans"],
+            period=period,
+            basic_pay_amount=basic_pay_amount,
+        )
+
+        # Regular deductions only (non-loan)
         self._apply_deductions(payroll, ctx["deductions"], period)
 
         # 8.5 compute TAXABLE income base before payroll tax
@@ -858,7 +864,7 @@ class PayrollGenerationService:
 
         # 10 lifecycle
         self._update_ppe_status(ppe, generated_by_user)
-    
+
     def _get_target_run_no(self, employee: Employee, period: Payroll_Period) -> int:
         """
         Compute the run number that is about to be generated.
@@ -908,7 +914,7 @@ class PayrollGenerationService:
         - approved attendance events
         - leave map (date -> Leave_Day)
         - holiday map + policy map
-        - allowances/deductions/commissions
+        - allowances/deductions/commissions/loans
         - pay rules resolved by priority
         - upcoming target_run_no + run-specific exclusions
         """
@@ -924,7 +930,6 @@ class PayrollGenerationService:
         attendance_map = self._get_attendance_map(employee, period)
         approved_events = self._get_approved_events(attendance_map)
 
-        # Leave placeholder for now (ready when other team finishes)
         leave_map = self._get_leave_map(employee, period)
 
         holiday_map = self._get_holiday_map(period, active_bases)
@@ -966,6 +971,7 @@ class PayrollGenerationService:
             period,
             deduction_exclusion_map=deduction_exclusion_map,
         )
+        loans = self._get_loans(employee, period)
         commissions = self._get_commissions(
             employee,
             period,
@@ -976,13 +982,12 @@ class PayrollGenerationService:
         rule_map = self._get_pay_rules(employee, department, period)
 
         warnings = []
-        # Hard stop if salary missing
+
         if not salary:
             raise ValidationError({"detail": "Employee has no salary effective for this payroll period."})
         if not shift:
             raise ValidationError({"detail": "Employee has no shift (direct or department shift)."})
 
-        # Hard stop if any PRESENT attendance has missing time_in/out (prevents wrong payroll)
         for d, att in attendance_map.items():
             if att.status == "PRESENT" and (att.time_in is None or att.time_out is None):
                 raise ValidationError({"detail": f"Attendance on {d} is PRESENT but missing time_in/time_out."})
@@ -1005,12 +1010,12 @@ class PayrollGenerationService:
             "allowances": allowances,
             "additional_allowances": additional_allowances,
             "deductions": deductions,
+            "loans": loans,
             "commissions": commissions,
             "commission_tax_rules": commission_tax_rules,
             "rule_map": rule_map,
             "warnings": warnings,
-        }    
-
+        }
 
     def _get_employee_shift(self, employee: Employee) -> Shift | None:
        
@@ -1208,6 +1213,191 @@ class PayrollGenerationService:
                     rows.append(d)
             return rows
     
+    def _get_loans(self, employee: Employee, period: Payroll_Period):
+        """
+        Return payroll-eligible loans for this employee and payroll period.
+
+        Rules:
+        - only Approved or Active
+        - remaining_balance > 0
+        - deduction snapshot must be complete
+        - effective range must overlap the payroll period
+        - actual cutoff filtering is handled later in _loan_applies_to_cutoff()
+        - select_for_update() is used because payroll generation may update balances/status
+        """
+        return list(
+            Loan.objects.select_for_update()
+            .filter(
+                employee=employee,
+                status__in=["Approved", "Active"],
+                remaining_balance__gt=0,
+                rule__isnull=False,
+                deduction_mode__isnull=False,
+                deduction_value__isnull=False,
+                apply_to_cutoff__isnull=False,
+                effective_from__lte=period.end_date,
+            )
+            .filter(Q(effective_to__isnull=True) | Q(effective_to__gte=period.start_date))
+            .select_related("rule")
+            .order_by("effective_from", "id")
+        )
+
+    def _loan_applies_to_cutoff(self, loan: Loan, period: Payroll_Period) -> bool:
+        """
+        Check if a loan is applicable to this payroll period cutoff.
+
+        Loan choices:
+        - FIRST
+        - SECOND
+        - BOTH
+
+        Period cutoff_type:
+        - FIRST
+        - SECOND
+        """
+        loan_cutoff = (loan.apply_to_cutoff or "").strip().upper()
+        period_cutoff = (getattr(period, "cutoff_type", "") or "").strip().upper()
+
+        if loan_cutoff == "BOTH":
+            return period_cutoff in {"FIRST", "SECOND"}
+
+        return loan_cutoff == period_cutoff
+
+    def _compute_loan_deduction_breakdown(self, loan: Loan, basic_pay_amount: Decimal) -> dict:
+        """
+        Compute the scheduled deduction amount for one loan in one payroll run
+        and return a full breakdown for audit/UI clarity.
+
+        Assumption:
+        - PERCENT is stored fraction-style
+        e.g. 0.30 = 30%
+        """
+        remaining_balance = _d2(_safe_decimal(loan.remaining_balance, "remaining_balance"))
+        basic_pay_amount = _d2(_safe_decimal(basic_pay_amount, "basic_pay_amount"))
+        mode = (loan.deduction_mode or "").strip().upper()
+        deduction_value = _safe_decimal(loan.deduction_value or 0, "deduction_value")
+
+        if remaining_balance <= 0:
+            return {
+                "mode": mode,
+                "deduction_value": deduction_value,
+                "basic_pay_amount": basic_pay_amount,
+                "scheduled_amount": DEC_0,
+                "deducted_amount": DEC_0,
+                "remaining_balance": remaining_balance,
+                "was_capped": False,
+            }
+
+        if mode == "FIXED":
+            scheduled_amount = _d2(deduction_value)
+        elif mode == "PERCENT":
+            scheduled_amount = _d2(basic_pay_amount * deduction_value)
+        else:
+            raise ValidationError({"detail": f"Unsupported loan deduction_mode: {loan.deduction_mode}"})
+
+        if scheduled_amount <= 0:
+            return {
+                "mode": mode,
+                "deduction_value": deduction_value,
+                "basic_pay_amount": basic_pay_amount,
+                "scheduled_amount": DEC_0,
+                "deducted_amount": DEC_0,
+                "remaining_balance": remaining_balance,
+                "was_capped": False,
+            }
+
+        deducted_amount = _d2(min(scheduled_amount, remaining_balance))
+
+        return {
+            "mode": mode,
+            "deduction_value": deduction_value,
+            "basic_pay_amount": basic_pay_amount,
+            "scheduled_amount": scheduled_amount,
+            "deducted_amount": deducted_amount,
+            "remaining_balance": remaining_balance,
+            "was_capped": deducted_amount < scheduled_amount,
+        }
+
+    def _apply_loans(self, payroll: Payroll, loans, period: Payroll_Period, basic_pay_amount: Decimal):
+        """
+        Apply loan deductions into payroll with a clearer audit trail.
+
+        Keeps the same business logic:
+        - only deduct if cutoff applies
+        - amount is still capped by remaining_balance
+        - create LoanPayment
+        - update remaining balance and status
+        """
+        for loan in loans:
+            if not self._loan_applies_to_cutoff(loan, period):
+                continue
+
+            breakdown = self._compute_loan_deduction_breakdown(loan, basic_pay_amount)
+            deducted_amount = breakdown["deducted_amount"]
+
+            if deducted_amount <= 0:
+                continue
+
+            previous_balance = _d2(_safe_decimal(loan.remaining_balance, "remaining_balance"))
+            new_balance = _d2(previous_balance - deducted_amount)
+
+            if new_balance < 0:
+                new_balance = DEC_0
+
+            deduction_desc = f"Loan: {loan.name}"
+            if loan.rule_id:
+                deduction_desc += f" ({loan.rule.name})"
+
+            self._create_line(
+                payroll,
+                "DEDUCTION",
+                deduction_desc,
+                deducted_amount,
+                source_type="ADJUSTMENT",
+                source_id=loan.id,
+                rate_applied=breakdown["deduction_value"],
+            )
+
+            self._create_line(
+                payroll,
+                "INFORMATION",
+                (
+                    f"Loan Rule Info ({loan.name}): "
+                    f"rule={loan.rule.name if loan.rule_id else '-'}; "
+                    f"mode={breakdown['mode']}; "
+                    f"value={breakdown['deduction_value']}; "
+                    f"cutoff={loan.apply_to_cutoff}; "
+                    f"basic_pay={breakdown['basic_pay_amount']}; "
+                    f"scheduled={breakdown['scheduled_amount']}; "
+                    f"capped={'YES' if breakdown['was_capped'] else 'NO'}; "
+                    f"deducted={deducted_amount}; "
+                    f"previous={previous_balance}; "
+                    f"new={new_balance}"
+                ),
+                DEC_0,
+                source_type="ADJUSTMENT",
+                source_id=loan.id,
+                rate_applied=breakdown["deduction_value"],
+            )
+
+            LoanPayment.objects.create(
+                loan=loan,
+                payroll=payroll,
+                payroll_period=period,
+                deducted_amount=deducted_amount,
+                previous_balance=previous_balance,
+                new_balance=new_balance,
+            )
+
+            loan.remaining_balance = new_balance
+
+            if new_balance <= 0:
+                loan.status = "Completed"
+            elif loan.status == "Approved":
+                loan.status = "Active"
+
+            loan.save(update_fields=["remaining_balance", "status", "updated_at"])
+
     def _get_commissions(self, employee: Employee, period: Payroll_Period, commission_exclusion_map=None):
         """
         Return commissions stored specifically for:
@@ -2214,27 +2404,28 @@ class PayrollGenerationService:
             )
     def _apply_deductions(self, payroll: Payroll, deductions, period: Payroll_Period):
         """
-        Apply employee deductions into DEDUCTION payslip lines.
+        Apply regular employee deductions into DEDUCTION payslip lines.
+
+        Important:
+        - New Loan model is now the source of truth for payroll loan deductions.
+        - Old loan-style Employee_Deduction rows (amortization_per_period-based)
+        are skipped here to avoid double deduction.
 
         Rules:
-        - Loan rows with amortization_per_period:
-            use amortization_per_period directly (already per payroll period)
-        - Other deductions:
-            resolve amount using frequency + cutoff type
+        - normal deductions resolve amount using frequency + cutoff type
         """
         for d in deductions:
-            is_loan = d.amortization_per_period is not None
+            # Skip old loan-style deduction rows now that Loan is handled separately.
+            if getattr(d, "amortization_per_period", None) is not None:
+                continue
 
-            if is_loan:
-                amt = _d2(d.amortization_per_period)
-            else:
-                amt = self._resolve_deduction_frequency_amount(
-                    d.amount,
-                    d.frequency,
-                    d.effective_from,
-                    d.effective_to,
-                    period,
-                )
+            amt = self._resolve_deduction_frequency_amount(
+                d.amount,
+                d.frequency,
+                d.effective_from,
+                d.effective_to,
+                period,
+            )
 
             if amt <= 0:
                 continue

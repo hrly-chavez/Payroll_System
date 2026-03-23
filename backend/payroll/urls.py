@@ -12,6 +12,12 @@ urlpatterns = [
     path("superadmin/payroll-tax-brackets/", SuperAdminPayrollTaxBracketListCreateView.as_view()),
     path("superadmin/payroll-tax-brackets/<int:pk>/", SuperAdminPayrollTaxBracketRetrieveUpdateView.as_view()),
     path("superadmin/payroll-tax-brackets/choices/", PayrollTaxBracketChoicesView.as_view()),
+
+    #Loan Rule
+    path("superadmin/loan-rules/", LoanRuleListCreateView.as_view(), name="loan-rule-list-create"),
+    path("superadmin/loan-rules/<int:pk>/", LoanRuleRetrieveUpdateView.as_view(), name="loan-rule-detail"),
+    path("superadmin/loan-rules/<int:pk>/status/", LoanRuleUpdateStatusView.as_view(), name="loan-rule-update-status"),
+    path("superadmin/loan-rules/choices/", LoanRuleChoicesView.as_view(), name="loan-rule-choices"),
     
     # Commission Rules (Pay_Rule)
     path("superadmin/commission-tax-rules/", SuperAdminCommissionTaxRuleListCreateView.as_view()),

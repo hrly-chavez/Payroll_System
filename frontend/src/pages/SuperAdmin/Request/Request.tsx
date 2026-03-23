@@ -1,3 +1,5 @@
+  //src/pages/SuperAdmin/Request/Request.tsx
+  
   import React, { useEffect, useState } from 'react';
   import { Layout, Card, Table, Tag, Spin, message, Dropdown, Button, Select } from 'antd';
   import { DownOutlined } from '@ant-design/icons';
@@ -6,27 +8,42 @@
   import dayjs from 'dayjs';
   import './Request.css';
   import api from "../../../api/axios";
-
+  import LoanDeclineModal from './LoanDeclineModal';
 
   const { Content } = Layout;
   const { Option } = Select;
 
   interface RequestItem {
     id: number;
-    type: 'Holiday' | 'Leave';
-    name: string;
-    date: string;
+    type: "Holiday" | "Leave" | "Loan";
+    employee: string;
+    details: string;
+    reason: string;
     status: string;
-    base?: string;
-    is_active: boolean;
+    model: "holiday" | "leave" | "loan";
     created_at: string;
+
+    loan_name?: string;
+    principal_amount?: string;
+    remaining_balance?: string;
+    effective_from?: string;
+    effective_to?: string | null;
+    declined_reason?: string | null;
+    rule_name?: string | null;
+    deduction_mode?: string | null;
+    deduction_value?: string | null;
+    apply_to_cutoff?: string | null;
   }
 
   const Request: React.FC = () => {
     const [requests, setRequests] = useState<RequestItem[]>([]);
     const [loading, setLoading] = useState(false);
-    const [filterType, setFilterType] = useState<'All' | 'Leave'>('All');
-    const [filterStatus, setFilterStatus] = useState<'All' | 'Pending' | 'Approved' | 'Declined'>('All');
+    const [filterType, setFilterType] = useState<"All" | "Holiday" | "Leave" | "Loan">("All");
+    const [filterStatus, setFilterStatus] = useState<"All" | "Pending" | "Approved" | "Active" | "Declined">("All");
+
+    const [declineModalOpen, setDeclineModalOpen] = useState(false);
+    const [declineSubmitting, setDeclineSubmitting] = useState(false);
+    const [selectedDeclineRecord, setSelectedDeclineRecord] = useState<RequestItem | null>(null);
 
     useEffect(() => {
       fetchRequests();
@@ -35,14 +52,8 @@
     const fetchRequests = async () => {
       setLoading(true);
       try {
-        const holidaysRes = await api.get("/approvals/holidays/");
-        const holidays = holidaysRes.data;
-
-        const allRequests: RequestItem[] = [
-          ...holidays.map((h: any) => ({ ...h, type: "Holiday" })),
-        ];
-
-        setRequests(sortRequests(allRequests));
+        const res = await api.get("/approvals/all-requests/");
+        setRequests(sortRequests(res.data || []));
       } catch (error) {
         console.error(error);
         message.error("Failed to fetch requests");
@@ -52,95 +63,191 @@
     };
 
     const sortRequests = (data: RequestItem[]) => {
-      const normalizeStatus = (status: string) => status.toLowerCase();
+    const normalizeStatus = (status: string) => status.toLowerCase();
 
-      const statusPriority = (status: string) => {
-        const s = normalizeStatus(status);
-        if (s === 'pending') return 1;
-        if (s === 'approved') return 2;
-        if (s === 'declined') return 3;
-        return 4;
-      };
-
-      return [...data].sort((a, b) => {
-        const statusDiff = statusPriority(a.status) - statusPriority(b.status);
-        if (statusDiff !== 0) return statusDiff;
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      });
+    const statusPriority = (status: string) => {
+      const s = normalizeStatus(status);
+      if (s === "pending") return 1;
+      if (s === "approved") return 2;
+      if (s === "active") return 3;
+      if (s === "declined" || s === "cancelled") return 4;
+      return 5;
     };
 
-    const handleStatusChange = async (key: string, requestId: number, requestType: string) => {
+    return [...data].sort((a, b) => {
+      const statusDiff = statusPriority(a.status) - statusPriority(b.status);
+      if (statusDiff !== 0) return statusDiff;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  };
+
+    const openDeclineModal = (record: RequestItem) => {
+      setSelectedDeclineRecord(record);
+      setDeclineModalOpen(true);
+    };
+
+    const closeDeclineModal = () => {
+      setDeclineModalOpen(false);
+      setSelectedDeclineRecord(null);
+    };
+
+    const handleDeclineSubmit = async (declineReason: string) => {
+      if (!selectedDeclineRecord) return;
+
+      setDeclineSubmitting(true);
       try {
-        await api.post(`/approvals/superadmin/holidays/${requestId}/status/`, { status: key });
-        setRequests((prev) =>
-          sortRequests(
-            prev.map((r) => r.id === requestId && r.type === requestType ? { ...r, status: key } : r)
-          )
-        );
-        message.success(`${requestType} request ${key}`);
-      } catch (error) {
+        if (selectedDeclineRecord.model === "loan") {
+          await api.post(`/approvals/superadmin/loans/${selectedDeclineRecord.id}/decline/`, {
+            decline_reason: declineReason,
+          });
+        } else if (selectedDeclineRecord.model === "holiday") {
+          await api.post(`/approvals/superadmin/holidays/${selectedDeclineRecord.id}/status/`, {
+            status: "Declined",
+            decline_reason: declineReason,
+          });
+        } else {
+          message.warning("Leave decline action is not wired here yet.");
+          return;
+        }
+
+        await fetchRequests();
+        message.success(`${selectedDeclineRecord.type} request Declined`);
+        closeDeclineModal();
+      } catch (error: any) {
         console.error(error);
-        message.error("Failed to update status");
+        const backendMessage =
+          error?.response?.data?.detail ||
+          error?.response?.data?.message ||
+          "Failed to decline request";
+        message.error(backendMessage);
+      } finally {
+        setDeclineSubmitting(false);
       }
     };
 
-    const filteredRequests = requests.filter(r => {
-      const typeMatch = filterType === 'All' || r.type === filterType;
-      const statusMatch = filterStatus === 'All' || r.status === filterStatus;
+    const handleStatusChange = async (key: string, record: RequestItem) => {
+      try {
+        if (key === "Declined") {
+          openDeclineModal(record);
+          return;
+        }
+
+        if (record.model === "holiday") {
+          await api.post(`/approvals/superadmin/holidays/${record.id}/status/`, { status: key });
+        } else if (record.model === "loan") {
+          if (key === "Approved") {
+            await api.post(`/approvals/superadmin/loans/${record.id}/approve/`);
+          } else if (key === "Active") {
+            await api.post(`/approvals/superadmin/loans/${record.id}/activate/`);
+          }
+        } else {
+          message.warning("Leave status action is not wired here yet.");
+          return;
+        }
+
+        await fetchRequests();
+        message.success(`${record.type} request ${key}`);
+      } catch (error: any) {
+        console.error(error);
+        const backendMessage =
+          error?.response?.data?.detail ||
+          error?.response?.data?.message ||
+          "Failed to update status";
+        message.error(backendMessage);
+      }
+    };
+
+    const filteredRequests = requests.filter((r) => {
+      const typeMatch = filterType === "All" || r.type === filterType;
+      const displayStatus = r.status === "Cancelled" ? "Declined" : r.status;
+      const statusMatch = filterStatus === "All" || displayStatus === filterStatus;
       return typeMatch && statusMatch;
     });
 
-    const columns = [
+   const columns = [
       {
-        title: 'Request Type',
-        dataIndex: 'type',
-        key: 'type',
+        title: "Request Type",
+        dataIndex: "type",
+        key: "type",
         render: (type: string) => (
-          <Tag color={type === 'Holiday' ? 'blue' : type === 'Leave' ? 'orange' : 'purple'}>
+          <Tag color={type === "Holiday" ? "blue" : type === "Leave" ? "orange" : "purple"}>
             {type}
           </Tag>
         ),
       },
-      { title: 'Name', dataIndex: 'name', key: 'name' },
       {
-        title: 'Date',
-        dataIndex: 'date',
-        key: 'date',
-        render: (date: string) => dayjs(date).format('MMM DD, YYYY'),
+        title: "Employee",
+        dataIndex: "employee",
+        key: "employee",
       },
       {
-        title: 'Status',
-        key: 'status',
+        title: "Details",
+        dataIndex: "details",
+        key: "details",
+      },
+      {
+        title: "Reason / Remarks",
+        dataIndex: "reason",
+        key: "reason",
+        render: (value: string) => value || "-",
+      },
+      {
+        title: "Status",
+        key: "status",
         render: (_: any, record: RequestItem) => {
-          if (record.status === 'Approved' || record.status === 'Declined') {
+          const displayStatus = record.status === "Cancelled" ? "Declined" : record.status;
+
+          if (displayStatus === "Approved" || displayStatus === "Declined" || displayStatus === "Active") {
             return (
               <Button
                 disabled
                 style={{
-                  backgroundColor: record.status === 'Approved' ? '#d4edda' : '#f8d7da',
-                  color: record.status === 'Approved' ? '#155724' : '#721c24',
-                  cursor: 'default',
+                  backgroundColor:
+                    displayStatus === "Approved"
+                      ? "#d4edda"
+                      : displayStatus === "Active"
+                      ? "#d1ecf1"
+                      : "#f8d7da",
+                  color:
+                    displayStatus === "Approved"
+                      ? "#155724"
+                      : displayStatus === "Active"
+                      ? "#0c5460"
+                      : "#721c24",
+                  cursor: "default",
                 }}
               >
-                {record.status}
+                {displayStatus}
               </Button>
             );
           }
 
-          const menuItems = [
-            { label: 'Approved', key: 'Approved' },
-            { label: 'Declined', key: 'Declined' },
-          ];
+          const menuItems =
+            record.model === "loan"
+              ? [
+                  { label: "Approved", key: "Approved" },
+                  { label: "Declined", key: "Declined" },
+                ]
+              : record.model === "holiday"
+              ? [
+                  { label: "Approved", key: "Approved" },
+                  { label: "Declined", key: "Declined" },
+                ]
+              : [];
+
+          if (!menuItems.length) {
+            return <Tag>{displayStatus}</Tag>;
+          }
 
           return (
             <Dropdown
               menu={{
                 items: menuItems,
-                onClick: ({ key }) => handleStatusChange(key, record.id, record.type),
+                onClick: ({ key }) => handleStatusChange(key, record),
               }}
             >
               <Button>
-                {record.status} <DownOutlined />
+                {displayStatus} <DownOutlined />
               </Button>
             </Dropdown>
           );
@@ -163,12 +270,14 @@
                   <Option value="All">All Types</Option>
                   <Option value="Holiday">Holiday</Option>
                   <Option value="Leave">Leave</Option>
+                  <Option value="Loan">Loan</Option>
                 </Select>
 
                 <Select value={filterStatus} onChange={value => setFilterStatus(value)} style={{ width: 200 }}>
                   <Option value="All">All Statuses</Option>
                   <Option value="Pending">Pending</Option>
                   <Option value="Approved">Approved</Option>
+                  <Option value="Active">Active</Option>
                   <Option value="Declined">Declined</Option>
                 </Select>
               </div>
@@ -187,6 +296,13 @@
             </Card>
           </Content>
         </Layout>
+        <LoanDeclineModal
+          open={declineModalOpen}
+          loading={declineSubmitting}
+          requestType={selectedDeclineRecord?.type}
+          onClose={closeDeclineModal}
+          onSubmit={handleDeclineSubmit}
+        />
       </Layout>
     );
   };

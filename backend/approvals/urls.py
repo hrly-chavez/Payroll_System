@@ -34,4 +34,11 @@ urlpatterns = [
     path("holiday-policy/<int:pk>/", HolidayPolicyRetrieveUpdateDestroyView.as_view(), name="holiday-policy-detail"),
     path("holiday-policy/ensure/", HolidayPolicyEnsureView.as_view(), name="holiday-policy-ensure"),
     path("departments/<int:department_id>/holiday-bases/", DepartmentActiveHolidayBasesView.as_view(), name="department-holiday-bases"),
+
+    #Loan Request
+    path("loans/", EmployeeLoanRequestListCreateView.as_view(), name="employee-loan-requests"),
+    path("superadmin/loans/", SuperAdminLoanRequestListView.as_view(), name="superadmin-loan-requests"),
+    path("superadmin/loans/<int:pk>/approve/", SuperAdminLoanApproveView.as_view(), name="superadmin-loan-approve"),
+    path("superadmin/loans/<int:pk>/decline/", SuperAdminLoanDeclineView.as_view(), name="superadmin-loan-decline"),
+    path("superadmin/loans/<int:pk>/activate/", SuperAdminLoanActivateView.as_view(), name="superadmin-loan-activate"),
 ]

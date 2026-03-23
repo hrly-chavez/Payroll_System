@@ -6,7 +6,13 @@ import styles from "./LeaveRequest.module.css";
 
 const { RangePicker } = DatePicker;
 
-const LeaveRequest = ({ open, onClose }: any) => {
+type LeaveRequestProps = {
+  open: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+};
+
+const LeaveRequest: React.FC<LeaveRequestProps> = ({ open, onClose, onSuccess }) => {
   const [form] = Form.useForm();
   const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -41,7 +47,9 @@ const LeaveRequest = ({ open, onClose }: any) => {
 
       message.success("Leave request submitted successfully");
       form.resetFields();
+      onSuccess?.();
       onClose();
+
     } catch (error: any) {
       message.error(
         error.response?.data?.detail ||
@@ -55,12 +63,13 @@ const LeaveRequest = ({ open, onClose }: any) => {
 
   return (
     <Modal
-      title="Request Leave"
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      destroyOnClose
-    >
+        title="Request Leave"
+        open={open}
+        onCancel={onClose}
+        footer={null}
+        destroyOnClose
+        centered
+      >
       <Form layout="vertical" form={form} onFinish={onFinish}>
         
         {/* Leave Type */}

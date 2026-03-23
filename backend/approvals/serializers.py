@@ -2,34 +2,13 @@ from datetime import datetime
 import re
 from rest_framework import serializers
 from shared_model.models import *
-
-class HolidaySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Holiday
-        fields = (
-            'id',
-            'name',
-            'date',
-            'type',
-            'base',
-            'status',
-        )
-    def validate(self, attrs):
-        date = attrs.get("date")
-        qs = Holiday.objects.filter(date=date)
-
-        if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
-
-        if qs.exists():
-            raise serializers.ValidationError(  
-                {"date": "Holiday already exists for this date."}
-            )
-
-        return attrs
+from decimal import Decimal, InvalidOperation
+from django.db.models import Q
 
 LEAVE_NAME_REGEX = re.compile(r"^[A-Za-z0-9 _-]+$")
 
+
+#=========Leave Type & Request============
 class LeaveTypeSerializer(serializers.ModelSerializer):
     name = serializers.CharField(
         max_length=20,
@@ -119,6 +98,7 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
             "requested_at",
         ]
 
+#=========Commission Type============
 class CommissionTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Commission_Type
@@ -163,6 +143,7 @@ class CommissionTypeSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
+#=========Allowance Type============
 class AllowanceTypeSerializer(serializers.ModelSerializer):
     name = serializers.CharField(
         max_length=50,
@@ -195,6 +176,32 @@ class AllowanceTypeSerializer(serializers.ModelSerializer):
             )
 
         return name
+
+#=========Holiday=============
+class HolidaySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Holiday
+        fields = (
+            'id',
+            'name',
+            'date',
+            'type',
+            'base',
+            'status',
+        )
+    def validate(self, attrs):
+        date = attrs.get("date")
+        qs = Holiday.objects.filter(date=date)
+
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+
+        if qs.exists():
+            raise serializers.ValidationError(  
+                {"date": "Holiday already exists for this date."}
+            )
+
+        return attrs
 
 class HolidayPolicySerializer(serializers.ModelSerializer):
     # nice-to-have fields for frontend tables
@@ -261,3 +268,140 @@ class HolidayPolicySerializer(serializers.ModelSerializer):
 
         instance.save()
         return instance 
+
+#=========Loan Request============
+class LoanRequestSerializer(serializers.ModelSerializer):
+    employee_name = serializers.SerializerMethodField()
+    employee_id_no = serializers.CharField(source="employee.id_no", read_only=True)
+    department_name = serializers.CharField(source="employee.department.name", read_only=True)
+    rule_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Loan
+        fields = [
+            "id",
+            "employee",
+            "employee_name",
+            "employee_id_no",
+            "department_name",
+            "rule",
+            "rule_name",
+            "name",
+            "principal_amount",
+            "remaining_balance",
+            "deduction_mode",
+            "deduction_value",
+            "apply_to_cutoff",
+            "effective_from",
+            "effective_to",
+            "status",
+            "remarks",
+            "declined_reason",
+            "created_by",
+            "approved_by",
+            "approved_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "employee",
+            "employee_name",
+            "employee_id_no",
+            "department_name",
+            "rule",
+            "rule_name",
+            "remaining_balance",
+            "deduction_mode",
+            "deduction_value",
+            "apply_to_cutoff",
+            "status",
+            "declined_reason",
+            "created_by",
+            "approved_by",
+            "approved_at",
+            "created_at",
+            "updated_at",
+        ]
+    def get_rule_name(self, obj):
+        return obj.rule.name if obj.rule else None
+    def get_employee_name(self, obj):
+        emp = obj.employee
+        if not emp:
+            return None
+
+        parts = [emp.fname]
+        if getattr(emp, "initial", None):
+            parts.append(emp.initial + ".")
+        parts.append(emp.lname)
+        if getattr(emp, "suffix", None):
+            parts.append(emp.suffix)
+
+        return " ".join(parts)
+    
+class LoanRequestCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Loan
+        fields = [
+            "id",
+            "name",
+            "principal_amount",
+            "effective_from",
+            "effective_to",
+            "remarks",
+        ]
+        read_only_fields = ["id"]
+
+    def validate_principal_amount(self, value):
+        try:
+            amount = Decimal(str(value))
+        except (InvalidOperation, ValueError):
+            raise serializers.ValidationError("Invalid principal amount.")
+
+        if amount <= 0:
+            raise serializers.ValidationError("Principal amount must be greater than 0.")
+
+        return value
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        employee = getattr(request.user, "employee", None)
+
+        if not employee:
+            raise serializers.ValidationError({"detail": "Employee profile not found."})
+
+        effective_from = attrs.get("effective_from")
+        effective_to = attrs.get("effective_to")
+
+        if effective_to and effective_from and effective_to < effective_from:
+            raise serializers.ValidationError({
+                "effective_to": "effective_to cannot be earlier than effective_from."
+            })
+
+        return attrs
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        employee = request.user.employee
+
+        principal_amount = Decimal(str(validated_data["principal_amount"]))
+
+        loan = Loan.objects.create(
+            employee=employee,
+            rule=None,
+            name=validated_data["name"],
+            principal_amount=principal_amount,
+            remaining_balance=principal_amount,
+            deduction_mode=None,
+            deduction_value=None,
+            apply_to_cutoff=None,
+            effective_from=validated_data["effective_from"],
+            effective_to=validated_data.get("effective_to"),
+            status="Pending",
+            remarks=validated_data.get("remarks", ""),
+            declined_reason=None,
+            created_by=request.user,
+        )
+        return loan
+    
+class LoanDeclineSerializer(serializers.Serializer):
+    decline_reason = serializers.CharField(required=True, allow_blank=False, trim_whitespace=True)

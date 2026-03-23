@@ -242,11 +242,6 @@ class EmployeeDeductionMiniSerializer(serializers.ModelSerializer):
             "effective_to",
             "status",
             "deduction_type",
-            # loan fields
-            "total_loan_amount",
-            "balance",
-            "amortization_per_period",
-
             # run-specific exclusion state
             "is_excluded_for_run",
             "exclusion_id",
@@ -815,7 +810,65 @@ class PayrollTaxBracketSerializer(serializers.ModelSerializer):
         if obj.employee:
             return f"{obj.employee.fname} {obj.employee.lname}".strip()
         return None
-    
+
+#==========================================LOAN TAX RULE========================================
+
+class LoanRuleSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(
+        max_length=100,
+        validators=[
+            UniqueValidator(
+                queryset=LoanRule.objects.all(),
+                message="A loan rule with this name already exists. Please choose a different name.",
+            )
+        ],
+    )
+
+    department_name = serializers.CharField(source="department.name", read_only=True)
+    employee_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LoanRule
+        fields = "__all__"
+
+    def get_employee_name(self, obj):
+        if obj.employee:
+            return f"{obj.employee.fname} {obj.employee.lname}".strip()
+        return None
+
+    def validate(self, attrs):
+        department = attrs.get("department", getattr(self.instance, "department", None))
+        employee = attrs.get("employee", getattr(self.instance, "employee", None))
+
+        effective_from = attrs.get("effective_from", getattr(self.instance, "effective_from", None))
+        effective_to = attrs.get("effective_to", getattr(self.instance, "effective_to", None))
+
+        deduction_value = attrs.get("deduction_value", getattr(self.instance, "deduction_value", None))
+
+        if department and employee:
+            raise ValidationError({
+                "department": ["Choose either Department or Employee, not both."],
+                "employee": ["Choose either Department or Employee, not both."],
+            })
+
+        if effective_to and effective_from and effective_to < effective_from:
+            raise ValidationError({
+                "effective_to": ["effective_to cannot be earlier than effective_from."]
+            })
+
+        if deduction_value is not None:
+            try:
+                if Decimal(str(deduction_value)) < 0:
+                    raise ValidationError({
+                        "deduction_value": ["Deduction value cannot be negative."]
+                    })
+            except Exception:
+                raise ValidationError({
+                    "deduction_value": ["Invalid deduction value."]
+                })
+
+        return attrs
+
 #==========================================PAYROLL GENERATION===========================
 
 class GeneratePayrollPeriodResponseSerializer(serializers.Serializer):

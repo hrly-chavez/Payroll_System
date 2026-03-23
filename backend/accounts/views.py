@@ -32,7 +32,11 @@ class CookieTokenObtainPairView(TokenObtainPairView):
         access = response.data.get("access")
         refresh = response.data.get("refresh")
 
-        res = Response({"message": "Login successful"}, status=status.HTTP_200_OK)
+        res = Response({
+            "access": access,
+            "refresh": refresh,
+            "message": "Login successful"
+        }, status=status.HTTP_200_OK)
 
         res.set_cookie(
             key="access_token",

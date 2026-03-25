@@ -34,7 +34,7 @@ interface Notification {
   description: string;
   is_read: boolean;
   created_at: string;
-  category: "leave" | "attendance" | "holiday" | "payroll";
+  category: "leave" | "attendance" | "holiday" | "payroll" | "loan";
   redirect_url?: string;
 }
 
@@ -155,24 +155,28 @@ const NotificationPage: React.FC = () => {
         return <FileDoneOutlined />;
       case "payroll":
         return <DollarOutlined />;
+      case "loan":
+        return <DollarOutlined />;
+
       default:
         return <BellOutlined />;
     }
   };
 
-  // ✅ Category-specific tags
   const getCategoryTag = (category: Notification["category"]) => {
-    const map: Record<
-      Notification["category"],
-      { label: string; cls: string }
-    > = {
+    const map: Record<string, { label: string; cls: string }> = {
       leave: { label: "Leave", cls: styles.tagLeave },
       holiday: { label: "Holiday", cls: styles.tagHoliday },
       attendance: { label: "Attendance", cls: styles.tagAttendance },
       payroll: { label: "Payroll", cls: styles.tagPayroll },
+      loan: { label: "Loan", cls: styles.tagLoan },
     };
 
-    const v = map[category];
+    const v = map[category] || {
+      label: "Unknown",
+      cls: styles.tagDefault,
+    };
+
     return <Tag className={`${styles.tag} ${v.cls}`}>{v.label}</Tag>;
   };
 
@@ -324,7 +328,7 @@ const NotificationPage: React.FC = () => {
                             {/* ✅ Category-colored icon bubble */}
                             <div
                               className={`${styles.iconBubble} ${
-                                styles[`icon_${item.category}`]
+                               styles[`icon_${item.category}`] || styles.icon_default
                               }`}
                             >
                               {getIcon(item.category)}

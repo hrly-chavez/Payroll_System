@@ -839,6 +839,8 @@ class PayrollGenerationService:
             department=ctx["department"],
             commission_tax_rules=ctx["commission_tax_rules"],
         )
+        
+        self._apply_fines(payroll, ctx["fines"])
 
         # New loan stage (new Loan model is now the source of truth)
         self._apply_loans(
@@ -977,6 +979,20 @@ class PayrollGenerationService:
             period,
             commission_exclusion_map=commission_exclusion_map,
         )
+
+        fine_exclusion_map = self._get_run_input_exclusion_map(
+            employee=employee,
+            period=period,
+            target_run_no=target_run_no,
+            source_type="FINE",
+        )
+
+        fines = self._get_fines(
+            employee,
+            period,
+            fine_exclusion_map=fine_exclusion_map,
+        )
+
         commission_tax_rules = self._get_commission_tax_rules(employee, department, period)
 
         rule_map = self._get_pay_rules(employee, department, period)
@@ -1012,6 +1028,8 @@ class PayrollGenerationService:
             "deductions": deductions,
             "loans": loans,
             "commissions": commissions,
+            "fines": fines,
+            "fine_exclusion_map": fine_exclusion_map,
             "commission_tax_rules": commission_tax_rules,
             "rule_map": rule_map,
             "warnings": warnings,
@@ -1415,6 +1433,17 @@ class PayrollGenerationService:
         )
 
         return [row for row in rows if row.id not in commission_exclusion_map]
+
+    def _get_fines(self, employee, period, fine_exclusion_map=None):
+        fine_exclusion_map = fine_exclusion_map or {}
+
+        rows = list(
+            PayrollPeriodEmployeeFine.objects
+            .filter(period=period, employee=employee)
+            .order_by("created_at", "id")
+        )
+
+        return [row for row in rows if row.id not in fine_exclusion_map]
 
     def _get_pay_rules(self, employee: Employee, department, period: Payroll_Period):
         """
@@ -2402,6 +2431,34 @@ class PayrollGenerationService:
                 rate_applied=rate_applied,
                 commission_tax_rule=rule,
             )
+    
+    def _apply_fines(self, payroll: Payroll, fines):
+        """
+        Apply manual fines as DEDUCTION lines.
+
+        Behavior:
+        - Direct deduction
+        - No tax logic (unless you explicitly add later)
+        - Fully auditable per entry
+        """
+        fines = fines or []
+
+        for f in fines:
+            amt = _d2(f.amount)
+            if amt <= 0:
+                continue
+
+            desc = f"Fine: {f.name}" if f.name else "Fine"
+
+            self._create_line(
+                payroll,
+                "DEDUCTION",
+                desc,
+                amt,
+                source_type="FINE",
+                source_id=f.id,
+            )
+
     def _apply_deductions(self, payroll: Payroll, deductions, period: Payroll_Period):
         """
         Apply regular employee deductions into DEDUCTION payslip lines.

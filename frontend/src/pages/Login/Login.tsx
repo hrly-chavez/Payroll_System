@@ -84,9 +84,9 @@ export default function Login() {
         password: sanitizedPassword,
       });
 
-      const { access, refresh } = tokenRes.data;
-
       const meRes = await api.get("/accounts/me/");
+
+      localStorage.setItem("isAuthenticated", "true");
 
       const userName = meRes.data.user_name;
       const role = meRes.data.role;

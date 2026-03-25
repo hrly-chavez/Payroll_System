@@ -980,7 +980,18 @@ class PayrollGenerationService:
             commission_exclusion_map=commission_exclusion_map,
         )
 
-        fines = self._get_fines(employee, period)
+        fine_exclusion_map = self._get_run_input_exclusion_map(
+            employee=employee,
+            period=period,
+            target_run_no=target_run_no,
+            source_type="FINE",
+        )
+
+        fines = self._get_fines(
+            employee,
+            period,
+            fine_exclusion_map=fine_exclusion_map,
+        )
 
         commission_tax_rules = self._get_commission_tax_rules(employee, department, period)
 
@@ -1018,6 +1029,7 @@ class PayrollGenerationService:
             "loans": loans,
             "commissions": commissions,
             "fines": fines,
+            "fine_exclusion_map": fine_exclusion_map,
             "commission_tax_rules": commission_tax_rules,
             "rule_map": rule_map,
             "warnings": warnings,
@@ -1422,12 +1434,16 @@ class PayrollGenerationService:
 
         return [row for row in rows if row.id not in commission_exclusion_map]
 
-    def _get_fines(self, employee: Employee, period: Payroll_Period):
-        return list(
+    def _get_fines(self, employee, period, fine_exclusion_map=None):
+        fine_exclusion_map = fine_exclusion_map or {}
+
+        rows = list(
             PayrollPeriodEmployeeFine.objects
             .filter(period=period, employee=employee)
             .order_by("created_at", "id")
         )
+
+        return [row for row in rows if row.id not in fine_exclusion_map]
 
     def _get_pay_rules(self, employee: Employee, department, period: Payroll_Period):
         """

@@ -474,6 +474,10 @@ class PayrollPeriodEmployeeFineCreateSerializer(serializers.ModelSerializer):
         return value
     
 class PayrollPeriodEmployeeFineListSerializer(serializers.ModelSerializer):
+    is_excluded_for_run = serializers.SerializerMethodField()
+    exclusion_id = serializers.SerializerMethodField()
+    exclusion_remarks = serializers.SerializerMethodField()
+
     class Meta:
         model = PayrollPeriodEmployeeFine
         fields = [
@@ -482,7 +486,25 @@ class PayrollPeriodEmployeeFineListSerializer(serializers.ModelSerializer):
             "amount",
             "remarks",
             "created_at",
+            "is_excluded_for_run",
+            "exclusion_id",
+            "exclusion_remarks",
         ]
+
+    def _get_exclusion(self, obj):
+        fine_exclusion_map = self.context.get("fine_exclusion_map", {})
+        return fine_exclusion_map.get(obj.id)
+
+    def get_is_excluded_for_run(self, obj):
+        return obj.id in self.context.get("fine_exclusion_map", {})
+
+    def get_exclusion_id(self, obj):
+        ex = self._get_exclusion(obj)
+        return ex.id if ex else None
+
+    def get_exclusion_remarks(self, obj):
+        ex = self._get_exclusion(obj)
+        return ex.remarks if ex else None
 #============================
 # Aggregated snapshot shown in Verify Employee modal before payroll generation
 class PayrollVerifySnapshotSerializer(serializers.Serializer):

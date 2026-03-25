@@ -137,6 +137,19 @@ def _validate_payroll_input_source(period, employee, source_type: str, source_id
         if not obj:
             raise ValidationError({"detail": "Commission source not found for this employee and payroll period."})
         return obj
+    if source_type == "FINE":
+        try:
+            obj = PayrollPeriodEmployeeFine.objects.get(
+                id=source_id,
+                period=period,
+                employee=employee,
+            )
+        except PayrollPeriodEmployeeFine.DoesNotExist:
+            raise ValidationError({
+                "detail": "Fine source not found for this employee and payroll period."
+            })
+
+        return obj
 
     if source_type == "ALLOWANCE":
         # 1) regular/master employee allowance
@@ -589,7 +602,17 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
             .select_related("commission_type")
             .order_by("-created_at")
         )
+        fine_exclusion_rows = PayrollRunInputExclusion.objects.filter(
+            period=period,
+            employee=employee,
+            target_run_no=target_run_no,
+            source_type="FINE",
+            is_excluded=True,
+        )
 
+        fine_exclusion_map = {
+            row.source_id: row for row in fine_exclusion_rows
+        }
         attendances = (
             Attendance.objects
             .filter(
@@ -614,6 +637,12 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
         if not attendances.exists():
             warnings.append("No attendance records found within this payroll period.")
 
+        fines = (
+            PayrollPeriodEmployeeFine.objects
+            .filter(period=period, employee=employee)
+            .order_by("-created_at")
+        )
+
         payload = {
             "period_id": period.id,
             "employee_id": employee.id,
@@ -630,14 +659,15 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
             "attendances": attendances,
             "leave_days": leave_days,
             "commissions": commissions,
+            "fines": fines,
         }
-
         serializer = PayrollVerifySnapshotSerializer(
             payload,
             context={
                 "deduction_exclusion_map": deduction_exclusion_map,
                 "allowance_exclusion_map": allowance_exclusion_map,
                 "commission_exclusion_map": commission_exclusion_map,
+                "fine_exclusion_map": fine_exclusion_map,
             }
         )
 
@@ -1027,6 +1057,130 @@ class PayrollPeriodEmployeeAllowanceDeleteView(APIView):
             {"detail": "Additional allowance deleted successfully."},
             status=http_status.HTTP_200_OK,
         )
+
+#===========================ADD FINE========================
+class PayrollPeriodEmployeeFineListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _guard_locked(self, period, employee):
+        # block when payroll already exists
+        if Payroll.objects.filter(payroll_period=period, employee=employee).exclude(status="Void").exists():
+            return Response(
+                {"detail": "Payroll already generated. Fines are locked for this employee in this period."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        ppe = get_object_or_404(PayrollPeriodEmployee, period=period, employee=employee)
+
+        if ppe.status != "Pending":
+            return Response(
+                {"detail": f"Cannot modify fines when status is {ppe.status}. Fines are only allowed while Pending."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        return None
+
+    def get(self, request, period_id, employee_id):
+        period = get_object_or_404(Payroll_Period, id=period_id)
+        employee = get_object_or_404(Employee, id=employee_id)
+
+        qs = (
+            PayrollPeriodEmployeeFine.objects
+            .filter(period=period, employee=employee)
+            .order_by("-created_at")
+        )
+
+        target_run_no = get_next_payroll_run_no(period.id, employee.id)
+
+        fine_exclusion_rows = PayrollRunInputExclusion.objects.filter(
+            period=period,
+            employee=employee,
+            target_run_no=target_run_no,
+            source_type="FINE",
+            is_excluded=True,
+        )
+
+        fine_exclusion_map = {row.source_id: row for row in fine_exclusion_rows}
+
+        serializer = PayrollPeriodEmployeeFineListSerializer(
+            qs,
+            many=True,
+            context={
+                "fine_exclusion_map": fine_exclusion_map
+            }
+        )
+
+        return Response(serializer.data, status=http_status.HTTP_200_OK)
+
+    @transaction.atomic
+    def post(self, request, period_id, employee_id):
+        period = get_object_or_404(Payroll_Period, id=period_id)
+        employee = get_object_or_404(Employee, id=employee_id)
+
+        locked = self._guard_locked(period, employee)
+        if locked:
+            return locked
+
+        serializer = PayrollPeriodEmployeeFineCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        obj = PayrollPeriodEmployeeFine.objects.create(
+            period=period,
+            employee=employee,
+            name=serializer.validated_data["name"],
+            amount=serializer.validated_data["amount"],
+            remarks=serializer.validated_data.get("remarks"),
+            created_by=request.user,
+        )
+
+        return Response(
+            {
+                "detail": "Fine added successfully.",
+                "fine": PayrollPeriodEmployeeFineListSerializer(obj).data,
+            },
+            status=http_status.HTTP_201_CREATED,
+        )
+
+class PayrollPeriodEmployeeFineDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def delete(self, request, period_id, employee_id, fine_id):
+        period = get_object_or_404(Payroll_Period, id=period_id)
+        employee = get_object_or_404(Employee, id=employee_id)
+
+        ppe = get_object_or_404(
+            PayrollPeriodEmployee.objects.select_for_update(),
+            period=period,
+            employee=employee,
+        )
+
+        if Payroll.objects.filter(payroll_period=period, employee=employee).exclude(status="Void").exists():
+            return Response(
+                {"detail": "Payroll already generated. Fines are locked for this employee in this period."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        if ppe.status != "Pending":
+            return Response(
+                {"detail": f"Cannot delete fines when status is {ppe.status}. Fines are only allowed while Pending."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        obj = get_object_or_404(
+            PayrollPeriodEmployeeFine,
+            id=fine_id,
+            period=period,
+            employee=employee,
+        )
+
+        obj.delete()
+
+        return Response(
+            {"detail": "Fine deleted successfully."},
+            status=http_status.HTTP_200_OK,
+        )
+
 #==========================================PAYRULE========================================
 
 class SuperAdminPayRuleListCreateView(generics.ListCreateAPIView):

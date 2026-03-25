@@ -423,6 +423,7 @@ class PayrollPeriodEmployeeCommissionCreateSerializer(serializers.ModelSerialize
             raise serializers.ValidationError("Amount must be greater than 0.")
         return value
 #============================
+
 #Loan
 class LoanMiniSerializer(serializers.ModelSerializer):
     rule_name = serializers.CharField(source="rule.name", read_only=True)
@@ -448,6 +449,41 @@ class LoanMiniSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
+#===================Fine================
+class PayrollPeriodEmployeeFineCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PayrollPeriodEmployeeFine
+        fields = ["name", "amount", "remarks"]
+
+    def validate_name(self, value):
+        v = (value or "").strip()
+        if not v:
+            raise serializers.ValidationError("Fine name is required.")
+        if len(v) > 100:
+            raise serializers.ValidationError("Fine name is too long.")
+        return v
+
+    def validate_amount(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Amount must be greater than 0.")
+        return value
+
+    def validate_remarks(self, value):
+        if value:
+            return value.strip()
+        return value
+    
+class PayrollPeriodEmployeeFineListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PayrollPeriodEmployeeFine
+        fields = [
+            "id",
+            "name",
+            "amount",
+            "remarks",
+            "created_at",
+        ]
+#============================
 # Aggregated snapshot shown in Verify Employee modal before payroll generation
 class PayrollVerifySnapshotSerializer(serializers.Serializer):
     # Aggregated snapshot shown in Verify Employee modal
@@ -475,6 +511,7 @@ class PayrollVerifySnapshotSerializer(serializers.Serializer):
     attendances = AttendanceMiniSerializer(many=True)
     leave_days = LeaveDayMiniSerializer(many=True)
     commissions = PayrollPeriodEmployeeCommissionListSerializer(many=True)
+    fines = PayrollPeriodEmployeeFineListSerializer(many=True)
 
 #NOTE: This is for additional allowance in a particular payroll period
 class PayrollPeriodEmployeeAllowanceCreateSerializer(serializers.ModelSerializer):

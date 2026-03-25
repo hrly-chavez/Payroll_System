@@ -51,6 +51,9 @@ urlpatterns = [
     path("periods/<int:period_id>/employees/<int:employee_id>/allowances/",PayrollPeriodEmployeeAllowanceListCreateView.as_view(),name="payroll-period-employee-allowances"),
     path("periods/<int:period_id>/employees/<int:employee_id>/allowances/<int:allowance_id>/delete/",PayrollPeriodEmployeeAllowanceDeleteView.as_view(),name="payroll-period-employee-allowance-delete"),
 
+    path("payroll-period/<int:period_id>/employee/<int:employee_id>/fines/",PayrollPeriodEmployeeFineListCreateView.as_view(),name="payroll-period-employee-fines",),
+    path("payroll-period/<int:period_id>/employee/<int:employee_id>/fines/<int:fine_id>/",PayrollPeriodEmployeeFineDeleteView.as_view(),name="payroll-period-employee-fine-delete",),
+
     # Payroll Generation
     path("periods/<int:period_id>/generate/", GeneratePayrollForPeriodView.as_view(), name="payroll-generate-period"),
     path("periods/<int:period_id>/employees/<int:employee_id>/generate/", GeneratePayrollForEmployeeView.as_view(), name="payroll-generate-employee"),

@@ -425,6 +425,9 @@ class PayrollPeriodEligibleEmployeesView(APIView):
     def get(self, request, period_id):
         period = get_object_or_404(Payroll_Period, id=period_id)
 
+        # query param (optional)
+        department_id = request.query_params.get("department_id")
+
         # attendance must exist within the payroll period date range
         attendance_in_period = Attendance.objects.filter(
             employee_id=OuterRef("pk"),
@@ -432,7 +435,7 @@ class PayrollPeriodEligibleEmployeesView(APIView):
             date__lte=period.end_date,
         )
 
-        # 1) define the employee population for this period (same rules as before)
+        # 1) define the employee population for this period
         period_employees = (
             Employee.objects
             .filter(is_active=True)
@@ -446,9 +449,10 @@ class PayrollPeriodEligibleEmployeesView(APIView):
             .select_related("department", "user")
         )
 
-        # 2) lazy-create PayrollPeriodEmployee rows for these employees
+        # 2) lazy-create PayrollPeriodEmployee rows
         existing_employee_ids = set(
-            PayrollPeriodEmployee.objects.filter(period=period)
+            PayrollPeriodEmployee.objects
+            .filter(period=period)
             .values_list("employee_id", flat=True)
         )
 
@@ -461,20 +465,38 @@ class PayrollPeriodEligibleEmployeesView(APIView):
         if to_create:
             PayrollPeriodEmployee.objects.bulk_create(to_create, ignore_conflicts=True)
 
-        # 3) return ALL PayrollPeriodEmployee rows for this period (including Processing/Approved/etc)
+        # 3) base queryset (display layer)
         ppe_qs = (
             PayrollPeriodEmployee.objects
             .filter(period=period, employee__in=period_employees)
             .select_related("employee", "employee__department")
-            .order_by("employee__lname", "employee__fname")
         )
+
+        #  APPLY FILTER HERE (correct layer)
+        if department_id:
+            if not department_id.isdigit():
+                return Response({"detail": "Invalid department_id"}, status=400)
+
+            department_id = int(department_id)
+            ppe_qs = ppe_qs.filter(employee__department_id=department_id)
+
+        # final ordering
+        ppe_qs = ppe_qs.order_by("employee__lname", "employee__fname")
 
         return Response({
             "period": PayrollPeriodCreateSerializer(period).data,
             "eligible_employees": EligibleEmployeeSerializer(ppe_qs, many=True).data,
         })
 
+class DepartmentListView(APIView):
+    permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        qs = Department.objects.filter(is_active=True).order_by("name")
+
+        data = DepartmentSerializer(qs, many=True).data
+
+        return Response(data, status=200)
 #=========================VERIFY EMPLOYEE==========================
 
 # Returns salary, shift, taxes, loans, and allowances for employee verification preview
@@ -1748,6 +1770,14 @@ class PayrollPeriodApprovalQueueView(APIView):
         ppe_qs = PayrollPeriodEmployee.objects.filter(period=period).select_related(
             "employee", "employee__department"
         )
+
+        department_id = request.query_params.get("department_id")
+
+        if department_id:
+            if not department_id.isdigit():
+                return Response({"detail": "Invalid department_id"}, status=400)
+
+            ppe_qs = ppe_qs.filter(employee__department_id=int(department_id))
 
         if status_filter != "All":
             ppe_qs = ppe_qs.filter(status=status_filter)

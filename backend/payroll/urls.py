@@ -34,7 +34,8 @@ urlpatterns = [
     #Payroll Period
     path("periods/", PayrollPeriodListCreateView.as_view(), name="payroll-periods"),
     path("periods/<int:period_id>/eligible-employees/",PayrollPeriodEligibleEmployeesView.as_view(),name="payroll-period-eligible-employees"),
-
+    path("departments/", DepartmentListView.as_view(), name="department-list"),
+    
     #Verify Employee
     path("periods/<int:period_id>/employees/<int:employee_id>/verify-snapshot/",PayrollVerifyEmployeeSnapshotView.as_view(),name="payroll-verify-employee-snapshot"),
     path("periods/<int:period_id>/employees/<int:employee_id>/verify/",PayrollVerifyEmployeeView.as_view(),name="payroll-verify-employee"),

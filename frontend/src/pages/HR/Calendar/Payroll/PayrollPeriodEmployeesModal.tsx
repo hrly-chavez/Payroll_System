@@ -8,7 +8,7 @@ import dayjs from "dayjs";
 
 import VerifyEmployeeModal from "./VerifyEmployeeModal";
 import PayrollResultModal from "./PayrollResultModal";
-
+import { Select } from "antd";
 
 type Props = {
   open: boolean;
@@ -48,12 +48,20 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
   const canGenerate = !!periodId && (period?.status === "Open");
   const verifiedCount = employees.filter((e) => e.status === "Verified").length;
 
+  const [departmentId, setDepartmentId] = useState<number | null>(null);
+  const [departments, setDepartments] = useState<any[]>([]);
+
   const loadEligibleEmployees = async () => {
     if (!periodId) return;
 
     setLoading(true);
     try {
-      const res = await api.get(`/payroll/periods/${periodId}/eligible-employees/`);
+      const res = await api.get(
+        `/payroll/periods/${periodId}/eligible-employees/`,
+        {
+          params: departmentId ? { department_id: departmentId } : {},
+        }
+      );
       setPeriod(res.data.period);
       setEmployees(res.data.eligible_employees || []);
     } catch (err: any) {
@@ -66,13 +74,22 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
       setLoading(false);
     }
   };
- 
+
+  const loadDepartments = async () => {
+    try {
+      const res = await api.get("/payroll/departments/");
+      setDepartments(res.data || []);
+    } catch {
+      message.error("Failed to load departments");
+    }
+  };
+
   useEffect(() => {
     if (open && periodId) {
       loadEligibleEmployees();
+      loadDepartments();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, periodId]);
+  }, [open, periodId, departmentId]);
 
   const columns = [
     { title: "Employee", dataIndex: "full_name" },
@@ -176,7 +193,19 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
         </Button>
 
       </div>
-
+          <div style={{ marginBottom: 12, display: "flex", gap: 8 }}>
+            <Select
+              placeholder="Filter by Department"
+              allowClear
+              style={{ width: 220 }}
+              value={departmentId ?? undefined}
+              onChange={(value) => setDepartmentId(value || null)}
+              options={departments.map((d) => ({
+                value: d.id,
+                label: d.name,
+              }))}
+            />
+          </div>
         <Table
         columns={columns}
         dataSource={employees}

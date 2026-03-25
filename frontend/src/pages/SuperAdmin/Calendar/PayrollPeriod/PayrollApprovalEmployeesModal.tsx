@@ -83,13 +83,19 @@ export default function PayrollApprovalEmployeesModal({ open, periodId, onClose 
   const [declineReasonsMap, setDeclineReasonsMap] = useState<Record<number, string>>({});
   const [approveIdsPending, setApproveIdsPending] = useState<number[]>([]);
 
+  const [departmentId, setDepartmentId] = useState<number | null>(null);
+  const [departments, setDepartments] = useState<any[]>([]);
+
   const loadQueue = async () => {
     if (!open || !periodId) return;
 
     setLoading(true);
     try {
       const res = await api.get(`/payroll/periods/${periodId}/approval-queue/`, {
-        params: { status: statusFilter },
+        params: {
+          status: statusFilter,
+          ...(departmentId ? { department_id: departmentId } : {}),
+        },
       });
 
       setPeriod(res.data?.period || null);
@@ -104,10 +110,19 @@ export default function PayrollApprovalEmployeesModal({ open, periodId, onClose 
       setLoading(false);
     }
   };
+  const loadDepartments = async () => {
+    try {
+      const res = await api.get("/payroll/departments/");
+      setDepartments(res.data || []);
+    } catch {
+      message.error("Failed to load departments");
+    }
+  };
 
   useEffect(() => {
     if (open && periodId) {
       loadQueue();
+      loadDepartments();
     } else if (!open) {
       setPeriod(null);
       setRows([]);
@@ -128,7 +143,7 @@ export default function PayrollApprovalEmployeesModal({ open, periodId, onClose 
     if (open && periodId) {
       loadQueue();
     }
-  }, [statusFilter]);
+  }, [statusFilter, departmentId]);
 
   const filtered = useMemo(() => {
     const q = (searchText || "").trim().toLowerCase();
@@ -339,12 +354,16 @@ export default function PayrollApprovalEmployeesModal({ open, periodId, onClose 
               ]}
             />
 
-            <Input
-              placeholder="Search employee / department / status..."
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              style={{ width: 320 }}
+            <Select
+              placeholder="Filter by Department"
               allowClear
+              style={{ width: 220 }}
+              value={departmentId ?? undefined}
+              onChange={(value) => setDepartmentId(value || null)}
+              options={departments.map((d) => ({
+                value: d.id,
+                label: d.name,
+              }))}
             />
           </Space>
 

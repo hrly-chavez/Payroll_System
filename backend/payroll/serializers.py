@@ -193,7 +193,10 @@ class EligibleEmployeeSerializer(serializers.ModelSerializer):
         e = obj.employee
         return f"{e.fname} {e.lname}".strip()
 
-
+class DepartmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Department
+        fields = ["id", "name"]
 #=========================VERIFY EMPLOYEE==========================
 # Serializes workdays of a shift (used for verification preview only)
 class ShiftWorkdaySerializer(serializers.ModelSerializer):

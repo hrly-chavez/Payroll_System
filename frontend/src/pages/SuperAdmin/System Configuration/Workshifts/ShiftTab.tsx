@@ -66,6 +66,16 @@ const ShiftTab = ({ active }: Props) => {
     { title: "End", dataIndex: "end_time" },
     { title: "Break (min)", dataIndex: "break_minutes" },
     { title: "Grace (min)", dataIndex: "grace_minutes" },
+    {
+      title: "Crosses midnight?",
+      dataIndex: "crosses_midnight",
+      render: (value: boolean) =>
+        value ? (
+          <Tag color="blue">Yes</Tag>
+        ) : (
+          <Tag color="default">No</Tag>
+        ),
+    },
 
     {
       title: "Status",

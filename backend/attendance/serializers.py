@@ -123,6 +123,7 @@ class ShiftSerializer(serializers.ModelSerializer):
             "grace_minutes",
             "is_overnight",
             "is_active",
+            "crosses_midnight",
             "workdays",   #  added
         ]
 

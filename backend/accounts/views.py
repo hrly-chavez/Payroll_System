@@ -10,6 +10,7 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def me(request):
     user = request.user
     if not user or not user.is_authenticated:
@@ -42,16 +43,18 @@ class CookieTokenObtainPairView(TokenObtainPairView):
             key="access_token",
             value=access,
             httponly=True,
-            secure=False,  # True in production
-            samesite="Lax",
+            secure=True,  # True in production / Gi true lang for switch sa https
+            # samesite="Lax",
+            samesite="None",
         )
 
         res.set_cookie(
             key="refresh_token",
             value=refresh,
             httponly=True,
-            secure=False,   #True if HTTPS
-            samesite="Lax", #Strict para prevent CSRF
+            secure=True,   #True if HTTPS
+            # samesite="Lax", #Strict para prevent CSRF
+            samesite="None", #kani gi gamit para sa cross site origin
         )
 
         return res

@@ -1,4 +1,3 @@
-// src/api/axios.ts
 import axios from "axios";
 
 const baseURL =
@@ -7,19 +6,16 @@ const baseURL =
 
 const api = axios.create({
   baseURL,
-  withCredentials: true, // VERY IMPORTANT to send cookies
+  withCredentials: true, // VERY IMPORTANT: send cookies
 });
 
 let isRefreshing = false;
-let failedQueue: any[] = [];
+let failedQueue: { resolve: (value?: any) => void; reject: (err: any) => void }[] = [];
 
-const processQueue = (error: any, token: string | null = null) => {
+const processQueue = (error: any = null) => {
   failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token);
-    }
+    if (error) prom.reject(error);
+    else prom.resolve();
   });
   failedQueue = [];
 };
@@ -30,12 +26,7 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // Only handle 401 for endpoints other than refresh
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      // If user is already logged out, do nothing
-      if (localStorage.getItem("loggedOut") === "true") {
-        return Promise.reject(error);
-      }
-
+    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes("token/refresh")) {
       originalRequest._retry = true;
 
       if (isRefreshing) {
@@ -49,24 +40,18 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const res = await axios.post(
-          `${baseURL}/accounts/token/refresh/`,
-          {},
-          { withCredentials: true }
-        );
+        // ✅ Use the SAME api instance for refresh
+        await api.post("/accounts/token/refresh/"); // cookie is sent automatically
 
         isRefreshing = false;
-        processQueue(null);
+        processQueue(); // retry queued requests
 
-        return api(originalRequest);
+        return api(originalRequest); // retry original request
       } catch (err) {
         isRefreshing = false;
-        processQueue(err, null);
+        processQueue(err);
 
-        // Mark as logged out to prevent looping
         localStorage.setItem("loggedOut", "true");
-
-        // Redirect to login once
         window.location.href = "/";
 
         return Promise.reject(err);

@@ -8,6 +8,7 @@ import AddCommission from "./AddCommission";
 import AdditionalAllowanceModal from "./AdditionalAllowanceModal";
 import { formatBackendTime } from "../../../helpers";
 import dayjs from "dayjs";
+import AddFineModal from "./AddFineModal";
 
 const { Text } = Typography;
 
@@ -118,6 +119,18 @@ type AdditionalAllowance = {
   exclusion_id?: number | null;
   exclusion_remarks?: string | null;
 };
+type Fine = {
+  id: number;
+  name: string;
+  amount: string;
+  remarks?: string | null;
+  created_at: string;
+
+  is_excluded_for_run?: boolean;
+  exclusion_id?: number | null;
+  exclusion_remarks?: string | null;
+};
+
 type CommissionType = {
   id: number;
   name: string;
@@ -195,6 +208,7 @@ type Snapshot = {
   attendances: AttendanceRow[];
   leave_days: LeaveDayRow[];
   commissions: Commission[];
+  fines: Fine[];
   warnings?: string[];
 };
 
@@ -229,6 +243,7 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
 
   // additional allowances
   const [openAdditionalAllowanceModal, setOpenAdditionalAllowanceModal] = useState(false);
+  const [openFineModal, setOpenFineModal] = useState(false);
 
   const canVerify = status === "Pending";
   const canAddCommission = status === "Pending";
@@ -380,6 +395,7 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
       message.error(msg);
     }
   };
+
   const handleExcludeCommission = async (row: Commission) => {
   if (!employee || !period) return;
 
@@ -399,6 +415,52 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
       err?.response?.data?.detail ||
       err?.response?.data?.message ||
       "Failed to exclude commission";
+    message.error(msg);
+  }
+  };
+
+  const handleExcludeFine = async (row: Fine) => {
+  if (!employee || !period) return;
+
+  try {
+    await api.post(
+      `/payroll/periods/${period.id}/employees/${employee.id}/exclude-input/`,
+      {
+        source_type: "FINE",
+        source_id: row.id,
+      }
+    );
+
+    message.success("Fine excluded for this payroll run.");
+    loadSnapshot();
+  } catch (err: any) {
+    const msg =
+      err?.response?.data?.detail ||
+      err?.response?.data?.message ||
+      "Failed to exclude fine";
+    message.error(msg);
+  }
+};
+
+const handleIncludeFine = async (row: Fine) => {
+  if (!employee || !period) return;
+
+  try {
+    await api.post(
+      `/payroll/periods/${period.id}/employees/${employee.id}/include-input/`,
+      {
+        source_type: "FINE",
+        source_id: row.id,
+      }
+    );
+
+    message.success("Fine restored for this payroll run.");
+    loadSnapshot();
+  } catch (err: any) {
+    const msg =
+      err?.response?.data?.detail ||
+      err?.response?.data?.message ||
+      "Failed to restore fine";
     message.error(msg);
   }
 };
@@ -633,6 +695,60 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
     },
   ];
 
+  const fineColumns = [
+  {
+    title: "Name",
+    dataIndex: "name",
+    render: (v: string) => v || "-",
+  },
+  {
+    title: "Amount",
+    dataIndex: "amount",
+    render: (v: string) => v || "0.00",
+  },
+  {
+    title: "Remarks",
+    dataIndex: "remarks",
+    render: (v: string) => v || "-",
+  },
+  {
+    title: "Status",
+    render: (_: any, row: Fine) =>
+      row.is_excluded_for_run ? (
+        <Tag color="red">Excluded</Tag>
+      ) : (
+        <Tag color="green">Included</Tag>
+      ),
+  },
+  {
+    title: "Action",
+    render: (_: any, row: Fine) => {
+      if (row.is_excluded_for_run) {
+        return (
+          <Button
+            size="small"
+            onClick={() => handleIncludeFine(row)}
+            disabled={status !== "Pending"}
+          >
+            Restore
+          </Button>
+        );
+      }
+
+      return (
+        <Button
+          danger
+          size="small"
+          onClick={() => handleExcludeFine(row)}
+          disabled={status !== "Pending"}
+        >
+          X
+        </Button>
+      );
+    },
+  },
+];
+
   const attendanceColumns = [
     { title: "Date", dataIndex: "date", render: (v: string) => v || "-" },
     { title: "Status", dataIndex: "status", render: (v: string) => v || "-" },
@@ -743,6 +859,13 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
                     onClick={() => setOpenAdditionalAllowanceModal(true)}
                     disabled={!canAddAdditionalAllowance || !period}>
                     Add Additional Allowance
+                  </Button>
+
+                  <Button
+                    block
+                    onClick={() => setOpenFineModal(true)}
+                    disabled={status !== "Pending" || !period}>
+                    Add Fine
                   </Button>
 
                   <Button
@@ -865,6 +988,19 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
                   />
                 </div>
               </Card>
+                {/* Fine */}
+              <Card title="Fines" style={sectionCardStyle} bodyStyle={{ padding: 14 }}>
+                <div style={tableBoxStyle}>
+                  <Table
+                    columns={fineColumns}
+                    dataSource={snapshot?.fines || []}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    locale={{ emptyText: "No fines added" }}
+                  />
+                </div>
+              </Card>
 
               {/* Allowances */}
               <Card title="Allowances" style={sectionCardStyle} bodyStyle={{ padding: 14 }}>
@@ -949,6 +1085,15 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
                   loadCommissions();
                 }}
               />
+              {period && employee && (
+                <AddFineModal
+                  open={openFineModal}
+                  periodId={period.id}
+                  employeeId={employee.id}
+                  onClose={() => setOpenFineModal(false)}
+                  onSuccess={loadSnapshot}
+                />
+              )}
               <AdditionalAllowanceModal
                   open={openAdditionalAllowanceModal}
                   period={period}

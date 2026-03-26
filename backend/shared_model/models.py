@@ -145,6 +145,11 @@ class Employee(models.Model):
     is_active = models.BooleanField(default=True)
     shift = models.ForeignKey( Shift, on_delete=models.SET_NULL,related_name="employees",null=True,blank=True)
     department = models.ForeignKey( Department,on_delete=models.PROTECT,related_name="employees",null=True,blank=True)
+    profile_picture = models.ImageField(
+    upload_to="employees/",  # This will save files in MEDIA_ROOT/employees/
+    null=True,
+    blank=True
+    )
     
     def __str__(self):
         return f"{self.fname} {self.lname}"

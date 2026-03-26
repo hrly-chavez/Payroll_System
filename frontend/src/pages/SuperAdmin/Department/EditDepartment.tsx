@@ -3,11 +3,10 @@ import { Modal, Form, Input, Select, Button, message } from "antd";
 import styles from "./Add_department.module.css";
 import api from "../../../api/axios";
 
-// ---------------- Interfaces ----------------
 export interface DepartmentType {
   id?: number;
   name: string;
-  shift?: number;
+  shift?: any;
   holiday_base: string[];
   is_active?: boolean;
 }
@@ -15,9 +14,8 @@ export interface DepartmentType {
 interface Props {
   open: boolean;
   onClose: () => void;
-  initialValues?: DepartmentType; // optional for editing
+  department: DepartmentType | null;
 }
-// --------------------------------------------
 
 const HOLIDAY_OPTIONS = [
   { label: "Philippines", value: "PH" },
@@ -25,11 +23,11 @@ const HOLIDAY_OPTIONS = [
   { label: "Company", value: "COMPANY" },
 ];
 
-const AddDepartment: React.FC<Props> = ({ open, onClose, initialValues }) => {
+const EditDepartment: React.FC<Props> = ({ open, onClose, department }) => {
+  const [form] = Form.useForm();
   const [shifts, setShifts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Fetch shifts
   useEffect(() => {
     if (!open) return;
 
@@ -42,36 +40,38 @@ const AddDepartment: React.FC<Props> = ({ open, onClose, initialValues }) => {
         message.error("Failed to load shifts");
       }
     };
+
     fetchShifts();
   }, [open]);
 
-  // Handle submit: create or update
+  useEffect(() => {
+    if (open && department) {
+      form.setFieldsValue({
+        name: department.name,
+        shift: typeof department.shift === "object" ? department.shift?.id : department.shift,
+        holiday_base: department.holiday_base,
+      });
+    }
+  }, [open, department, form]);
+
   const onFinish = async (values: any) => {
+    if (!department?.id) return;
+
     setLoading(true);
     const sanitizedName = values.name.trim();
 
     try {
-      if (initialValues?.id) {
-        // Update existing
-        await api.patch(`/employees/departments/${initialValues.id}/`, {
-          name: sanitizedName,
-          shift_id: values.shift,
-          holiday_base: values.holiday_base,
-        });
-        message.success("Department updated successfully");
-      } else {
-        // Create new
-        await api.post("/employees/departments/", {
-          name: sanitizedName,
-          shift_id: values.shift,
-          holiday_base: values.holiday_base,
-        });
-        message.success("Department created successfully");
-      }
+      await api.patch(`/employees/departments/${department.id}/`, {
+        name: sanitizedName,
+        shift_id: values.shift,
+        holiday_base: values.holiday_base,
+      });
+
+      message.success("Department updated successfully");
       onClose();
     } catch (error: any) {
       console.error(error);
-      message.error(error.response?.data?.message || "Error saving department");
+      message.error(error.response?.data?.message || "Error updating department");
     } finally {
       setLoading(false);
     }
@@ -79,23 +79,15 @@ const AddDepartment: React.FC<Props> = ({ open, onClose, initialValues }) => {
 
   return (
     <Modal
-      title={initialValues?.id ? "Edit Department" : "Add Department & Shift"}
+      title="Edit Department"
       open={open}
       onCancel={onClose}
       footer={null}
       centered
       className={styles.modal}
+      destroyOnHidden
     >
-      <Form
-        layout="vertical"
-        className={styles.form}
-        onFinish={onFinish}
-        initialValues={{
-          name: initialValues?.name,
-          shift: initialValues?.shift,
-          holiday_base: initialValues?.holiday_base,
-        }}
-      >
+      <Form form={form} layout="vertical" className={styles.form} onFinish={onFinish}>
         <Form.Item
           label="Name"
           name="name"
@@ -141,7 +133,7 @@ const AddDepartment: React.FC<Props> = ({ open, onClose, initialValues }) => {
 
         <div className={styles.actions}>
           <Button type="primary" htmlType="submit" className={styles.saveBtn} loading={loading}>
-            Save
+            Update
           </Button>
           <Button onClick={onClose}>Cancel</Button>
         </div>
@@ -150,4 +142,4 @@ const AddDepartment: React.FC<Props> = ({ open, onClose, initialValues }) => {
   );
 };
 
-export default AddDepartment;
+export default EditDepartment;

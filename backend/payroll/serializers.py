@@ -452,7 +452,7 @@ class LoanMiniSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
-#===================Fine================
+#===================Fine================(#Now used as Additional Deduction)
 class PayrollPeriodEmployeeFineCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = PayrollPeriodEmployeeFine

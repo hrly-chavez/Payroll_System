@@ -1,4 +1,4 @@
-//src/pages/HR/Calendar/Payroll/AddFineModal.tsx
+//src/pages/HR/Calendar/Payroll/AddDeductionModal.tsx
 import React, { useState } from "react";
 import { Modal, Form, Input, InputNumber, message } from "antd";
 import api from "../../../../api/axios";
@@ -11,7 +11,7 @@ interface Props {
   onSuccess: () => void; // reload fines table
 }
 
-const AddFineModal: React.FC<Props> = ({
+const AddDeductionModal: React.FC<Props> = ({
   open,
   onClose,
   periodId,
@@ -64,7 +64,7 @@ const AddFineModal: React.FC<Props> = ({
 
   return (
     <Modal
-      title="Add Fine"
+      title="Add Deduction"
       open={open}
       onOk={handleSubmit}
       onCancel={handleCancel}
@@ -74,14 +74,14 @@ const AddFineModal: React.FC<Props> = ({
     >
       <Form layout="vertical" form={form}>
         <Form.Item
-          label="Fine Name"
+          label="Deduction Name"
           name="name"
           rules={[
-            { required: true, message: "Fine name is required" },
+            { required: true, message: "Deduction name is required" },
             { max: 100, message: "Max 100 characters only" },
           ]}
         >
-          <Input placeholder="e.g. Broken Headset" />
+          <Input placeholder="e.g. Broken Headset / Cash Advance" />
         </Form.Item>
 
         <Form.Item
@@ -127,4 +127,4 @@ const AddFineModal: React.FC<Props> = ({
   );
 };
 
-export default AddFineModal;
+export default AddDeductionModal;

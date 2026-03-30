@@ -8,7 +8,7 @@ import AddCommission from "./AddCommission";
 import AdditionalAllowanceModal from "./AdditionalAllowanceModal";
 import { formatBackendTime } from "../../../helpers";
 import dayjs from "dayjs";
-import AddFineModal from "./AddFineModal";
+import AddDeductionModal from "./AddDeductionModal";
 
 const { Text } = Typography;
 
@@ -865,7 +865,7 @@ const handleIncludeFine = async (row: Fine) => {
                     block
                     onClick={() => setOpenFineModal(true)}
                     disabled={status !== "Pending" || !period}>
-                    Add Fine
+                    Add Deduction
                   </Button>
 
                   <Button
@@ -1086,7 +1086,7 @@ const handleIncludeFine = async (row: Fine) => {
                 }}
               />
               {period && employee && (
-                <AddFineModal
+                <AddDeductionModal
                   open={openFineModal}
                   periodId={period.id}
                   employeeId={employee.id}

@@ -1081,7 +1081,7 @@ class PayrollPeriodEmployeeAllowanceDeleteView(APIView):
             status=http_status.HTTP_200_OK,
         )
 
-#===========================ADD FINE========================
+#===========================ADD FINE========================(#Now used as Additional Deduction)
 class PayrollPeriodEmployeeFineListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 

@@ -192,13 +192,13 @@ const Attendance: React.FC = () => {
                   Request Leave
                 </Button>
 
-                  <Button
+                  {/* <Button
                   className={styles.requestBtn}
                   icon={<CalendarOutlined />}
                   onClick={() => setIsLoanOpen(true)}
                 >
                   Request Loan
-                </Button>
+                </Button> */}
 
               </div>
             </Row>
@@ -234,9 +234,9 @@ const Attendance: React.FC = () => {
                 <AttendanceCorrectionLogs />
               </Tabs.TabPane>
 
-              <Tabs.TabPane tab="Loan Request(s)" key="loans">
+              {/* <Tabs.TabPane tab="Loan Request(s)" key="loans">
                 <RequestLoanLogs refreshKey={loanRefreshKey} />
-              </Tabs.TabPane>
+              </Tabs.TabPane> */}
 
             </Tabs>
           </Card>

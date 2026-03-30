@@ -1433,7 +1433,7 @@ class PayrollGenerationService:
         )
 
         return [row for row in rows if row.id not in commission_exclusion_map]
-
+    #Now used as Additional Deduction
     def _get_fines(self, employee, period, fine_exclusion_map=None):
         fine_exclusion_map = fine_exclusion_map or {}
 
@@ -2432,6 +2432,7 @@ class PayrollGenerationService:
                 commission_tax_rule=rule,
             )
     
+    #Now used as Additional Deduction
     def _apply_fines(self, payroll: Payroll, fines):
         """
         Apply manual fines as DEDUCTION lines.

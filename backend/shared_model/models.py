@@ -1574,7 +1574,7 @@ class PayrollPeriodEmployeeAllowance(models.Model):
 
     def __str__(self):
         return f"{self.employee} - {self.allowance_type} ({self.amount}) [{self.period.code}]"
-
+#Now used as Additional Deduction
 class PayrollPeriodEmployeeFine(models.Model):
     id = models.AutoField(primary_key=True)
 

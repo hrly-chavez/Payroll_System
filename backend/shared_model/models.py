@@ -247,6 +247,18 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.user_name} ({self.role})"
+    
+class PayrollMinimumSetting(models.Model): #minimum wage
+    id = models.AutoField(primary_key=True)
+
+    # Minimum daily wage (for example, in PHP)
+    daily_minimum_wage = models.DecimalField(max_digits=10, decimal_places=2, default=500)
+
+    # You can add other types like monthly/hourly minimums if needed later
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Minimum Wage: {self.daily_minimum_wage}"
         
 class Employee_Salary(models.Model):
     PAY_TYPES = [

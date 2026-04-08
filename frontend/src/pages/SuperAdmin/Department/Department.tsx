@@ -5,7 +5,7 @@ import { PlusOutlined, SearchOutlined, EditOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
-import AddDepartment, { DepartmentType } from "../../HR/Department/AddDepartment";
+import AddDepartment, { DepartmentType } from "./AddDepartment";
 import styles from "../../HR/Department/Department.module.css";
 import api from "../../../api/axios";
 

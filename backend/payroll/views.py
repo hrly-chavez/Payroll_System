@@ -445,8 +445,8 @@ class PayrollPeriodEligibleEmployeesView(APIView):
                 Q(user__role__iexact="SUPER_ADMIN")
             )
             .exclude(Q(user__isnull=False) & Q(user__is_active=False))
-            .annotate(has_attendance=Exists(attendance_in_period))
-            .filter(has_attendance=True)
+            #NOTE: COMMENTED CAUSE MAYBE WILL BE NEEDED FOR FUTURE
+            # .filter(has_attendance=True)
             .select_related("department", "user")
         )
 
@@ -471,6 +471,15 @@ class PayrollPeriodEligibleEmployeesView(APIView):
             PayrollPeriodEmployee.objects
             .filter(period=period, employee__in=period_employees)
             .select_related("employee", "employee__department")
+            .annotate(
+                has_attendance=Exists(
+                    Attendance.objects.filter(
+                        employee_id=OuterRef("employee_id"),
+                        date__gte=period.start_date,
+                        date__lte=period.end_date,
+                    )
+                )
+            )
         )
 
         #  APPLY FILTER HERE (correct layer)
@@ -1614,10 +1623,29 @@ class PayrollEmployeeResultView(APIView):
                 .first()
             )
 
+        # check attendance within period
+        has_attendance = Attendance.objects.filter(
+            employee_id=employee_id,
+            date__gte=ppe.period.start_date,
+            date__lte=ppe.period.end_date,
+        ).exists()
+
         if not payroll:
+            if not has_attendance:
+                return Response(
+                    {
+                        "detail": "Payroll not generated",
+                        "reason": "NO_ATTENDANCE",
+                    },
+                    status=http_status.HTTP_400_BAD_REQUEST,
+                )
+
             return Response(
-                {"detail": "Payroll has not been generated for this employee in this period."},
-                status=http_status.HTTP_404_NOT_FOUND
+                {
+                    "detail": "Payroll not generated",
+                    "reason": "NOT_GENERATED",
+                },
+                status=http_status.HTTP_400_BAD_REQUEST,
             )
 
         period = payroll.payroll_period  # use select_related result (no extra DB hit)

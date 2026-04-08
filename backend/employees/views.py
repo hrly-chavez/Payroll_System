@@ -734,7 +734,7 @@ class ForgotPasswordView(APIView):
             expires_at=timezone.now() + timedelta(minutes=5)
         )
 
-        reset_url = f"http://localhost:3000/reset-password/{token}/"
+        reset_url = f"http://192.168.1.6:3000/reset-password/{token}/"
 
         send_mail(
             subject="Payroll System Password Reset",

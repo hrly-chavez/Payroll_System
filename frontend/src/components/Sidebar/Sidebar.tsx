@@ -195,7 +195,9 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
 
   const selectedKey =
     menuConfig.find(item =>
-      Object.values(item.hrefs).includes(location.pathname)
+      Object.values(item.hrefs).some(href =>
+        location.pathname.startsWith(href!)
+      )
     )?.key ?? 'dashboard';
 
   const showOverlay = isMobile && !collapsed;

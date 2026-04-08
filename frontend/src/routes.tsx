@@ -77,7 +77,7 @@ const Router: React.FC = () => {
             element={<AdDepartmentEmployee />}
           />
           <Route
-            path="/admin/employee/employee-details/:employeeId"
+            path="/admin/department/employee/employee-details/:employeeId"
             element={<EmployeeDetailsPage />}
           />
           <Route path="/admin/requests" element={<AdRequests />} />
@@ -91,7 +91,7 @@ const Router: React.FC = () => {
           <Route path="/super-admin/reports" element={<SupReport />} />
           <Route path="/super-admin/department" element={<SupDepartment />} />
           <Route path="/super-admin/department-employee/:deptId" element={<SupDepartmentEmployee />} />
-          <Route path="/super-admin/employee/employee-details/:employeeId" element={<SupEmployeeDetailsPage />} />
+          <Route path="/super-admin/department/employee/employee-details/:employeeId" element={<SupEmployeeDetailsPage />} />
           <Route path="/super-admin/system" element={<SupSystemConfig />} />
           <Route path="/super-admin/requests" element={<SupRequest />} />
         </Route>

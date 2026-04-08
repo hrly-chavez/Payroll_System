@@ -1653,7 +1653,7 @@ class AuditLog(models.Model):
     old_data = models.JSONField(null=True, blank=True)
     new_data = models.JSONField(null=True, blank=True)
     reason = models.TextField(null=True, blank=True, default="Created via system")
-    timestamp = models.DateTimeField(auto_now_add=True)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self):
         return f"{self.action} {self.model_name} ({self.object_id})"

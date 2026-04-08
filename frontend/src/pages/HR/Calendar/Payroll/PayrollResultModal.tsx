@@ -76,6 +76,7 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PayrollResult | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const [errorReason, setErrorReason] = useState<string | null>(null);
   const status = (employee?.status || "Processing") as EligibleEmployee["status"];
   // reset after decline
   const [resetOpen, setResetOpen] = useState(false);
@@ -419,6 +420,7 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
 
     setResult(null);
     setErrorDetail(null);
+    setErrorReason(null);
     setLoading(true);
 
     try {
@@ -431,7 +433,15 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
         err?.response?.data?.detail ||
         err?.response?.data?.message ||
         "Failed to load payroll result";
-        setErrorDetail(msg);
+
+        const data = err?.response?.data;
+        setErrorDetail(
+          data?.detail ||
+          data?.message ||
+          "Failed to load payroll result"
+        );
+
+        setErrorReason(data?.reason || null);
 
         // optional toast (keep if you want)
         // message.error(msg);
@@ -722,18 +732,31 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
               <Spin />
             </div>
           ) : !result ? (
-            <Alert
-                type="warning"
-                showIcon title="No payroll result found"
-                description={errorDetail || "Payroll may not have been generated yet for this employee in this period."}
-            />
+            errorReason === "NO_ATTENDANCE" ? (
+              <Alert
+                type="error"
+                showIcon
+                message="No Attendance"
+                description="This employee has no attendance within the payroll period."
+              />
             ) : (
+              <Alert
+                type="warning"
+                showIcon
+                message="Payroll Not Generated"
+                description={
+                  errorDetail ||
+                  "Payroll may not have been generated yet for this employee in this period."
+                }
+              />
+            )
+          ): (
             <>
              {/* Decline Reason (only if declined) */}
             {result && (result.ppe_status === "Declined" || (result.payroll_status || "").toLowerCase() === "disapproved") ? (
             <Alert
               type="error"
-              showIcon
+              showIcon 
               style={{ marginBottom: 12 }}  
               message="Declined Reason"
               description={result.declined_reason ? result.declined_reason : "No reason provided."}

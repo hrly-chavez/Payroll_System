@@ -31,6 +31,8 @@ type EligibleEmployee = {
   full_name: string;
   department_name?: string;
   status: "Pending" | "Verified" | "Processing" | "Approved" | "Declined";
+
+  has_attendance?: boolean;
 };
 
 
@@ -92,7 +94,21 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
   }, [open, periodId, departmentId]);
 
   const columns = [
-    { title: "Employee", dataIndex: "full_name" },
+      {
+        title: "Employee",
+        dataIndex: "full_name",
+        render: (_: any, row: EligibleEmployee) => {
+          return (
+            <div>
+              <div>{row.full_name}</div>
+
+              {row.has_attendance === false && (
+                <Tag color="red">No Attendance</Tag>
+              )}
+            </div>
+          );
+        },
+      },
     {
       title: "Department",
       dataIndex: "department_name",
@@ -216,6 +232,10 @@ export default function PayrollPeriodEmployeesModal({ open, periodId, onClose }:
         onRow={(record) => ({
           onClick: () => {
             if (loading) return;
+
+            if (record.has_attendance === false) {
+              message.warning("This employee has no attendance for this payroll period.");
+            }
 
             setSelectedEmployee(record);
 

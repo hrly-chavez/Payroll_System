@@ -739,15 +739,15 @@ class PayrollGenerationService:
         # block if payroll already exists
         if (Payroll.objects.filter(payroll_period_id=ppe.period_id, employee_id=ppe.employee_id).exclude(status="Void").exists()):
             raise ValidationError({"detail": "Payroll already exists for this employee in this period."})
-
+        #NOTE: COMMENTED CAUSE MAYBE WILL BE NEEDED FOR FUTURE
         # block if no attendance within the period
-        has_attendance = Attendance.objects.filter(
-            employee_id=ppe.employee_id,
-            date__gte=period.start_date,
-            date__lte=period.end_date,
-        ).exists()
-        if not has_attendance:
-            raise ValidationError({"detail": "Employee has no attendance within this payroll period."})
+        # has_attendance = Attendance.objects.filter(
+        #     employee_id=ppe.employee_id,
+        #     date__gte=period.start_date,
+        #     date__lte=period.end_date,
+        # ).exists()
+        # if not has_attendance:
+        #     raise ValidationError({"detail": "Employee has no attendance within this payroll period."})
 
 
     # -------------------------

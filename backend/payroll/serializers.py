@@ -184,10 +184,11 @@ class EligibleEmployeeSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     department_name = serializers.CharField(source="employee.department.name", read_only=True)
     status = serializers.CharField(read_only=True) # status comes from PayrollPeriodEmployee
+    has_attendance = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = PayrollPeriodEmployee
-        fields = ["id", "full_name", "department_name", "status"]
+        fields = ["id", "full_name", "department_name", "status", "has_attendance"]
 
     def get_full_name(self, obj: PayrollPeriodEmployee):
         e = obj.employee

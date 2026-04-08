@@ -9,6 +9,13 @@ const PublicRoute: React.FC = () => {
 
   // Fetch user info
   useEffect(() => {
+    const isAuth = localStorage.getItem("isAuthenticated");
+
+    if (!isAuth) {
+      setLoading(false);
+      return;
+    }
+
     api.get("/accounts/me/")
       .then((res) => {
         const role = res.data.role;
@@ -16,10 +23,11 @@ const PublicRoute: React.FC = () => {
         if (role === "EMPLOYEE") setRedirectPath("/employee_dashboard");
         else if (role === "ADMIN") setRedirectPath("/admin/dashboard");
         else if (role === "SUPER_ADMIN") setRedirectPath("/super-admin/dashboard");
-        else setRedirectPath("/"); // fallback
+        else setRedirectPath("/");
       })
       .catch(() => {
-        setRedirectPath(null); // not authenticated
+        localStorage.removeItem("isAuthenticated");
+        setRedirectPath(null);
       })
       .finally(() => setLoading(false));
   }, []);

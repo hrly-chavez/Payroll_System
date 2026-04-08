@@ -84,12 +84,9 @@ export default function Login() {
         password: sanitizedPassword,
       });
 
-      const { access, refresh } = tokenRes.data;
-
-      localStorage.setItem("access_token", access);
-      localStorage.setItem("refresh_token", refresh);
-
       const meRes = await api.get("/accounts/me/");
+
+      localStorage.setItem("isAuthenticated", "true");
 
       const userName = meRes.data.user_name;
       const role = meRes.data.role;
@@ -97,7 +94,7 @@ export default function Login() {
       localStorage.setItem("user_name", userName);
       localStorage.setItem("role", role);
 
-      // 🎉 Welcome message
+      //  Welcome message
       message.success(`Welcome back, ${userName}!`);
 
       // Navigate based on role
@@ -112,7 +109,7 @@ export default function Login() {
       }
 
     } catch (err: any) {
-      // 🔥 Proper error trapping
+      //  Proper error trapping
       if (err.response) {
         const status = err.response.status;
 

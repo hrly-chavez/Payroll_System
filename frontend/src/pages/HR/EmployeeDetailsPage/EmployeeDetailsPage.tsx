@@ -52,6 +52,7 @@ interface EmployeeData {
   contact_no: string;
   address: AddressData;
   role: "EMPLOYEE" | "ADMIN" | "SUPER_ADMIN";
+  profile_picture?: string;
 }
 
 interface DeductionRow {
@@ -253,7 +254,11 @@ const EmployeeDetailsPage: React.FC = () => {
             {/* LEFT PROFILE CARD */}
             <Card className={styles.profileCard}>
               <div className={styles.profileHeader}>
-                <img src="/avatar.jpg" className={styles.avatar} alt="avatar" />
+                <img
+                  src={employee.profile_picture || "/avatar.jpg"}
+                  className={styles.avatar}
+                  alt={employee.name}
+                />
 
                 <div className={styles.nameSection}>
                   <div className={styles.nameTop}>

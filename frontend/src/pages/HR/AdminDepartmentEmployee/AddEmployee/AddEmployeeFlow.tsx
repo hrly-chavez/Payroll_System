@@ -57,24 +57,74 @@ const AddEmployeeFlow: React.FC<Props> = ({ open, departmentId, onClose }) => {
   ) => {
     const roleToUse = roleOverride || selectedRole;
 
-    setLoading(true); // start loading
+    setLoading(true);
 
     try {
+      if (!roleToUse) {
+        message.error("Role is missing");
+        return;
+      }
+
       const payload = {
         ...employeeDetails,
         role: roleToUse,
-        salary: roleToUse === "SUPER_ADMIN" ? null : salaryData,
-        contributions: roleToUse === "SUPER_ADMIN" ? [] : contributionsData,
+        salary: salaryData,
+        contributions: contributionsData,
         allowances: finalAllowances,
       };
 
       console.log("ROLE BEING SENT:", roleToUse);
       console.log("FULL PAYLOAD:", payload);
 
-      const res = await api.post(
-        "/employees/employees/create-full-employee/",
-        payload
-      );
+      const formData = new FormData();
+
+      // ------------------
+      // Append basic fields (including nested address)
+      // ------------------
+      Object.keys(employeeDetails).forEach((key) => {
+        const value = employeeDetails[key];
+
+        if (key === "address") {
+          Object.keys(value).forEach((addrKey) => {
+            const addrValue = value[addrKey];
+            if (addrValue !== undefined && addrValue !== null && addrValue !== "undefined") {
+              formData.append(`address.${addrKey}`, addrValue);
+            }
+          });
+        } else if (key === "profile_picture") {
+          if (value) {
+            formData.append("profile_picture", value); // file object
+          }
+        } else {
+          if (value !== undefined && value !== null && value !== "undefined") {
+            formData.append(key, value);
+          }
+        }
+      });
+
+      // ------------------
+      // Append role
+      // ------------------
+      formData.append("role", roleToUse);
+
+      // ------------------
+      // Append JSON fields as Blobs
+      // ------------------
+      const normalizedSalary =
+        salaryData && !Array.isArray(salaryData)
+          ? salaryData
+          : salaryData?.[0] || {};
+
+      formData.append("salary", JSON.stringify(normalizedSalary));
+      formData.append("contributions", JSON.stringify(contributionsData || []));
+      formData.append("allowances", JSON.stringify(finalAllowances || []));
+
+      // ------------------
+      // Send POST
+      // ------------------
+      const res = await api.post("/employees/employees/create-full-employee/", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
       setCredentials({
         username: res.data.username,
@@ -85,7 +135,7 @@ const AddEmployeeFlow: React.FC<Props> = ({ open, departmentId, onClose }) => {
     } catch (err: any) {
       message.error(err.response?.data?.message || "Failed to create employee");
     } finally {
-      setLoading(false); // stop loading
+      setLoading(false);
     }
   };
 

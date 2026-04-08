@@ -20,6 +20,7 @@ interface EmployeeType {
   department: string;
   shift: string;
   hired_date: string;
+  profile_picture?: string;
 }
 
 const AdminDepartmentEmployee: React.FC = () => {
@@ -33,6 +34,8 @@ const AdminDepartmentEmployee: React.FC = () => {
 
   const location = useLocation();
   const deptName = (location.state as { deptName?: string })?.deptName || "Employees";
+
+  const BASE_URL = (process.env.REACT_APP_API_BASE_URL || "").replace("/api", "");
 
   const fetchEmployees = async () => {
     if (!deptId) return;
@@ -66,9 +69,27 @@ const AdminDepartmentEmployee: React.FC = () => {
       title: "Employee Name",
       dataIndex: "name",
       key: "name",
-      render: (text) => (
-        <span className={styles.empLink}>{text}</span>
-      ),
+      render: (_, record) => {
+        const imageUrl = record.profile_picture
+          ? `${BASE_URL}${record.profile_picture}`
+          : "https://ui-avatars.com/api/?name=" + encodeURIComponent(record.name);
+
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <img
+              src={imageUrl}
+              alt={record.name}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                objectFit: "cover",
+              }}
+            />
+            <span className={styles.empLink}>{record.name}</span>
+          </div>
+        );
+      },
     },
     { title: "Position", dataIndex: "position", key: "position" },
     { title: "Status", dataIndex: "status", key: "status" },

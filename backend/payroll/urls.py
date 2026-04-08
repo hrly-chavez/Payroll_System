@@ -34,7 +34,8 @@ urlpatterns = [
     #Payroll Period
     path("periods/", PayrollPeriodListCreateView.as_view(), name="payroll-periods"),
     path("periods/<int:period_id>/eligible-employees/",PayrollPeriodEligibleEmployeesView.as_view(),name="payroll-period-eligible-employees"),
-
+    path("departments/", DepartmentListView.as_view(), name="department-list"),
+    
     #Verify Employee
     path("periods/<int:period_id>/employees/<int:employee_id>/verify-snapshot/",PayrollVerifyEmployeeSnapshotView.as_view(),name="payroll-verify-employee-snapshot"),
     path("periods/<int:period_id>/employees/<int:employee_id>/verify/",PayrollVerifyEmployeeView.as_view(),name="payroll-verify-employee"),
@@ -50,6 +51,9 @@ urlpatterns = [
     # Additional Allowances (Payroll-period specific)
     path("periods/<int:period_id>/employees/<int:employee_id>/allowances/",PayrollPeriodEmployeeAllowanceListCreateView.as_view(),name="payroll-period-employee-allowances"),
     path("periods/<int:period_id>/employees/<int:employee_id>/allowances/<int:allowance_id>/delete/",PayrollPeriodEmployeeAllowanceDeleteView.as_view(),name="payroll-period-employee-allowance-delete"),
+
+    path("payroll-period/<int:period_id>/employee/<int:employee_id>/fines/",PayrollPeriodEmployeeFineListCreateView.as_view(),name="payroll-period-employee-fines",),
+    path("payroll-period/<int:period_id>/employee/<int:employee_id>/fines/<int:fine_id>/",PayrollPeriodEmployeeFineDeleteView.as_view(),name="payroll-period-employee-fine-delete",),
 
     # Payroll Generation
     path("periods/<int:period_id>/generate/", GeneratePayrollForPeriodView.as_view(), name="payroll-generate-period"),
@@ -69,7 +73,6 @@ urlpatterns = [
     # Mark period as Paid (only Closed -> Paid)
     path("periods/<int:period_id>/mark-paid/", PayrollPeriodMarkPaidView.as_view(), name="payroll-period-mark-paid"),
     #Download Payroll
-    path("my-payrolls/<int:period_id>/download/", EmployeePayrollDownloadPDFView.as_view(), name="employee-my-payrolls-download"),
     path("periods/<int:period_id>/employees/<int:employee_id>/download/",AdminEmployeePayrollDownloadPDFView.as_view(),name="admin-employee-payroll-download",),
 
     #payroll logs

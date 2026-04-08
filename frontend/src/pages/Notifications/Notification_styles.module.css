@@ -753,3 +753,22 @@
     font-size: 13px;
   }
 }
+.tagLoan {
+  background: rgba(139, 92, 246, 0.12) !important;
+  color: #7c3aed !important;
+}
+
+.tagDefault {
+  background: rgba(107, 114, 128, 0.12) !important;
+  color: #6b7280 !important;
+}
+
+.icon_loan {
+  background: rgba(139, 92, 246, 0.12);
+  color: #7c3aed;
+}
+
+.icon_default {
+  background: rgba(107, 114, 128, 0.12);
+  color: #6b7280;
+}

@@ -27,6 +27,11 @@ const Topbar: React.FC<TopbarProps> = ({
     try {
       await api.post("/accounts/logout/"); // call backend
 
+      localStorage.removeItem("isAuthenticated");
+      localStorage.removeItem("manualLogout");
+      localStorage.removeItem("role");
+      localStorage.removeItem("user_name");
+
       message.success("You have been logged out successfully");
 
       if (onLogout) onLogout();

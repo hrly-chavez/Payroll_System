@@ -170,11 +170,11 @@ export default function RequestLoan({ open, onClose, onSuccess }: Props) {
 
         <Form.Item
           name="remarks"
-          label="Remarks (optional)"
+          label="Reason (optional)"
         >
           <Input.TextArea
             rows={4}
-            placeholder="Add any notes for your loan request"
+            placeholder="Input reason for your loan request"
             maxLength={1000}
           />
         </Form.Item>

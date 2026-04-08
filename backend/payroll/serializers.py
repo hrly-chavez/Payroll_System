@@ -193,7 +193,10 @@ class EligibleEmployeeSerializer(serializers.ModelSerializer):
         e = obj.employee
         return f"{e.fname} {e.lname}".strip()
 
-
+class DepartmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Department
+        fields = ["id", "name"]
 #=========================VERIFY EMPLOYEE==========================
 # Serializes workdays of a shift (used for verification preview only)
 class ShiftWorkdaySerializer(serializers.ModelSerializer):
@@ -338,7 +341,7 @@ class LeaveDayMiniSerializer(serializers.ModelSerializer):
         model = Leave_Day
         fields = ["id", "date", "units", "is_paid", "pay_rate", "leave_request"]
 
-#==================================COMMISION================================
+#==========COMMISION=========
 # Commission type dropdown
 class CommissionTypeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -422,10 +425,90 @@ class PayrollPeriodEmployeeCommissionCreateSerializer(serializers.ModelSerialize
         if value <= 0:
             raise serializers.ValidationError("Amount must be greater than 0.")
         return value
+#============================
 
+#Loan
+class LoanMiniSerializer(serializers.ModelSerializer):
+    rule_name = serializers.CharField(source="rule.name", read_only=True)
 
-#==================================================================
+    class Meta:
+        model = Loan
+        fields = [
+            "id",
+            "name",
+            "principal_amount",
+            "remaining_balance",
+            "deduction_mode",
+            "deduction_value",
+            "apply_to_cutoff",
+            "effective_from",
+            "effective_to",
+            "status",
+            "remarks",
+            "declined_reason",
+            "rule",
+            "rule_name",
+            "approved_at",
+            "created_at",
+        ]
 
+#===================Fine================(#Now used as Additional Deduction)
+class PayrollPeriodEmployeeFineCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PayrollPeriodEmployeeFine
+        fields = ["name", "amount", "remarks"]
+
+    def validate_name(self, value):
+        v = (value or "").strip()
+        if not v:
+            raise serializers.ValidationError("Fine name is required.")
+        if len(v) > 100:
+            raise serializers.ValidationError("Fine name is too long.")
+        return v
+
+    def validate_amount(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Amount must be greater than 0.")
+        return value
+
+    def validate_remarks(self, value):
+        if value:
+            return value.strip()
+        return value
+    
+class PayrollPeriodEmployeeFineListSerializer(serializers.ModelSerializer):
+    is_excluded_for_run = serializers.SerializerMethodField()
+    exclusion_id = serializers.SerializerMethodField()
+    exclusion_remarks = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PayrollPeriodEmployeeFine
+        fields = [
+            "id",
+            "name",
+            "amount",
+            "remarks",
+            "created_at",
+            "is_excluded_for_run",
+            "exclusion_id",
+            "exclusion_remarks",
+        ]
+
+    def _get_exclusion(self, obj):
+        fine_exclusion_map = self.context.get("fine_exclusion_map", {})
+        return fine_exclusion_map.get(obj.id)
+
+    def get_is_excluded_for_run(self, obj):
+        return obj.id in self.context.get("fine_exclusion_map", {})
+
+    def get_exclusion_id(self, obj):
+        ex = self._get_exclusion(obj)
+        return ex.id if ex else None
+
+    def get_exclusion_remarks(self, obj):
+        ex = self._get_exclusion(obj)
+        return ex.remarks if ex else None
+#============================
 # Aggregated snapshot shown in Verify Employee modal before payroll generation
 class PayrollVerifySnapshotSerializer(serializers.Serializer):
     # Aggregated snapshot shown in Verify Employee modal
@@ -442,7 +525,7 @@ class PayrollVerifySnapshotSerializer(serializers.Serializer):
     salary = EmployeeSalaryMiniSerializer(allow_null=True)
 
     taxes = EmployeeDeductionMiniSerializer(many=True)   # SSS/PAGIBIG/PHILHEALTH...
-    loans = EmployeeDeductionMiniSerializer(many=True)   # loan deductions only
+    loans = LoanMiniSerializer(many=True)                # new Loan model preview
 
     # regular/master allowances
     allowances = EmployeeAllowanceMiniSerializer(many=True)
@@ -452,7 +535,8 @@ class PayrollVerifySnapshotSerializer(serializers.Serializer):
 
     attendances = AttendanceMiniSerializer(many=True)
     leave_days = LeaveDayMiniSerializer(many=True)
-    commissions = PayrollPeriodEmployeeCommissionListSerializer(many=True)   
+    commissions = PayrollPeriodEmployeeCommissionListSerializer(many=True)
+    fines = PayrollPeriodEmployeeFineListSerializer(many=True)
 
 #NOTE: This is for additional allowance in a particular payroll period
 class PayrollPeriodEmployeeAllowanceCreateSerializer(serializers.ModelSerializer):

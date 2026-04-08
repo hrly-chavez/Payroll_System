@@ -2,8 +2,9 @@
   "use client";
 
   import React, { useEffect, useMemo, useState } from "react";
-  import { message, Spin, Tag, Empty } from "antd";
   import api from "../../../../api/axios";
+  import { message, Spin, Tag, Empty, Modal } from "antd";
+  import styles from "./RequestLoanLogs.module.css";
 
   import dayjs from "dayjs";
 
@@ -53,6 +54,10 @@
   export default function RequestLoanLogs({ refreshKey = 0 }: Props) {
     const [loading, setLoading] = useState(false);
     const [rows, setRows] = useState<LoanRequestRow[]>([]);
+
+    //Modal
+    const [selectedLoan, setSelectedLoan] = useState<LoanRequestRow | null>(null);
+    const [open, setOpen] = useState(false);
 
     const fetchLoans = async () => {
       setLoading(true);
@@ -136,6 +141,16 @@
       }
     };
 
+    const handleOpen = (row: LoanRequestRow) => {
+      setSelectedLoan(row);
+      setOpen(true);
+    };
+
+    const handleClose = () => {
+      setOpen(false);
+      setSelectedLoan(null);
+    };
+
     const content = useMemo(() => {
       if (loading) return <Spin />;
 
@@ -144,92 +159,157 @@
       }
 
       return (
-        <div style={{ display: "grid", gap: 12 }}>
-          {rows.map((row) => (
-            <div
-              key={row.id}
-              style={{
-                border: "1px solid #f0f0f0",
-                borderRadius: 10,
-                padding: 16,
-                background: "#fff",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  alignItems: "flex-start",
-                  flexWrap: "wrap",
-                  marginBottom: 10,
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 16 }}>{row.name}</div>
-                  <div style={{ color: "#666", fontSize: 13 }}>
-                    Rule: {row.rule_name || (row.status === "Pending" ? "Will be assigned upon approval" : "Not assigned")}
-                  </div>
+      <div className={styles.container}>
+        {rows.map((row) => (
+          <div
+            key={row.id}
+            className={styles.card} // ✅ CSS instead of inline
+            onClick={() => handleOpen(row)} // ✅ CLICK HANDLER ADDED
+          >
+            <div className={styles.header}>
+              <div>
+                <div className={styles.name}>{row.name}</div>
+                <div className={styles.rule}>
+                  Rule:{" "}
+                  {row.rule_name ||
+                    (row.status === "Pending"
+                      ? "Will be assigned upon approval"
+                      : "Not assigned")}
                 </div>
-
-                <div>{statusTag(row.status)}</div>
               </div>
 
-              <div style={{ display: "grid", gap: 6 }}>
-                <div>
-                  <strong>Principal Amount:</strong> {formatMoney(row.principal_amount)}
+              <div>{statusTag(row.status)}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }, [loading, rows]);
+
+  // =========================
+  // FINAL RETURN
+  // =========================
+  return (
+    <>
+      <div>{content}</div>
+
+      {/* ✅ MODAL ADDED */}
+      <Modal
+        open={open}
+        onCancel={handleClose}
+        footer={null}
+        title={null} // ✅ we will create custom header
+      >
+        {selectedLoan && (
+          <>
+            {/* ✅ CUSTOM HEADER */}
+            <div className={styles.modalHeader}>
+              <div className={styles.modalTitle}>{selectedLoan.name}</div>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              {statusTag(selectedLoan.status)}
+            </div>
+
+            <div className={styles.divider} />
+
+            {/* ✅ FINANCIAL INFO */}
+            <div className={styles.modalSection}>
+              <div className={styles.modalGrid}>
+                <div className={styles.label}>Principal</div>
+                <div className={`${styles.value} ${styles.money}`}>
+                  {formatMoney(selectedLoan.principal_amount)}
                 </div>
-                <div>
-                  <strong>Remaining Balance:</strong> {formatMoney(row.remaining_balance)}
+
+                <div className={styles.label}>Remaining</div>
+                <div className={`${styles.value} ${styles.money}`}>
+                  {formatMoney(selectedLoan.remaining_balance)}
                 </div>
-                <div>
-                  <strong>Deduction:</strong>{" "}
-                  {row.deduction_mode
-                    ? `${row.deduction_mode} - ${formatDeductionValue(row)}`
+
+                <div className={styles.label}>Deduction</div>
+                <div className={styles.value}>
+                  {selectedLoan.deduction_mode
+                    ? `${selectedLoan.deduction_mode} - ${formatDeductionValue(selectedLoan)}`
                     : "To be determined upon approval"}
                 </div>
-                <div>
-                  <strong>Apply To Cutoff:</strong> {formatCutoff(row.apply_to_cutoff)}
+              </div>
+            </div>
+
+            <div className={styles.divider} />
+
+            {/* ✅ SCHEDULE INFO */}
+            <div className={styles.modalSection}>
+              <div className={styles.modalGrid}>
+                <div className={styles.label}>Cutoff</div>
+                <div className={styles.value}>
+                  {formatCutoff(selectedLoan.apply_to_cutoff)}
                 </div>
-                <div>
-                  <strong>Effective From:</strong> {formatDateOnly(row.effective_from)}
+
+                <div className={styles.label}>Effective From</div>
+                <div className={styles.value}>
+                  {formatDateOnly(selectedLoan.effective_from)}
                 </div>
 
-                {row.effective_to && (
-                  <div>
-                    <strong>Effective To:</strong> {formatDateOnly(row.effective_to)}
-                  </div>
-                )}
-
-                {row.remarks && (
-                  <div>
-                    <strong>Remarks:</strong> {row.remarks}
-                  </div>
-                )}
-
-                {row.declined_reason && (
-                  <div style={{ color: "#cf1322" }}>
-                    <strong>Declined Reason:</strong> {row.declined_reason}
-                  </div>
-                )}
-
-                {row.created_at && (
-                  <div>
-                    <strong>Requested At:</strong> {formatDateTime(row.created_at)}
-                  </div>
-                )}
-
-                {row.approved_at && (
-                  <div>
-                    <strong>Reviewed At:</strong> {formatDateTime(row.approved_at)}
-                  </div>
+                {selectedLoan.effective_to && (
+                  <>
+                    <div className={styles.label}>Effective To</div>
+                    <div className={styles.value}>
+                      {formatDateOnly(selectedLoan.effective_to)}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
-          ))}
-        </div>
-      );
-    }, [loading, rows]);
 
-    return <div>{content}</div>;
-  }
+            {/* ✅ REASON */}
+            {selectedLoan.remarks !== null && selectedLoan.remarks !== undefined && (              
+              <>
+                <div className={styles.modalSection}>
+                <div className={styles.modalGrid}>
+                  <div className={styles.label}>Reason</div>
+                  <div className={styles.value}>
+                    {selectedLoan.remarks?.trim() || "No reason provided"}
+                  </div>
+                </div>
+              </div>
+              </>
+            )}
+
+            {/* ❌ DECLINED */}
+            {selectedLoan.declined_reason && (
+              <>
+                <div className={styles.divider} />
+                <div className={styles.danger}>
+                  Declined: {selectedLoan.declined_reason}
+                </div>
+              </>
+            )}
+
+            {/* 🕒 TIMESTAMPS */}
+            <div className={styles.divider} />
+            <div className={styles.modalSection}>
+              <div className={styles.modalGrid}>
+                {selectedLoan.created_at && (
+                  <>
+                    <div className={styles.label}>Requested</div>
+                    <div className={styles.value}>
+                      {formatDateTime(selectedLoan.created_at)}
+                    </div>
+                  </>
+                )}
+
+                {selectedLoan.approved_at && (
+                  <>
+                    <div className={styles.label}>Reviewed</div>
+                    <div className={styles.value}>
+                      {formatDateTime(selectedLoan.approved_at)}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </Modal>
+    </>
+  );
+}

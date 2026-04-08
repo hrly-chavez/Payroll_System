@@ -203,6 +203,10 @@ const AddShift = ({ open, onClose, refresh }: any) => {
           <Switch />
         </Form.Item>
 
+        <Form.Item name="crosses_midnight" label="Crosses midnight?" valuePropName="checked">
+          <Switch />
+        </Form.Item>
+
         <Divider style={{ margin: "12px 0" }} />
 
         <Form.Item

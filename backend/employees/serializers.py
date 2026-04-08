@@ -98,6 +98,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "email",
             "contact_no",
             "address",
+            "profile_picture",
         ]
 
     def get_name(self, obj):
@@ -183,13 +184,14 @@ class AddressSerializer(serializers.ModelSerializer):
 
 class EmployeeCreateSerializer(serializers.ModelSerializer):
     address = AddressSerializer()
+    profile_picture = serializers.ImageField(required=False)
 
     class Meta:
         model = Employee
         fields = [
             "id_no", "fname", "initial", "lname", "suffix", "status", "employment_status",
             "contact_no", "email", "hired_date", "position", "bank_info",
-            "shift", "department", "address",
+            "shift", "department", "address", "profile_picture",
         ]
 
     # -------------------------
@@ -264,6 +266,21 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({"zip_code": "Zip code must contain digits only."})
                 value[key] = sanitized
         return value
+    
+    def validate_profile_picture(self, value):
+        # If no file was uploaded, skip validation
+        if not value:
+            return value
+
+        # Check MIME type
+        if value.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
+            raise serializers.ValidationError("Only JPEG and PNG images are allowed.")
+
+        # Check file size (max 2MB)
+        if value.size > 2 * 1024 * 1024:
+            raise serializers.ValidationError("Image size should not exceed 2MB.")
+
+        return value
 
     # -------------------------
     # CREATE METHOD
@@ -287,13 +304,14 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
 class EmployeeUpdateSerializer(serializers.ModelSerializer):
     address = AddressSerializer(required=False)
     reason = serializers.CharField(write_only=True, required=True)
+    profile_picture = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
         model = Employee
         fields = [
             "fname", "initial", "lname", "suffix", "status", "employment_status", "contact_no",
             "email", "hired_date", "position", "bank_info", "shift",
-            "department", "address", "is_active", "reason",
+            "department", "address", "is_active", "reason", "profile_picture",
         ]
 
     # -------------------------

@@ -1,9 +1,11 @@
 //src/pages/HR/EmployeeDetailPage/Modals/EditEmployeeDetailsModal.tsx
 import React, { useEffect } from "react";
-import { Modal, Form, Input, DatePicker, Select, message, Row, Col } from "antd";
+import { Modal, Form, Input, DatePicker, Select, message, Row, Col, Upload } from "antd";
+import { UploadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import api from "api/axios";
 const { TextArea } = Input;
+
 
 type Props = {
   open: boolean;
@@ -59,25 +61,31 @@ const EditEmployeeDetailsModal: React.FC<Props> = ({
         return; // STOP UPDATE
       }
 
-      const payload = {
-        fname: values.fname,
-        lname: values.lname,
-        initial: values.initial || null,
-        suffix: values.suffix || null,
-        status: values.status,
-        contact_no: values.contact_no,
-        email: values.email,
-        hired_date: values.hired_date
-          ? values.hired_date.format("YYYY-MM-DD")
-          : null,
-        position: values.position,
-        bank_info: values.bank_info,
-        reason: values.reason,
-      };
+      const formData = new FormData();
+
+      Object.keys(values).forEach((key) => {
+        if (key === "profile_picture") {
+          if (values.profile_picture?.[0]?.originFileObj) {
+            formData.append("profile_picture", values.profile_picture[0].originFileObj);
+          }
+        } else if (key === "hired_date") {
+          formData.append(
+            "hired_date",
+            values.hired_date ? values.hired_date.format("YYYY-MM-DD") : ""
+          );
+        } else {
+          formData.append(key, values[key] ?? "");
+        }
+      });
 
       await api.put(
         `/employees/employees/${employee.id}/update/`,
-        payload
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
       );
 
       onSuccess();
@@ -92,6 +100,8 @@ const EditEmployeeDetailsModal: React.FC<Props> = ({
       );
     }
   };
+  // from .env
+  const BASE_URL = (process.env.REACT_APP_API_BASE_URL || "").replace("/api", "");
 
   return (
     <Modal
@@ -105,8 +115,29 @@ const EditEmployeeDetailsModal: React.FC<Props> = ({
       centered={false}     // Disable vertical centering
       style={{ top: 50 }}  // Push modal higher
     >
+
+      <img
+        src={`${BASE_URL}${employee.profile_picture}`}
+        alt="Profile"
+        style={{ width: 120, height: 120, objectFit: "cover", borderRadius: 8 }}
+      />
       <Form layout="vertical" form={form}>
         <Row gutter={16}>
+
+          <Col xs={24} md={12}>
+            <Form.Item label="Profile Picture" name="profile_picture" valuePropName="fileList" getValueFromEvent={(e) => e.fileList}>
+              <Upload
+                beforeUpload={() => false} // prevent auto upload
+                maxCount={1}
+                accept=".jpeg,.jpg,.png"
+                listType="picture"
+              >
+                <button type="button">
+                  <UploadOutlined /> Change Picture
+                </button>
+              </Upload>
+            </Form.Item>
+          </Col>
 
           <Col xs={24} md={12}>
             <Form.Item label="First Name" name="fname">

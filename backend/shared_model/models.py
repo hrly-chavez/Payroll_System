@@ -127,6 +127,12 @@ class Employee(models.Model):
         ("OJT", "OJT"),
     ]
 
+    profile_picture = models.ImageField(
+        upload_to="employees/",  # This will save files in MEDIA_ROOT/employees/
+        null=True,
+        blank=True
+    )
+
     id = models.AutoField(primary_key=True)
     id_no = models.CharField(max_length=50,unique=True,null=True,blank=True)
     fname = models.CharField(max_length=50)
@@ -833,7 +839,7 @@ class LoanRule(models.Model):
     name = models.CharField(max_length=100, unique=True)
 
     # scope pattern:
-    # employee set   => employee-specific
+    # employee set   => employee-specifi
     # department set => department-specific
     # both null      => applies to all
     department = models.ForeignKey(Department,on_delete=models.CASCADE,null=True,blank=True,related_name="loan_rules",)
@@ -1503,6 +1509,7 @@ class PayrollRunInputExclusion(models.Model):
         ("DEDUCTION", "Deduction"),
         ("COMMISSION", "Commission"),
         ("ALLOWANCE", "Allowance"),
+        ("FINE", "Fine"),
     ]
 
     id = models.AutoField(primary_key=True)
@@ -1572,8 +1579,49 @@ class PayrollPeriodEmployeeAllowance(models.Model):
 
     def __str__(self):
         return f"{self.employee} - {self.allowance_type} ({self.amount}) [{self.period.code}]"
+#Now used as Additional Deduction
+class PayrollPeriodEmployeeFine(models.Model):
+    id = models.AutoField(primary_key=True)
 
+    period = models.ForeignKey(
+        Payroll_Period,
+        on_delete=models.CASCADE,
+        related_name="employee_fines"
+    )
 
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name="payroll_fines"
+    )
+
+    name = models.CharField(max_length=100)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    remarks = models.TextField(null=True, blank=True)
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_payroll_fines"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def clean(self):
+        if self.amount <= 0:
+            raise ValidationError({"amount": "Amount must be greater than 0."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["period", "employee"]),
+        ]
+        
 #audit logs
 class AuditLog(models.Model):
     ACTION_CHOICES = [

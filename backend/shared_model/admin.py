@@ -188,6 +188,19 @@ class Employee_SalaryAdmin(admin.ModelAdmin):
     employee_fname.admin_order_field = 'employee__fname'
     employee_fname.short_description = 'Employee First Name'
 
+
+@admin.register(Employee_Deduction)
+class EmployeeDeductionAdmin(admin.ModelAdmin):
+    list_display = ("id","deduction_type","amount","frequency","status","effective_from","effective_to","created_at",)
+
+    list_filter = ("status","frequency","deduction_type","effective_from",)
+
+    search_fields = ("id","employee__first_name","employee__last_name","deduction_type__name",)
+
+    ordering = ("-created_at",)
+
+    readonly_fields = ("created_at",)
+
 @admin.register(Deduction_Type)
 class DeductionTypeAdmin(admin.ModelAdmin):
     list_display = ("id","code","calculation_type","amount","is_active","create_at",)
@@ -489,7 +502,7 @@ class CommissionTaxRuleAdmin(admin.ModelAdmin):
     list_filter = ("commission_type", "rate_type", "is_active", "effective_from", "applies_to")
     search_fields = ("name", "commission_type__name", "employee__fname", "employee__lname", "applies_to__name")
     ordering = ("-id",)
-
+admin.site.register(Loan)
 admin.site.register(LoanRule)
 admin.site.register(Employee)
 admin.site.register(Address)

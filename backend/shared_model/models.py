@@ -1590,29 +1590,13 @@ class PayrollPeriodEmployeeAllowance(models.Model):
 class PayrollPeriodEmployeeFine(models.Model):
     id = models.AutoField(primary_key=True)
 
-    period = models.ForeignKey(
-        Payroll_Period,
-        on_delete=models.CASCADE,
-        related_name="employee_fines"
-    )
-
-    employee = models.ForeignKey(
-        Employee,
-        on_delete=models.CASCADE,
-        related_name="payroll_fines"
-    )
-
+    period = models.ForeignKey(Payroll_Period,on_delete=models.CASCADE,related_name="employee_fines")
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="payroll_fines")
     name = models.CharField(max_length=100)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     remarks = models.TextField(null=True, blank=True)
 
-    created_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="created_payroll_fines"
-    )
+    created_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="created_payroll_fines")
 
     created_at = models.DateTimeField(auto_now_add=True)
 

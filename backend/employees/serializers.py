@@ -613,14 +613,21 @@ class AllowanceTypeSerializer(serializers.ModelSerializer):
 
 #this is the read or get for allowance
 class EmployeeAllowanceSerializer(serializers.ModelSerializer):
-    allowance_type = AllowanceTypeSerializer(read_only=True)  # nested
+    allowance_type = AllowanceTypeSerializer(read_only=True)  # for display
+
+    allowance_type_id = serializers.PrimaryKeyRelatedField(
+        queryset=Allowance_Type.objects.all(),
+        source='allowance_type',
+        write_only=True
+    )
 
     class Meta:
         model = Employee_Allowance
         fields = [
             "id",
             "employee",
-            "allowance_type",
+            "allowance_type",      # read
+            "allowance_type_id",   # write ✅
             "amount",
             "frequency",
             "effective_from",

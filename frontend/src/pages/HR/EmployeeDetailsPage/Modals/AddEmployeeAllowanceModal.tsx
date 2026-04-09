@@ -63,7 +63,7 @@ const AddEmployeeAllowanceModal: React.FC<Props> = ({
 
       const payload = {
         employee: employeeId,
-        allowance_type: values.allowance_type,
+        allowance_type_id: values.allowance_type,
         amount: values.amount,
         frequency: values.frequency,
         effective_from: values.effective_from.format("YYYY-MM-DD"),

@@ -1139,7 +1139,21 @@ class EmployeeAllowanceViewSet(viewsets.ModelViewSet):
         return queryset
     
     def perform_create(self, serializer):
-        serializer.save(_current_user=self.request.user)
+        allowance = serializer.save()
+
+        AuditLog.objects.create(
+            user=self.request.user,
+            action="CREATE",
+            model_name="Employee_Allowance",
+            object_id=str(allowance.id),
+            old_data={},
+            new_data={
+                "amount": float(allowance.amount),
+                "frequency": allowance.frequency,
+                "status": allowance.status,
+            },
+            reason="Created via system",
+        )
     
     @action(detail=True, methods=["POST"], url_path="edit_allowance")
     def edit_allowance(self, request, pk=None):

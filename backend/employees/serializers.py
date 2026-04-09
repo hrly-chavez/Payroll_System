@@ -630,18 +630,29 @@ class EmployeeAllowanceSerializer(serializers.ModelSerializer):
 
 #audit logs
 class UserActivityAuditLogSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(source="user.user_name", read_only=True)
+    username = serializers.SerializerMethodField()
     role = serializers.SerializerMethodField()
     timestamp = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S")
 
     class Meta:
         model = AuditLog
-        fields = ["id", "username", "role", "action", "model_name", "timestamp"]
+        fields = ["id", "username", "role", "action", "model_name", "timestamp", "reason"]
+
+    def get_username(self, obj):
+        if obj.user_id:
+            try:
+                return obj.user.user_name
+            except:
+                return "Deleted User"
+        return "Anonymous"
 
     def get_role(self, obj):
-        if obj.user:
-            return obj.user.role
-        return "Anonymous"
+        if obj.user_id:
+            try:
+                return obj.user.role
+            except:
+                return None
+        return None
 
 
 #------------ COMPANY NOTE SERIALIZER-----------

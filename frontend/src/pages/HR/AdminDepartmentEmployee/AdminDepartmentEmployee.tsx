@@ -175,7 +175,7 @@ const AdminDepartmentEmployee: React.FC = () => {
             onRow={(record) => ({
               onClick: () =>
                 navigate(
-                  `/admin/employee/employee-details/${record.id}`
+                  `/admin/department/employee/employee-details/${record.id}`
                 ),
               style: { cursor: "pointer" },
             })}

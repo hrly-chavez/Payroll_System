@@ -32,6 +32,7 @@ from django.shortcuts import redirect
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from decimal import Decimal
 from django.utils.dateparse import parse_date
+from rest_framework.pagination import PageNumberPagination
 
 import logging
 import secrets
@@ -734,7 +735,7 @@ class ForgotPasswordView(APIView):
             expires_at=timezone.now() + timedelta(minutes=5)
         )
 
-        reset_url = f"http://192.168.1.6:3000/reset-password/{token}/"
+        reset_url = f"http://192.168.68.68:3000/reset-password/{token}/"
 
         send_mail(
             subject="Payroll System Password Reset",
@@ -1294,24 +1295,31 @@ def employee_audit_logs(request, employee_id):
     return Response(serialized_logs)
 
 #audit logs (Reports)
+# Pagination class with 200 per page
+class AuditLogPagination(PageNumberPagination):
+    page_size = 200
+    page_size_query_param = "page_size"  # allow client to override page size if needed
+    max_page_size = 500  # optional max
+
 class UserActivityLogViewSet(viewsets.ViewSet):
-    """
-    Read-only ViewSet that returns all CREATE/UPDATE/DELETE audit logs
-    triggered from DRF API requests (not Django admin).
-    """
+
     def list(self, request):
-        #delete logs after a day
-        one_day_ago = timezone.now() - timedelta(days=1)
-        AuditLog.objects.filter(timestamp__lt=one_day_ago).delete()
-        
-        # Only include logs where user is NOT None and NOT a superuser
-        logs = AuditLog.objects.exclude(
-            user__isnull=True
-        ).order_by("-timestamp")
+        # Delete logs older than 3 days (run on each access)
+        three_days_ago = timezone.now() - timedelta(days=3)
+        AuditLog.objects.filter(timestamp__lt=three_days_ago).delete()
 
+        # Query logs from the last 3 days
+        logs = AuditLog.objects.select_related("user").only(
+            "id", "action", "model_name", "timestamp", "user__user_name", "user__role"
+        ).filter(timestamp__gte=three_days_ago).order_by("-timestamp")
 
-        serializer = UserActivityAuditLogSerializer(logs, many=True)
-        return Response(serializer.data)
+        # Paginate
+        paginator = AuditLogPagination()
+        page = paginator.paginate_queryset(logs, request)
+
+        # Serialize and return
+        serializer = UserActivityAuditLogSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 #done logs
 #COMPANY NOTE

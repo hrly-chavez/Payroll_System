@@ -87,7 +87,22 @@ def log_save(sender, instance, created, **kwargs):
     if sender == AuditLog:
         return
     
-    if sender in [AuditLog, Notification, Province, City, Barangay, Holiday]:
+    EXCLUDED_MODELS = [
+        "AuditLog",
+        "Notification",
+        "Province",
+        "City",
+        "Barangay",
+        "Holiday",
+        # Django internal
+        "Session",
+        "LogEntry",
+        # JWT
+        "BlacklistedToken",
+        "OutstandingToken",
+    ]
+
+    if sender.__name__ in EXCLUDED_MODELS:
         return
 
     # Skip if manually set
@@ -131,7 +146,22 @@ def log_delete(sender, instance, **kwargs):
     if sender == AuditLog:
         return
     
-    if sender in [AuditLog, Notification, Province, City, Barangay, Holiday]:
+    EXCLUDED_MODELS = [
+        "AuditLog",
+        "Notification",
+        "Province",
+        "City",
+        "Barangay",
+        "Holiday",
+        # Django internal
+        "Session",
+        "LogEntry",
+        # JWT
+        "BlacklistedToken",
+        "OutstandingToken",
+    ]
+
+    if sender.__name__ in EXCLUDED_MODELS:
         return
 
     # Skip if manually set

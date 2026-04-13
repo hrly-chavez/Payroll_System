@@ -84,6 +84,7 @@ class OffsetCreditAdmin(admin.ModelAdmin):
     )
     readonly_fields = ("created_at", "approved_at", "consumed_at", "expired_at")
     date_hierarchy = "target_date"
+
 @admin.register(Payslip)
 class PayslipAdmin(admin.ModelAdmin):
     list_display = (
@@ -178,17 +179,26 @@ class HolidayAdmin(admin.ModelAdmin):
 
 @admin.register(Employee_Salary)
 class Employee_SalaryAdmin(admin.ModelAdmin):
-    list_display = ('pay_type', 'employee_fname')
+    list_display = (
+        'employee_name',
+        'pay_type',
+        'base_rate',
+        'wage_type',
+        'effective_from',
+    )
 
-    # This method fetches the first name from the related Employee
-    def employee_fname(self, obj):
-        return obj.employee.fname
+    search_fields = (
+        'employee__fname',
+        'employee__lname',
+        'employee__email',
+    )
 
-    # Optional: allow sorting by employee's first name
-    employee_fname.admin_order_field = 'employee__fname'
-    employee_fname.short_description = 'Employee First Name'
+    def employee_name(self, obj):
+        return f"{obj.employee.fname} {obj.employee.lname}"
 
-
+    employee_name.admin_order_field = 'employee__fname'
+    employee_name.short_description = 'Employee'
+    
 @admin.register(Employee_Deduction)
 class EmployeeDeductionAdmin(admin.ModelAdmin):
     list_display = ("id","deduction_type","amount","frequency","status","effective_from","effective_to","created_at",)
@@ -502,9 +512,31 @@ class CommissionTaxRuleAdmin(admin.ModelAdmin):
     list_filter = ("commission_type", "rate_type", "is_active", "effective_from", "applies_to")
     search_fields = ("name", "commission_type__name", "employee__fname", "employee__lname", "applies_to__name")
     ordering = ("-id",)
+
+@admin.register(Employee)
+class EmployeeAdmin(admin.ModelAdmin):
+    list_display = ( "fname", "lname", "email", "position", "department", "is_active")
+    
+    search_fields = (
+        "id_no",
+        "fname",
+        "lname",
+        "email",
+        "position",
+    )
+
+    list_filter = (
+        "department",
+        "position",
+        "is_active",
+        "employment_status",
+    )
+
+    ordering = ("lname", "fname")
+
 admin.site.register(Loan)
 admin.site.register(LoanRule)
-admin.site.register(Employee)
+
 admin.site.register(Address)
 admin.site.register(Payroll_Period)
 admin.site.register(AuditLog)

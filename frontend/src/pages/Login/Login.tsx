@@ -198,25 +198,14 @@ export default function Login() {
                 }}
               />
             </Form.Item>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "10px",
-              }}
-            >
-              <Form.Item
-                name="remember"
-                valuePropName="checked"
-                style={{ marginBottom: 0 }}
-              >
-                <Checkbox>Remember Me</Checkbox>
+            <div className={styles.rememberRow}>
+              <Form.Item name="remember" valuePropName="checked" noStyle>
+                <Checkbox>Remember me</Checkbox>
               </Form.Item>
 
               <Button
                 type="link"
-                style={{ padding: 0 }}
+                className={styles.forgotBtn}
                 onClick={() => setForgotPasswordOpen(true)}
               >
                 Forgot Password?

@@ -411,6 +411,7 @@ def _resolve_attendance_for_punch_out(employee, shift):
         return Attendance.objects.filter(employee=employee, date=yesterday).first()
 
     return None
+
 def _get_active_offset_credit(employee, work_date: date):
     """
     Returns the earliest active offset credit for the employee on the target work date.
@@ -539,6 +540,7 @@ def punch_in(user):
         Attendance_Event.objects.filter(attendance=attendance, type="Late").delete()
 
     return attendance
+
 @transaction.atomic
 def punch_out(user):
     employee = _get_employee_or_400(user)

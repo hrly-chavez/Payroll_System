@@ -51,9 +51,13 @@ urlpatterns = [
     # Additional Allowances (Payroll-period specific)
     path("periods/<int:period_id>/employees/<int:employee_id>/allowances/",PayrollPeriodEmployeeAllowanceListCreateView.as_view(),name="payroll-period-employee-allowances"),
     path("periods/<int:period_id>/employees/<int:employee_id>/allowances/<int:allowance_id>/delete/",PayrollPeriodEmployeeAllowanceDeleteView.as_view(),name="payroll-period-employee-allowance-delete"),
-
+    #Fines (Now used as add deduction)
     path("payroll-period/<int:period_id>/employee/<int:employee_id>/fines/",PayrollPeriodEmployeeFineListCreateView.as_view(),name="payroll-period-employee-fines",),
     path("payroll-period/<int:period_id>/employee/<int:employee_id>/fines/<int:fine_id>/",PayrollPeriodEmployeeFineDeleteView.as_view(),name="payroll-period-employee-fine-delete",),
+
+    # Additional Earnings (Payroll-period specific)
+    path("payroll-period/<int:period_id>/employee/<int:employee_id>/additional-earnings/",PayrollPeriodEmployeeAdditionalEarningListCreateView.as_view(),name="payroll-period-employee-additional-earnings",),
+    path("payroll-period/<int:period_id>/employee/<int:employee_id>/additional-earnings/<int:earning_id>/",PayrollPeriodEmployeeAdditionalEarningDeleteView.as_view(),name="payroll-period-employee-additional-earning-delete",),
 
     # Payroll Generation
     path("periods/<int:period_id>/generate/", GeneratePayrollForPeriodView.as_view(), name="payroll-generate-period"),

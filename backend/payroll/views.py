@@ -508,7 +508,7 @@ class DepartmentListView(APIView):
 
         return Response(data, status=200)
 #=========================VERIFY EMPLOYEE==========================
-
+#Verify Snapshot
 # Returns salary, shift, taxes, loans, and allowances for employee verification preview
 class PayrollVerifyEmployeeSnapshotView(APIView):
     permission_classes = [IsAuthenticated]
@@ -549,12 +549,7 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
             if _overlaps_period(d.effective_from, d.effective_to, period.start_date, period.end_date)
         ]
 
-        # Taxes stay in Employee_Deduction
-        taxes = [
-            d for d in in_period_deductions
-            if d.deduction_type
-            and d.deduction_type.category == "TAX"
-        ]
+        
 
         # Loans now come from the new Loan model
         loans_qs = (
@@ -645,6 +640,17 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
         fine_exclusion_map = {
             row.source_id: row for row in fine_exclusion_rows
         }
+        earning_exclusion_rows = PayrollRunInputExclusion.objects.filter(
+            period=period,
+            employee=employee,
+            target_run_no=target_run_no,
+            source_type="ADDITIONAL_EARNING",
+            is_excluded=True,
+        )
+
+        earning_exclusion_map = {
+            row.source_id: row for row in earning_exclusion_rows
+        }
         attendances = (
             Attendance.objects
             .filter(
@@ -675,6 +681,11 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
             .order_by("-created_at")
         )
 
+        additional_earnings = (
+            PayrollPeriodEmployeeAdditionalEarning.objects
+            .filter(period=period, employee=employee)
+            .order_by("-created_at")
+        )
         payload = {
             "period_id": period.id,
             "employee_id": employee.id,
@@ -692,6 +703,7 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
             "leave_days": leave_days,
             "commissions": commissions,
             "fines": fines,
+            "additional_earnings": additional_earnings,
         }
         serializer = PayrollVerifySnapshotSerializer(
             payload,
@@ -700,6 +712,7 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
                 "allowance_exclusion_map": allowance_exclusion_map,
                 "commission_exclusion_map": commission_exclusion_map,
                 "fine_exclusion_map": fine_exclusion_map,
+                "earning_exclusion_map": earning_exclusion_map,
             }
         )
 
@@ -762,7 +775,7 @@ class PayrollRunExcludeInputView(APIView):
             },
             status=http_status.HTTP_201_CREATED if created else http_status.HTTP_200_OK,
         )
-
+ 
 class PayrollRunIncludeInputView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1210,6 +1223,129 @@ class PayrollPeriodEmployeeFineDeleteView(APIView):
 
         return Response(
             {"detail": "Fine deleted successfully."},
+            status=http_status.HTTP_200_OK,
+        )
+
+#===========================ADDITIONAL EARNING========================
+class PayrollPeriodEmployeeAdditionalEarningListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _guard_locked(self, period, employee):
+        if Payroll.objects.filter(payroll_period=period, employee=employee).exclude(status="Void").exists():
+            return Response(
+                {"detail": "Payroll already generated. Additional earnings are locked for this employee in this period."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        ppe = get_object_or_404(PayrollPeriodEmployee, period=period, employee=employee)
+
+        if ppe.status != "Pending":
+            return Response(
+                {"detail": f"Cannot modify additional earnings when status is {ppe.status}. Only allowed while Pending."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        return None
+
+    def get(self, request, period_id, employee_id):
+        period = get_object_or_404(Payroll_Period, id=period_id)
+        employee = get_object_or_404(Employee, id=employee_id)
+
+        qs = (
+            PayrollPeriodEmployeeAdditionalEarning.objects
+            .filter(period=period, employee=employee)
+            .order_by("-created_at")
+        )
+
+        target_run_no = get_next_payroll_run_no(period.id, employee.id)
+
+        earning_exclusion_rows = PayrollRunInputExclusion.objects.filter(
+            period=period,
+            employee=employee,
+            target_run_no=target_run_no,
+            source_type="ADDITIONAL_EARNING",
+            is_excluded=True,
+        )
+
+        earning_exclusion_map = {row.source_id: row for row in earning_exclusion_rows}
+
+        serializer = PayrollPeriodEmployeeAdditionalEarningListSerializer(
+            qs,
+            many=True,
+            context={
+                "earning_exclusion_map": earning_exclusion_map
+            }
+        )
+
+        return Response(serializer.data, status=http_status.HTTP_200_OK)
+
+    @transaction.atomic
+    def post(self, request, period_id, employee_id):
+        period = get_object_or_404(Payroll_Period, id=period_id)
+        employee = get_object_or_404(Employee, id=employee_id)
+
+        locked = self._guard_locked(period, employee)
+        if locked:
+            return locked
+
+        serializer = PayrollPeriodEmployeeAdditionalEarningCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        obj = PayrollPeriodEmployeeAdditionalEarning.objects.create(
+            period=period,
+            employee=employee,
+            name=serializer.validated_data["name"],
+            amount=serializer.validated_data["amount"],
+            remarks=serializer.validated_data.get("remarks"),
+            created_by=request.user,
+        )
+
+        return Response(
+            {
+                "detail": "Additional earning added successfully.",
+                "earning": PayrollPeriodEmployeeAdditionalEarningListSerializer(obj).data,
+            },
+            status=http_status.HTTP_201_CREATED,
+        )
+    
+
+class PayrollPeriodEmployeeAdditionalEarningDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def delete(self, request, period_id, employee_id, earning_id):
+        period = get_object_or_404(Payroll_Period, id=period_id)
+        employee = get_object_or_404(Employee, id=employee_id)
+
+        ppe = get_object_or_404(
+            PayrollPeriodEmployee.objects.select_for_update(),
+            period=period,
+            employee=employee,
+        )
+
+        if Payroll.objects.filter(payroll_period=period, employee=employee).exclude(status="Void").exists():
+            return Response(
+                {"detail": "Payroll already generated. Additional earnings are locked."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        if ppe.status != "Pending":
+            return Response(
+                {"detail": f"Cannot delete additional earnings when status is {ppe.status}."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        obj = get_object_or_404(
+            PayrollPeriodEmployeeAdditionalEarning,
+            id=earning_id,
+            period=period,
+            employee=employee,
+        )
+
+        obj.delete()
+
+        return Response(
+            {"detail": "Additional earning deleted successfully."},
             status=http_status.HTTP_200_OK,
         )
 

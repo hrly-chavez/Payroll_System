@@ -9,6 +9,7 @@ import AdditionalAllowanceModal from "./AdditionalAllowanceModal";
 import { formatBackendTime } from "../../../helpers";
 import dayjs from "dayjs";
 import AddDeductionModal from "./AddDeductionModal";
+import AddEarnings from "./AddEarnings";
 
 const { Text } = Typography;
 
@@ -119,7 +120,20 @@ type AdditionalAllowance = {
   exclusion_id?: number | null;
   exclusion_remarks?: string | null;
 };
+
 type Fine = {
+  id: number;
+  name: string;
+  amount: string;
+  remarks?: string | null;
+  created_at: string;
+
+  is_excluded_for_run?: boolean;
+  exclusion_id?: number | null;
+  exclusion_remarks?: string | null;
+};
+
+type AdditionalEarning = {
   id: number;
   name: string;
   amount: string;
@@ -209,6 +223,7 @@ type Snapshot = {
   leave_days: LeaveDayRow[];
   commissions: Commission[];
   fines: Fine[];
+  additional_earnings: AdditionalEarning[];
   warnings?: string[];
 };
 
@@ -241,9 +256,10 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [openCommissionModal, setOpenCommissionModal] = useState(false);
 
-  // additional allowances
+  // additional allowances, fine, earning
   const [openAdditionalAllowanceModal, setOpenAdditionalAllowanceModal] = useState(false);
   const [openFineModal, setOpenFineModal] = useState(false);
+  const [showAddEarning, setShowAddEarning] = useState(false);
 
   const canVerify = status === "Pending";
   const canAddCommission = status === "Pending";
@@ -464,6 +480,52 @@ const handleIncludeFine = async (row: Fine) => {
     message.error(msg);
   }
 };
+
+const handleExcludeEarning = async (row: AdditionalEarning) => {
+    if (!employee || !period) return;
+
+    try {
+      await api.post(
+        `/payroll/periods/${period.id}/employees/${employee.id}/exclude-input/`,
+        {
+          source_type: "ADDITIONAL_EARNING",
+          source_id: row.id,
+        }
+      );
+
+      message.success("Earning excluded for this payroll run.");
+      loadSnapshot();
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to exclude earning";
+      message.error(msg);
+    }
+  };
+
+  const handleIncludeEarning = async (row: AdditionalEarning) => {
+    if (!employee || !period) return;
+
+    try {
+      await api.post(
+        `/payroll/periods/${period.id}/employees/${employee.id}/include-input/`,
+        {
+          source_type: "ADDITIONAL_EARNING",
+          source_id: row.id,
+        }
+      );
+
+      message.success("Earning restored for this payroll run.");
+      loadSnapshot();
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to restore earning";
+      message.error(msg);
+    }
+  };
 
   const handleIncludeCommission = async (row: Commission) => {
     if (!employee || !period) return;
@@ -749,6 +811,60 @@ const handleIncludeFine = async (row: Fine) => {
   },
 ];
 
+  const additionalEarningColumns = [
+    {
+      title: "Name",
+      dataIndex: "name",
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Amount",
+      dataIndex: "amount",
+      render: (v: string) => v || "0.00",
+    },
+    {
+      title: "Remarks",
+      dataIndex: "remarks",
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Status",
+      render: (_: any, row: AdditionalEarning) =>
+        row.is_excluded_for_run ? (
+          <Tag color="red">Excluded</Tag>
+        ) : (
+          <Tag color="green">Included</Tag>
+        ),
+    },
+    {
+      title: "Action",
+      render: (_: any, row: AdditionalEarning) => {
+        if (row.is_excluded_for_run) {
+          return (
+            <Button
+              size="small"
+              onClick={() => handleIncludeEarning(row)}
+              disabled={status !== "Pending"}
+            >
+              Restore
+            </Button>
+          );
+        }
+
+        return (
+          <Button
+            danger
+            size="small"
+            onClick={() => handleExcludeEarning(row)}
+            disabled={status !== "Pending"}
+          >
+            X
+          </Button>
+        );
+      },
+    },
+  ];
+
   const attendanceColumns = [
     { title: "Date", dataIndex: "date", render: (v: string) => v || "-" },
     { title: "Status", dataIndex: "status", render: (v: string) => v || "-" },
@@ -863,10 +979,12 @@ const handleIncludeFine = async (row: Fine) => {
 
                   <Button
                     block
-                    onClick={() => setOpenFineModal(true)}
-                    disabled={status !== "Pending" || !period}>
-                    Add Deduction
+                    onClick={() => setShowAddEarning(true)}
+                    disabled={status !== "Pending" || !period}
+                  >
+                    Add Additional Earning
                   </Button>
+              
 
                   <Button
                     type="primary"
@@ -1001,6 +1119,20 @@ const handleIncludeFine = async (row: Fine) => {
                   />
                 </div>
               </Card>
+              
+              {/* EARNING */}
+              <Card title="Additional Earnings" style={sectionCardStyle} bodyStyle={{ padding: 14 }}>
+                <div style={tableBoxStyle}>
+                  <Table
+                    columns={additionalEarningColumns}
+                    dataSource={snapshot?.additional_earnings || []}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    locale={{ emptyText: "No additional earnings added" }}
+                  />
+                </div>
+              </Card>
 
               {/* Allowances */}
               <Card title="Allowances" style={sectionCardStyle} bodyStyle={{ padding: 14 }}>
@@ -1094,6 +1226,17 @@ const handleIncludeFine = async (row: Fine) => {
                   onSuccess={loadSnapshot}
                 />
               )}
+
+              {period && employee && (
+                <AddEarnings
+                  open={showAddEarning}
+                  onClose={() => setShowAddEarning(false)}
+                  periodId={period.id}
+                  employeeId={employee.id}
+                  onSuccess={loadSnapshot}
+                />
+              )}
+
               <AdditionalAllowanceModal
                   open={openAdditionalAllowanceModal}
                   period={period}

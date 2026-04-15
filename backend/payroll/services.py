@@ -739,15 +739,15 @@ class PayrollGenerationService:
         # block if payroll already exists
         if (Payroll.objects.filter(payroll_period_id=ppe.period_id, employee_id=ppe.employee_id).exclude(status="Void").exists()):
             raise ValidationError({"detail": "Payroll already exists for this employee in this period."})
-
+        #NOTE: COMMENTED CAUSE MAYBE WILL BE NEEDED FOR FUTURE
         # block if no attendance within the period
-        has_attendance = Attendance.objects.filter(
-            employee_id=ppe.employee_id,
-            date__gte=period.start_date,
-            date__lte=period.end_date,
-        ).exists()
-        if not has_attendance:
-            raise ValidationError({"detail": "Employee has no attendance within this payroll period."})
+        # has_attendance = Attendance.objects.filter(
+        #     employee_id=ppe.employee_id,
+        #     date__gte=period.start_date,
+        #     date__lte=period.end_date,
+        # ).exists()
+        # if not has_attendance:
+        #     raise ValidationError({"detail": "Employee has no attendance within this payroll period."})
 
 
     # -------------------------
@@ -841,6 +841,11 @@ class PayrollGenerationService:
         )
         
         self._apply_fines(payroll, ctx["fines"])
+
+        self._apply_additional_earnings(
+            payroll=payroll,
+            additional_earnings=ctx["additional_earnings"],
+        )
 
         # New loan stage (new Loan model is now the source of truth)
         self._apply_loans(
@@ -992,6 +997,18 @@ class PayrollGenerationService:
             period,
             fine_exclusion_map=fine_exclusion_map,
         )
+        earning_exclusion_map = self._get_run_input_exclusion_map(
+            employee=employee,
+            period=period,
+            target_run_no=target_run_no,
+            source_type="ADDITIONAL_EARNING",
+        )
+
+        additional_earnings = self._get_additional_earnings(
+            employee,
+            period,
+            earning_exclusion_map=earning_exclusion_map,
+        )
 
         commission_tax_rules = self._get_commission_tax_rules(employee, department, period)
 
@@ -1029,7 +1046,9 @@ class PayrollGenerationService:
             "loans": loans,
             "commissions": commissions,
             "fines": fines,
+            "additional_earnings": additional_earnings,
             "fine_exclusion_map": fine_exclusion_map,
+            "earning_exclusion_map": earning_exclusion_map,
             "commission_tax_rules": commission_tax_rules,
             "rule_map": rule_map,
             "warnings": warnings,
@@ -1444,6 +1463,17 @@ class PayrollGenerationService:
         )
 
         return [row for row in rows if row.id not in fine_exclusion_map]
+
+    def _get_additional_earnings(self, employee, period, earning_exclusion_map=None):
+        earning_exclusion_map = earning_exclusion_map or {}
+
+        rows = list(
+            PayrollPeriodEmployeeAdditionalEarning.objects
+            .filter(period=period, employee=employee)
+            .order_by("created_at", "id")
+        )
+
+        return [row for row in rows if row.id not in earning_exclusion_map]
 
     def _get_pay_rules(self, employee: Employee, department, period: Payroll_Period):
         """
@@ -2451,6 +2481,9 @@ class PayrollGenerationService:
 
             desc = f"Fine: {f.name}" if f.name else "Fine"
 
+            if f.remarks:
+                desc += f" - {f.remarks}"
+
             self._create_line(
                 payroll,
                 "DEDUCTION",
@@ -2458,6 +2491,36 @@ class PayrollGenerationService:
                 amt,
                 source_type="FINE",
                 source_id=f.id,
+            )
+
+    def _apply_additional_earnings(self, payroll: Payroll, additional_earnings):
+        """
+        Apply manual additional earnings as EARNING lines.
+
+        Behavior:
+        - Direct earning
+        - No tax logic (unless you add later)
+        - Fully auditable per entry
+        """
+        additional_earnings = additional_earnings or []
+
+        for e in additional_earnings:
+            amt = _d2(e.amount)
+            if amt <= 0:
+                continue
+
+            desc = f"Additional Earning: {e.name}" if e.name else "Additional Earning"
+
+            if e.remarks:
+                desc += f" - {e.remarks}"
+
+            self._create_line(
+                payroll,
+                "EARNING",
+                desc,
+                amt,
+                source_type="ADDITIONAL_EARNING",
+                source_id=e.id,
             )
 
     def _apply_deductions(self, payroll: Payroll, deductions, period: Payroll_Period):

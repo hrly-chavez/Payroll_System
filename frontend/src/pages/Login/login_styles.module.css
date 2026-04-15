@@ -70,6 +70,31 @@
   opacity: 0.9;
 }
 
+/* ROW CONTAINER */
+.rememberRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+
+/* keep your gray style */
+.rememberRow :global(.ant-checkbox + span) {
+  color: #999;
+}
+
+/* hover */
+.rememberRow :global(.ant-checkbox-wrapper:hover .ant-checkbox + span) {
+  color: #666;
+}
+
+/* forgot button alignment fix */
+.forgotBtn {
+  padding: 0 !important;
+  height: auto;
+  line-height: 1;
+}
+
 /* RESPONSIVE */
 @media (max-width: 768px) {
   .card {

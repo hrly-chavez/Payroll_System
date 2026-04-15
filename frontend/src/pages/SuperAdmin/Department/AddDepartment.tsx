@@ -1,126 +1,179 @@
 import React, { useEffect, useState } from "react";
-import { Modal, Form, Input, Select, Button, message } from "antd";
-import styles from "./Add_department.module.css";
+import { Layout, Table, Input, Button, message, Tooltip, Switch, Tag } from "antd";
+import type { TableProps } from "antd";
+import { PlusOutlined, SearchOutlined, EditOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
+import Sidebar from "../../../components/Sidebar/Sidebar";
+import Topbar from "../../../components/Topbar/Topbar";
+import AddDepartment, { DepartmentType } from "./AddDepartment";
+import styles from "../../HR/Department/Department.module.css";
 import api from "../../../api/axios";
 
-interface Props {
-  open: boolean;
-  onClose: () => void;
-}
-
-const HOLIDAY_OPTIONS = [
-  { label: "Philippines", value: "PH" },
-  { label: "United States", value: "US" },
-  { label: "Company", value: "COMPANY" },
-];
-
-const AddDepartment: React.FC<Props> = ({ open, onClose }) => {
-  const [form] = Form.useForm();
-  const [shifts, setShifts] = useState<any[]>([]);
+const Department: React.FC = () => {
+  const navigate = useNavigate();
+  const [departments, setDepartments] = useState<DepartmentType[]>([]);
   const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [editingDept, setEditingDept] = useState<DepartmentType | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
-
-    form.resetFields();
-
-    const fetchShifts = async () => {
-      try {
-        const res = await api.get("/employees/shifts/");
-        setShifts(res.data);
-      } catch (err) {
-        console.error(err);
-        message.error("Failed to load shifts");
-      }
-    };
-
-    fetchShifts();
-  }, [open, form]);
-
-  const onFinish = async (values: any) => {
+  const fetchDepartments = async () => {
     setLoading(true);
-    const sanitizedName = values.name.trim();
-
     try {
-      await api.post("/employees/departments/", {
-        name: sanitizedName,
-        shift_id: values.shift,
-        holiday_base: values.holiday_base,
-      });
-
-      message.success("Department created successfully");
-      onClose();
-    } catch (error: any) {
-      console.error(error);
-      message.error(error.response?.data?.message || "Error creating department");
+      const res = await api.get("/employees/departments/");
+      setDepartments(res.data);
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to load departments");
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <Modal
-      title="Add Department & Shift"
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      centered
-      className={styles.modal}
-      destroyOnHidden
-    >
-      <Form form={form} layout="vertical" className={styles.form} onFinish={onFinish}>
-        <Form.Item
-          label="Name"
-          name="name"
-          rules={[
-            { required: true, message: "Please enter a department name" },
-            { max: 50, message: "Department name cannot exceed 50 characters" },
-            {
-              pattern: /^[A-Za-z0-9\s]+$/,
-              message: "Name can only contain letters, numbers, and spaces",
-            },
-          ]}
-        >
-          <Input placeholder="Name" />
-        </Form.Item>
+  useEffect(() => {
+    fetchDepartments();
+  }, []);
 
-        <Form.Item
-          label="Work Shift"
-          name="shift"
-          rules={[{ required: true, message: "Please select a shift" }]}
-        >
-          <Select placeholder="Choose" loading={shifts.length === 0}>
-            {shifts.map((shift) => (
-              <Select.Option key={shift.id} value={shift.id}>
-                {shift.start_time} - {shift.end_time}
-              </Select.Option>
-            ))}
-          </Select>
-        </Form.Item>
+  const filteredDepartments = departments.filter((dept) =>
+    dept.name.toLowerCase().includes(search.toLowerCase())
+  );
 
-        <Form.Item
-          label="Holiday Base"
-          name="holiday_base"
-          rules={[{ required: true, message: "Please select a holiday base" }]}
-        >
-          <Select mode="multiple" placeholder="Choose">
-            {HOLIDAY_OPTIONS.map((option) => (
-              <Select.Option key={option.value} value={option.value}>
-                {option.label}
-              </Select.Option>
-            ))}
-          </Select>
-        </Form.Item>
+  const handleToggleActive = async (dept: DepartmentType) => {
+    try {
+      await api.patch(`/employees/departments/${dept.id}/`, {
+        is_active: !dept.is_active,
+      });
+      message.success(`${dept.name} is now ${!dept.is_active ? "active" : "inactive"}`);
+      fetchDepartments();
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to update status");
+    }
+  };
 
-        <div className={styles.actions}>
-          <Button type="primary" htmlType="submit" className={styles.saveBtn} loading={loading}>
-            Save
-          </Button>
-          <Button onClick={onClose}>Cancel</Button>
+  const columns: TableProps<DepartmentType>["columns"] = [
+    { title: "ID", dataIndex: "id", key: "id", width: 80 },
+    {
+      title: "Department",
+      dataIndex: "name",
+      key: "name",
+      sorter: (a, b) => a.name.localeCompare(b.name), // alphabetical sort
+      sortDirections: ["ascend", "descend"],
+      render: (text) => (
+        <span className={styles.rowLink}>{text}</span>
+      ),
+    },
+    {
+      title: "Workshift",
+      dataIndex: "shift",
+      key: "shift",
+      render: (shift) => {
+        if (!shift) return "—";
+        if (typeof shift === "object") return `${shift.start_time} - ${shift.end_time}`;
+        return shift;
+      },
+    },
+    {
+      title: "Holiday Base",
+      dataIndex: "holiday_base",
+      key: "holiday_base",
+      render: (bases: string[]) => {
+        if (!bases || bases.length === 0) return "—";
+        return bases.map((base) => (
+          <Tag key={base}>{base}</Tag>
+        ));
+      },
+    },
+    {
+      title: "Actions",
+      key: "actions",
+      render: (_, record) => (
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <Tooltip title="Edit">
+            <Button
+              type="default"
+              icon={<EditOutlined />}
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingDept(record);
+                setOpen(true);
+              }}
+            />
+          </Tooltip>
+          <Tooltip title={record.is_active ? "Deactivate" : "Activate"}>
+            <Switch
+              checked={record.is_active}
+              onClick={(checked, e) => {
+                e.stopPropagation();
+                handleToggleActive(record);
+              }}
+            />
+          </Tooltip>
         </div>
-      </Form>
-    </Modal>
+      ),
+    },
+  ];
+
+  return (
+    <Layout className={styles.layout} style={{ minHeight: "100vh" }}>
+      <Sidebar />
+      <Layout>
+        <Topbar title="Department" />
+        <Layout.Content className={styles.content}>
+          <div className={styles.topBar}>
+            <div className={styles.leftControls}>
+              <Input
+                placeholder="Search"
+                prefix={<SearchOutlined />}
+                className={styles.searchInput}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              className={styles.addBtn}
+              onClick={() => {
+                setEditingDept(null);
+                setOpen(true);
+              }}
+            >
+              Add Department
+            </Button>
+          </div>
+
+          <Table<DepartmentType>
+            columns={columns}
+            dataSource={filteredDepartments}
+            rowKey="id"
+            loading={loading}
+            pagination={false}
+            scroll={{ x: "max-content" }}
+            className={styles.table}
+            onRow={(record) => ({
+              onClick: () =>
+                navigate(`/super-admin/department-employee/${record.id}`, {
+                  state: { deptName: record.name },
+                }),
+              style: { cursor: "pointer" },
+            })}
+          />
+
+          <AddDepartment
+            open={open}
+            onClose={() => {
+              setOpen(false);
+              fetchDepartments();
+              setEditingDept(null);
+            }}
+            initialValues={editingDept || undefined}
+          />
+        </Layout.Content>
+      </Layout>
+    </Layout>
   );
 };
 
-export default AddDepartment;
+export default Department;

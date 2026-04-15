@@ -27,8 +27,6 @@ interface Props {
   onClose: () => void;
 }
 
-const MIN_DAILY_WAGE = 500; // Cebu reference minimum daily wage
-
 const EditEmployeeSalaryModal: React.FC<Props> = ({
   open,
   employeeId,
@@ -42,7 +40,8 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
   const [newSalaryBase, setNewSalaryBase] = useState<number | null>(null);
   const [initialDeductions, setInitialDeductions] = useState<any[]>([]);
 
-  const [divisor, setDivisor] = useState<number>(22);
+  const [minWage, setMinWage] = useState<number | null>(null);
+  const [divisor, setDivisor] = useState<number | null>(null);
 
   const payType = Form.useWatch("pay_type", form);
   const baseRate = Form.useWatch("base_rate", form);
@@ -56,11 +55,15 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
     const fetchPayrollSetting = async () => {
       try {
         const res = await api.get("/employees/settings/");
-        if (res.data.daily_rate_divisor) {
-          setDivisor(res.data.daily_rate_divisor);
-        }
-      } catch {
-        console.error("Failed to load payroll settings");
+
+        setDivisor(res.data.daily_rate_divisor);
+        setMinWage(res.data.daily_minimum_wage);
+      } catch (err: any) {
+        console.error("Failed to load payroll settings", err);
+
+        message.error(
+          err.response?.data?.detail || "Payroll settings not configured"
+        );
       }
     };
 
@@ -73,7 +76,7 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
   --------------------------------
   */
   const calculateWageType = (pay_type: string, base_rate: number) => {
-    if (!pay_type || !base_rate) return undefined;
+    if (!pay_type || !base_rate || !divisor || !minWage) return undefined;
 
     let monthlyEquivalent = 0;
 
@@ -87,7 +90,7 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
 
     const dailyEquivalent = monthlyEquivalent / divisor;
 
-    return dailyEquivalent >= MIN_DAILY_WAGE
+    return dailyEquivalent >= minWage
       ? "ABOVE_MINIMUM"
       : "MINIMUM";
   };
@@ -102,11 +105,11 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
     if (wageType) {
       form.setFieldsValue({ wage_type: wageType });
     }
-  }, [payType, baseRate, divisor]);
+  }, [payType, baseRate, divisor, minWage]);
 
   // Fetch latest salary on open
   useEffect(() => {
-    if (!open) return;
+    if (!open || !divisor || !minWage) return;
 
     const fetchLatest = async () => {
       try {
@@ -132,7 +135,7 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
     };
 
     fetchLatest();
-  }, [open, employeeId]);
+  }, [open, employeeId, divisor, minWage]);
 
   const handleSubmit = async () => {
     try {

@@ -184,10 +184,11 @@ class EligibleEmployeeSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     department_name = serializers.CharField(source="employee.department.name", read_only=True)
     status = serializers.CharField(read_only=True) # status comes from PayrollPeriodEmployee
+    has_attendance = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = PayrollPeriodEmployee
-        fields = ["id", "full_name", "department_name", "status"]
+        fields = ["id", "full_name", "department_name", "status", "has_attendance"]
 
     def get_full_name(self, obj: PayrollPeriodEmployee):
         e = obj.employee
@@ -508,7 +509,63 @@ class PayrollPeriodEmployeeFineListSerializer(serializers.ModelSerializer):
     def get_exclusion_remarks(self, obj):
         ex = self._get_exclusion(obj)
         return ex.remarks if ex else None
-#============================
+#===================Additional Earning================
+class PayrollPeriodEmployeeAdditionalEarningCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PayrollPeriodEmployeeAdditionalEarning
+        fields = ["name", "amount", "remarks"]
+
+    def validate_name(self, value):
+        v = (value or "").strip()
+        if not v:
+            raise serializers.ValidationError("Earning name is required.")
+        if len(v) > 100:
+            raise serializers.ValidationError("Earning name is too long.")
+        return v
+
+    def validate_amount(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Amount must be greater than 0.")
+        return value
+
+    def validate_remarks(self, value):
+        if value:
+            return value.strip()
+        return value
+
+class PayrollPeriodEmployeeAdditionalEarningListSerializer(serializers.ModelSerializer):
+    is_excluded_for_run = serializers.SerializerMethodField()
+    exclusion_id = serializers.SerializerMethodField()
+    exclusion_remarks = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PayrollPeriodEmployeeAdditionalEarning
+        fields = [
+            "id",
+            "name",
+            "amount",
+            "remarks",
+            "created_at",
+            "is_excluded_for_run",
+            "exclusion_id",
+            "exclusion_remarks",
+        ]
+
+    def _get_exclusion(self, obj):
+        earning_exclusion_map = self.context.get("earning_exclusion_map", {})
+        return earning_exclusion_map.get(obj.id)
+
+    def get_is_excluded_for_run(self, obj):
+        return obj.id in self.context.get("earning_exclusion_map", {})
+
+    def get_exclusion_id(self, obj):
+        ex = self._get_exclusion(obj)
+        return ex.id if ex else None
+
+    def get_exclusion_remarks(self, obj):
+        ex = self._get_exclusion(obj)
+        return ex.remarks if ex else None
+    
 # Aggregated snapshot shown in Verify Employee modal before payroll generation
 class PayrollVerifySnapshotSerializer(serializers.Serializer):
     # Aggregated snapshot shown in Verify Employee modal
@@ -537,7 +594,8 @@ class PayrollVerifySnapshotSerializer(serializers.Serializer):
     leave_days = LeaveDayMiniSerializer(many=True)
     commissions = PayrollPeriodEmployeeCommissionListSerializer(many=True)
     fines = PayrollPeriodEmployeeFineListSerializer(many=True)
-
+    additional_earnings = PayrollPeriodEmployeeAdditionalEarningListSerializer(many=True)
+    
 #NOTE: This is for additional allowance in a particular payroll period
 class PayrollPeriodEmployeeAllowanceCreateSerializer(serializers.ModelSerializer):
     class Meta:

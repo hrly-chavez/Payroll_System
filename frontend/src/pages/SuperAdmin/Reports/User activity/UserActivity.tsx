@@ -20,7 +20,7 @@ const UserActivity: React.FC = () => {
     setLoading(true);
     try {
       const res = await api.get("/employees/user-activity-logs/");
-      setLogs(res.data);
+      setLogs(res.data.results);
     } catch (err: any) {
       console.error(err);
       message.error("Failed to fetch user activity logs");
@@ -39,6 +39,7 @@ const UserActivity: React.FC = () => {
     { title: "Role", dataIndex: "role", key: "role" },
     { title: "Action", dataIndex: "action", key: "action" },
     { title: "Table", dataIndex: "model_name", key: "model_name" },
+    { title: "Reason", dataIndex: "reason", key: "reason" },
   ];
 
   if (loading) return <Spin tip="Loading..." style={{ marginTop: 50 }} />;

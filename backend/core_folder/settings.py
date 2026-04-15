@@ -158,7 +158,7 @@ SIMPLE_JWT = {
 
     # optional
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "REFRESH_TOKEN_LIFETIME": timedelta(hours=12),
 
     # Token rotation & blacklist
     "ROTATE_REFRESH_TOKENS": True,       # Issue new refresh token every time

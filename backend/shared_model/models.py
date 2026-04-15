@@ -252,6 +252,18 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.user_name} ({self.role})"
+    
+class PayrollMinimumSetting(models.Model): #minimum wage
+    id = models.AutoField(primary_key=True)
+
+    # Minimum daily wage (for example, in PHP)
+    daily_minimum_wage = models.DecimalField(max_digits=10, decimal_places=2, default=500)
+
+    # You can add other types like monthly/hourly minimums if needed later
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Minimum Wage: {self.daily_minimum_wage}"
         
 class Employee_Salary(models.Model):
     PAY_TYPES = [
@@ -1510,6 +1522,7 @@ class PayrollRunInputExclusion(models.Model):
         ("COMMISSION", "Commission"),
         ("ALLOWANCE", "Allowance"),
         ("FINE", "Fine"),
+        ("ADDITIONAL_EARNING", "Additional Earning"),
     ]
 
     id = models.AutoField(primary_key=True)
@@ -1579,33 +1592,18 @@ class PayrollPeriodEmployeeAllowance(models.Model):
 
     def __str__(self):
         return f"{self.employee} - {self.allowance_type} ({self.amount}) [{self.period.code}]"
+
 #Now used as Additional Deduction
 class PayrollPeriodEmployeeFine(models.Model):
     id = models.AutoField(primary_key=True)
 
-    period = models.ForeignKey(
-        Payroll_Period,
-        on_delete=models.CASCADE,
-        related_name="employee_fines"
-    )
-
-    employee = models.ForeignKey(
-        Employee,
-        on_delete=models.CASCADE,
-        related_name="payroll_fines"
-    )
-
+    period = models.ForeignKey(Payroll_Period,on_delete=models.CASCADE,related_name="employee_fines")
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="payroll_fines")
     name = models.CharField(max_length=100)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     remarks = models.TextField(null=True, blank=True)
 
-    created_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="created_payroll_fines"
-    )
+    created_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="created_payroll_fines")
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -1621,7 +1619,33 @@ class PayrollPeriodEmployeeFine(models.Model):
         indexes = [
             models.Index(fields=["period", "employee"]),
         ]
-        
+
+class PayrollPeriodEmployeeAdditionalEarning(models.Model):
+    id = models.AutoField(primary_key=True)
+
+    period = models.ForeignKey(Payroll_Period,on_delete=models.CASCADE,related_name="employee_earnings")
+    employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="payroll_earnings")
+    name = models.CharField(max_length=100)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    remarks = models.TextField(null=True, blank=True)
+
+    created_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="created_payroll_earnings")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def clean(self):
+        if self.amount <= 0:
+            raise ValidationError({"amount": "Amount must be greater than 0."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["period", "employee"]),
+        ]
+
 #audit logs
 class AuditLog(models.Model):
     ACTION_CHOICES = [
@@ -1646,7 +1670,7 @@ class AuditLog(models.Model):
     old_data = models.JSONField(null=True, blank=True)
     new_data = models.JSONField(null=True, blank=True)
     reason = models.TextField(null=True, blank=True, default="Created via system")
-    timestamp = models.DateTimeField(auto_now_add=True)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self):
         return f"{self.action} {self.model_name} ({self.object_id})"

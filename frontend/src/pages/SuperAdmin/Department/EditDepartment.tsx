@@ -17,6 +17,7 @@ interface Props {
   department: DepartmentType | null;
 }
 
+<<<<<<<< HEAD:frontend/src/pages/SuperAdmin/Department/EditDepartment.tsx
 const HOLIDAY_OPTIONS = [
   { label: "Philippines", value: "PH" },
   { label: "United States", value: "US" },
@@ -28,19 +29,41 @@ const EditDepartment: React.FC<Props> = ({ open, onClose, department }) => {
   const [shifts, setShifts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+========
+const AddDepartment: React.FC<Props> = ({ open, onClose, initialValues }) => {
+  const [shifts, setShifts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const [holidayOptions, setHolidayOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  // Fetch shifts
+>>>>>>>> 9ba4cf0b5958eb817439a1ebc451f369d07f0911:frontend/src/pages/SuperAdmin/Department/AddDepartment.tsx
   useEffect(() => {
     if (!open) return;
 
-    const fetchShifts = async () => {
+    const fetchData = async () => {
       try {
-        const res = await api.get("/employees/shifts/");
-        setShifts(res.data);
+        // Fetch shifts
+        const shiftRes = await api.get("/employees/shifts/");
+        setShifts(shiftRes.data);
+
+        // Fetch holiday options
+        const holidayRes = await api.get(
+          "/employees/departments/holiday_base_choices/"
+        );
+        setHolidayOptions(holidayRes.data);
+
       } catch (err) {
         console.error(err);
-        message.error("Failed to load shifts");
+        message.error("Failed to load data");
       }
     };
 
+<<<<<<<< HEAD:frontend/src/pages/SuperAdmin/Department/EditDepartment.tsx
     fetchShifts();
   }, [open]);
 
@@ -54,6 +77,19 @@ const EditDepartment: React.FC<Props> = ({ open, onClose, department }) => {
     }
   }, [open, department, form]);
 
+========
+    fetchData();
+  }, [open]);
+
+  const handleHolidayChange = (values: string[]) => {
+    // If all selected → close dropdown
+    if (values.length === holidayOptions.length) {
+      setTimeout(() => setDropdownOpen(false), 150);
+    }
+  };
+
+  // Handle submit: create or update
+>>>>>>>> 9ba4cf0b5958eb817439a1ebc451f369d07f0911:frontend/src/pages/SuperAdmin/Department/AddDepartment.tsx
   const onFinish = async (values: any) => {
     if (!department?.id) return;
 
@@ -122,13 +158,15 @@ const EditDepartment: React.FC<Props> = ({ open, onClose, department }) => {
           name="holiday_base"
           rules={[{ required: true, message: "Please select a holiday base" }]}
         >
-          <Select mode="multiple" placeholder="Choose">
-            {HOLIDAY_OPTIONS.map((option) => (
-              <Select.Option key={option.value} value={option.value}>
-                {option.label}
-              </Select.Option>
-            ))}
-          </Select>
+          <Select
+            mode="multiple"
+            maxTagCount="responsive"
+            placeholder="Choose"
+            options={holidayOptions}
+            open={dropdownOpen}
+            onDropdownVisibleChange={(open) => setDropdownOpen(open)}
+            onChange={handleHolidayChange}
+          />
         </Form.Item>
 
         <div className={styles.actions}>

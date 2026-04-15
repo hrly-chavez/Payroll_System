@@ -5,8 +5,7 @@ import { PlusOutlined, SearchOutlined, EditOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
-import AddDepartment from "./AddDepartment";
-import EditDepartment, { DepartmentType } from "./EditDepartment";
+import AddDepartment, { DepartmentType } from "./AddDepartment";
 import styles from "../../HR/Department/Department.module.css";
 import api from "../../../api/axios";
 
@@ -14,8 +13,7 @@ const Department: React.FC = () => {
   const navigate = useNavigate();
   const [departments, setDepartments] = useState<DepartmentType[]>([]);
   const [loading, setLoading] = useState(false);
-  const [openAdd, setOpenAdd] = useState(false);
-  const [openEdit, setOpenEdit] = useState(false);
+  const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [editingDept, setEditingDept] = useState<DepartmentType | null>(null);
 
@@ -59,9 +57,11 @@ const Department: React.FC = () => {
       title: "Department",
       dataIndex: "name",
       key: "name",
-      sorter: (a, b) => a.name.localeCompare(b.name),
+      sorter: (a, b) => a.name.localeCompare(b.name), // alphabetical sort
       sortDirections: ["ascend", "descend"],
-      render: (text) => <span className={styles.rowLink}>{text}</span>,
+      render: (text) => (
+        <span className={styles.rowLink}>{text}</span>
+      ),
     },
     {
       title: "Workshift",
@@ -79,7 +79,9 @@ const Department: React.FC = () => {
       key: "holiday_base",
       render: (bases: string[]) => {
         if (!bases || bases.length === 0) return "—";
-        return bases.map((base) => <Tag key={base}>{base}</Tag>);
+        return bases.map((base) => (
+          <Tag key={base}>{base}</Tag>
+        ));
       },
     },
     {
@@ -94,11 +96,10 @@ const Department: React.FC = () => {
               onClick={(e) => {
                 e.stopPropagation();
                 setEditingDept(record);
-                setOpenEdit(true);
+                setOpen(true);
               }}
             />
           </Tooltip>
-
           <Tooltip title={record.is_active ? "Deactivate" : "Activate"}>
             <Switch
               checked={record.is_active}
@@ -134,7 +135,10 @@ const Department: React.FC = () => {
               type="primary"
               icon={<PlusOutlined />}
               className={styles.addBtn}
-              onClick={() => setOpenAdd(true)}
+              onClick={() => {
+                setEditingDept(null);
+                setOpen(true);
+              }}
             >
               Add Department
             </Button>
@@ -158,21 +162,13 @@ const Department: React.FC = () => {
           />
 
           <AddDepartment
-            open={openAdd}
+            open={open}
             onClose={() => {
-              setOpenAdd(false);
+              setOpen(false);
               fetchDepartments();
-            }}
-          />
-
-          <EditDepartment
-            open={openEdit}
-            onClose={() => {
-              setOpenEdit(false);
               setEditingDept(null);
-              fetchDepartments();
             }}
-            department={editingDept}
+            initialValues={editingDept || undefined}
           />
         </Layout.Content>
       </Layout>

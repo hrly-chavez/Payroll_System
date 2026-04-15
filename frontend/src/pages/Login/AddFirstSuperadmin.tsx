@@ -156,13 +156,13 @@ const AddFirstSuperadmin: React.FC<Props> = ({ open, onNext, onClose, mode }) =>
           if (messages.length > 0) {
             messages.forEach(msg => message.error(msg));
           } else {
-            message.error("Failed to create SUPER_ADMIN");
+            message.error("Failed to create First User");
           }
         } else if (typeof data === "string") {
           message.error(data);
         }
       } else {
-        message.error("Failed to create SUPER_ADMIN");
+        message.error("Failed to create First User");
       }
     } finally {
       setLoading(false);

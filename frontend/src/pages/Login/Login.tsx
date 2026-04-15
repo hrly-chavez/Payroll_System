@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Form, Input, Button, message } from "antd";
+import { Form, Input, Button, message, Checkbox } from "antd";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import styles from "./login_styles.module.css";
@@ -14,12 +14,30 @@ import AddFirstSuperadmin from "./AddFirstSuperadmin";
 interface LoginFormValues {
   username: string;
   password: string;
+  remember?: boolean;
 }
 
 export default function Login() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [form] = Form.useForm();
+
+  useEffect(() => {
+    const savedUsername = localStorage.getItem("rememberedUsername");
+    const savedPassword = localStorage.getItem("rememberedPassword");
+
+    if (savedUsername && savedPassword) {
+      // decode password
+      const decodedPassword = atob(savedPassword);
+
+      form.setFieldsValue({
+        username: savedUsername,
+        password: decodedPassword,
+        remember: true,
+      });
+    }
+  }, []);
 
   //for modal
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
@@ -86,6 +104,20 @@ export default function Login() {
 
       const meRes = await api.get("/accounts/me/");
 
+      const rememberMe = values.remember || false;
+
+      if (rememberMe) {
+        localStorage.setItem("rememberedUsername", sanitizedUsername);
+
+        // encode password before saving
+        const encodedPassword = btoa(sanitizedPassword);
+        localStorage.setItem("rememberedPassword", encodedPassword);
+
+      } else {
+        localStorage.removeItem("rememberedUsername");
+        localStorage.removeItem("rememberedPassword");
+      }
+      
       localStorage.setItem("isAuthenticated", "true");
 
       const userName = meRes.data.user_name;
@@ -144,12 +176,12 @@ export default function Login() {
         <div className={styles.formSide}>
           <h2 className={styles.loginTitle}>LOGIN</h2>
 
-          <Form layout="vertical" onFinish={onFinish} className={styles.form}>
+          <Form form={form} layout="vertical" onFinish={onFinish} className={styles.form}>
             <Form.Item
               name="username"
               rules={[{ required: true, message: "Enter username" }]}
             >
-              <Input prefix={<UserOutlined />} placeholder="Username" />
+              <Input prefix={<UserOutlined />} placeholder="Username" autoComplete="username"/>
             </Form.Item>
 
             <Form.Item
@@ -159,16 +191,21 @@ export default function Login() {
               <Input.Password
                 prefix={<LockOutlined />}
                 placeholder="Password"
+                autoComplete="current-password"
                 visibilityToggle={{
                   visible: passwordVisible,
                   onVisibleChange: setPasswordVisible,
                 }}
               />
             </Form.Item>
-            <div style={{ textAlign: "right", marginBottom: "10px" }}>
+            <div className={styles.rememberRow}>
+              <Form.Item name="remember" valuePropName="checked" noStyle>
+                <Checkbox>Remember me</Checkbox>
+              </Form.Item>
+
               <Button
                 type="link"
-                style={{ padding: 0 }}
+                className={styles.forgotBtn}
                 onClick={() => setForgotPasswordOpen(true)}
               >
                 Forgot Password?

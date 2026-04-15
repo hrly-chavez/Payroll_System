@@ -441,10 +441,10 @@ const adminOrderedChartData = [...adminChartData].sort(
    ========================================================= */
 
   useEffect(() => {
-    fetchTodayAttendance();
+    // fetchTodayAttendance();
     fetchPunchInEligibility();
     loadCalendarEvents();
-    fetchMyDashboardStats();
+    // fetchMyDashboardStats();
     fetchAdminMonthlyAttendanceStats();
   }, []);
 
@@ -574,9 +574,9 @@ const punchInDisabled =
               Good to see you, <span className={styles.greetingName}>{name}</span>
             </div>
 
-            <div className={`${styles.greetingStatus} ${styles[statusKey]}`}>
+            {/* <div className={`${styles.greetingStatus} ${styles[statusKey]}`}>
               {statusLabel}
-            </div>
+            </div> */}
           </div>
 
           {/* STATS */}

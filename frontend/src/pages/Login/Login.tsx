@@ -141,22 +141,27 @@ export default function Login() {
       }
 
     } catch (err: any) {
-      //  Proper error trapping
-      if (err.response) {
-        const status = err.response.status;
+        if (err.response) {
+          const status = err.response.status;
 
-        if (status === 401) {
-          message.error("User does not exist or invalid credentials.");
-        } else if (status === 400) {
-          message.error("Invalid login request.");
-        } else if (status >= 500) {
-          message.error("Server error. Please try again later.");
+          // Get backend message if available
+          const backendMessage =
+            err.response?.data?.detail ||
+            err.response?.data?.message ||
+            "Something went wrong.";
+
+          if (status === 401) {
+            message.error(backendMessage);
+          } else if (status === 400) {
+            message.error(backendMessage);
+          } else if (status >= 500) {
+            message.error("Server error. Please try again later.");
+          } else {
+            message.error(backendMessage);
+          }
         } else {
-          message.error("Login failed. Please try again.");
+          message.error("Network error. Please check your connection.");
         }
-      } else {
-        message.error("Network error. Please check your connection.");
-      }
     } finally {
       setLoading(false);
     }

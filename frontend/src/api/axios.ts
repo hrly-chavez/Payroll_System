@@ -25,11 +25,24 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (
-      error.response?.status === 401 &&
-      !originalRequest._retry &&
-      !originalRequest.url?.includes("token/refresh")
-    ) {
+    //  Endpoints that should NEVER trigger refresh
+    const skipRefreshEndpoints = [
+      "/accounts/login/",
+      "/accounts/token/refresh/",
+      "/accounts/logout/",
+    ];
+
+    const shouldSkipRefresh = skipRefreshEndpoints.some((url) =>
+      originalRequest.url?.includes(url)
+    );
+
+    //  If request is login/refresh/logout → DO NOT refresh
+    if (shouldSkipRefresh) {
+      return Promise.reject(error);
+    }
+
+    //  Only handle 401 errors
+    if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
       if (isRefreshing) {
@@ -47,12 +60,12 @@ api.interceptors.response.use(
         processQueue();
 
         return api(originalRequest);
-      } catch (err) {
+      } catch (refreshError) {
         isRefreshing = false;
-        processQueue(err);
+        processQueue(refreshError);
 
-        // ❗ DO NOT redirect here
-        return Promise.reject(err);
+        //  Important: return ORIGINAL error, not refresh error
+        return Promise.reject(error);
       }
     }
 

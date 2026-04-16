@@ -1,7 +1,8 @@
 // src/pages/SuperAdmin/System Configuration/SystemConfiguration.tsx
 
 import React, { useState, useEffect } from "react";
-import { Layout } from "antd";
+import { Layout, Tabs } from "antd";
+import type { TabsProps } from "antd";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 import "./SystemConfiguration.css";
@@ -14,6 +15,7 @@ import ShiftTab from "./Workshifts/ShiftTab";
 import AllowanceTypeTab from "./AllowanceType/AllowanceType";
 import HolidayPolicy from "./HolidayPolicy/HolidayPolicy";
 import TaxRulesTab from "./TaxRules/TaxRulesTab";
+import LoanRulesTab from "./LoanRules/LoanRulesTab";
 
 import CommissionRuleTab from "./Commission Rules/CommissionRuleTab";
 
@@ -26,38 +28,74 @@ type TabType =
   | "commission"          
   | "commission_rules" 
   | "tax_rules"
+  | "loan_rules"
   | "workshifts"
   | "allowance"
   | "holiday";
 
 const SystemConfiguration: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabType>(() => {
-    const savedTab = localStorage.getItem("systemConfigTab") as TabType;
-    return savedTab || "contribution";
+  const [activeKey, setActiveKey] = useState<TabType>(() => {
+    return (localStorage.getItem("systemConfigTab") as TabType) || "contribution";
   });
 
   useEffect(() => {
-    localStorage.setItem("systemConfigTab", activeTab);
-  }, [activeTab]);
+    localStorage.setItem("systemConfigTab", activeKey);
+  }, [activeKey]);
 
-  const headerTitle =
-    activeTab === "contribution"
-      ? "Contribution Table"
-      : activeTab === "payroll"
-      ? "Payroll Rules"
-      : activeTab === "tax_rules"
-      ? "Payroll Tax Brackets"
-      : activeTab === "leave"
-      ? "Leave Types"
-      : activeTab === "holiday"
-      ? "Holiday Policy"
-      : activeTab === "workshifts"
-      ? "Workshifts"
-      : activeTab === "allowance"
-      ? "Allowance Types"
-      : activeTab === "commission_rules"
-      ? "Commission Rules"
-      : "Commission Types";
+
+  const items: TabsProps["items"] = [
+    {
+      label: "Workshifts",
+      key: "workshifts",
+      children: <ShiftTab active />,
+    },
+    {
+      label: "Contribution Table",
+      key: "contribution",
+      children: <ContributionTab active />,
+    },
+    {
+      label: "Payroll Rules",
+      key: "payroll",
+      children: <PayRulesTab active />,
+    },
+    {
+      label: "Tax Brackets Rules",
+      key: "tax_rules",
+      children: <TaxRulesTab active />,
+    },
+    {
+      label: "Loan Rules",
+      key: "loan_rules",
+      children: <LoanRulesTab active />,
+    },
+    {
+      label: "Leave Types",
+      key: "leave",
+      children: <LeaveTab active />,
+    },
+    {
+      label: "Commission Types",
+      key: "commission",
+      children: <CommissionTypeTab active />,
+    },
+    // Optional
+    // {
+    //   label: "Commission Rules",
+    //   key: "commission_rules",
+    //   children: <CommissionRuleTab active />,
+    // },
+    {
+      label: "Allowance Types",
+      key: "allowance",
+      children: <AllowanceTypeTab active />,
+    },
+    {
+      label: "Holiday Policy",
+      key: "holiday",
+      children: <HolidayPolicy active />,
+    },
+  ];
 
   return (
     <Layout className="system-layout">
@@ -66,84 +104,14 @@ const SystemConfiguration: React.FC = () => {
         <Topbar title="System Configuration" />
         <Content className="system-content">
           <div className="config-container">
-            <div className="config-tabs">
-              <button
-                className={activeTab === "contribution" ? "active" : ""}
-                onClick={() => setActiveTab("contribution")}
-              >
-                Contribution Table
-              </button>
 
-              <button
-                className={activeTab === "payroll" ? "active" : ""}
-                onClick={() => setActiveTab("payroll")}
-              >
-                Payroll Rules
-              </button>
-              
-                <button
-                  className={activeTab === "tax_rules" ? "active" : ""}
-                  onClick={() => setActiveTab("tax_rules")}
-                >
-                  Tax Brackets
-                </button>
+            <Tabs
+              type="card"
+              activeKey={activeKey}
+              onChange={(key) => setActiveKey(key as TabType)}
+              items={items}
+            />
 
-              <button
-                className={activeTab === "leave" ? "active" : ""}
-                onClick={() => setActiveTab("leave")}
-              >
-                Leave Types
-              </button>
-
-              <button
-                className={activeTab === "commission" ? "active" : ""}
-                onClick={() => setActiveTab("commission")}
-              >
-                Commission Types
-              </button>
-
-              {/* <button
-                className={activeTab === "commission_rules" ? "active" : ""}
-                onClick={() => setActiveTab("commission_rules")}
-              >
-                Commission Rules
-              </button> */}
-
-              <button
-                className={activeTab === "workshifts" ? "active" : ""}
-                onClick={() => setActiveTab("workshifts")}
-              >
-                Workshifts
-              </button>
-
-              <button
-                className={activeTab === "allowance" ? "active" : ""}
-                onClick={() => setActiveTab("allowance")}
-              >
-                Allowance Types
-              </button>
-
-              <button
-                className={activeTab === "holiday" ? "active" : ""}
-                onClick={() => setActiveTab("holiday")}
-              >
-                Holiday Policy
-              </button>
-            </div>
-
-            <div className="section-header">
-              <h3>{headerTitle}</h3>
-            </div>
-
-            {activeTab === "contribution" && <ContributionTab active />}
-            {activeTab === "payroll" && <PayRulesTab active />}
-            {activeTab === "tax_rules" && <TaxRulesTab active />}
-            {activeTab === "leave" && <LeaveTab active />}
-            {activeTab === "holiday" && <HolidayPolicy active />}
-            {activeTab === "commission" && <CommissionTypeTab active />}
-            {activeTab === "commission_rules" && <CommissionRuleTab active />}
-            {activeTab === "workshifts" && <ShiftTab active />}
-            {activeTab === "allowance" && <AllowanceTypeTab active />}
           </div>
         </Content>
       </Layout>

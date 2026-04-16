@@ -456,8 +456,8 @@ const Dashboard: React.FC = () => {
     loadingStatus ||
     loadingPunchInEligibility ||
     loadingPunchIn ||
-    !!attendance?.time_in ||
     !(punchInEligibility?.can_punch_in ?? false);
+
   const payrollStatusColor = (s?: string | null) => {
   const x = (s || "").toLowerCase();
   if (x === "approved") return "green";

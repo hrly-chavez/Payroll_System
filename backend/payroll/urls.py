@@ -12,6 +12,12 @@ urlpatterns = [
     path("superadmin/payroll-tax-brackets/", SuperAdminPayrollTaxBracketListCreateView.as_view()),
     path("superadmin/payroll-tax-brackets/<int:pk>/", SuperAdminPayrollTaxBracketRetrieveUpdateView.as_view()),
     path("superadmin/payroll-tax-brackets/choices/", PayrollTaxBracketChoicesView.as_view()),
+
+    #Loan Rule
+    path("superadmin/loan-rules/", LoanRuleListCreateView.as_view(), name="loan-rule-list-create"),
+    path("superadmin/loan-rules/<int:pk>/", LoanRuleRetrieveUpdateView.as_view(), name="loan-rule-detail"),
+    path("superadmin/loan-rules/<int:pk>/status/", LoanRuleUpdateStatusView.as_view(), name="loan-rule-update-status"),
+    path("superadmin/loan-rules/choices/", LoanRuleChoicesView.as_view(), name="loan-rule-choices"),
     
     # Commission Rules (Pay_Rule)
     path("superadmin/commission-tax-rules/", SuperAdminCommissionTaxRuleListCreateView.as_view()),
@@ -28,14 +34,30 @@ urlpatterns = [
     #Payroll Period
     path("periods/", PayrollPeriodListCreateView.as_view(), name="payroll-periods"),
     path("periods/<int:period_id>/eligible-employees/",PayrollPeriodEligibleEmployeesView.as_view(),name="payroll-period-eligible-employees"),
-
+    path("departments/", DepartmentListView.as_view(), name="department-list"),
+    
     #Verify Employee
     path("periods/<int:period_id>/employees/<int:employee_id>/verify-snapshot/",PayrollVerifyEmployeeSnapshotView.as_view(),name="payroll-verify-employee-snapshot"),
     path("periods/<int:period_id>/employees/<int:employee_id>/verify/",PayrollVerifyEmployeeView.as_view(),name="payroll-verify-employee"),
 
+    # Run-specific input exclusion (Verify stage)
+    path("periods/<int:period_id>/employees/<int:employee_id>/exclude-input/",PayrollRunExcludeInputView.as_view(),name="payroll-exclude-input",),
+    path("periods/<int:period_id>/employees/<int:employee_id>/include-input/",PayrollRunIncludeInputView.as_view(),name="payroll-include-input",),
+
     # Commissions
     path("commission-types/", CommissionTypeListView.as_view(), name="commission-types"),
     path("periods/<int:period_id>/employees/<int:employee_id>/commissions/",PayrollPeriodEmployeeCommissionListCreateView.as_view(),name="payroll-period-employee-commissions"),
+
+    # Additional Allowances (Payroll-period specific)
+    path("periods/<int:period_id>/employees/<int:employee_id>/allowances/",PayrollPeriodEmployeeAllowanceListCreateView.as_view(),name="payroll-period-employee-allowances"),
+    path("periods/<int:period_id>/employees/<int:employee_id>/allowances/<int:allowance_id>/delete/",PayrollPeriodEmployeeAllowanceDeleteView.as_view(),name="payroll-period-employee-allowance-delete"),
+    #Fines (Now used as add deduction)
+    path("payroll-period/<int:period_id>/employee/<int:employee_id>/fines/",PayrollPeriodEmployeeFineListCreateView.as_view(),name="payroll-period-employee-fines",),
+    path("payroll-period/<int:period_id>/employee/<int:employee_id>/fines/<int:fine_id>/",PayrollPeriodEmployeeFineDeleteView.as_view(),name="payroll-period-employee-fine-delete",),
+
+    # Additional Earnings (Payroll-period specific)
+    path("payroll-period/<int:period_id>/employee/<int:employee_id>/additional-earnings/",PayrollPeriodEmployeeAdditionalEarningListCreateView.as_view(),name="payroll-period-employee-additional-earnings",),
+    path("payroll-period/<int:period_id>/employee/<int:employee_id>/additional-earnings/<int:earning_id>/",PayrollPeriodEmployeeAdditionalEarningDeleteView.as_view(),name="payroll-period-employee-additional-earning-delete",),
 
     # Payroll Generation
     path("periods/<int:period_id>/generate/", GeneratePayrollForPeriodView.as_view(), name="payroll-generate-period"),
@@ -48,12 +70,13 @@ urlpatterns = [
     path("periods/<int:period_id>/approval-queue/",PayrollPeriodApprovalQueueView.as_view(),name="payroll-period-approval-queue",),
     path("periods/<int:period_id>/employees/<int:employee_id>/approve/",PayrollApproveEmployeeView.as_view(),name="payroll-approve-employee",),
     path("periods/<int:period_id>/employees/<int:employee_id>/decline/",PayrollDeclineEmployeeView.as_view(),name="payroll-decline-employee",),
+    #Bulk Approve
+    path("periods/<int:period_id>/bulk-decision/", PayrollBulkDecisionView.as_view(), name="payroll-bulk-decision"),
     #Reset Payroll
     path("periods/<int:period_id>/employees/<int:employee_id>/reset-after-decline/",PayrollResetAfterDeclineView.as_view(),name="payroll-reset-after-decline",),
     # Mark period as Paid (only Closed -> Paid)
     path("periods/<int:period_id>/mark-paid/", PayrollPeriodMarkPaidView.as_view(), name="payroll-period-mark-paid"),
     #Download Payroll
-    path("my-payrolls/<int:period_id>/download/", EmployeePayrollDownloadPDFView.as_view(), name="employee-my-payrolls-download"),
     path("periods/<int:period_id>/employees/<int:employee_id>/download/",AdminEmployeePayrollDownloadPDFView.as_view(),name="admin-employee-payroll-download",),
 
     #payroll logs

@@ -123,6 +123,7 @@ class ShiftSerializer(serializers.ModelSerializer):
             "grace_minutes",
             "is_overnight",
             "is_active",
+            "crosses_midnight",
             "workdays",   #  added
         ]
 
@@ -178,28 +179,28 @@ class ShiftSerializer(serializers.ModelSerializer):
 
         return instance
 
-#===============OVERTIME============
-class PendingOvertimeQueueSerializer(serializers.ModelSerializer):
+#===============EXCESS TIME============
+class PendingExcessTimeQueueSerializer(serializers.ModelSerializer):
     attendance_id = serializers.IntegerField(source="attendance.id", read_only=True)
     attendance_date = serializers.DateField(source="attendance.date", read_only=True)
     time_in = serializers.DateTimeField(source="attendance.time_in", read_only=True)
     time_out = serializers.DateTimeField(source="attendance.time_out", read_only=True)
 
-    employee_id = serializers.IntegerField(source="attendance.employee.id", read_only=True)
+    employee_id = serializers.IntegerField(source="employee.id", read_only=True)
     full_name = serializers.SerializerMethodField()
     department_name = serializers.SerializerMethodField()
     shift_name = serializers.SerializerMethodField()
 
     class Meta:
-        model = Attendance_Event
+        model = Excess_Time_Request
         fields = [
             "id",
-            "type",
             "minutes",
             "start_time",
             "end_time",
-            "approval_status",
-            "event_remarks",
+            "status",
+            "resolution_type",
+            "remarks",
             "created_at",
             "attendance_id",
             "attendance_date",
@@ -212,17 +213,38 @@ class PendingOvertimeQueueSerializer(serializers.ModelSerializer):
         ]
 
     def get_full_name(self, obj):
-        emp = obj.attendance.employee
+        emp = obj.employee
         return f"{emp.fname} {emp.lname}"
 
     def get_department_name(self, obj):
-        dept = getattr(obj.attendance.employee, "department", None)
+        dept = getattr(obj.employee, "department", None)
         return getattr(dept, "name", None)
 
     def get_shift_name(self, obj):
-        shift = getattr(obj.attendance.employee, "shift", None)
+        shift = getattr(obj.employee, "shift", None)
         return getattr(shift, "name", None)
 
+class ExcessTimeResolveSerializer(serializers.Serializer):
+    ACTION_CHOICES = [
+        ("Approve as Overtime", "Approve as Overtime"),
+        ("Approve as Offset", "Approve as Offset"),
+        ("Decline", "Decline"),
+    ]
+
+    action = serializers.ChoiceField(choices=ACTION_CHOICES)
+    reason = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        action = attrs.get("action")
+        reason = (attrs.get("reason") or "").strip()
+
+        if action == "Decline" and not reason:
+            raise serializers.ValidationError({
+                "reason": "Decline reason is required."
+            })
+
+        attrs["reason"] = reason
+        return attrs
 
 #==============Attendance Correction
 class AttendanceCorrectionCreateSerializer(serializers.ModelSerializer):
@@ -280,6 +302,7 @@ class AttendanceCorrectionListSerializer(serializers.ModelSerializer):
     attendance_id = serializers.IntegerField(source="attendance.id", read_only=True)
     employee_name = serializers.SerializerMethodField()
     department_name = serializers.SerializerMethodField()
+    file_attached = serializers.SerializerMethodField()
 
     class Meta:
         model = Attendance_Correction
@@ -305,7 +328,17 @@ class AttendanceCorrectionListSerializer(serializers.ModelSerializer):
         if obj.requested_by.department:
             return obj.requested_by.department.name
         return None
+    def get_file_attached(self, obj):
+        if not obj.file_attached:
+            return None
 
+        request = self.context.get("request")
+        url = obj.file_attached.url
+
+        if request:
+            return request.build_absolute_uri(url)
+
+        return url
 
 class AttendanceCorrectionReviewSerializer(serializers.Serializer):
     """
@@ -336,7 +369,8 @@ class AttendanceCorrectionDetailSerializer(serializers.ModelSerializer):
     attendance = AttendanceMiniSerializer(read_only=True)
     employee_name = serializers.SerializerMethodField()
     department_name = serializers.SerializerMethodField()
-
+    file_attached = serializers.SerializerMethodField()
+    
     class Meta:
         model = Attendance_Correction
         fields = [
@@ -359,6 +393,18 @@ class AttendanceCorrectionDetailSerializer(serializers.ModelSerializer):
     def get_department_name(self, obj):
         dept = getattr(obj.requested_by, "department", None)
         return getattr(dept, "name", None)
+    
+    def get_file_attached(self, obj):
+        if not obj.file_attached:
+            return None
+
+        request = self.context.get("request")
+        url = obj.file_attached.url
+
+        if request:
+            return request.build_absolute_uri(url)
+
+        return url
 
 # =========================
 # Attendance Event (Create)

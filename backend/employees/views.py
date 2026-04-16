@@ -5,7 +5,7 @@ from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from accounts.permissions import IsRole;
-import random, string
+import random, string, json
 from rest_framework.views import APIView
 from django.db import transaction
 from django.db.models import Q
@@ -29,6 +29,10 @@ from io import BytesIO
 from django.http import FileResponse
 from accounts.tokens import short_lived_token_generator
 from django.shortcuts import redirect
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from decimal import Decimal
+from django.utils.dateparse import parse_date
+from rest_framework.pagination import PageNumberPagination
 
 import logging
 import secrets
@@ -99,6 +103,15 @@ class DepartmentViewSet(viewsets.ModelViewSet):
             self.get_serializer(department).data,
             status=status.HTTP_201_CREATED
         )
+    
+    # ---------------- Drop Down Holiday Choices ----------------
+    @action(detail=False, methods=["get"])
+    def holiday_base_choices(self, request):
+        choices = [
+            {"value": key, "label": label}
+            for key, label in DepartmentHolidayCalendar.HOLIDAY_BASE_CHOICES
+        ]
+        return Response(choices)
 
     # ---------------- UPDATE ----------------
     @transaction.atomic
@@ -128,6 +141,7 @@ class DepartmentViewSet(viewsets.ModelViewSet):
                 )
 
         return Response(serializer.data)
+    
 
 # para ni sa populate ang shifts sa drop down
 class ShiftViewSet(viewsets.ModelViewSet):
@@ -152,7 +166,6 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"], url_path="employee/(?P<employee_id>[^/.]+)")
     def get_by_employee(self, request, employee_id=None):
         """Retrieve user account linked to a specific employee"""
-        from shared_model.models import Employee  # adjust import if needed
 
         try:
             employee = Employee.objects.get(id=employee_id)
@@ -260,6 +273,12 @@ class UserViewSet(viewsets.ModelViewSet):
             {"detail": f"User successfully {action_name.lower()}.", "is_active": user.is_active},
             status=status.HTTP_200_OK
         )
+
+#for employee create 
+# def parse_json_field(value, default):
+#         if isinstance(value, str):
+#             return json.loads(value)
+#         return value if value is not None else default
         
 #done logs
 #employee details crud
@@ -267,6 +286,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsRole]
     allowed_roles = ["ADMIN", "SUPER_ADMIN"]
     queryset = Employee.objects.filter(is_active=True)
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
     
     def get_serializer_class(self):
         if self.action == "create":
@@ -292,6 +312,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     # public actions (unauthenticated) only for first superadmin
     public_actions = ['create_first_superadmin']
 
+    # -------------------
+    # VIEWING EMPLOYEES IN A DEPARTMENT
+    # ------------------- 
     @action(detail=False, methods=["get"], url_path=r"by-department/(?P<dept_id>\d+)")
     def by_department(self, request, dept_id=None):
         user = request.user
@@ -304,6 +327,40 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(employees, many=True)
         return Response(serializer.data)
     
+    # -------------------
+    # CHANGING DEPARTMENT OF EMPLOYEE
+    # ------------------- 
+    @action(detail=True, methods=["patch"], url_path="change-department")
+    def change_department(self, request, pk=None):
+        employee = self.get_object()
+        new_department_id = request.data.get("department_id")
+        reason = request.data.get("reason", "Department updated")
+
+        if not new_department_id:
+            return Response({"error": "department_id is required"}, status=400)
+
+        old_department = employee.department_id
+
+        # Update employee
+        employee.department_id = new_department_id
+        employee.save()
+
+        # MANUAL AUDIT LOG
+        AuditLog.objects.create(
+            user=request.user,
+            action="UPDATE",
+            model_name="Employee",
+            object_id=str(employee.id),
+            old_data={"department": old_department},
+            new_data={"department": new_department_id},
+            reason=reason,
+        )
+
+        return Response({"message": "Department updated successfully"}, status=200)
+    
+    # -------------------
+    # VIEWING DETAILS FROM EACH EMPLOYEES 
+    # ------------------- 
     @action(detail=True, methods=["get"], url_path=r"details")
     def details(self, request, pk=None):
         employee = self.get_object()
@@ -422,6 +479,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             "password": password
         }, status=201)
 
+    # -------------------
+    # CREATE EMPLOYEE
+    # ------------------- 
     @action(detail=False, methods=["post"], url_path="create-full-employee")
     @transaction.atomic
     def create_full_employee(self, request):
@@ -429,9 +489,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         Create employee + user + salary + contributions + allowances in one atomic transaction
         """
         data = request.data
-        salary_data = data.pop("salary", None)
-        contributions_data = data.pop("contributions", [])
-        allowances_data = data.pop("allowances", [])
+        salary = json.loads(request.POST.get("salary", "{}"))
+        contributions = json.loads(request.POST.get("contributions", "[]"))
+        allowances = json.loads(request.POST.get("allowances", "[]"))
         requested_role = data.get("role", "EMPLOYEE")
 
         # -----------------------------
@@ -524,18 +584,38 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         # -----------------------------
         # 4. Create Salary
         # -----------------------------
-        if salary_data:
+        salary_data = request.data.get("salary")
+        contributions_data = request.data.get("contributions")
+        allowances_data = request.data.get("allowances")
+
+        # Parse JSON if they come as strings
+        if isinstance(salary_data, str):
+            salary_data = json.loads(salary_data)
+
+        if isinstance(contributions_data, str):
+            contributions_data = json.loads(contributions_data)
+
+        if isinstance(allowances_data, str):
+            allowances_data = json.loads(allowances_data)
+            
+            # Add required fields
             salary_data["employee"] = employee.id
-            salary_serializer = EmployeeSalarySerializer(data=salary_data, context={"_current_user": signed_in_user})
+            salary_data.setdefault("status", "Active")  # ensure salary is active
+            
+            # Serialize and save
+            salary_serializer = EmployeeSalarySerializer(
+                data=salary_data, context={"_current_user": signed_in_user}
+            )
             salary_serializer.is_valid(raise_exception=True)
             salary_obj = salary_serializer.save()
-        else:
-            salary_obj = None
 
         # -----------------------------
         # 5. Create Contributions
         # -----------------------------
-        for c in contributions_data:
+        for c in contributions_data or []:
+            if not isinstance(c, dict):
+                continue  # or raise error
+
             c["employee"] = employee.id
             serializer = EmployeeDeductionCreateSerializer(data=c)
             serializer.is_valid(raise_exception=True)
@@ -546,7 +626,10 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         # -----------------------------
         print("ALLOWANCES RECEIVED:", allowances_data)
 
-        for a in allowances_data:
+        for a in allowances_data or []:
+            if not isinstance(a, dict):
+                continue  # or raise error
+
             a["employee"] = employee.id
             serializer = EmployeeAllowanceCreateSerializer(data=a)
             serializer.is_valid(raise_exception=True)
@@ -575,6 +658,46 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             "message": "Employee updated successfully",
             "employee": EmployeeSerializer(updated_employee).data
         })
+
+    @action(detail=True, methods=["post"], url_path="update-employment-status")
+    def update_employment_status(self, request, pk=None):
+        employee = self.get_object()
+
+        new_status = request.data.get("employment_status")
+        reason = request.data.get("reason")
+
+        if not new_status:
+            return Response(
+                {"detail": "Employment status is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Save old value for audit
+        old_status = employee.employment_status
+
+        # Update
+        employee.employment_status = new_status
+        employee.save()
+
+        # Optional Audit Log
+        AuditLog.objects.create(
+            user=request.user,
+            action="UPDATE_EMPLOYMENT_STATUS",
+            model_name="Employee",
+            object_id=str(employee.pk),
+            old_data=old_status,
+            new_data=new_status,
+            reason=reason,
+        )
+
+        return Response(
+            {
+                "detail": "Employment status updated successfully.",
+                "employment_status": employee.employment_status
+            },
+            status=status.HTTP_200_OK
+        )
+    
 #forgot pass
 #undone logs
 User = get_user_model()
@@ -612,7 +735,7 @@ class ForgotPasswordView(APIView):
             expires_at=timezone.now() + timedelta(minutes=5)
         )
 
-        reset_url = f"http://localhost:3000/reset-password/{token}/"
+        reset_url = f"http://192.168.68.12:3000/reset-password/{token}/"
 
         send_mail(
             subject="Payroll System Password Reset",
@@ -681,6 +804,27 @@ class ResetPasswordConfirmView(APIView):
 
 #done logs
 #employee salary
+# Helper function to compute salary for deduction
+def get_salary_for_deduction(pay_type, base_rate):
+    """
+    Converts the employee's salary to the equivalent monthly amount
+    for deduction lookup based on Payroll Setting.
+    """
+    payroll_setting = Payroll_Setting.objects.first()  # assuming 1 row
+    divisor = payroll_setting.daily_rate_divisor if payroll_setting else 22
+
+    if pay_type == "Monthly":
+        salary_for_deduction = base_rate
+    elif pay_type == "Daily":
+        salary_for_deduction = base_rate * divisor
+    elif pay_type == "Hourly":
+        salary_for_deduction = base_rate * 8 * divisor
+    else:
+        salary_for_deduction = base_rate
+
+    return salary_for_deduction
+
+
 class EmployeeSalaryViewSet(viewsets.ModelViewSet):
     queryset = Employee_Salary.objects.all().order_by("-effective_from")
     serializer_class = EmployeeSalarySerializer
@@ -751,19 +895,17 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
         # Recompute percent-based deductions linked to this employee and effective_from
         self._recompute_percentage_deductions(
             employee_id=new_salary.employee_id,
-            salary_amount=new_salary.base_rate,
+            salary_obj=new_salary,
             effective_from=new_salary.effective_from,
             user=request.user
         )
 
         return Response(self.get_serializer(new_salary).data, status=status.HTTP_201_CREATED)
 
-    def _recompute_percentage_deductions(self, employee_id, salary_amount, effective_from, user):
-        from shared_model.models import Employee_Deduction, Deduction_Type
-        from decimal import Decimal
-        from datetime import timedelta
+    def _recompute_percentage_deductions(self, employee_id, salary_obj, effective_from, user):
 
-        salary_amount = Decimal(str(salary_amount))
+        # Convert salary to "monthly equivalent" for deduction lookup
+        salary_amount = Decimal(str(get_salary_for_deduction(salary_obj.pay_type, salary_obj.base_rate)))
 
         # Get ALL deduction codes this employee has ever had
         existing_codes = (
@@ -852,6 +994,34 @@ class EmployeeSalaryViewSet(viewsets.ModelViewSet):
                     active_deduction._current_user = user
                     active_deduction.save(update_fields=["status", "effective_to"])
                     print(f"[DEBUG] Fully inactivated {code}")
+
+class PayrollSettingView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        payroll_setting = Payroll_Setting.objects.first()
+        minimum_setting = PayrollMinimumSetting.objects.first()
+
+        #  Check payroll setting
+        if not payroll_setting:
+            return Response(
+                {"detail": "Payroll settings are not configured."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        #  Check minimum wage
+        if not minimum_setting:
+            return Response(
+                {"detail": "Minimum wage is not configured."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response({
+            "daily_rate_divisor": payroll_setting.daily_rate_divisor,
+            "is_semi_monthly": payroll_setting.is_semi_monthly,
+            "daily_minimum_wage": minimum_setting.daily_minimum_wage,
+        })
+    
 #done logs
 #employee deduction
 class EmployeeDeductionViewSet(viewsets.ModelViewSet):
@@ -959,11 +1129,7 @@ class EmployeeAllowanceViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsRole]
     allowed_roles = ["ADMIN", "SUPER_ADMIN"]
     queryset = Employee_Allowance.objects.all()
-
-    def get_serializer_class(self):
-        if self.action in ["list", "retrieve"]:
-            return EmployeeAllowanceSerializer  # read
-        return EmployeeAllowanceCreateSerializer  # create/update
+    serializer_class = EmployeeAllowanceSerializer
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -973,33 +1139,79 @@ class EmployeeAllowanceViewSet(viewsets.ModelViewSet):
         return queryset
     
     def perform_create(self, serializer):
-        serializer.save(_current_user=self.request.user)
-    
-    @action(detail=True, methods=["post"])
-    def edit_allowance(self, request, pk=None):
-        """
-        Custom action to "edit" an allowance:
-        - Create a new Employee_Allowance record
-        - Keep the old one for history
-        """
-        original = self.get_object()  # the current allowance
-        data = request.data.copy()
-        
-        # Ensure we use the same employee and allowance_type
-        data["employee"] = original.employee.id
-        data["allowance_type"] = original.allowance_type.id
-        data["status"] = data.get("status", "Active")
+        allowance = serializer.save()
 
-        serializer = EmployeeAllowanceCreateSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save(_current_user=request.user)
-
-
-        return Response(
-            {"message": "Allowance updated successfully"},
-            status=status.HTTP_201_CREATED
+        AuditLog.objects.create(
+            user=self.request.user,
+            action="CREATE",
+            model_name="Employee_Allowance",
+            object_id=str(allowance.id),
+            old_data={},
+            new_data={
+                "amount": float(allowance.amount),
+                "frequency": allowance.frequency,
+                "status": allowance.status,
+            },
+            reason="Created via system",
         )
+    
+    @action(detail=True, methods=["POST"], url_path="edit_allowance")
+    def edit_allowance(self, request, pk=None):
+        try:
+            allowance = Employee_Allowance.objects.get(pk=pk)
 
+            # Capture old data
+            old_data = {
+                "amount": float(allowance.amount),  # convert Decimal -> float
+                "frequency": allowance.frequency,
+                "status": allowance.status,
+                "effective_from": str(allowance.effective_from),
+            }
+
+            # Get new data from request
+            new_amount = request.data.get("amount")
+            new_frequency = request.data.get("frequency")
+            new_status = request.data.get("status")
+            new_effective_from = request.data.get("effective_from")
+            reason_text = request.data.get("reason", "Updated via system")
+
+            # Update the allowance
+            allowance._skip_audit_log = True  # prevent signal duplication
+            if new_amount is not None:
+                allowance.amount = Decimal(new_amount)
+            if new_frequency is not None:
+                allowance.frequency = new_frequency
+            if new_status is not None:
+                allowance.status = new_status
+            if new_effective_from is not None:
+                allowance.effective_from = parse_date(new_effective_from)
+
+            allowance.save()
+
+            # Capture new data
+            new_data = {
+                "amount": float(allowance.amount),
+                "frequency": allowance.frequency,
+            }
+
+            # Create audit log
+            AuditLog.objects.create(
+                user=request.user,
+                action="UPDATE",
+                model_name="Employee_Allowance",
+                object_id=str(allowance.id),
+                old_data=old_data,
+                new_data=new_data,
+                reason=reason_text,
+            )
+
+            serializer = EmployeeAllowanceSerializer(allowance)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Employee_Allowance.DoesNotExist:
+            return Response({"detail": "Allowance not found."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class AllowanceTypeListAPIView(APIView):
     permission_classes = [IsAuthenticated, IsRole]
@@ -1066,30 +1278,30 @@ def employee_audit_logs(request, employee_id):
 
     serialized_logs = []
     for log in all_logs:
-        old_data = ""
-        new_data = ""
+        message_text = ""
 
-        # UPDATE logs: convert dicts to formatted strings
-        if log.action == "UPDATE":
-            if isinstance(log.old_data, dict):
-                old_data = ", ".join([f'{k}: "{v}"' for k, v in log.old_data.items()])
-            else:
-                old_data = str(log.old_data)
+        if log.action == "UPDATE_EMPLOYMENT_STATUS":
+            message_text = f"Updated employment status"
 
-            if isinstance(log.new_data, dict):
-                new_data = ", ".join([f'{k}: "{v}"' for k, v in log.new_data.items()])
-            else:
-                new_data = str(log.new_data)
+        elif log.action == "CREATE":
+            message_text = f"Created {log.model_name}"
+
+        elif log.action == "UPDATE":
+            message_text = f"Updated {log.model_name}"
+
+        elif log.action == "DELETE":
+            message_text = f"Deleted {log.model_name}"
+
+        else:
+            message_text = log.action
 
         user_name = log.user.user_name if log.user else ""
 
         serialized_logs.append({
             "id": log.id,
             "user": user_name,
-            "action": log.action,
-            "model_name": log.model_name,
-            "old_data": old_data,
-            "new_data": new_data,
+            "action": message_text,
+            "reason": log.reason or "No reason provided",
             "timestamp": log.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
         })
 
@@ -1097,24 +1309,31 @@ def employee_audit_logs(request, employee_id):
     return Response(serialized_logs)
 
 #audit logs (Reports)
+# Pagination class with 200 per page
+class AuditLogPagination(PageNumberPagination):
+    page_size = 200
+    page_size_query_param = "page_size"  # allow client to override page size if needed
+    max_page_size = 500  # optional max
+
 class UserActivityLogViewSet(viewsets.ViewSet):
-    """
-    Read-only ViewSet that returns all CREATE/UPDATE/DELETE audit logs
-    triggered from DRF API requests (not Django admin).
-    """
+
     def list(self, request):
-        #delete logs after a day
-        one_day_ago = timezone.now() - timedelta(days=1)
-        AuditLog.objects.filter(timestamp__lt=one_day_ago).delete()
-        
-        # Only include logs where user is NOT None and NOT a superuser
-        logs = AuditLog.objects.exclude(
-            user__isnull=True
-        ).order_by("-timestamp")
+        # Delete logs older than 3 days (run on each access)
+        three_days_ago = timezone.now() - timedelta(days=3)
+        AuditLog.objects.filter(timestamp__lt=three_days_ago).delete()
 
+        # Query logs from the last 3 days
+        logs = AuditLog.objects.select_related("user").only(
+            "id", "action", "model_name", "timestamp", "user__user_name", "user__role"
+        ).filter(timestamp__gte=three_days_ago).order_by("-timestamp")
 
-        serializer = UserActivityAuditLogSerializer(logs, many=True)
-        return Response(serializer.data)
+        # Paginate
+        paginator = AuditLogPagination()
+        page = paginator.paginate_queryset(logs, request)
+
+        # Serialize and return
+        serializer = UserActivityAuditLogSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 #done logs
 #COMPANY NOTE

@@ -33,7 +33,7 @@ SECRET_KEY = 'django-insecure-5y)_r+#--6qx9#2ez%*6^gfs4*bogq2abe#sr4sl0xp9hxs^7q
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["192.168.68.9","localhost", "127.0.0.1"]
+ALLOWED_HOSTS = ["192.168.68.12","localhost", "127.0.0.1"]
 
 AUTH_USER_MODEL = "shared_model.User"
 
@@ -158,7 +158,7 @@ SIMPLE_JWT = {
 
     # optional
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "REFRESH_TOKEN_LIFETIME": timedelta(hours=12),
 
     # Token rotation & blacklist
     "ROTATE_REFRESH_TOKENS": True,       # Issue new refresh token every time
@@ -171,7 +171,7 @@ CORS_ALLOWED_ORIGINS = env.list(
     default=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "http://192.168.68.9:3000",
+        "http://192.168.68.12:3000",
     ]
 )
 

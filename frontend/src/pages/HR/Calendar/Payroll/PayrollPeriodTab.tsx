@@ -123,22 +123,18 @@ export default function PayrollPeriodTab({
       },
     },
   ];
-
   const filtered = useMemo(() => {
     const q = (searchText || "").trim().toLowerCase();
 
-    let data = [...payrollPeriods];
+    const data = [...payrollPeriods].sort((a, b) => {
+      const dateA = a.created_at || a.start_date;
+      const dateB = b.created_at || b.start_date;
+      return dayjs(dateB).valueOf() - dayjs(dateA).valueOf();
+    });
 
-      //SORT NEWEST FIRST
-      data.sort((a, b) => {
-        const dateA = a.created_at || a.start_date;
-        const dateB = b.created_at || b.start_date;
-        return dayjs(dateB).valueOf() - dayjs(dateA).valueOf();
-      });
+    if (!q) return data;
 
-    if (!q) return payrollPeriods;
-
-    return payrollPeriods.filter((p) =>
+    return data.filter((p) =>
       [
         p.code,
         p.status,
@@ -181,7 +177,9 @@ export default function PayrollPeriodTab({
         onClose={() => {
           setOpenEmployeesModal(false);
           setSelectedPeriodId(null);
+          loadPayrollPeriods(); // refresh table immediately
         }}
+        onChanged={loadPayrollPeriods}
       />
     </>
   );

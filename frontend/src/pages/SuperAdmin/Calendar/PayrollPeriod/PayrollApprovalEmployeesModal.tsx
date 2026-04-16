@@ -5,6 +5,7 @@ import { Modal, Table, Tag, message, Select, Input, Button, Space } from "antd";
 import dayjs from "dayjs";
 import api from "../../../../api/axios";
 import PayrollApprovalResultModal from "./PayrollApprovalResultModal";
+import BulkDeclineModal from "./BulkDeclineModal";
 
 type PayrollPeriod = {
   id: number;
@@ -34,6 +35,11 @@ type Props = {
   onClose: () => void;
 };
 
+type DeclinePayloadItem = {
+  employee_id: number;
+  declined_reason: string;
+};
+
 const ppeTag = (s?: string) => {
   const x = (s || "").toLowerCase();
   if (x === "approved") return <Tag color="green">Approved</Tag>;
@@ -54,8 +60,12 @@ const payrollTag = (s?: string | null) => {
   return <Tag>{s || "-"}</Tag>;
 };
 
+const isBulkDecisionEligible = (row: ApprovalEmployeeRow) =>
+  row.ppe_status === "Processing" && row.payroll_status === "Generated";
+
 export default function PayrollApprovalEmployeesModal({ open, periodId, onClose }: Props) {
   const [loading, setLoading] = useState(false);
+  const [acting, setActing] = useState(false);
   const [period, setPeriod] = useState<PayrollPeriod | null>(null);
   const [rows, setRows] = useState<ApprovalEmployeeRow[]>([]);
 
@@ -65,13 +75,27 @@ export default function PayrollApprovalEmployeesModal({ open, periodId, onClose 
   const [openResult, setOpenResult] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
 
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+
+  const [bulkDeclineOpen, setBulkDeclineOpen] = useState(false);
+  const [declineQueue, setDeclineQueue] = useState<ApprovalEmployeeRow[]>([]);
+  const [declineIndex, setDeclineIndex] = useState(0);
+  const [declineReasonsMap, setDeclineReasonsMap] = useState<Record<number, string>>({});
+  const [approveIdsPending, setApproveIdsPending] = useState<number[]>([]);
+
+  const [departmentId, setDepartmentId] = useState<number | null>(null);
+  const [departments, setDepartments] = useState<any[]>([]);
+
   const loadQueue = async () => {
     if (!open || !periodId) return;
 
     setLoading(true);
     try {
       const res = await api.get(`/payroll/periods/${periodId}/approval-queue/`, {
-        params: { status: statusFilter },
+        params: {
+          status: statusFilter,
+          ...(departmentId ? { department_id: departmentId } : {}),
+        },
       });
 
       setPeriod(res.data?.period || null);
@@ -86,10 +110,19 @@ export default function PayrollApprovalEmployeesModal({ open, periodId, onClose 
       setLoading(false);
     }
   };
+  const loadDepartments = async () => {
+    try {
+      const res = await api.get("/payroll/departments/");
+      setDepartments(res.data || []);
+    } catch {
+      message.error("Failed to load departments");
+    }
+  };
 
   useEffect(() => {
     if (open && periodId) {
       loadQueue();
+      loadDepartments();
     } else if (!open) {
       setPeriod(null);
       setRows([]);
@@ -97,6 +130,12 @@ export default function PayrollApprovalEmployeesModal({ open, periodId, onClose 
       setOpenResult(false);
       setStatusFilter("Processing");
       setSearchText("");
+      setSelectedRowKeys([]);
+      setBulkDeclineOpen(false);
+      setDeclineQueue([]);
+      setDeclineIndex(0);
+      setDeclineReasonsMap({});
+      setApproveIdsPending([]);
     }
   }, [open, periodId]);
 
@@ -104,7 +143,7 @@ export default function PayrollApprovalEmployeesModal({ open, periodId, onClose 
     if (open && periodId) {
       loadQueue();
     }
-  }, [statusFilter]);
+  }, [statusFilter, departmentId]);
 
   const filtered = useMemo(() => {
     const q = (searchText || "").trim().toLowerCase();
@@ -116,6 +155,101 @@ export default function PayrollApprovalEmployeesModal({ open, periodId, onClose 
         .some((v) => String(v).toLowerCase().includes(q))
     );
   }, [rows, searchText]);
+
+  const eligibleRows = useMemo(() => {
+    return filtered.filter(isBulkDecisionEligible);
+  }, [filtered]);
+
+  const currentDeclineEmployee = declineQueue[declineIndex] || null;
+
+  const resetBulkFlow = () => {
+    setBulkDeclineOpen(false);
+    setDeclineQueue([]);
+    setDeclineIndex(0);
+    setDeclineReasonsMap({});
+    setApproveIdsPending([]);
+  };
+
+  const submitBulkDecision = async (approveIds: number[], declineItems: DeclinePayloadItem[]) => {
+    if (!periodId) return;
+
+    setActing(true);
+    try {
+      const res = await api.post(`/payroll/periods/${periodId}/bulk-decision/`, {
+        approve_employee_ids: approveIds,
+        declines: declineItems,
+      });
+
+      const detail = res?.data?.detail || "Bulk payroll decision completed.";
+      message.success(detail);
+
+      resetBulkFlow();
+      setSelectedRowKeys([]);
+      await loadQueue();
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Bulk payroll decision failed";
+      message.error(msg);
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const startBulkApproveFlow = () => {
+    const eligibleIds = eligibleRows.map((r) => r.employee_id);
+
+    if (!eligibleIds.length) {
+      message.warning("No eligible employees found for bulk decision.");
+      return;
+    }
+
+    const selectedIds = selectedRowKeys.map(Number).filter((id) => eligibleIds.includes(id));
+    if (!selectedIds.length) {
+      message.warning("Please select at least one employee to approve.");
+      return;
+    }
+
+    const declineTargets = eligibleRows.filter((r) => !selectedIds.includes(r.employee_id));
+
+    setApproveIdsPending(selectedIds);
+
+    if (!declineTargets.length) {
+      submitBulkDecision(selectedIds, []);
+      return;
+    }
+
+    setDeclineQueue(declineTargets);
+    setDeclineIndex(0);
+    setDeclineReasonsMap({});
+    setBulkDeclineOpen(true);
+  };
+
+  const handleBulkDeclineSubmit = async (reason: string) => {
+    const current = declineQueue[declineIndex];
+    if (!current) return;
+
+    const nextMap = {
+      ...declineReasonsMap,
+      [current.employee_id]: reason,
+    };
+    setDeclineReasonsMap(nextMap);
+
+    const isLast = declineIndex >= declineQueue.length - 1;
+
+    if (!isLast) {
+      setDeclineIndex((prev) => prev + 1);
+      return;
+    }
+
+    const declineItems: DeclinePayloadItem[] = declineQueue.map((emp) => ({
+      employee_id: emp.employee_id,
+      declined_reason: nextMap[emp.employee_id] || "",
+    }));
+
+    await submitBulkDecision(approveIdsPending, declineItems);
+  };
 
   const columns = [
     { title: "Employee", dataIndex: "full_name" },
@@ -141,7 +275,7 @@ export default function PayrollApprovalEmployeesModal({ open, periodId, onClose 
       dataIndex: "run_no",
       width: 80,
       align: "right" as const,
-      render: (v: number | null) => (v ?? "-"),
+      render: (v: number | null) => v ?? "-",
     },
     {
       title: "Net Pay",
@@ -170,82 +304,136 @@ export default function PayrollApprovalEmployeesModal({ open, periodId, onClose 
     },
   ];
 
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (keys: React.Key[]) => {
+      setSelectedRowKeys(keys);
+    },
+    getCheckboxProps: (record: ApprovalEmployeeRow) => ({
+      disabled: !isBulkDecisionEligible(record),
+    }),
+  };
+
   const title = period
     ? `Approval Queue: ${dayjs(period.start_date).format("MM/DD/YYYY")} - ${dayjs(period.end_date).format("MM/DD/YYYY")}`
     : "Approval Queue";
 
   return (
-    <Modal
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      width={980}
-      title={title}
-      style={{ top: 50 }}
-      destroyOnClose
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
-        <Space wrap>
-          <div style={{ fontSize: 12, opacity: 0.8 }}>
-            Period Status: <b>{period?.status || "-"}</b>
-          </div>
-
-          <Select
-            value={statusFilter}
-            onChange={(v) => setStatusFilter(v)}
-            style={{ width: 160 }}
-            options={[
-              { value: "Processing", label: "Processing" },
-              { value: "Approved", label: "Approved" },
-              { value: "Declined", label: "Declined" },
-              { value: "All", label: "All" },
-            ]}
-          />
-
-          <Input
-            placeholder="Search employee / department / status..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            style={{ width: 320 }}
-            allowClear
-          />
-        </Space>
-
-        <Button onClick={loadQueue} loading={loading}>
-          Refresh
-        </Button>
-      </div>
-
-      <Table
-        columns={columns as any}
-        dataSource={filtered}
-        rowKey="employee_id"
-        loading={loading}
-        pagination={{
-          pageSize: 10,
-          showSizeChanger: true,
-          pageSizeOptions: ["5", "10", "20", "50"],
-          showTotal: (total) => `Total ${total} items`,
-        }}
-        onRow={(record) => ({
-          onClick: () => {
-            setSelectedEmployeeId(record.employee_id);
-            setOpenResult(true);
+    <>
+      <Modal
+        open={open}
+        onCancel={onClose}
+        footer={null}
+        width={980}
+        title={title}
+        style={{ top: 30 }}
+        destroyOnClose
+        styles={{
+          body: {
+            maxHeight: "calc(100vh - 180px)",
+            overflowY: "auto",
+            overflowX: "hidden",
           },
-        })}
-        rowClassName={() => "clickable-row"}
-      />
-
-      <PayrollApprovalResultModal
-        open={openResult}
-        periodId={periodId}
-        employeeId={selectedEmployeeId}
-        onClose={() => {
-          setOpenResult(false);
-          setSelectedEmployeeId(null);
-          loadQueue(); // refresh list after approve/decline
         }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+          <Space wrap>
+            <div style={{ fontSize: 12, opacity: 0.8 }}>
+              Period Status: <b>{period?.status || "-"}</b>
+            </div>
+
+            <Select
+              value={statusFilter}
+              onChange={(v) => setStatusFilter(v)}
+              style={{ width: 160 }}
+              options={[
+                { value: "Processing", label: "Processing" },
+                { value: "Approved", label: "Approved" },
+                { value: "Declined", label: "Declined" },
+                { value: "All", label: "All" },
+              ]}
+            />
+
+            <Select
+              placeholder="Filter by Department"
+              allowClear
+              style={{ width: 220 }}
+              value={departmentId ?? undefined}
+              onChange={(value) => setDepartmentId(value || null)}
+              options={departments.map((d) => ({
+                value: d.id,
+                label: d.name,
+              }))}
+            />
+          </Space>
+
+          <Space>
+            <Button onClick={loadQueue} loading={loading}>
+              Refresh
+            </Button>
+
+            <Button
+              type="primary"
+              onClick={startBulkApproveFlow}
+              disabled={acting || !eligibleRows.length}
+              loading={acting}
+            >
+              Bulk Decide
+            </Button>
+          </Space>
+        </div>
+
+        <div style={{ marginBottom: 8, fontSize: 12, opacity: 0.75 }}>
+          Eligible for bulk decision: <b>{eligibleRows.length}</b> | Selected to approve: <b>{selectedRowKeys.length}</b>
+        </div>
+
+        <Table
+          rowSelection={rowSelection}
+          columns={columns as any}
+          dataSource={filtered}
+          rowKey="employee_id"
+          loading={loading}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            pageSizeOptions: ["5", "10", "20", "50"],
+            showTotal: (total) => `Total ${total} items`,
+          }}
+          onRow={(record) => ({
+            onClick: () => {
+              setSelectedEmployeeId(record.employee_id);
+              setOpenResult(true);
+            },
+          })}
+          rowClassName={() => "clickable-row"}
+        />
+
+        <PayrollApprovalResultModal
+          open={openResult}
+          periodId={periodId}
+          employeeId={selectedEmployeeId}
+          onClose={() => {
+            setOpenResult(false);
+            setSelectedEmployeeId(null);
+            loadQueue();
+          }}
+        />
+      </Modal>
+
+      <BulkDeclineModal
+        open={bulkDeclineOpen}
+        employee={currentDeclineEmployee}
+        loading={acting}
+        initialReason={
+          currentDeclineEmployee ? declineReasonsMap[currentDeclineEmployee.employee_id] || "" : ""
+        }
+        currentIndex={declineIndex}
+        totalCount={declineQueue.length}
+        onCancel={() => {
+          resetBulkFlow();
+        }}
+        onSubmit={handleBulkDeclineSubmit}
       />
-    </Modal>
+    </>
   );
 }

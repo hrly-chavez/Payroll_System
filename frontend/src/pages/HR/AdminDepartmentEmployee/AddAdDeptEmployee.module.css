@@ -22,3 +22,14 @@
   background-color: #2f5f8d !important;   /* darker shade */
   border-color: #2f5f8d !important;
 }
+
+.filePreview {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 8px;
+  border: 1px dashed #d9d9d9;
+  border-radius: 4px;
+  width: 100%;
+}

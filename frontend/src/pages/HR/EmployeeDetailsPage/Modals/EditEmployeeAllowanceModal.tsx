@@ -1,6 +1,6 @@
 //src/pages/HR/EmployeeDetailPage/Modals/EditEmployeeAllowanceModal.tsx
 import React, { useEffect } from "react";
-import { Modal, Form, Input, Select, DatePicker, message } from "antd";
+import { Modal, Form, Input, Select, DatePicker, message, Switch } from "antd";
 import api from "api/axios";
 import dayjs from "dayjs";
 
@@ -30,6 +30,7 @@ const EditEmployeeAllowanceModal: React.FC<Props> = ({
         ),
         frequency: allowance.frequency,
         effective_from: dayjs(allowance.effective_from),
+        status: allowance.status === "Active",
       });
     } else {
       form.resetFields();
@@ -46,6 +47,8 @@ const EditEmployeeAllowanceModal: React.FC<Props> = ({
                 amount: values.amount,
                 frequency: values.frequency,
                 effective_from: values.effective_from.format("YYYY-MM-DD"),
+                status: values.status ? "Active" : "Inactive",
+                reason: values.reason,
             }
             );
 
@@ -95,6 +98,25 @@ const EditEmployeeAllowanceModal: React.FC<Props> = ({
           rules={[{ required: true, message: "Please select effective date" }]}
         >
           <DatePicker style={{ width: "100%" }} />
+        </Form.Item>
+
+        <Form.Item
+          label="Active"
+          name="status"
+          valuePropName="checked"
+        >
+          <Switch
+            checkedChildren="Active"
+            unCheckedChildren="Inactive"
+          />
+        </Form.Item>
+
+        <Form.Item
+          label="Reason"
+          name="reason"
+          rules={[{ required: true, message: "Please provide a reason" }]}
+        >
+          <Input.TextArea placeholder="Reason for edit" />
         </Form.Item>
       </Form>
     </Modal>

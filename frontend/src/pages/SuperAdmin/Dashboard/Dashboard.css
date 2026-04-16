@@ -48,7 +48,8 @@
 .card,
 .analytics-card,
 .calendar-card,
-.stat-card {
+.stat-card,
+.stat-tile {
   border-radius: var(--radius-card);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -60,7 +61,8 @@
 .card:hover,
 .analytics-card:hover,
 .calendar-card:hover,
-.stat-card:hover {
+.stat-card:hover,
+.stat-tile:hover {
   box-shadow: var(--shadow-medium);
 }
 
@@ -89,7 +91,13 @@
 /* ================= STAT TILES ================= */
 
 .stat-tile {
-  min-height: 230px;
+  height:  510px;
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-tile .ant-card-body {
+  height: 100%;
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -97,11 +105,7 @@
 }
 
 /* Top dashboard cards unified height */
-.stat-card,
-.stat-tile,
-.company-note-card {
-  height: 410px;
-}
+
 
 .stat-tile:hover {
   transform: translateY(-4px);
@@ -153,7 +157,9 @@
 /* ================= Analytics ================= */
 
 .analytics-card {
-  min-height: 360px;
+  display: flex;
+  flex-direction: column;
+  height: 520px;
   padding: 20px;
 }
 
@@ -163,19 +169,6 @@
   gap: 16px;
   margin-bottom: 20px;
   flex-wrap: wrap;
-}
-/* Make analytics card a flex column so chart can fill remaining space */
-.analytics-card {
-  display: flex;
-  flex-direction: column;
-  min-height: 360px;  /* keep    original intent */
-  height: auto;       /* important */
-}
-
-.analytics-card {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
 }
 
 .chart-area {
@@ -202,8 +195,10 @@
 /* ================= Calendar ================= */
 
 .calendar-card {
-  min-height: 360px;
+  height: 510px;
   padding: 16px;
+  display: flex;
+  flex-direction: column;
   
 }
 

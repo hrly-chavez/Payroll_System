@@ -61,6 +61,27 @@ def get_latest_active_payroll(period_id: int, employee_id: int) -> Payroll | Non
         .first()
     )
 
+def get_next_payroll_run_no(period_id: int, employee_id: int) -> int:
+    """
+    Return the next payroll run number for one employee in one payroll period.
+
+    Example:
+    - no payroll yet -> 1
+    - latest existing run is 1 -> next is 2
+    - latest existing run is 2 (even if run 1 is Void) -> next is 3
+
+    Used by:
+    - Verify Employee snapshot to know which upcoming run HR is editing
+    - run-specific exclusion logic before generation
+    """
+    last = (
+        Payroll.objects
+        .filter(payroll_period_id=period_id, employee_id=employee_id)
+        .order_by("-run_no", "-id")
+        .first()
+    )
+    return (int(last.run_no) + 1) if last else 1
+
 def _d2(x, places="0.01"):
     """
     Quantize/round decimals consistently across payroll computations.
@@ -304,24 +325,80 @@ class PayrollGenerationService:
         raise ValidationError({"detail": f"Unsupported rate_type: {bracket.rate_type}"})
 
 
-    def _compute_net_before_tax(self, payroll: Payroll) -> Decimal:
+    def _is_mwe_exempt_earning_line(self, line: Payslip) -> bool:
         """
-        Compute net BEFORE payroll tax is applied (used for bracket matching).
+        Return True if an earning line is exempt from payroll tax for a
+        Minimum Wage Earner (MWE).
 
-        We exclude any existing PAYROLL_TAX_BRACKET lines (defensive),
-        so regeneration / re-run doesn't double-tax if you ever call apply twice.
+        Current business rule for MWE-exempt earnings:
+        - Basic Pay
+        - Overtime
+        - Night Differential
+        - Holiday earnings
+
+        Taxable even for MWE (therefore NOT exempt here):
+        - Allowances
+        - Commissions
+        - other extra taxable earnings
         """
+        desc = (line.description or "").strip().lower()
+
+        if "basic pay" in desc:
+            return True
+
+        if "night differential" in desc:
+            return True
+
+        if desc.startswith("overtime"):
+            return True
+
+        holiday_keywords = (
+            "regular holiday",
+            "special holiday",
+            "special non working holiday",
+            "company holiday",
+        )
+        if any(k in desc for k in holiday_keywords):
+            return True
+
+        return False
+
+    def _compute_taxable_income(self, payroll: Payroll, ctx) -> Decimal:
+        """
+        Compute taxable income base BEFORE payroll tax bracket is applied.
+
+        Rules:
+        - Exclude PAYROLL_TAX_BRACKET lines defensively
+        - For ABOVE_MINIMUM:
+            taxable earnings = all earning lines
+        - For MINIMUM:
+            taxable earnings = only earning lines that are NOT MWE-exempt
+        - Deductions are still subtracted the same way as before
+          (except payroll-tax-bracket lines, which are excluded)
+        """
+        salary = ctx["salary"]
+        wage_type = (getattr(salary, "wage_type", "") or "").strip().upper()
+
         lines = payroll.payslip_lines.exclude(source_type="PAYROLL_TAX_BRACKET")
-        earnings = DEC_0
+
+        taxable_earnings = DEC_0
         deductions = DEC_0
 
         for ln in lines:
             if ln.line_type == "EARNING":
-                earnings += ln.amount
-            elif ln.line_type == "DEDUCTION":
-                deductions += ln.amount
+                if wage_type == "MINIMUM":
+                    if self._is_mwe_exempt_earning_line(ln):
+                        continue
+                taxable_earnings += _safe_decimal(ln.amount, "amount")
 
-        return _d2(earnings - deductions)
+            elif ln.line_type == "DEDUCTION":
+                deductions += _safe_decimal(ln.amount, "amount")
+
+        taxable_income = taxable_earnings - deductions
+        if taxable_income < DEC_0:
+            taxable_income = DEC_0
+
+        return _d2(taxable_income)
 
 
     def _apply_payroll_tax(self, payroll: Payroll, ctx, taxable_amount: Decimal):
@@ -662,15 +739,15 @@ class PayrollGenerationService:
         # block if payroll already exists
         if (Payroll.objects.filter(payroll_period_id=ppe.period_id, employee_id=ppe.employee_id).exclude(status="Void").exists()):
             raise ValidationError({"detail": "Payroll already exists for this employee in this period."})
-
+        #NOTE: COMMENTED CAUSE MAYBE WILL BE NEEDED FOR FUTURE
         # block if no attendance within the period
-        has_attendance = Attendance.objects.filter(
-            employee_id=ppe.employee_id,
-            date__gte=period.start_date,
-            date__lte=period.end_date,
-        ).exists()
-        if not has_attendance:
-            raise ValidationError({"detail": "Employee has no attendance within this payroll period."})
+        # has_attendance = Attendance.objects.filter(
+        #     employee_id=ppe.employee_id,
+        #     date__gte=period.start_date,
+        #     date__lte=period.end_date,
+        # ).exists()
+        # if not has_attendance:
+        #     raise ValidationError({"detail": "Employee has no attendance within this payroll period."})
 
 
     # -------------------------
@@ -694,7 +771,7 @@ class PayrollGenerationService:
         - This function assumes you are inside a transaction.atomic scope.
         - If anything raises ValidationError, everything rolls back.
         """
-        self._validate_ppe(ppe,period)
+        self._validate_ppe(ppe, period)
 
         ctx = self._build_context(period, ppe)
 
@@ -712,7 +789,7 @@ class PayrollGenerationService:
 
         # 7.3 attendance events (approved)
         self._apply_attendance_events(payroll, ctx["approved_events"], ctx["rule_map"], rates)
-        
+
         late_dates = self._get_late_dates(ctx["approved_events"])
 
         # Compute absences once (shared business rule)
@@ -723,15 +800,13 @@ class PayrollGenerationService:
             holiday_map=ctx["holiday_map"],
             holiday_policy_map=ctx["holiday_policy_map"],
         )
-        
 
         # Night differential (VOID if late-days already; also VOID per-day if has_absent)
         self._apply_night_differential(payroll, ctx["attendance_map"], ctx["rule_map"], rates, late_dates)
 
         # Holiday earnings (auto if worked on approved holiday)
-        self._apply_worked_holidays(payroll, ctx, rates)    
+        self._apply_worked_holidays(payroll, ctx, rates)
 
-        
         # 7.4 absent deduction
         absent_rule = ctx["rule_map"].get(("Absent", "Deduction"))
         self._apply_absent_deduction(
@@ -742,31 +817,91 @@ class PayrollGenerationService:
             rates=rates,
         )
 
-        # 8 allowances / deductions / commissions
-        self._apply_allowances(payroll=payroll,allowances=ctx["allowances"],period=period,employee=ctx["employee"],shift=ctx["shift"],leave_map=ctx["leave_map"],)
-        self._apply_commissions(payroll=payroll,commissions=ctx["commissions"],employee=ctx["employee"],department=ctx["department"],commission_tax_rules=ctx["commission_tax_rules"],)
+        # 8 allowances / commissions / loans / deductions
+        self._apply_allowances(
+            payroll=payroll,
+            allowances=ctx["allowances"],
+            period=period,
+            employee=ctx["employee"],
+            shift=ctx["shift"],
+            leave_map=ctx["leave_map"],
+        )
+
+        self._apply_additional_allowances(
+            payroll=payroll,
+            additional_allowances=ctx["additional_allowances"],
+        )
+
+        self._apply_commissions(
+            payroll=payroll,
+            commissions=ctx["commissions"],
+            employee=ctx["employee"],
+            department=ctx["department"],
+            commission_tax_rules=ctx["commission_tax_rules"],
+        )
+        
+        self._apply_fines(payroll, ctx["fines"])
+
+        self._apply_additional_earnings(
+            payroll=payroll,
+            additional_earnings=ctx["additional_earnings"],
+        )
+
+        # New loan stage (new Loan model is now the source of truth)
+        self._apply_loans(
+            payroll=payroll,
+            loans=ctx["loans"],
+            period=period,
+            basic_pay_amount=basic_pay_amount,
+        )
+
+        # Regular deductions only (non-loan)
         self._apply_deductions(payroll, ctx["deductions"], period)
 
-        # 8.5 compute base BEFORE payroll tax (this is your bracket base)
-        net_before_tax = self._compute_net_before_tax(payroll)
-        payroll.net_before_excess_tax = net_before_tax
+        # 8.5 compute TAXABLE income base before payroll tax
+        taxable_income = self._compute_taxable_income(payroll, ctx)
+        payroll.net_before_excess_tax = taxable_income
         payroll.save(update_fields=["net_before_excess_tax"])
 
         # 8.6 apply payroll tax bracket deduction
-        self._apply_payroll_tax(payroll, ctx, net_before_tax)
+        self._apply_payroll_tax(payroll, ctx, taxable_income)
 
         # 9 totals (final net_pay includes withholding)
         self._finalize_totals(payroll)
 
         # 10 lifecycle
         self._update_ppe_status(ppe, generated_by_user)
-        
-        # 9 totals
-        self._finalize_totals(payroll)
 
-        # 10 lifecycle
-        self._update_ppe_status(ppe, generated_by_user)
+    def _get_target_run_no(self, employee: Employee, period: Payroll_Period) -> int:
+        """
+        Compute the run number that is about to be generated.
 
+        This must match _create_payroll() logic so exclusions apply to the correct run.
+        """
+        return get_next_payroll_run_no(period.id, employee.id)
+
+    def _get_run_input_exclusion_map(
+        self,
+        employee: Employee,
+        period: Payroll_Period,
+        target_run_no: int,
+        source_type: str,
+    ) -> dict[int, PayrollRunInputExclusion]:
+        """
+        Return exclusions for one employee/period/run/source_type as:
+            { source_id: PayrollRunInputExclusion }
+
+        Only active excluded rows are included.
+        """
+        rows = PayrollRunInputExclusion.objects.filter(
+            period=period,
+            employee=employee,
+            target_run_no=target_run_no,
+            source_type=source_type,
+            is_excluded=True,
+        )
+
+        return {row.source_id: row for row in rows}
     # -------------------------
     # 3) Build Context
     # -------------------------
@@ -786,8 +921,9 @@ class PayrollGenerationService:
         - approved attendance events
         - leave map (date -> Leave_Day)
         - holiday map + policy map
-        - allowances/deductions/commissions
+        - allowances/deductions/commissions/loans
         - pay rules resolved by priority
+        - upcoming target_run_no + run-specific exclusions
         """
         employee = ppe.employee
         department = employee.department
@@ -801,27 +937,90 @@ class PayrollGenerationService:
         attendance_map = self._get_attendance_map(employee, period)
         approved_events = self._get_approved_events(attendance_map)
 
-        # Leave placeholder for now (ready when other team finishes)
         leave_map = self._get_leave_map(employee, period)
 
         holiday_map = self._get_holiday_map(period, active_bases)
         holiday_policy_map = self._get_holiday_policy_map(department)
 
-        allowances = self._get_allowances(employee, period)
-        deductions = self._get_deductions(employee, period)
-        commissions = self._get_commissions(employee, period)
+        target_run_no = self._get_target_run_no(employee, period)
+
+        deduction_exclusion_map = self._get_run_input_exclusion_map(
+            employee=employee,
+            period=period,
+            target_run_no=target_run_no,
+            source_type="DEDUCTION",
+        )
+        commission_exclusion_map = self._get_run_input_exclusion_map(
+            employee=employee,
+            period=period,
+            target_run_no=target_run_no,
+            source_type="COMMISSION",
+        )
+        allowance_exclusion_map = self._get_run_input_exclusion_map(
+            employee=employee,
+            period=period,
+            target_run_no=target_run_no,
+            source_type="ALLOWANCE",
+        )
+
+        allowances = self._get_allowances(
+            employee,
+            period,
+            allowance_exclusion_map=allowance_exclusion_map,
+        )
+        additional_allowances = self._get_additional_allowances(
+            employee,
+            period,
+            allowance_exclusion_map=allowance_exclusion_map,
+        )
+        deductions = self._get_deductions(
+            employee,
+            period,
+            deduction_exclusion_map=deduction_exclusion_map,
+        )
+        loans = self._get_loans(employee, period)
+        commissions = self._get_commissions(
+            employee,
+            period,
+            commission_exclusion_map=commission_exclusion_map,
+        )
+
+        fine_exclusion_map = self._get_run_input_exclusion_map(
+            employee=employee,
+            period=period,
+            target_run_no=target_run_no,
+            source_type="FINE",
+        )
+
+        fines = self._get_fines(
+            employee,
+            period,
+            fine_exclusion_map=fine_exclusion_map,
+        )
+        earning_exclusion_map = self._get_run_input_exclusion_map(
+            employee=employee,
+            period=period,
+            target_run_no=target_run_no,
+            source_type="ADDITIONAL_EARNING",
+        )
+
+        additional_earnings = self._get_additional_earnings(
+            employee,
+            period,
+            earning_exclusion_map=earning_exclusion_map,
+        )
+
         commission_tax_rules = self._get_commission_tax_rules(employee, department, period)
-    
+
         rule_map = self._get_pay_rules(employee, department, period)
 
         warnings = []
-        # Hard stop if salary missing
+
         if not salary:
             raise ValidationError({"detail": "Employee has no salary effective for this payroll period."})
         if not shift:
             raise ValidationError({"detail": "Employee has no shift (direct or department shift)."})
 
-        # Hard stop if any PRESENT attendance has missing time_in/out (prevents wrong payroll)
         for d, att in attendance_map.items():
             if att.status == "PRESENT" and (att.time_in is None or att.time_out is None):
                 raise ValidationError({"detail": f"Attendance on {d} is PRESENT but missing time_in/time_out."})
@@ -834,15 +1033,22 @@ class PayrollGenerationService:
             "shift": shift,
             "salary": salary,
             "payroll_setting": payroll_setting,
-            
+            "target_run_no": target_run_no,
+
             "attendance_map": attendance_map,
             "approved_events": approved_events,
             "leave_map": leave_map,
             "holiday_map": holiday_map,
             "holiday_policy_map": holiday_policy_map,
             "allowances": allowances,
+            "additional_allowances": additional_allowances,
             "deductions": deductions,
+            "loans": loans,
             "commissions": commissions,
+            "fines": fines,
+            "additional_earnings": additional_earnings,
+            "fine_exclusion_map": fine_exclusion_map,
+            "earning_exclusion_map": earning_exclusion_map,
             "commission_tax_rules": commission_tax_rules,
             "rule_map": rule_map,
             "warnings": warnings,
@@ -985,8 +1191,11 @@ class PayrollGenerationService:
         rows = HolidayPolicy.objects.filter(department=department)
         return {(r.base, r.holiday_type): bool(r.requires_work) for r in rows}
 
-    def _get_allowances(self, employee: Employee, period: Payroll_Period):
-        # Return all ACTIVE employee allowances that overlap the payroll period.
+    def _get_allowances(self, employee: Employee, period: Payroll_Period, allowance_exclusion_map=None):
+        # Return all ACTIVE employee allowances that overlap the payroll period,
+        # excluding run-specific allowance exclusions when present.
+        allowance_exclusion_map = allowance_exclusion_map or {}
+
         qs = (
             Employee_Allowance.objects
             .filter(employee=employee, status="Active")
@@ -995,35 +1204,276 @@ class PayrollGenerationService:
 
         rows = []
         for a in qs:
+            if a.id in allowance_exclusion_map:
+                continue
+
             if _overlaps_period(a.effective_from, a.effective_to, period.start_date, period.end_date):
                 rows.append(a)
         return rows
 
-    def _get_deductions(self, employee: Employee, period: Payroll_Period):
-        #Return all ACTIVE employee deductions that overlap the payroll period.
-        qs = (
-            Employee_Deduction.objects
-            .filter(employee=employee, status="Active")
-            .select_related("deduction_type")
+    def _get_additional_allowances(self, employee: Employee, period: Payroll_Period, allowance_exclusion_map=None):
+        """
+        Return payroll-period-specific manual/additional allowances for:
+        - this employee
+        - this payroll period
+
+        Excludes run-specific allowance exclusions when present.
+        """
+        allowance_exclusion_map = allowance_exclusion_map or {}
+
+        rows = list(
+            PayrollPeriodEmployeeAllowance.objects
+            .filter(period=period, employee=employee)
+            .select_related("allowance_type")
+            .order_by("allowance_date", "id")
         )
 
-        rows = []
-        for d in qs:
-            if _overlaps_period(d.effective_from, d.effective_to, period.start_date, period.end_date):
-                rows.append(d)
-        return rows
+        return [row for row in rows if row.id not in allowance_exclusion_map]
     
-    def _get_commissions(self, employee: Employee, period: Payroll_Period):
+    def _get_deductions(self, employee: Employee, period: Payroll_Period, deduction_exclusion_map=None):
+            # Return all ACTIVE employee deductions that overlap the payroll period,
+            # excluding run-specific deduction exclusions when present.
+            deduction_exclusion_map = deduction_exclusion_map or {}
+
+            qs = (
+                Employee_Deduction.objects
+                .filter(employee=employee, status="Active")
+                .select_related("deduction_type")
+            )
+
+            rows = []
+            for d in qs:
+                if d.id in deduction_exclusion_map:
+                    continue
+
+                if _overlaps_period(d.effective_from, d.effective_to, period.start_date, period.end_date):
+                    rows.append(d)
+            return rows
+    
+    def _get_loans(self, employee: Employee, period: Payroll_Period):
+        """
+        Return payroll-eligible loans for this employee and payroll period.
+
+        Rules:
+        - only Approved or Active
+        - remaining_balance > 0
+        - deduction snapshot must be complete
+        - effective range must overlap the payroll period
+        - actual cutoff filtering is handled later in _loan_applies_to_cutoff()
+        - select_for_update() is used because payroll generation may update balances/status
+        """
+        return list(
+            Loan.objects.select_for_update()
+            .filter(
+                employee=employee,
+                status__in=["Approved", "Active"],
+                remaining_balance__gt=0,
+                rule__isnull=False,
+                deduction_mode__isnull=False,
+                deduction_value__isnull=False,
+                apply_to_cutoff__isnull=False,
+                effective_from__lte=period.end_date,
+            )
+            .filter(Q(effective_to__isnull=True) | Q(effective_to__gte=period.start_date))
+            .select_related("rule")
+            .order_by("effective_from", "id")
+        )
+
+    def _loan_applies_to_cutoff(self, loan: Loan, period: Payroll_Period) -> bool:
+        """
+        Check if a loan is applicable to this payroll period cutoff.
+
+        Loan choices:
+        - FIRST
+        - SECOND
+        - BOTH
+
+        Period cutoff_type:
+        - FIRST
+        - SECOND
+        """
+        loan_cutoff = (loan.apply_to_cutoff or "").strip().upper()
+        period_cutoff = (getattr(period, "cutoff_type", "") or "").strip().upper()
+
+        if loan_cutoff == "BOTH":
+            return period_cutoff in {"FIRST", "SECOND"}
+
+        return loan_cutoff == period_cutoff
+
+    def _compute_loan_deduction_breakdown(self, loan: Loan, basic_pay_amount: Decimal) -> dict:
+        """
+        Compute the scheduled deduction amount for one loan in one payroll run
+        and return a full breakdown for audit/UI clarity.
+
+        Assumption:
+        - PERCENT is stored fraction-style
+        e.g. 0.30 = 30%
+        """
+        remaining_balance = _d2(_safe_decimal(loan.remaining_balance, "remaining_balance"))
+        basic_pay_amount = _d2(_safe_decimal(basic_pay_amount, "basic_pay_amount"))
+        mode = (loan.deduction_mode or "").strip().upper()
+        deduction_value = _safe_decimal(loan.deduction_value or 0, "deduction_value")
+
+        if remaining_balance <= 0:
+            return {
+                "mode": mode,
+                "deduction_value": deduction_value,
+                "basic_pay_amount": basic_pay_amount,
+                "scheduled_amount": DEC_0,
+                "deducted_amount": DEC_0,
+                "remaining_balance": remaining_balance,
+                "was_capped": False,
+            }
+
+        if mode == "FIXED":
+            scheduled_amount = _d2(deduction_value)
+        elif mode == "PERCENT":
+            scheduled_amount = _d2(basic_pay_amount * deduction_value)
+        else:
+            raise ValidationError({"detail": f"Unsupported loan deduction_mode: {loan.deduction_mode}"})
+
+        if scheduled_amount <= 0:
+            return {
+                "mode": mode,
+                "deduction_value": deduction_value,
+                "basic_pay_amount": basic_pay_amount,
+                "scheduled_amount": DEC_0,
+                "deducted_amount": DEC_0,
+                "remaining_balance": remaining_balance,
+                "was_capped": False,
+            }
+
+        deducted_amount = _d2(min(scheduled_amount, remaining_balance))
+
+        return {
+            "mode": mode,
+            "deduction_value": deduction_value,
+            "basic_pay_amount": basic_pay_amount,
+            "scheduled_amount": scheduled_amount,
+            "deducted_amount": deducted_amount,
+            "remaining_balance": remaining_balance,
+            "was_capped": deducted_amount < scheduled_amount,
+        }
+
+    def _apply_loans(self, payroll: Payroll, loans, period: Payroll_Period, basic_pay_amount: Decimal):
+        """
+        Apply loan deductions into payroll with a clearer audit trail.
+
+        Keeps the same business logic:
+        - only deduct if cutoff applies
+        - amount is still capped by remaining_balance
+        - create LoanPayment
+        - update remaining balance and status
+        """
+        for loan in loans:
+            if not self._loan_applies_to_cutoff(loan, period):
+                continue
+
+            breakdown = self._compute_loan_deduction_breakdown(loan, basic_pay_amount)
+            deducted_amount = breakdown["deducted_amount"]
+
+            if deducted_amount <= 0:
+                continue
+
+            previous_balance = _d2(_safe_decimal(loan.remaining_balance, "remaining_balance"))
+            new_balance = _d2(previous_balance - deducted_amount)
+
+            if new_balance < 0:
+                new_balance = DEC_0
+
+            deduction_desc = f"Loan: {loan.name}"
+            if loan.rule_id:
+                deduction_desc += f" ({loan.rule.name})"
+
+            self._create_line(
+                payroll,
+                "DEDUCTION",
+                deduction_desc,
+                deducted_amount,
+                source_type="ADJUSTMENT",
+                source_id=loan.id,
+                rate_applied=breakdown["deduction_value"],
+            )
+
+            self._create_line(
+                payroll,
+                "INFORMATION",
+                (
+                    f"Loan Rule Info ({loan.name}): "
+                    f"rule={loan.rule.name if loan.rule_id else '-'}; "
+                    f"mode={breakdown['mode']}; "
+                    f"value={breakdown['deduction_value']}; "
+                    f"cutoff={loan.apply_to_cutoff}; "
+                    f"basic_pay={breakdown['basic_pay_amount']}; "
+                    f"scheduled={breakdown['scheduled_amount']}; "
+                    f"capped={'YES' if breakdown['was_capped'] else 'NO'}; "
+                    f"deducted={deducted_amount}; "
+                    f"previous={previous_balance}; "
+                    f"new={new_balance}"
+                ),
+                DEC_0,
+                source_type="ADJUSTMENT",
+                source_id=loan.id,
+                rate_applied=breakdown["deduction_value"],
+            )
+
+            LoanPayment.objects.create(
+                loan=loan,
+                payroll=payroll,
+                payroll_period=period,
+                deducted_amount=deducted_amount,
+                previous_balance=previous_balance,
+                new_balance=new_balance,
+            )
+
+            loan.remaining_balance = new_balance
+
+            if new_balance <= 0:
+                loan.status = "Completed"
+            elif loan.status == "Approved":
+                loan.status = "Active"
+
+            loan.save(update_fields=["remaining_balance", "status", "updated_at"])
+
+    def _get_commissions(self, employee: Employee, period: Payroll_Period, commission_exclusion_map=None):
         """
         Return commissions stored specifically for:
         - this employee
         - this payroll period
 
-        These are per-period manual entries (modal-based).
+        Excludes run-specific commission exclusions when present.
         """
-        return list(
-            PayrollPeriodEmployeeCommission.objects.filter(period=period, employee=employee).select_related("commission_type")
+        commission_exclusion_map = commission_exclusion_map or {}
+
+        rows = list(
+            PayrollPeriodEmployeeCommission.objects
+            .filter(period=period, employee=employee)
+            .select_related("commission_type")
         )
+
+        return [row for row in rows if row.id not in commission_exclusion_map]
+    #Now used as Additional Deduction
+    def _get_fines(self, employee, period, fine_exclusion_map=None):
+        fine_exclusion_map = fine_exclusion_map or {}
+
+        rows = list(
+            PayrollPeriodEmployeeFine.objects
+            .filter(period=period, employee=employee)
+            .order_by("created_at", "id")
+        )
+
+        return [row for row in rows if row.id not in fine_exclusion_map]
+
+    def _get_additional_earnings(self, employee, period, earning_exclusion_map=None):
+        earning_exclusion_map = earning_exclusion_map or {}
+
+        rows = list(
+            PayrollPeriodEmployeeAdditionalEarning.objects
+            .filter(period=period, employee=employee)
+            .order_by("created_at", "id")
+        )
+
+        return [row for row in rows if row.id not in earning_exclusion_map]
 
     def _get_pay_rules(self, employee: Employee, department, period: Payroll_Period):
         """
@@ -1041,25 +1491,37 @@ class PayrollGenerationService:
         - effective_from <= period.end_date
         - effective_to is null OR effective_to >= period.start_date
         """
-        rules = Pay_Rule.objects.filter(is_active=True)
+        rules = Pay_Rule.objects.filter(
+            is_active=True
+        ).filter(
+            Q(employee_id=employee.id) |
+            Q(applies_to_id=department.id) |
+            Q(employee__isnull=True, applies_to__isnull=True)
+        )
 
         # only rules that overlap this period (effective_from <= period_end and (effective_to is null or >= period_start))
         rules = rules.filter(
             effective_from__lte=period.end_date
         ).filter(
             Q(effective_to__isnull=True) | Q(effective_to__gte=period.start_date)
-        )
+        ).order_by("-effective_from", "-id")
 
         # fetch all candidates, then choose by priority per (event_type, category)
         candidates = list(rules)
 
         def priority(rule: Pay_Rule):
+            # Employee specific rule
             if rule.employee_id == employee.id:
                 return 3
-            if rule.applies_to_id == department.id:
+
+            # Department rule (ONLY if not employee rule)
+            if rule.employee_id is None and rule.applies_to_id == department.id:
                 return 2
+
+            # Global rule
             if rule.employee_id is None and rule.applies_to_id is None:
                 return 1
+
             return 0
 
         rule_map = {}
@@ -1782,7 +2244,7 @@ class PayrollGenerationService:
     # -------------------------
     # 8) Allowances, Commissions, Deductions
     # -------------------------
-    def _compute_allowance_eligible_days_for_month(self,employee: Employee,shift: Shift,month_start: date,month_end: date,leave_map: dict[date, Leave_Day],) -> int:
+    def _compute_allowance_eligible_days_for_month(self,employee: Employee,shift: Shift,month_start: date,month_end: date,leave_map: dict[date, Leave_Day],) -> list[date]:
         """
         Compute how many days in a month are eligible for a PER-DAY allowance.
 
@@ -1823,27 +2285,22 @@ class PayrollGenerationService:
 
         return eligible_dates
 
-    def _apply_allowances(self,payroll: Payroll,allowances,period: Payroll_Period,employee: Employee,shift: Shift,leave_map: dict[date, Leave_Day],):
+    def _apply_allowances(self, payroll: Payroll, allowances, period: Payroll_Period, employee: Employee, shift: Shift, leave_map: dict[date, Leave_Day]):
         """
         Apply allowances into payslip lines.
 
-        Special behavior for frequency="Per Day":
-        - Compute totals per MONTH
-        - Pay only on payroll period that contains that month-end
-        - Eligibility is computed by _compute_allowance_eligible_days_for_month()
-
-        For other frequencies:
-        - Uses _resolve_frequency_amount (Per Period / Monthly / One Time)
-        - Creates one EARNING line per allowance row
+        Rules:
+        - Per Day:
+            compute eligible allowance days within the relevant month-end logic
+        - Monthly / Per Period / One Time:
+            only apply if this payroll period overlaps the allowance row
+            use the stored amount directly (no cutoff-based split)
         """
         for a in allowances:
             at = a.allowance_type
             name = at.name if at else "Allowance"
 
-            # ------------------------------------------------------
-            # ALL Per Day allowances -> compute per MONTH,
-            # pay ONLY on payroll period that contains month-end
-            # ------------------------------------------------------
+            # Per Day allowance logic
             if a.frequency == "Per Day":
                 per_day_amt = _d2(a.amount)
                 if per_day_amt <= 0:
@@ -1851,46 +2308,48 @@ class PayrollGenerationService:
 
                 for month_start, month_end in self._month_ends_within(period.start_date, period.end_date):
                     eligible_dates = self._compute_allowance_eligible_days_for_month(
-                    employee=employee,
-                    shift=shift,
-                    month_start=month_start,
-                    month_end=month_end,
-                    leave_map=leave_map,
-                )
-                eligible_days = len(eligible_dates)
-                if eligible_days <= 0:
-                    continue
+                        employee=employee,
+                        shift=shift,
+                        month_start=month_start,
+                        month_end=month_end,
+                        leave_map=leave_map,
+                    )
 
-                amount = _d2(Decimal(eligible_days) * per_day_amt)
+                    eligible_days = len(eligible_dates)
+                    if eligible_days <= 0:
+                        continue
 
-                # EARNING line (same as before)
-                self._create_line(
-                    payroll,
-                    "EARNING",
-                    f"Allowance: {name} ({month_start.strftime('%b %Y')}) ({eligible_days} day(s))",
-                    amount,
-                    source_type="MANUAL",
-                    source_id=a.id,
-                )
+                    amount = _d2(Decimal(eligible_days) * per_day_amt)
 
-                # INFORMATION line (for UI date tags)
-                dates_str = ", ".join([d.isoformat() for d in sorted(eligible_dates)])
-                self._create_line(
-                    payroll,
-                    "INFORMATION",
-                    f"Allowance: {name} days: {dates_str}",
-                    DEC_0,
-                    source_type="MANUAL",
-                    source_id=a.id,
-                )
+                    self._create_line(
+                        payroll,
+                        "EARNING",
+                        f"Allowance: {name} ({month_start.strftime('%b %Y')}) ({eligible_days} day(s))",
+                        amount,
+                        source_type="MANUAL",
+                        source_id=a.id,
+                    )
+
+                    dates_str = ", ".join([d.isoformat() for d in sorted(eligible_dates)])
+                    self._create_line(
+                        payroll,
+                        "INFORMATION",
+                        f"Allowance: {name} days: {dates_str}",
+                        DEC_0,
+                        source_type="MANUAL",
+                        source_id=a.id,
+                    )
                 continue
 
-            # ------------------------------------------------------
-            # Non-Per-Day allowances remain your current behavior
-            # ------------------------------------------------------
-            amt = self._resolve_frequency_amount(a.amount, a.frequency, a.effective_from, a.effective_to, period)
+            # Non-Per-Day allowances:
+            # count only within this payroll period, use stored amount directly
+            amt = _d2(a.amount)
             if amt <= 0:
                 continue
+
+            if a.frequency == "One Time":
+                if not (a.effective_from and period.start_date <= a.effective_from <= period.end_date):
+                    continue
 
             self._create_line(
                 payroll,
@@ -1900,7 +2359,36 @@ class PayrollGenerationService:
                 source_type="MANUAL",
                 source_id=a.id
             )
+    
+    def _apply_additional_allowances(self, payroll: Payroll, additional_allowances):
+        """
+        Apply payroll-period-specific manual/additional allowances.
 
+        These are separate from Employee_Allowance recurring rules.
+        They are direct earning inputs for this specific employee + payroll period.
+        """
+        for a in additional_allowances:
+            amt = _d2(a.amount)
+            if amt <= 0:
+                continue
+
+            allowance_name = a.allowance_type.name if a.allowance_type else "Additional Allowance"
+            allowance_date = a.allowance_date.isoformat() if a.allowance_date else "-"
+
+            desc = f"Additional Allowance: {allowance_name} ({allowance_date})"
+
+            if a.remarks:
+                desc += f" - {a.remarks}"
+
+            self._create_line(
+                payroll,
+                "EARNING",
+                desc,
+                amt,
+                source_type="MANUAL",
+                source_id=a.id,
+            )
+    
     def _apply_commissions(
         self,
         payroll: Payroll,
@@ -1973,26 +2461,99 @@ class PayrollGenerationService:
                 rate_applied=rate_applied,
                 commission_tax_rule=rule,
             )
+    
+    #Now used as Additional Deduction
+    def _apply_fines(self, payroll: Payroll, fines):
+        """
+        Apply manual fines as DEDUCTION lines.
+
+        Behavior:
+        - Direct deduction
+        - No tax logic (unless you explicitly add later)
+        - Fully auditable per entry
+        """
+        fines = fines or []
+
+        for f in fines:
+            amt = _d2(f.amount)
+            if amt <= 0:
+                continue
+
+            desc = f"Fine: {f.name}" if f.name else "Fine"
+
+            if f.remarks:
+                desc += f" - {f.remarks}"
+
+            self._create_line(
+                payroll,
+                "DEDUCTION",
+                desc,
+                amt,
+                source_type="FINE",
+                source_id=f.id,
+            )
+
+    def _apply_additional_earnings(self, payroll: Payroll, additional_earnings):
+        """
+        Apply manual additional earnings as EARNING lines.
+
+        Behavior:
+        - Direct earning
+        - No tax logic (unless you add later)
+        - Fully auditable per entry
+        """
+        additional_earnings = additional_earnings or []
+
+        for e in additional_earnings:
+            amt = _d2(e.amount)
+            if amt <= 0:
+                continue
+
+            desc = f"Additional Earning: {e.name}" if e.name else "Additional Earning"
+
+            if e.remarks:
+                desc += f" - {e.remarks}"
+
+            self._create_line(
+                payroll,
+                "EARNING",
+                desc,
+                amt,
+                source_type="ADDITIONAL_EARNING",
+                source_id=e.id,
+            )
+
     def _apply_deductions(self, payroll: Payroll, deductions, period: Payroll_Period):
         """
-        Apply employee deductions into DEDUCTION payslip lines.
+        Apply regular employee deductions into DEDUCTION payslip lines.
 
-        Special handling:
-        - If a deduction row represents a loan, use amortization_per_period when available.
-          Otherwise, use d.amount.
+        Important:
+        - New Loan model is now the source of truth for payroll loan deductions.
+        - Old loan-style Employee_Deduction rows (amortization_per_period-based)
+        are skipped here to avoid double deduction.
 
-        Amount is then resolved by frequency (Per Period / Monthly / One Time).
+        Rules:
+        - normal deductions resolve amount using frequency + cutoff type
         """
         for d in deductions:
-            # If this deduction is a loan row, prefer amortization_per_period (per payroll period)
-            base_amount = d.amortization_per_period if d.amortization_per_period is not None else d.amount
+            # Skip old loan-style deduction rows now that Loan is handled separately.
+            if getattr(d, "amortization_per_period", None) is not None:
+                continue
 
-            amt = self._resolve_frequency_amount(base_amount, d.frequency, d.effective_from, d.effective_to, period)
+            amt = self._resolve_deduction_frequency_amount(
+                d.amount,
+                d.frequency,
+                d.effective_from,
+                d.effective_to,
+                period,
+            )
+
             if amt <= 0:
                 continue
 
             code = d.deduction_type.code if d.deduction_type else "Deduction"
             desc = f"Deduction: {code}"
+
             self._create_line(
                 payroll,
                 "DEDUCTION",
@@ -2002,27 +2563,42 @@ class PayrollGenerationService:
                 source_id=d.id
             )
 
-    def _resolve_frequency_amount(self, amount, frequency, eff_from, eff_to, period: Payroll_Period) -> Decimal:
+    def _resolve_deduction_frequency_amount(self, amount, frequency, eff_from, eff_to, period: Payroll_Period) -> Decimal:
         """
-        Apply employee deductions into DEDUCTION payslip lines.
+        Resolve how much of the base amount should be applied in THIS payroll period.
 
-        Special handling:
-        - If a deduction row represents a loan, use amortization_per_period when available.
-          Otherwise, use d.amount.
-
-        Amount is then resolved by frequency (Per Period / Monthly / One Time).
+        Business rules:
+        - Monthly:
+            full amount on FIRST cutoff only
+        - Per Period:
+            split amount across FIRST and SECOND
+            FIRST gets rounded half
+            SECOND gets the remainder
+        - One Time:
+            apply once only if effective_from falls inside this payroll period
+        - Per Day:
+            handled elsewhere
         """
         amt = _d2(amount)
+        cutoff_type = (getattr(period, "cutoff_type", "") or "").strip().upper()
 
         if frequency == "Per Day":
-            # handled per-attendance day in _apply_allowances
+            return DEC_0
+
+        if frequency == "Monthly":
+            if cutoff_type == "FIRST":
+                return amt
             return DEC_0
 
         if frequency == "Per Period":
-            return amt
+            first_half = _d2(amt / Decimal("2"))
+            second_half = _d2(amt - first_half)
 
-        if frequency == "Monthly":
-            return _d2(amt / Decimal("2"))
+            if cutoff_type == "FIRST":
+                return first_half
+            if cutoff_type == "SECOND":
+                return second_half
+            return DEC_0
 
         if frequency == "One Time":
             if eff_from and period.start_date <= eff_from <= period.end_date:
@@ -2030,7 +2606,6 @@ class PayrollGenerationService:
             return DEC_0
 
         return amt
-
 
     # -------------------------
     # 9) Totals

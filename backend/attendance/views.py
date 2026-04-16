@@ -17,13 +17,46 @@ from rest_framework.exceptions import PermissionDenied, NotFound,ValidationError
 from datetime import timedelta
 from io import BytesIO
 from .serializers import *
-from .services import (punch_in,punch_out,get_today_status,_get_employee_or_400,_month_date_range,punch_in_eligibility,get_monthly_attendance_stats,get_admin_attendance_analytics_for_range)
-from .services import (punch_in,punch_out,get_today_status,_get_employee_or_400,_month_date_range,punch_in_eligibility,get_monthly_attendance_stats)
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from .services import (
+    punch_in,
+    punch_out,
+    get_today_status,
+    _get_employee_or_400,
+    _month_date_range,
+    punch_in_eligibility,
+    get_monthly_attendance_stats,
+    get_admin_attendance_analytics_for_range,
+    _is_workday_for_shift,
+)
+
+#Helpers
+def _get_next_offset_target_date(employee: Employee, source_date: date) -> date:
+    """
+    Finds the next scheduled workday after the source attendance date.
+    This will be the target_date for Offset_Credit.
+
+    Rule:
+    - next shift only = next workday after source_date
+    """
+    shift = getattr(employee, "shift", None)
+    if not shift:
+        raise ValidationError({"detail": "Employee has no assigned shift."})
+
+    # scan up to 14 days ahead for the next workday
+    for i in range(1, 15):
+        candidate = source_date + timedelta(days=i)
+        if _is_workday_for_shift(shift, candidate):
+            return candidate
+
+    raise ValidationError({
+        "detail": "No next scheduled workday found for this employee."
+    })
+
 
 
 
@@ -59,8 +92,9 @@ class PunchOutView(APIView):
             "message": "Punch out successful.",
             "attendance": AttendanceSerializer(attendance).data,
         })
-#Overtime
-class SuperAdminPendingOvertimeView(APIView):
+
+# Excess Time
+class SuperAdminPendingExcessTimeView(APIView):
     permission_classes = [IsAuthenticated, IsRole]
     allowed_roles = ["SUPER_ADMIN"]
 
@@ -79,72 +113,156 @@ class SuperAdminPendingOvertimeView(APIView):
         date_from, date_to = _month_date_range(year, month)
 
         qs = (
-            Attendance_Event.objects
+            Excess_Time_Request.objects
             .filter(
-                type="Overtime",
-                approval_status="Pending",
-                attendance__date__range=[date_from, date_to],
+                status="Pending",
+                date__range=[date_from, date_to],
             )
             .select_related(
                 "attendance",
-                "attendance__employee",
-                "attendance__employee__department",
-                "attendance__employee__shift",
+                "employee",
+                "employee__department",
+                "employee__shift",
             )
-            .order_by("-attendance__date", "-created_at")
+            .order_by("-date", "-created_at")
         )
 
         if search:
             qs = qs.filter(
-                Q(attendance__employee__fname__icontains=search) |
-                Q(attendance__employee__lname__icontains=search) |
-                Q(attendance__employee__department__name__icontains=search)
+                Q(employee__fname__icontains=search) |
+                Q(employee__lname__icontains=search) |
+                Q(employee__department__name__icontains=search)
             )
 
         return Response({
             "year": year,
             "month": month,
             "count": qs.count(),
-            "results": PendingOvertimeQueueSerializer(qs, many=True).data,
+            "results": PendingExcessTimeQueueSerializer(qs, many=True).data,
         })
-
-class SuperAdminOvertimeStatusView(APIView):
+    
+#Approve as Overtime or Offset
+class SuperAdminResolveExcessTimeView(APIView):
     permission_classes = [IsAuthenticated, IsRole]
     allowed_roles = ["SUPER_ADMIN"]
 
+    @transaction.atomic
     def post(self, request, pk):
-        status = request.data.get("status")
-        reason = (request.data.get("reason") or "").strip()
+        serializer = ExcessTimeResolveSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        if status not in ["Approved", "Declined"]:
-            raise ValidationError({"detail": "Invalid status."})
+        action = serializer.validated_data["action"]
+        reason = serializer.validated_data.get("reason", "")
 
         try:
-            event = Attendance_Event.objects.select_related(
-                "attendance__employee"
-            ).get(pk=pk, type="Overtime")
-        except Attendance_Event.DoesNotExist:
-            raise ValidationError({"detail": "Overtime event not found."})
+            excess = Excess_Time_Request.objects.select_related(
+                "attendance",
+                "employee",
+                "employee__shift",
+            ).get(pk=pk)
+        except Excess_Time_Request.DoesNotExist:
+            raise ValidationError({"detail": "Excess time request not found."})
 
-        if event.approval_status != "Pending":
+        if excess.status != "Pending":
             raise ValidationError({"detail": "This request is already processed."})
 
-        if status == "Declined" and not reason:
-            raise ValidationError({"detail": "Decline reason is required."})
+        # Safety: remove any existing overtime event tied to this same attendance
+        Attendance_Event.objects.filter(
+            attendance=excess.attendance,
+            type="Overtime",
+        ).delete()
 
-        event.approval_status = status
-        event.approved_by = request.user
+        if action == "Approve as Overtime":
+            Attendance_Event.objects.create(
+                attendance=excess.attendance,
+                type="Overtime",
+                minutes=excess.minutes,
+                start_time=excess.start_time,
+                end_time=excess.end_time,
+                approval_status="Approved",
+                event_remarks=(
+                    excess.remarks
+                    or f"Approved as Overtime from excess time request #{excess.id}."
+                ),
+                approved_by=request.user,
+            )
 
-        #  Use event_remarks as decline reason
-        if status == "Declined":
-            event.event_remarks = reason
-        else:
-            event.event_remarks = event.event_remarks or "Approved by SuperAdmin."
+            excess.status = "Approved"
+            excess.resolution_type = "Overtime"
+            excess.approved_by = request.user
+            excess.approved_at = timezone.now()
+            excess.declined_reason = None
+            excess.save(update_fields=[
+                "status",
+                "resolution_type",
+                "approved_by",
+                "approved_at",
+                "declined_reason",
+            ])
 
-        event.save(update_fields=["approval_status", "approved_by", "event_remarks"])
+            return Response({"detail": "Excess time approved as Overtime successfully."})
 
-        return Response({"detail": f"Overtime {status} successfully."})
+        if action == "Approve as Offset":
+            target_date = _get_next_offset_target_date(
+                employee=excess.employee,
+                source_date=excess.date,
+            )
 
+            Offset_Credit.objects.update_or_create(
+                source_request=excess,
+                defaults={
+                    "employee": excess.employee,
+                    "attendance": excess.attendance,
+                    "approved_minutes": excess.minutes,
+                    "used_minutes": 0,
+                    "remaining_minutes": excess.minutes,
+                    "target_date": target_date,
+                    "status": "Active",
+                    "approved_by": request.user,
+                    "approved_at": timezone.now(),
+                    "consumed_at": None,
+                    "expired_at": None,
+                    "remarks": (
+                        excess.remarks
+                        or f"Approved as Offset from excess time request #{excess.id}."
+                    ),
+                },
+            )
+
+            excess.status = "Approved"
+            excess.resolution_type = "Offset"
+            excess.approved_by = request.user
+            excess.approved_at = timezone.now()
+            excess.declined_reason = None
+            excess.save(update_fields=[
+                "status",
+                "resolution_type",
+                "approved_by",
+                "approved_at",
+                "declined_reason",
+            ])
+
+            return Response({"detail": "Excess time approved as Offset successfully."})
+
+        # Decline
+        excess.status = "Declined"
+        excess.resolution_type = None
+        excess.approved_by = request.user
+        excess.approved_at = timezone.now()
+        excess.declined_reason = reason
+        excess.save(update_fields=[
+            "status",
+            "resolution_type",
+            "approved_by",
+            "approved_at",
+            "declined_reason",
+        ])
+
+        # Safety: remove offset credit if somehow one exists
+        Offset_Credit.objects.filter(source_request=excess).delete()
+
+        return Response({"detail": "Excess time declined successfully."})
+    
 #Attendance Status
 class TodayAttendanceView(APIView):
     permission_classes = [IsAuthenticated]
@@ -192,6 +310,7 @@ class AttendanceLogsView(APIView):
             "count": qs.count(),
             "results": AttendanceLogSerializer(qs, many=True).data,
         })
+
 #Attendance Logs for admin & superadmin
 class CEOandHRAttendanceLogsView(APIView):
     permission_classes = [IsAuthenticated, IsRole]
@@ -256,7 +375,7 @@ class ShiftRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ShiftSerializer
     permission_classes = [IsAuthenticated]
 
-#==========================================ATTENDANCE REQUEST==============================
+#==========================================ATTENDANCE CORRECTION REQUEST==============================
 
 class EmployeeAttendanceCorrectionCreateView(APIView):
     """
@@ -322,7 +441,10 @@ class EmployeeAttendanceCorrectionCreateView(APIView):
         return Response(
             {
                 "detail": "Attendance correction request submitted.",
-                "correction": AttendanceCorrectionListSerializer(obj).data,
+                "correction": AttendanceCorrectionListSerializer(
+                    obj,
+                    context={"request": request},
+                ).data,
             },
             status=http_status.HTTP_201_CREATED,
         )
@@ -343,7 +465,11 @@ class EmployeeAttendanceCorrectionListView(APIView):
         return Response(
             {
                 "count": qs.count(),
-                "results": AttendanceCorrectionListSerializer(qs, many=True).data,
+                "results": AttendanceCorrectionListSerializer(
+                    qs,
+                    many=True,
+                    context={"request": request},
+                ).data,
             }
         )
 
@@ -365,7 +491,11 @@ class AdminPendingAttendanceCorrectionsView(APIView):
         return Response(
             {
                 "count": qs.count(),
-                "results": AttendanceCorrectionListSerializer(qs, many=True).data,
+                "results": AttendanceCorrectionListSerializer(
+                    qs,
+                    many=True,
+                    context={"request": request},
+                ).data,
             }
         )
 
@@ -489,7 +619,12 @@ class AdminAttendanceCorrectionDetailView(APIView):
         except Attendance_Correction.DoesNotExist:
             raise NotFound("Attendance correction request not found.")
 
-        return Response(AttendanceCorrectionDetailSerializer(obj).data)
+        return Response(
+            AttendanceCorrectionDetailSerializer(
+                obj,
+                context={"request": request},
+            ).data
+        )
 
 
 class AdminApplyAttendanceCorrectionView(APIView):
@@ -614,7 +749,10 @@ class AdminApplyAttendanceCorrectionView(APIView):
         return Response(
             {
                 "detail": "Attendance correction applied and verified.",
-                "correction": AttendanceCorrectionListSerializer(obj).data,
+                "correction": AttendanceCorrectionListSerializer(
+                    obj,
+                    context={"request": request},
+                ).data,
                 "attendance": AttendanceMiniSerializer(attendance).data,
                 "created_event_count": len(created_events),
             }
@@ -1210,7 +1348,7 @@ class AttendanceLogsPDFView(APIView):
         from django.http import FileResponse
         return FileResponse(buffer, as_attachment=True, filename=filename, content_type="application/pdf")
     
-class AttendanceLogsView(APIView):
+class AttendanceLogsListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):

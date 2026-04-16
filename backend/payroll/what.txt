@@ -18,7 +18,9 @@
         
         Commission Rule
 
-        Tax bracket
+        Pay Rules
+
+        Tax bracket rule
 
 Rule:
 

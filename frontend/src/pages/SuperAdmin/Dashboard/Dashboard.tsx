@@ -1,4 +1,3 @@
-//src/pages/SuperAdmin/Dashboard/Dashboard.tsx
 import React, { useEffect, useState } from "react";
 import { Layout, Row, Col, Spin, message, DatePicker, Segmented, Card } from "antd";
 import Chart from "../../../components/Chart";
@@ -16,23 +15,18 @@ import { useNavigate } from "react-router-dom";
 import api from "../../../api/axios";
 import "./Dashboard.css";
 
-import OverTimeModal  from "./OverTimeModal";
-import OverTimeDetailModal  from "./OverTimeDetailModal";
+import ExcessTimeModal from "./ExcessTimeModal";
+import ExcessTimeDetailModal from "./ExcessTimeDetailModal";
 import DeclineReasonModal from "./DeclineReasonModal";
 import { HourglassOutlined } from "@ant-design/icons";
 
-import {HOLIDAY_LEGEND,HolidayBase,HolidayType,} from "../../../components/SharedCalendar/CalendarLegend";
+import { HOLIDAY_LEGEND, HolidayBase, HolidayType } from "../../../components/SharedCalendar/CalendarLegend";
 import { PAYROLL_COLOR } from "../../../components/SharedCalendar/CalendarLegend";
-import type { OverTimeRequest, PendingOTResponse } from "./types";
+import type { ExcessTimeRequest, PendingExcessTimeResponse } from "./types";
 
 const role = localStorage.getItem("role") || "";
 
 const { Content } = Layout;
-
-
-
-
-
 
 type AttendanceStatus =
   | "PRESENT"
@@ -45,10 +39,9 @@ type RangeMode = "Day" | "Week" | "Month" | "Year";
 
 type AttendanceAnalyticsResponse = {
   mode: RangeMode;
-  date: string;        // YYYY-MM-DD (anchor)
-  start_date: string;  // YYYY-MM-DD
-  end_date: string;    // YYYY-MM-DD
-
+  date: string;
+  start_date: string;
+  end_date: string;
   present: number;
   late: number;
   absent: number;
@@ -58,13 +51,12 @@ type AttendanceAnalyticsResponse = {
 };
 
 type CalendarEvent = {
-    type: "holiday" | "payroll";
-    start_date: string;
-    end_date?: string;
-    title: string;
-    color: string;
-  };
-
+  type: "holiday" | "payroll";
+  start_date: string;
+  end_date?: string;
+  title: string;
+  color: string;
+};
 
 const Dashboard: React.FC = () => {
   const currentDate = dayjs().format("MMMM D, YYYY");
@@ -112,17 +104,14 @@ const Dashboard: React.FC = () => {
       message.error("Failed to load calendar events");
     }
   };
-  
+
   /* ------------------ Chart state ------------------ */
   const [chartOption, setChartOption] =
     useState<echarts.ComposeOption<echarts.BarSeriesOption>>();
-  
 
-/* ================= OVERTIME STATE ================= */
-  const [overtimeData, setOvertimeData] = useState<OverTimeRequest[]>([]);
-  const [overtimeLoading, setOvertimeLoading] = useState(false);
-
-
+  /* ================= EXCESS TIME STATE ================= */
+  const [excessTimeData, setExcessTimeData] = useState<ExcessTimeRequest[]>([]);
+  const [excessTimeLoading, setExcessTimeLoading] = useState(false);
 
   /* ================= ATTENDANCE STATE ================= */
   const [attendanceData, setAttendanceData] =
@@ -137,107 +126,105 @@ const Dashboard: React.FC = () => {
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [rangeMode, setRangeMode] = useState<RangeMode>("Day");
 
-
-/* ================= MODAL STATE ================= */
-  const [isOverTimeModalOpen, setIsOverTimeModalOpen] = useState(false);
-  const [isOverTimeDetailModalOpen, setIsOverTimeDetailModalOpen] =
+  /* ================= MODAL STATE ================= */
+  const [isExcessTimeModalOpen, setIsExcessTimeModalOpen] = useState(false);
+  const [isExcessTimeDetailModalOpen, setIsExcessTimeDetailModalOpen] =
     useState(false);
-  const [selectedOverTime, setSelectedOverTime] =
-    useState<OverTimeRequest | null>(null);
+  const [selectedExcessTime, setSelectedExcessTime] =
+    useState<ExcessTimeRequest | null>(null);
   const [isDeclineModalOpen, setIsDeclineModalOpen] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
-  
 
   /* ================= FETCH FUNCTIONS ================= */
-  const fetchOverTimeRequests = async () => {
-      setOvertimeLoading(true);
-      try {
-        const now = dayjs();
+  const fetchExcessTimeRequests = async () => {
+    setExcessTimeLoading(true);
+    try {
+      const now = dayjs();
 
-        const params = {
-          year: now.year(),
-          month: now.month() + 1,
-        };
+      const params = {
+        year: now.year(),
+        month: now.month() + 1,
+      };
 
-        const res = await api.get<PendingOTResponse>(
-          "/attendance/super_admin/overtime/pending/",
-          { params }
-        );
+      const res = await api.get<PendingExcessTimeResponse>(
+        "/attendance/super_admin/excess-time/pending/",
+        { params }
+      );
 
-        const mapped: OverTimeRequest[] = (res.data.results || []).map((r) => ({
-          id: r.id,
-          employee_id: r.employee_id,
-          name: r.full_name,
+      const mapped: ExcessTimeRequest[] = (res.data.results || []).map((r) => ({
+        id: r.id,
+        employee_id: r.employee_id,
+        name: r.full_name,
 
-          attendance_id: r.attendance_id,
-          attendance_date: r.attendance_date,
+        attendance_id: r.attendance_id,
+        attendance_date: r.attendance_date,
 
-          type: r.type, 
+        minutes: r.minutes,
+        start_time: r.start_time,
+        end_time: r.end_time,
 
-          minutes: r.minutes,
-          start_time: r.start_time,
-          end_time: r.end_time,
+        time_in: r.time_in,
+        time_out: r.time_out,
 
-          time_in: r.time_in,
-          time_out: r.time_out,
+        status: r.status,
+        resolution_type: r.resolution_type,
+        remarks: r.remarks,
+        created_at: r.created_at,
 
-          status: r.approval_status,
-          event_remarks: r.event_remarks,
-          department_name: r.department_name,
-          shift_name: r.shift_name,
-        }));
+        department_name: r.department_name,
+        shift_name: r.shift_name,
+      }));
 
-        setOvertimeData(mapped);
-        return mapped;
-      } catch {
-        message.error("Failed to fetch overtime requests");
-        return [];
-      } finally {
-        setOvertimeLoading(false);
-      }
-    };
+      setExcessTimeData(mapped);
+      return mapped;
+    } catch {
+      message.error("Failed to fetch excess time requests");
+      return [];
+    } finally {
+      setExcessTimeLoading(false);
+    }
+  };
 
-     
-const fetchAttendanceAnalytics = async (d?: Dayjs, mode?: RangeMode) => {
-  setAttendanceLoading(true);
-  try {
-    const anchor = d ?? selectedDate;
-    const m = mode ?? rangeMode;
+  const fetchAttendanceAnalytics = async (d?: Dayjs, mode?: RangeMode) => {
+    setAttendanceLoading(true);
+    try {
+      const anchor = d ?? selectedDate;
+      const m = mode ?? rangeMode;
 
-    const params = {
-      mode: m,
-      date: anchor.format("YYYY-MM-DD"),
-    };
+      const params = {
+        mode: m,
+        date: anchor.format("YYYY-MM-DD"),
+      };
 
-    // Use the new backend endpoint (same rules as pie charts)
-    const res = await api.get<AttendanceAnalyticsResponse>(
-      "/attendance/super_admin/analytics/",
-      { params }
-    );
+      const res = await api.get<AttendanceAnalyticsResponse>(
+        "/attendance/super_admin/analytics/",
+        { params }
+      );
 
-    setAttendanceData({
-      PRESENT: res.data.present ?? 0,
-      ABSENT: res.data.absent ?? 0,
-      LATE: res.data.late ?? 0,
-      OVERTIME: res.data.overtime ?? 0,
-      UNDERTIME: res.data.undertime ?? 0,
-    });
-  } catch (err: any) {
-    const msg =
-      err?.response?.data?.detail ||
-      err?.response?.data?.message ||
-      "Failed to load attendance analytics";
-    message.error(msg);
-  } finally {
-    setAttendanceLoading(false);
-  }
-};
+      setAttendanceData({
+        PRESENT: res.data.present ?? 0,
+        ABSENT: res.data.absent ?? 0,
+        LATE: res.data.late ?? 0,
+        OVERTIME: res.data.overtime ?? 0,
+        UNDERTIME: res.data.undertime ?? 0,
+      });
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to load attendance analytics";
+      message.error(msg);
+    } finally {
+      setAttendanceLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchAttendanceAnalytics(selectedDate, rangeMode);
   }, [selectedDate, rangeMode]);
 
   useEffect(() => {
-    fetchOverTimeRequests();
+    fetchExcessTimeRequests();
     loadCalendarEvents();
   }, []);
 
@@ -282,37 +269,59 @@ const fetchAttendanceAnalytics = async (d?: Dayjs, mode?: RangeMode) => {
     return () => window.removeEventListener("resize", handleResize);
   }, [attendanceData]);
 
-  const updateOverTimeStatus = async (status: "Approved" | "Declined") => {
-    if (!selectedOverTime) return;
+  const resolveExcessTimeRequest = async (
+    action: "Approve as Overtime" | "Approve as Offset" | "Decline"
+  ) => {
+    if (!selectedExcessTime) return;
+
     try {
-      const payload: any = { status };
-        if (status === "Declined") payload.reason = declineReason;
+      const payload: { action: string; reason?: string } = { action };
 
-        await api.post(
-          `/attendance/super_admin/overtime/${selectedOverTime.id}/status/`,
-          payload
-        );
+      if (action === "Decline") {
+        payload.reason = declineReason.trim();
+      }
 
-      setOvertimeData((prev) =>
-        prev.map((r) => (r.id === selectedOverTime.id ? { ...r, status } : r))
+      await api.post(
+        `/attendance/super_admin/excess-time/${selectedExcessTime.id}/resolve/`,
+        payload
       );
 
-      message.success(`Overtime request ${status}`);
-      setIsOverTimeDetailModalOpen(false);
+      let successMessage = "Excess time request updated successfully.";
+      if (action === "Approve as Overtime") {
+        successMessage = "Excess time approved as Overtime.";
+      } else if (action === "Approve as Offset") {
+        successMessage = "Excess time approved as Offset.";
+      } else if (action === "Decline") {
+        successMessage = "Excess time request declined.";
+      }
+
+      message.success(successMessage);
+
+      setIsExcessTimeDetailModalOpen(false);
       setIsDeclineModalOpen(false);
       setDeclineReason("");
-      setSelectedOverTime(null);
+      setSelectedExcessTime(null);
 
-      await fetchOverTimeRequests();
-    } catch {
-      message.error("Failed to update status");
+      await fetchExcessTimeRequests();
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.reason?.[0] ||
+        err?.response?.data?.reason ||
+        "Failed to resolve excess time request";
+      message.error(msg);
     }
   };
 
-  const handleApprove = async () => updateOverTimeStatus("Approved");
-  const handleDecline = async () => updateOverTimeStatus("Declined");
+  const handleApproveAsOvertime = async () =>
+    resolveExcessTimeRequest("Approve as Overtime");
 
-  /* ================= RENDER ================= */
+  const handleApproveAsOffset = async () =>
+    resolveExcessTimeRequest("Approve as Offset");
+
+  const handleDecline = async () =>
+    resolveExcessTimeRequest("Decline");
+
   return (
     <Layout className="dashboard-layout">
       <Sidebar />
@@ -320,58 +329,8 @@ const fetchAttendanceAnalytics = async (d?: Dayjs, mode?: RangeMode) => {
         <Topbar title="Dashboard" />
         <Content className="dashboard-content">
           <Row gutter={[16, 16]} className="equalHeightRow">
-          
 
-          {/* PENDING PAYROLL */}
-          <Col xs={25} md={7}>
-            <Card className="stat-tile primary" hoverable>
-              <div className="tile-title">Off Set (Coming Soon)</div>
-
-              <div className="tile-body">
-                <HourglassOutlined className="tile-icon" />
-                <div className="tile-value">—</div>
-              </div>
-            </Card>
-          </Col>
-
-          {/* OVERTIME */}
-          <Col xs={25} md={7}>
-            <Card
-              className="stat-tile"
-              hoverable
-              onClick={async () => {
-                const latest = await fetchOverTimeRequests();
-                const pending = latest.filter((r) => r.status === "Pending");
-
-                if (pending.length === 1) {
-                  setSelectedOverTime(pending[0]);
-                  setIsOverTimeDetailModalOpen(true);
-                } else {
-                  setIsOverTimeModalOpen(true);
-                }
-              }}
-            >
-              <div className="tile-title">Overtime Pending(s)</div>
-                {/* Change this into clock coming soon */}
-              <div className="tile-body">
-                <HourglassOutlined className="tile-icon" />
-                <div className="tile-value">
-                  {overtimeData.filter((r) => r.status === "Pending").length}
-                </div>
-              </div>
-            </Card>
-          </Col>
-
-          {/* ANNOUNCEMENTS */}
-          <Col xs={24} md={10}>
-            <CompanyNote role="SUPER_ADMIN" />
-          </Col>
-
-        </Row>
-
-          {/* ================= BOTTOM ROW ================= */}
-            <Row gutter={[16, 16]} className="equalHeightRow">
-              <Col xs={24} lg={16}>
+            <Col xs={24} lg={16}>
               <div className="card analytics-card">
                 <div className="filter-row">
                   <Segmented
@@ -393,45 +352,78 @@ const fetchAttendanceAnalytics = async (d?: Dayjs, mode?: RangeMode) => {
                     }}
                   />
                 </div>
-              <div className="chart-area">
-              <Spin spinning={attendanceLoading} style={{ width: "100%", height: "100%" }}>
-                <div className="chart-fill">
-                  {chartOption && <Chart option={chartOption} />}
+                <div className="chart-area">
+                  <Spin spinning={attendanceLoading} style={{ width: "100%", height: "100%" }}>
+                    <div className="chart-fill">
+                      {chartOption && <Chart option={chartOption} />}
+                    </div>
+                  </Spin>
                 </div>
-              </Spin>
-            </div>
               </div>
             </Col>
 
-            <Col xs={24} lg={8}>
-            <div className="card calendar-card">
-              <SharedCalendar events={calendarEvents} />
-              <CalendarLegendDisplay />
-            </div>
+            <Col xs={24} md={8}>
+              <CompanyNote role="SUPER_ADMIN" />
             </Col>
           </Row>
 
-          {/* ================= MODALS ================= */}
-          <OverTimeModal
-            visible={isOverTimeModalOpen}
-            onClose={() => setIsOverTimeModalOpen(false)}
-            data={overtimeData}
-            loading={overtimeLoading}
+          <Row gutter={[16, 16]} className="equalHeightRow">
+            <Col xs={24} md={8}>
+            
+              <Card
+                className="stat-tile"
+                hoverable
+                onClick={async () => {
+                  const latest = await fetchExcessTimeRequests();
+                  const pending = latest.filter((r) => r.status === "Pending");
+
+                  if (pending.length === 1) {
+                    setSelectedExcessTime(pending[0]);
+                    setIsExcessTimeDetailModalOpen(true);
+                  } else {
+                    setIsExcessTimeModalOpen(true);
+                  }
+                }}
+              >
+                <div className="tile-title">Excess Time Pending(s)</div>
+                <div className="tile-body">
+                  <HourglassOutlined className="tile-icon" />
+                  <div className="tile-value">
+                    {excessTimeData.filter((r) => r.status === "Pending").length}
+                  </div>
+                </div>
+              </Card>
+            </Col>
+
+            <Col xs={24} lg={16}>
+              <div className="card calendar-card">
+                <SharedCalendar events={calendarEvents} />
+                <CalendarLegendDisplay />
+              </div>
+            </Col>
+          </Row>
+
+          <ExcessTimeModal
+            visible={isExcessTimeModalOpen}
+            onClose={() => setIsExcessTimeModalOpen(false)}
+            data={excessTimeData}
+            loading={excessTimeLoading}
             navigateToAll={() => navigate("/super-admin/requests/")}
             onRowClick={(row) => {
-              setIsOverTimeModalOpen(false);      // close list modal
-              setSelectedOverTime(row);
-              setIsOverTimeDetailModalOpen(true); // open detail modal
+              setIsExcessTimeModalOpen(false);
+              setSelectedExcessTime(row);
+              setIsExcessTimeDetailModalOpen(true);
             }}
           />
 
-          <OverTimeDetailModal
-            visible={isOverTimeDetailModalOpen}
-            overtime={selectedOverTime}
-            onClose={() => setIsOverTimeDetailModalOpen(false)} 
-            onApprove={handleApprove}
-            onDecline={() => setIsDeclineModalOpen(true)}
-          />
+          <ExcessTimeDetailModal
+              visible={isExcessTimeDetailModalOpen}
+              excessTime={selectedExcessTime}
+              onClose={() => setIsExcessTimeDetailModalOpen(false)}
+              onApproveAsOvertime={handleApproveAsOvertime}
+              onApproveAsOffset={handleApproveAsOffset}
+              onDecline={() => setIsDeclineModalOpen(true)}
+            />
 
           <DeclineReasonModal
             visible={isDeclineModalOpen}
@@ -440,8 +432,6 @@ const fetchAttendanceAnalytics = async (d?: Dayjs, mode?: RangeMode) => {
             onCancel={() => setIsDeclineModalOpen(false)}
             onSave={handleDecline}
           />
-
-
         </Content>
       </Layout>
     </Layout>

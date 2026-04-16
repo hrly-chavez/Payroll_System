@@ -1,4 +1,3 @@
-// src/api/axios.ts
 import axios from "axios";
 
 const baseURL =
@@ -7,19 +6,16 @@ const baseURL =
 
 const api = axios.create({
   baseURL,
-  withCredentials: true, // VERY IMPORTANT to send cookies
+  withCredentials: true,
 });
 
 let isRefreshing = false;
 let failedQueue: any[] = [];
 
-const processQueue = (error: any, token: string | null = null) => {
+const processQueue = (error: any = null) => {
   failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token);
-    }
+    if (error) prom.reject(error);
+    else prom.resolve();
   });
   failedQueue = [];
 };
@@ -29,47 +25,47 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Only handle 401 for endpoints other than refresh
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      // If user is already logged out, do nothing
-      if (localStorage.getItem("loggedOut") === "true") {
-        return Promise.reject(error);
-      }
+    //  Endpoints that should NEVER trigger refresh
+    const skipRefreshEndpoints = [
+      "/accounts/login/",
+      "/accounts/token/refresh/",
+      "/accounts/logout/",
+    ];
 
+    const shouldSkipRefresh = skipRefreshEndpoints.some((url) =>
+      originalRequest.url?.includes(url)
+    );
+
+    //  If request is login/refresh/logout → DO NOT refresh
+    if (shouldSkipRefresh) {
+      return Promise.reject(error);
+    }
+
+    //  Only handle 401 errors
+    if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
-        })
-          .then(() => api(originalRequest))
-          .catch((err) => Promise.reject(err));
+        }).then(() => api(originalRequest));
       }
 
       isRefreshing = true;
 
       try {
-        const res = await axios.post(
-          `${baseURL}/accounts/token/refresh/`,
-          {},
-          { withCredentials: true }
-        );
+        await api.post("/accounts/token/refresh/");
 
         isRefreshing = false;
-        processQueue(null);
+        processQueue();
 
         return api(originalRequest);
-      } catch (err) {
+      } catch (refreshError) {
         isRefreshing = false;
-        processQueue(err, null);
+        processQueue(refreshError);
 
-        // Mark as logged out to prevent looping
-        localStorage.setItem("loggedOut", "true");
-
-        // Redirect to login once
-        window.location.href = "/";
-
-        return Promise.reject(err);
+        //  Important: return ORIGINAL error, not refresh error
+        return Promise.reject(error);
       }
     }
 

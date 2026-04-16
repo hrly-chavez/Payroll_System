@@ -16,8 +16,10 @@ import PayslipsTab from "./Tabs/PayslipsTab";
 import EmployeeAccountTab from "./Tabs/EmployeeAccountTab";
 import AuditLogsTab from "./Tabs/AuditLogsTab";
 
+//edit employee's information
 import EditEmployeeDetailsModal from "./Modals/EditEmployeeDetailsModal";
 import EditEmployeeAddressModal from "./Modals/EditEmployeeAddressModal";
+import EditEmploymentStatusModal from "./Modals/EditEmploymentStatusModal";
 
 
 const { Content } = Layout;
@@ -36,11 +38,12 @@ interface AddressData {
 }
 
 interface EmployeeData {
-  id: number;
+  id_no: number;
   name: string;
   department_name: string;
   position: string;
   status: string;
+  employment_status: string;
   is_active: boolean;
   shift_info: string | null;
   hired_date: string;
@@ -49,6 +52,7 @@ interface EmployeeData {
   contact_no: string;
   address: AddressData;
   role: "EMPLOYEE" | "ADMIN" | "SUPER_ADMIN";
+  profile_picture?: string;
 }
 
 interface DeductionRow {
@@ -210,6 +214,10 @@ const EmployeeDetailsPage: React.FC = () => {
     fetchAuditLogs();
   }, [employeeId]);
 
+  /* =========================
+     EMPLOYMENT STATUS RETRIEVE STATE
+  ========================== */
+  const [isEditEmploymentStatusOpen, setIsEditEmploymentStatusOpen] = useState(false);
   
 
   const salaryColumns = [
@@ -234,9 +242,6 @@ const EmployeeDetailsPage: React.FC = () => {
   if (loading) return <Spin tip="Loading..." style={{ marginTop: 100 }} />;
   if (!employee) return <p style={{ marginTop: 100 }}>Employee not found.</p>;
 
-  const employeeStatus: "active" | "deactivated" =
-    (employee as any).is_active ? "active" : "deactivated";
-
   return (
     <Layout className={styles.layout}>
       <Sidebar />
@@ -249,7 +254,11 @@ const EmployeeDetailsPage: React.FC = () => {
             {/* LEFT PROFILE CARD */}
             <Card className={styles.profileCard}>
               <div className={styles.profileHeader}>
-                <img src="/avatar.jpg" className={styles.avatar} alt="avatar" />
+                <img
+                  src={employee.profile_picture || "/avatar.jpg"}
+                  className={styles.avatar}
+                  alt={employee.name}
+                />
 
                 <div className={styles.nameSection}>
                   <div className={styles.nameTop}>
@@ -262,7 +271,7 @@ const EmployeeDetailsPage: React.FC = () => {
                     />
 
                   </div>
-                  <span className={styles.empId}>ID : {employee.id}</span>
+                  <span className={styles.empId}>ID : {employee.id_no}</span>
                 </div>
               </div>
 
@@ -366,24 +375,36 @@ const EmployeeDetailsPage: React.FC = () => {
                 </div>
 
 
-                <div className={styles.statusRow}>
+                <div className={styles.infoRow}>
                   <div className={styles.iconBox}>
-                    {employeeStatus === "active" ? (
-                      <CheckCircleOutlined className={styles.activeIcon} />
-                    ) : (
-                      <StopOutlined className={styles.inactiveIcon} />
-                    )}
+                    <UserOutlined />
                   </div>
-                  <div>
-                    <span className={styles.label}>Status</span>
+                  <div className={styles.nameSection}>
+                    <div className={styles.nameTop}>
+                      <span className={styles.label}>Employment Status</span>
+
+                      <Button
+                        type="text"
+                        icon={<EditOutlined />}
+                        className={styles.editBtn}
+                        onClick={() => setIsEditEmploymentStatusOpen(true)}
+                      />
+                    </div>
+
                     <p
-                      className={
-                        employeeStatus === "active"
-                          ? styles.activeText
-                          : styles.inactiveText
-                      }
+                      style={{
+                        fontWeight: 600,
+                        color:
+                          employee.employment_status === "REGULAR"
+                            ? "green"
+                            : employee.employment_status === "PROBATION"
+                            ? "orange"
+                            : employee.employment_status === "NEW_HIRE"
+                            ? "blue"
+                            : "purple",
+                      }}
                     >
-                      {employeeStatus === "active" ? "Active" : "Deactivated"}
+                      {employee.employment_status.replace("_", " ")}
                     </p>
                   </div>
                 </div>
@@ -486,6 +507,21 @@ const EmployeeDetailsPage: React.FC = () => {
           setIsEditAddressOpen(false);
 
           // Refresh employee data
+          const res = await api.get(
+            `/employees/employees/${employeeId}/details/`
+          );
+          setEmployee(res.data);
+        }}
+      />
+
+      <EditEmploymentStatusModal
+        open={isEditEmploymentStatusOpen}
+        employeeId={Number(employeeId)}
+        currentStatus={employee.employment_status}
+        onClose={() => setIsEditEmploymentStatusOpen(false)}
+        onSuccess={async () => {
+          setIsEditEmploymentStatusOpen(false);
+
           const res = await api.get(
             `/employees/employees/${employeeId}/details/`
           );

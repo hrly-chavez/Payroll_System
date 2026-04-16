@@ -6,7 +6,6 @@
     "@ant-design/plots": "^2.6.8",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/user-event": "^13.5.0",
-    "@types/node": "^25.1.0",
     "antd": "^6.2.2",
     "axios": "^1.13.4",
     "echarts": "^6.0.0",
@@ -45,6 +44,7 @@
     "@testing-library/react": "^16.3.2",
     "@types/echarts": "^4.9.22",
     "@types/jest": "^30.0.0",
+    "@types/node": "^25.5.2",
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
     "typescript": "^4.9.5"

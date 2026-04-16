@@ -12,12 +12,21 @@ const ProtectedRoute: React.FC<Props> = ({ allowedRoles }) => {
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
+    const isAuth = localStorage.getItem("isAuthenticated");
+
+    if (!isAuth) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
     api.get("/accounts/me/")
       .then((res) => {
         setUser(res.data);
       })
       .catch(() => {
         setUser(null);
+        localStorage.removeItem("isAuthenticated"); // cleanup
       })
       .finally(() => {
         setLoading(false);

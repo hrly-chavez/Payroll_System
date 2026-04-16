@@ -9,8 +9,10 @@ urlpatterns = [
     path("logs/", AttendanceLogsView.as_view(), name="attendance-logs"),
     path("admin/logs/", CEOandHRAttendanceLogsView.as_view(), name="attendance-admin-logs"),
     path("super_admin/logs/", CEOandHRAttendanceLogsView.as_view(), name="attendance-super_admin-logs"),
-    path("super_admin/overtime/pending/", SuperAdminPendingOvertimeView.as_view(), name="superadmin-overtime-pending"),
-    path("super_admin/overtime/<int:pk>/status/",SuperAdminOvertimeStatusView.as_view(),name="superadmin-overtime-status",),
+    
+    path("super_admin/excess-time/pending/", SuperAdminPendingExcessTimeView.as_view(), name="superadmin-excess-time-pending"),
+    path("super_admin/excess-time/<int:pk>/resolve/", SuperAdminResolveExcessTimeView.as_view(), name="superadmin-excess-time-resolve"),
+
     path("shifts/", ShiftListCreateView.as_view(), name="shift-list-create"),
     path("shifts/<int:pk>/", ShiftRetrieveUpdateDestroyView.as_view(), name="shift-detail"),    
     # Attendance Correction (Employee)
@@ -35,5 +37,5 @@ urlpatterns = [
     #pdf generation
     path("attendance-logs/pdf/", AttendanceLogsPDFView.as_view(), name="attendance_logs_pdf"),
     path("attendance-logs/employees/dropdown/", AttendanceEmployeesDropdownView.as_view(), name="attendance_logs_employee_dropdown"),
-    path("attendance-logs/", AttendanceLogsView.as_view(), name="attendance_logs"),
+    path("attendance-logs/", AttendanceLogsListView.as_view(), name="attendance_logs"),
 ]

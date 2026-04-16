@@ -162,8 +162,12 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
       ? `Tax Bracket Breakdown (${bracketLabel})`
       : "Tax Bracket Breakdown";
 
-    if (!raw) {
-      return { title, items: [] as Array<{ label: string; value: string }> };
+     if (!raw) {
+      return {
+        kind: "tax" as const,
+        title,
+        items: [] as Array<{ label: string; value: string }>,
+      };
     }
 
     const toMoney = (v: string) => {
@@ -229,10 +233,131 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
         return { label, value };
       });
 
-    return { title, items };
+        return {
+          kind: "tax" as const,
+          title,
+          items,
+        };
+      };
+    const formatLoanRuleInfoDescription = (text: string) => {
+    // Example:
+    // Loan Rule Info (test2): rule=Standard Employee Loan Rule; mode=PERCENT; value=0.30; cutoff=BOTH; basic_pay=12500.00; scheduled=3750.00; capped=YES; deducted=3000.00; previous=3000.00; new=0.00
+    const t = (text || "").trim();
+
+    const m = t.match(/^Loan Rule Info\s*\((.+?)\):\s*(.*)$/i);
+    if (!m) return null;
+
+    const loanLabel = (m[1] || "").trim();
+    const raw = (m[2] || "").trim();
+
+    const title = loanLabel
+      ? `Loan Rule Breakdown (${loanLabel})`
+      : "Loan Rule Breakdown";
+
+    if (!raw) {
+      return {
+        kind: "loan" as const,
+        title,
+        items: [] as Array<{ label: string; value: string }>,
+      };
+    }
+
+    const toMoney = (v: string) => {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return v;
+      return `₱ ${n.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+    };
+
+    const toPercent = (v: string) => {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return v;
+      return `${(n * 100).toFixed(2)}%`;
+    };
+
+    const prettyKey: Record<string, string> = {
+      rule: "Rule",
+      mode: "Mode",
+      value: "Value",
+      cutoff: "Apply To Cutoff",
+      basic_pay: "Basic Pay Basis",
+      scheduled: "Scheduled Deduction",
+      capped: "Capped by Remaining Balance",
+      deducted: "Final Deducted Amount",
+      previous: "Previous Balance",
+      new: "New Balance",
+    };
+
+    const moneyKeys = new Set([
+      "basic_pay",
+      "scheduled",
+      "deducted",
+      "previous",
+      "new",
+    ]);
+
+    const percentKeys = new Set(["value"]);
+
+    const parts = raw
+      .split(";")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const kvMap: Record<string, string> = {};
+    for (const p of parts) {
+      const idx = p.indexOf("=");
+      if (idx === -1) continue;
+      const k = p.slice(0, idx).trim();
+      const v = p.slice(idx + 1).trim();
+      kvMap[k] = v;
+    }
+
+    const order = [
+      "rule",
+      "mode",
+      "value",
+      "cutoff",
+      "basic_pay",
+      "scheduled",
+      "capped",
+      "deducted",
+      "previous",
+      "new",
+    ];
+
+    const items = order
+      .filter((k) => kvMap[k] !== undefined)
+      .map((k) => {
+        const label = prettyKey[k] || k;
+        const rawVal = kvMap[k];
+
+        let value = rawVal;
+
+        if (moneyKeys.has(k)) value = toMoney(rawVal);
+        if (percentKeys.has(k)) value = toPercent(rawVal);
+
+        if (k === "mode" && rawVal === "PERCENT") value = "Percent";
+        if (k === "mode" && rawVal === "FIXED") value = "Fixed";
+
+        if (k === "cutoff" && rawVal === "BOTH") value = "Both";
+        if (k === "cutoff" && rawVal === "FIRST") value = "First cutoff";
+        if (k === "cutoff" && rawVal === "SECOND") value = "Second cutoff";
+
+        if (k === "capped" && rawVal === "YES") value = "Yes";
+        if (k === "capped" && rawVal === "NO") value = "No";
+
+        return { label, value };
+      });
+
+    return {
+      kind: "loan" as const,
+      title,
+      items,
+    };
   };
- 
-      
+    
   const statusMap: Record<EmployeeMini["status"], { text: string; color: string }> = {
     Pending: { text: "Pending", color: "default" },
     Verified: { text: "Verified", color: "blue" },
@@ -343,21 +468,44 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
           const info =
             formatNightDiffInfoDescription(v || "") ||
             formatAllowanceInfoDescription(v || "") ||
-            formatTaxBracketInfoDescription(v || "");
+            formatTaxBracketInfoDescription(v || "") ||
+            formatLoanRuleInfoDescription(v || "");
 
           if (info) {
             return (
               <div>
                 <div style={{ fontWeight: 600 }}>{info.title}</div>
 
-                {"items" in info ? (
+                                {"items" in info ? (
                   info.items.length > 0 ? (
-                    <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    <div
+                      style={{
+                        marginTop: 8,
+                        border: "1px solid #f0f0f0",
+                        borderRadius: 8,
+                        overflow: "hidden",
+                        background: "#fafafa",
+                      }}
+                    >
                       {info.items.map((it, idx) => (
-                        <Tag key={`${it.label}-${idx}`}>
-                          <span style={{ marginRight: 6 }}>{it.label}:</span>
-                          <span>{it.value}</span>
-                        </Tag>
+                        <div
+                          key={`${it.label}-${idx}`}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "220px 1fr",
+                            gap: 12,
+                            padding: "8px 12px",
+                            borderTop: idx === 0 ? "none" : "1px solid #f0f0f0",
+                            alignItems: "start",
+                          }}
+                        >
+                          <div style={{ fontSize: 12, fontWeight: 600, color: "#595959" }}>
+                            {it.label}
+                          </div>
+                          <div style={{ fontSize: 13, color: "#262626", wordBreak: "break-word" }}>
+                            {it.value}
+                          </div>
+                        </div>
                       ))}
                     </div>
                   ) : (
@@ -489,19 +637,18 @@ export default function PayrollResultModal({ open, employee, period, onClose }: 
                 <Descriptions.Item label="Total Earnings">{money(result?.total_earnings)}</Descriptions.Item>
                 <Descriptions.Item label="Total Deductions">{money(result?.total_deductions)}</Descriptions.Item>
                 {(() => {
-                const nbet = Number(result?.net_before_excess_tax ?? 0);
-                const net = Number(result?.net_pay ?? 0);
+                  const hasPayrollTaxBracket = (result?.lines || []).some(
+                    (line) => line.source_type === "PAYROLL_TAX_BRACKET"
+                  );
 
-                // show ONLY if excess tax affected net pay
-                if (!Number.isFinite(nbet) || !Number.isFinite(net)) return null;
-                if (Math.abs(nbet - net) < 0.0001) return null;
+                  if (!hasPayrollTaxBracket) return null;
 
-                return (
-                  <Descriptions.Item label="Net Before Excess Tax">
-                    {money(result?.net_before_excess_tax)}
-                  </Descriptions.Item>
-                );
-              })()}
+                  return (
+                    <Descriptions.Item label="Net Before Excess Tax">
+                      {money(result?.net_before_excess_tax)}
+                    </Descriptions.Item>
+                  );
+                })()}
 
                 <Descriptions.Item label="Net Pay">
                   <span style={{ fontWeight: 700 }}>{money(result?.net_pay)}</span>

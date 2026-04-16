@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Modal, Form, Select, InputNumber, DatePicker, Button, message } from "antd";
 import dayjs from "dayjs";
+import api from "../../../../api/axios";
 
 interface Props {
   open: boolean;
@@ -9,8 +10,6 @@ interface Props {
   onClose: () => void;
   initialValues?: any;
 }
-
-const MIN_DAILY_WAGE = 500; // Cebu reference minimum daily wage
 
 const EmployeeSalaryModal: React.FC<Props> = ({
   open,
@@ -24,6 +23,28 @@ const EmployeeSalaryModal: React.FC<Props> = ({
   const payType = Form.useWatch("pay_type", form);
   const baseRate = Form.useWatch("base_rate", form);
   const [loading, setLoading] = useState(false);
+  const [divisor, setDivisor] = useState<number | null>(null);
+  const [minWage, setMinWage] = useState<number | null>(null);
+
+  // Fetch payroll settings dynamically
+  useEffect(() => {
+    const fetchPayrollSetting = async () => {
+      try {
+        const res = await api.get("/employees/settings/");
+        setDivisor(res.data.daily_rate_divisor);
+        setMinWage(res.data.daily_minimum_wage);
+      } catch (err: any) {
+        console.error("Failed to fetch payroll settings", err);
+
+        // show backend message
+        message.error(
+          err.response?.data?.detail || "Failed to load payroll settings"
+        );
+      }
+    };
+
+    fetchPayrollSetting();
+  }, []);
 
   // Strict blockers: prevent typing/pasting letters & special chars
   const blockNonNumeric = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -99,19 +120,26 @@ const EmployeeSalaryModal: React.FC<Props> = ({
 
   // Function to calculate wage type dynamically
   const calculateWageType = (pay_type: string, base_rate: number) => {
-    if (!pay_type || !base_rate) return undefined;
+    if (!pay_type || !base_rate || !divisor || !minWage) return undefined; // <-- guard here
+
     let dailyEquivalent = 0;
-    if (pay_type === "Monthly") dailyEquivalent = base_rate / 20;
-    else if (pay_type === "Daily") dailyEquivalent = base_rate;
-    else if (pay_type === "Hourly") dailyEquivalent = base_rate * 8;
-    return dailyEquivalent >= MIN_DAILY_WAGE ? "ABOVE_MINIMUM" : "MINIMUM";
+
+    if (pay_type === "Monthly") {
+      dailyEquivalent = base_rate / divisor; // safe now
+    } else if (pay_type === "Daily") {
+      dailyEquivalent = base_rate;
+    } else if (pay_type === "Hourly") {
+      dailyEquivalent = base_rate * 8;
+    }
+
+    return dailyEquivalent >= minWage ? "ABOVE_MINIMUM" : "MINIMUM";
   };
 
-  // Update wage_type whenever pay_type or base_rate changes
+  // Update wage_type whenever pay_type or base_rate or minWage changes
   useEffect(() => {
     const wageType = calculateWageType(payType, baseRate);
     if (wageType) form.setFieldsValue({ wage_type: wageType });
-  }, [payType, baseRate]);
+  }, [payType, baseRate, minWage]);
 
   useEffect(() => {
     if (open && initialValues) {

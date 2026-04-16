@@ -290,7 +290,7 @@ def get_admin_attendance_analytics_for_range(date_from: date, date_to: date) -> 
 # ====================== HELPERS ======================
 EARLY_PUNCH_IN_MINUTES = 60
 
-OT_APPROVAL_THRESHOLD_MINUTES = 60  # only OT >= 60 mins requires approval
+EXCESS_TIME_APPROVAL_THRESHOLD_MINUTES = 60  # only OT >= 60 mins requires approval
 
 def _get_employee_or_400(user):
     employee = getattr(user, "employee", None)
@@ -412,6 +412,22 @@ def _resolve_attendance_for_punch_out(employee, shift):
 
     return None
 
+def _get_active_offset_credit(employee, work_date: date):
+    """
+    Returns the earliest active offset credit for the employee on the target work date.
+    For now, only one next-shift offset is expected, but order defensively.
+    """
+    return (
+        Offset_Credit.objects
+        .filter(
+            employee=employee,
+            target_date=work_date,
+            status="Active",
+            remaining_minutes__gt=0,
+        )
+        .order_by("created_at")
+        .first()
+    )
 
 # ====================== ATTENDANCE ======================
 @transaction.atomic
@@ -460,22 +476,67 @@ def punch_in(user):
         attendance.status = attendance.status or "PRESENT"
         attendance.save(update_fields=["time_in", "status"])
 
-    # Late event (system approved) — based on shift start + grace (early punch-in will never be late)
-    late_minutes = _compute_minutes_late_dt(shift, shift_start_dt, now_dt)
-    if late_minutes > 0:
+    # -------------------------------------------------
+    # Late computation with offset consumption
+    # -------------------------------------------------
+    raw_late_minutes = _compute_minutes_late_dt(shift, shift_start_dt, now_dt)
+
+    # default: no offset used
+    offset_used_minutes = 0
+    remaining_late_minutes = raw_late_minutes
+
+    active_offset = None
+    if raw_late_minutes > 0:
+        active_offset = _get_active_offset_credit(employee, work_date)
+
+    if raw_late_minutes > 0 and active_offset:
+        offset_used_minutes = min(raw_late_minutes, active_offset.remaining_minutes)
+        remaining_late_minutes = raw_late_minutes - offset_used_minutes
+
+        active_offset.used_minutes += offset_used_minutes
+        active_offset.remaining_minutes -= offset_used_minutes
+
+        if active_offset.remaining_minutes <= 0:
+            active_offset.remaining_minutes = 0
+            active_offset.status = "Used"
+            active_offset.consumed_at = now_dt
+        else:
+            active_offset.status = "Active"
+
+        active_offset.save(update_fields=[
+            "used_minutes",
+            "remaining_minutes",
+            "status",
+            "consumed_at",
+        ])
+
+    # -------------------------------------------------
+    # Final Late event creation
+    # -------------------------------------------------
+    if remaining_late_minutes > 0:
+        if offset_used_minutes > 0:
+            remarks = (
+                f"System detected {raw_late_minutes} minute(s) late. "
+                f"Offset applied: {offset_used_minutes} minute(s). "
+                f"Remaining late: {remaining_late_minutes} minute(s)."
+            )
+        else:
+            remarks = f"System detected {remaining_late_minutes} minute(s) late."
+
         Attendance_Event.objects.update_or_create(
             attendance=attendance,
             type="Late",
             defaults={
-                "minutes": late_minutes,
+                "minutes": remaining_late_minutes,
                 "approval_status": "Approved",
-                "event_remarks": f"System detected {late_minutes} minute(s) late.",
+                "event_remarks": remarks,
                 "start_time": shift.start_time,
                 "end_time": None,
                 "approved_by": None,
             },
         )
     else:
+        # Fully covered by offset OR not late at all
         Attendance_Event.objects.filter(attendance=attendance, type="Late").delete()
 
     return attendance
@@ -525,59 +586,103 @@ def punch_out(user):
         Attendance_Event.objects.filter(attendance=attendance, type="Undertime").delete()
 
     # -------------------------
-    # Overtime (after shift end)
-    # - Only requires approval if >= 60 minutes
-    # - Store start_time/end_time:
-    #     start_time = shift.end_time
-    #     end_time   = actual punch-out time (local time)
+    # Excess Time (after shift end)
+    # Rule:
+    # - below threshold: ignore
+    # - threshold reached/exceeded: create/update Pending Excess_Time_Request
+    # - do NOT create Attendance_Event(type="Overtime") yet
     # -------------------------
-    overtime_minutes = int((now_dt - shift_end_dt).total_seconds() // 60)
-    overtime_minutes = max(0, overtime_minutes)
+    excess_minutes = int((now_dt - shift_end_dt).total_seconds() // 60)
+    excess_minutes = max(0, excess_minutes)
 
-    if overtime_minutes > 0:
-        needs_approval = overtime_minutes >= OT_APPROVAL_THRESHOLD_MINUTES
-
-        Attendance_Event.objects.update_or_create(
+    if excess_minutes >= EXCESS_TIME_APPROVAL_THRESHOLD_MINUTES:
+        Excess_Time_Request.objects.update_or_create(
             attendance=attendance,
-            type="Overtime",
             defaults={
-                "minutes": overtime_minutes,
-                "approval_status": "Pending" if needs_approval else "Approved",
-                "event_remarks": (
-                    f"System detected {overtime_minutes} minute(s) overtime."
-                    + (" Needs approval." if needs_approval else " Auto-approved (below 60 minutes).")
-                ),
-                "start_time": shift.end_time,     # OT starts at shift end (your requirement)
+                "employee": employee,
+                "date": attendance.date,
+                "minutes": excess_minutes,
+                "start_time": shift.end_time,
                 "end_time": timezone.localtime(now_dt).time(),
+                "status": "Pending",
+                "resolution_type": None,
+                "remarks": f"System detected {excess_minutes} minute(s) excess time. Needs approval.",
                 "approved_by": None,
+                "approved_at": None,
+                "declined_reason": None,
             },
         )
-    else:
-        Attendance_Event.objects.filter(attendance=attendance, type="Overtime").delete()
 
+        # Safety: if an overtime event somehow exists for this attendance, remove it.
+        Attendance_Event.objects.filter(attendance=attendance, type="Overtime").delete()
+    else:
+        # Below threshold = ignore entirely
+        Excess_Time_Request.objects.filter(attendance=attendance).delete()
+        Attendance_Event.objects.filter(attendance=attendance, type="Overtime").delete()
+    
     return attendance
 
 def get_today_status(user):
     """
-    For frontend: show today's attendance.
-    Note: for true overnight shifts, if the record is on yesterday, we return it
-    (so the user can still punch out after midnight).
+    Returns the attendance record that is currently relevant for the dashboard.
+
+    Goals:
+    - Normal same-day shift:
+        show today's attendance
+    - True overnight shift after midnight:
+        show yesterday's attendance so punch-out still works
+    - Midnight-start next-day shift (e.g. 00:00-09:00 at 11:30 PM today):
+        if the early-in window for tomorrow is already open,
+        do NOT let today's completed attendance block the next shift.
+        In that case:
+          - return tomorrow's attendance if it already exists
+          - otherwise return None
     """
     employee = _get_employee_or_400(user)
-    shift = employee.shift
+    shift = getattr(employee, "shift", None)
     today = _get_today_local_date()
+    now_dt = _get_now_local_dt()
 
+    # No shift assigned -> plain today lookup
+    if not shift:
+        return Attendance.objects.filter(employee=employee, date=today).first()
+
+    # Resolve the punch-in target work date using the same shared logic
+    target_work_date = _resolve_work_date_for_punch_in(shift, now_dt, today)
+    shift_start_dt, _shift_end_dt = _get_shift_start_end_dt(shift, target_work_date)
+    earliest_allowed_dt = shift_start_dt - timedelta(minutes=EARLY_PUNCH_IN_MINUTES)
+
+    # If we are already inside the target shift's early-in window,
+    # prioritize that target work date.
+    #
+    # This is the key fix for midnight-start shifts:
+    # March 17 11:30 PM should target March 18, not return March 17's old row.
+    if now_dt >= earliest_allowed_dt:
+        target_att = Attendance.objects.filter(
+            employee=employee,
+            date=target_work_date
+        ).first()
+
+        if target_att:
+            return target_att
+
+        # Important:
+        # If target work date is NOT today and we are already in that shift window,
+        # return None so today's completed row does not block punch-in.
+        if target_work_date != today:
+            return None
+
+    # Fallback 1: today's row
     att_today = Attendance.objects.filter(employee=employee, date=today).first()
     if att_today:
         return att_today
 
-    if shift and _is_true_overnight(shift):
+    # Fallback 2: true overnight yesterday row for after-midnight punch-out
+    if _is_true_overnight(shift):
         yesterday = today - timedelta(days=1)
         return Attendance.objects.filter(employee=employee, date=yesterday).first()
 
     return None
-
-
 
 # ====================== PUNCH-IN ELIGIBILITY ======================
 def punch_in_eligibility(user):

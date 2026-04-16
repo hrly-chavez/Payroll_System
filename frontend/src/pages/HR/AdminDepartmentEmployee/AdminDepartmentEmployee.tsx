@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Layout, Table, Input, Button, message } from "antd";
+import { Layout, Table, Input, Button, message, Modal, Form, Select } from "antd";
 import type { TableProps } from "antd";
-import { PlusOutlined, SearchOutlined, SlidersOutlined } from "@ant-design/icons";
+import { PlusOutlined, SearchOutlined, EditOutlined } from "@ant-design/icons";
 import { useNavigate, useParams } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
@@ -20,6 +20,7 @@ interface EmployeeType {
   department: string;
   shift: string;
   hired_date: string;
+  profile_picture?: string;
 }
 
 const AdminDepartmentEmployee: React.FC = () => {
@@ -31,8 +32,28 @@ const AdminDepartmentEmployee: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeType | null>(null);
+  
+  const [departments, setDepartments] = useState<any[]>([]);
+
   const location = useLocation();
   const deptName = (location.state as { deptName?: string })?.deptName || "Employees";
+
+  const BASE_URL = (process.env.REACT_APP_API_BASE_URL || "").replace("/api", "");
+
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const res = await api.get("/employees/departments/");
+        setDepartments(res.data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchDepartments();
+  }, []);
 
   const fetchEmployees = async () => {
     if (!deptId) return;
@@ -66,14 +87,48 @@ const AdminDepartmentEmployee: React.FC = () => {
       title: "Employee Name",
       dataIndex: "name",
       key: "name",
-      render: (text) => (
-        <span className={styles.empLink}>{text}</span>
-      ),
+      render: (_, record) => {
+        const imageUrl = record.profile_picture
+          ? record.profile_picture.startsWith("http")
+            ? record.profile_picture // already full URL
+            : `${BASE_URL}${record.profile_picture}` // relative path
+          : `https://ui-avatars.com/api/?name=${encodeURIComponent(record.name)}`;
+
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <img
+              src={imageUrl}
+              alt={record.name}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                objectFit: "cover",
+              }}
+            />
+            <span className={styles.empLink}>{record.name}</span>
+          </div>
+        );
+      },
     },
     { title: "Position", dataIndex: "position", key: "position" },
     { title: "Status", dataIndex: "status", key: "status" },
     { title: "Shift", dataIndex: "shift_info", key: "shift" },
     { title: "Hired Date", dataIndex: "hired_date", key: "hired_date" },
+    {
+      title: "Actions",
+      key: "actions",
+      render: (_, record) => (
+        <Button
+          icon={<EditOutlined />}
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedEmployee(record);
+            setEditModalOpen(true);
+          }}
+        />
+      ),
+    },
   ];
 
   return (
@@ -92,9 +147,6 @@ const AdminDepartmentEmployee: React.FC = () => {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              <Button icon={<SlidersOutlined />} className={styles.filterBtn}>
-                Filter
-              </Button>
             </div>
 
             <Button
@@ -123,7 +175,7 @@ const AdminDepartmentEmployee: React.FC = () => {
             onRow={(record) => ({
               onClick: () =>
                 navigate(
-                  `/admin/employee/employee-details/${record.id}`
+                  `/admin/department/employee/employee-details/${record.id}`
                 ),
               style: { cursor: "pointer" },
             })}
@@ -138,6 +190,62 @@ const AdminDepartmentEmployee: React.FC = () => {
               fetchEmployees();
             }}
           />
+          <Modal
+            title="Change Department"
+            open={editModalOpen}
+            onCancel={() => setEditModalOpen(false)}
+            footer={null}
+          >
+            <Form
+              layout="vertical"
+              onFinish={async (values) => {
+                try {
+                  await api.patch(
+                    `/employees/employees/${selectedEmployee?.id}/change-department/`,
+                    {
+                      department_id: values.department_id,
+                      reason: values.reason,
+                    }
+                  );
+
+                  message.success("Department updated");
+                  setEditModalOpen(false);
+                  fetchEmployees();
+                } catch (err: any) {
+                  console.error(err);
+                  message.error("Failed to update department");
+                }
+              }}
+            >
+              <Form.Item
+                label="New Department"
+                name="department_id"
+                rules={[{ required: true, message: "Select department" }]}
+              >
+                <Select>
+                  {departments
+                    .filter((d) => d.id !== selectedEmployee?.department)
+                    .map((dept) => (
+                      <Select.Option key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </Select.Option>
+                    ))}
+                </Select>
+              </Form.Item>
+
+              <Form.Item
+                label="Reason"
+                name="reason"
+                rules={[{ required: true, message: "Please provide a reason" }]}
+              >
+                <Input.TextArea placeholder="Reason for transfer" />
+              </Form.Item>
+
+              <Button type="primary" htmlType="submit" block>
+                Save
+              </Button>
+            </Form>
+          </Modal>
         </Layout.Content>
       </Layout>
     </Layout>

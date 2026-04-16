@@ -44,6 +44,7 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
         grace_minutes: String(shift.grace_minutes ?? 0),
 
         is_overnight: !!shift.is_overnight,
+        crosses_midnight: !!shift.crosses_midnight,
         is_active: shift.is_active ?? true,
 
         workdays_selected: selectedDays,
@@ -51,7 +52,7 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
     }
   }, [shift, form]);
 
-  const confirmToggle = (fieldName: "is_overnight" | "is_active") => {
+  const confirmToggle = (fieldName: "is_overnight" | "is_active" | "crosses_midnight") => {
     const currentValue = !!form.getFieldValue(fieldName);
     const nextValue = !currentValue;
 
@@ -60,9 +61,13 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
         ? currentValue
           ? "Are you sure you want to deactivate this shift?"
           : "Are you sure you want to activate this shift?"
+        : fieldName === "is_overnight"
+        ? currentValue
+          ? "Are you sure you want to remove overnight from this shift?"
+          : "Are you sure you want to mark this shift as overnight?"
         : currentValue
-        ? "Are you sure you want to remove overnight from this shift?"
-        : "Are you sure you want to mark this shift as overnight?";
+        ? "Are you sure you want to remove cross-midnight from this shift?"
+        : "Are you sure you want to mark this shift as cross-midnight?";
 
     Modal.confirm({
       title: "Confirm Change",
@@ -79,6 +84,15 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
   const onFinish = async (values: any) => {
     const selectedDays: number[] = values.workdays_selected || [];
 
+    if (!values.crosses_midnight && values.end_time.isBefore(values.start_time)) {
+      message.error("Enable 'Crosses Midnight' for this time range");
+      return;
+    }
+    if (values.crosses_midnight && values.end_time.isAfter(values.start_time)) {
+      message.error("Disable 'Crosses Midnight' for this time range");
+      return;
+    }
+
     const payload: any = {
       ...values,
       start_time: values.start_time.format("HH:mm"),
@@ -91,7 +105,9 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
         day_of_week: d.value,
         is_workday: selectedDays.includes(d.value),
       })),
+      crosses_midnight: values.crosses_midnight, // use the toggle value
     };
+
 
     delete payload.workdays_selected;
     delete payload.break_mins;
@@ -242,6 +258,10 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
           <Input />
         </Form.Item>
 
+        <Form.Item name="crosses_midnight" hidden>
+          <Input />
+        </Form.Item>
+
         <Form.Item name="is_active" hidden>
           <Input />
         </Form.Item>
@@ -257,6 +277,24 @@ const EditShift = ({ open, onClose, shift, refresh }: any) => {
                       <Switch
                         checked={value}
                         onClick={() => confirmToggle("is_overnight")}
+                      />
+                    </Tooltip>
+                  );
+                }}
+              </Form.Item>
+            </Form.Item>
+          </Col>
+
+          <Col xs={24} md={12}>
+            <Form.Item label="Crosses Midnight">
+              <Form.Item noStyle shouldUpdate>
+                {({ getFieldValue }) => {
+                  const value = !!getFieldValue("crosses_midnight");
+                  return (
+                    <Tooltip title={value ? "Unset Cross Midnight" : "Mark as Cross Midnight"}>
+                      <Switch
+                        checked={value}
+                        onClick={() => confirmToggle("crosses_midnight")}
                       />
                     </Tooltip>
                   );

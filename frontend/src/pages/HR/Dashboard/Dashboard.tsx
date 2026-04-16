@@ -441,10 +441,10 @@ const adminOrderedChartData = [...adminChartData].sort(
    ========================================================= */
 
   useEffect(() => {
-    fetchTodayAttendance();
+    // fetchTodayAttendance();
     fetchPunchInEligibility();
     loadCalendarEvents();
-    fetchMyDashboardStats();
+    // fetchMyDashboardStats();
     fetchAdminMonthlyAttendanceStats();
   }, []);
 
@@ -556,12 +556,12 @@ const adminOrderedChartData = [...adminChartData].sort(
     formatBackendTime
   );
       
-  const punchInDisabled =
+const punchInDisabled =
     loadingStatus ||
     loadingPunchInEligibility ||
     loadingPunchIn ||
-    !!attendance?.time_in ||
     !(punchInEligibility?.can_punch_in ?? false);
+    
   return (
     <Layout style={{ minHeight: "100vh" }}>
       <Sidebar />
@@ -574,9 +574,9 @@ const adminOrderedChartData = [...adminChartData].sort(
               Good to see you, <span className={styles.greetingName}>{name}</span>
             </div>
 
-            <div className={`${styles.greetingStatus} ${styles[statusKey]}`}>
+            {/* <div className={`${styles.greetingStatus} ${styles[statusKey]}`}>
               {statusLabel}
-            </div>
+            </div> */}
           </div>
 
           {/* STATS */}

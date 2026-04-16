@@ -81,6 +81,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
         model = Employee
         fields = [
             "id",
+            "id_no",
             "role",
             "fname",
             "lname",
@@ -90,12 +91,14 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "department_name",
             "position",
             "status",
+            "employment_status",
             "shift_info",
             "hired_date",
             "bank_info",
             "email",
             "contact_no",
             "address",
+            "profile_picture",
         ]
 
     def get_name(self, obj):
@@ -181,13 +184,14 @@ class AddressSerializer(serializers.ModelSerializer):
 
 class EmployeeCreateSerializer(serializers.ModelSerializer):
     address = AddressSerializer()
+    profile_picture = serializers.ImageField(required=False)
 
     class Meta:
         model = Employee
         fields = [
-            "id_no", "fname", "initial", "lname", "suffix", "status",
+            "id_no", "fname", "initial", "lname", "suffix", "status", "employment_status",
             "contact_no", "email", "hired_date", "position", "bank_info",
-            "shift", "department", "address",
+            "shift", "department", "address", "profile_picture",
         ]
 
     # -------------------------
@@ -262,6 +266,21 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({"zip_code": "Zip code must contain digits only."})
                 value[key] = sanitized
         return value
+    
+    def validate_profile_picture(self, value):
+        # If no file was uploaded, skip validation
+        if not value:
+            return value
+
+        # Check MIME type
+        if value.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
+            raise serializers.ValidationError("Only JPEG and PNG images are allowed.")
+
+        # Check file size (max 2MB)
+        if value.size > 2 * 1024 * 1024:
+            raise serializers.ValidationError("Image size should not exceed 2MB.")
+
+        return value
 
     # -------------------------
     # CREATE METHOD
@@ -285,13 +304,14 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
 class EmployeeUpdateSerializer(serializers.ModelSerializer):
     address = AddressSerializer(required=False)
     reason = serializers.CharField(write_only=True, required=True)
+    profile_picture = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
         model = Employee
         fields = [
-            "fname", "initial", "lname", "suffix", "status", "contact_no",
+            "fname", "initial", "lname", "suffix", "status", "employment_status", "contact_no",
             "email", "hired_date", "position", "bank_info", "shift",
-            "department", "address", "is_active", "reason",
+            "department", "address", "is_active", "reason", "profile_picture",
         ]
 
     # -------------------------
@@ -337,17 +357,48 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
         return instance
   
 #for salary
-MIN_DAILY_WAGE = 500
+def get_salary_for_deduction(pay_type, base_rate):
+    """
+    Converts the employee's salary to the equivalent monthly amount
+    for deduction lookup based on Payroll Setting.
+    """
+    payroll_setting = Payroll_Setting.objects.first()  # assuming 1 row
+    divisor = payroll_setting.daily_rate_divisor if payroll_setting else 22
+
+    if pay_type == "Monthly":
+        salary_for_deduction = base_rate
+    elif pay_type == "Daily":
+        salary_for_deduction = base_rate * divisor
+    elif pay_type == "Hourly":
+        salary_for_deduction = base_rate * 8 * divisor
+    else:
+        salary_for_deduction = base_rate
+
+    return salary_for_deduction
+
+def get_minimum_wage():
+    setting = PayrollMinimumSetting.objects.first()
+    return setting.daily_minimum_wage if setting else 0  # no hardcoded 500
 
 def calculate_wage_type(pay_type, base_rate):
+
+    payroll_setting = Payroll_Setting.objects.first()
+    divisor = payroll_setting.daily_rate_divisor if payroll_setting else 20
+
+    minimum_wage = get_minimum_wage()
+
     daily_equivalent = 0
+
     if pay_type == "Monthly":
-        daily_equivalent = base_rate / 20
+        daily_equivalent = base_rate / divisor
+
     elif pay_type == "Daily":
         daily_equivalent = base_rate
+
     elif pay_type == "Hourly":
         daily_equivalent = base_rate * 8
-    return "ABOVE_MINIMUM" if daily_equivalent >= MIN_DAILY_WAGE else "MINIMUM"
+
+    return "ABOVE_MINIMUM" if daily_equivalent >= minimum_wage  else "MINIMUM"
 
 class EmployeeSalarySerializer(serializers.ModelSerializer):
     reason = serializers.CharField(write_only=True, required=False)
@@ -441,7 +492,8 @@ class EmployeeDeductionCreateSerializer(serializers.ModelSerializer):
         if not salary:
             raise serializers.ValidationError("Employee has no active salary")
 
-        base_salary = salary.base_rate
+        # Convert employee salary to monthly equivalent for deduction range check
+        base_salary = get_salary_for_deduction(salary.pay_type, salary.base_rate)
 
         # Validate salary range
         deduction_type = Deduction_Type.objects.filter(
@@ -561,14 +613,21 @@ class AllowanceTypeSerializer(serializers.ModelSerializer):
 
 #this is the read or get for allowance
 class EmployeeAllowanceSerializer(serializers.ModelSerializer):
-    allowance_type = AllowanceTypeSerializer(read_only=True)  # nested
+    allowance_type = AllowanceTypeSerializer(read_only=True)  # for display
+
+    allowance_type_id = serializers.PrimaryKeyRelatedField(
+        queryset=Allowance_Type.objects.all(),
+        source='allowance_type',
+        write_only=True
+    )
 
     class Meta:
         model = Employee_Allowance
         fields = [
             "id",
             "employee",
-            "allowance_type",
+            "allowance_type",      # read
+            "allowance_type_id",   # write ✅
             "amount",
             "frequency",
             "effective_from",
@@ -578,18 +637,29 @@ class EmployeeAllowanceSerializer(serializers.ModelSerializer):
 
 #audit logs
 class UserActivityAuditLogSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(source="user.user_name", read_only=True)
+    username = serializers.SerializerMethodField()
     role = serializers.SerializerMethodField()
     timestamp = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S")
 
     class Meta:
         model = AuditLog
-        fields = ["id", "username", "role", "action", "model_name", "timestamp"]
+        fields = ["id", "username", "role", "action", "model_name", "timestamp", "reason"]
+
+    def get_username(self, obj):
+        if obj.user_id:
+            try:
+                return obj.user.user_name
+            except:
+                return "Deleted User"
+        return "Anonymous"
 
     def get_role(self, obj):
-        if obj.user:
-            return obj.user.role
-        return "Anonymous"
+        if obj.user_id:
+            try:
+                return obj.user.role
+            except:
+                return None
+        return None
 
 
 #------------ COMPANY NOTE SERIALIZER-----------

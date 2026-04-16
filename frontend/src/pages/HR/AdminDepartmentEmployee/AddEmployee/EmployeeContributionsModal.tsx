@@ -17,6 +17,7 @@ const { Option } = Select;
 interface Props {
   open: boolean;
   salaryBase: number;
+  payType?: string;
   onNext: (data: any[]) => void;
   onBack: () => void;
   onClose: () => void;
@@ -26,6 +27,7 @@ interface Props {
 const EmployeeContributionsModal: React.FC<Props> = ({
   open,
   salaryBase,
+  payType,
   onBack,
   onNext,
   onClose,
@@ -35,6 +37,41 @@ const EmployeeContributionsModal: React.FC<Props> = ({
 
   const [deductionTypes, setDeductionTypes] = useState<any[]>([]);
   const [enabledDeductions, setEnabledDeductions] = useState<number[]>([]);
+
+  const [divisor, setDivisor] = useState<number>(22); // fallback
+  const [monthlySalary, setMonthlySalary] = useState<number>(salaryBase);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  useEffect(() => {
+    const fetchPayrollSetting = async () => {
+      try {
+        const res = await api.get("/employees/settings/");
+        if (res.data.daily_rate_divisor) {
+          setDivisor(res.data.daily_rate_divisor);
+        }
+        setSettingsLoaded(true);
+      } catch (err) {
+        console.error("Failed to fetch payroll settings", err);
+      }
+    };
+
+    fetchPayrollSetting(); // CALL THE FUNCTION
+  }, []);
+
+
+  useEffect(() => {
+    if (!open || !settingsLoaded || salaryBase <= 0) return;
+
+    const convertToMonthly = (base: number, type: string) => {
+      if (!base) return 0;
+      if (type === "Monthly") return base;
+      if (type === "Daily") return base * divisor;
+      if (type === "Hourly") return base * 8 * divisor;
+      return base;
+    };
+
+    setMonthlySalary(convertToMonthly(salaryBase, payType || "Monthly"));
+  }, [salaryBase, payType, divisor, settingsLoaded]);
 
   const MANDATORY_DEDUCTIONS = ["SSS", "PHILHEALTH", "PAGIBIG"];
 
@@ -108,12 +145,12 @@ const EmployeeContributionsModal: React.FC<Props> = ({
 
   /* -------------------- LOAD DEDUCTION TYPES -------------------- */
   useEffect(() => {
-    if (!open) return;
+    if (!open || monthlySalary <= 0 || !settingsLoaded) return;
 
     const load = async () => {
       try {
         const res = await api.get(
-          `/employees/deductions/deduction-types?salary=${salaryBase}`
+          `/employees/deductions/deduction-types?salary=${monthlySalary}`
         );
 
         const computed = res.data.map((d: any) => ({
@@ -170,7 +207,7 @@ const EmployeeContributionsModal: React.FC<Props> = ({
     };
 
     load();
-  }, [open, salaryBase, initialValues, form]);
+  }, [open, monthlySalary, salaryBase, payType, initialValues, settingsLoaded, form]);
 
   const enableOptional = (id: number) => {
     setEnabledDeductions((prev) => (prev.includes(id) ? prev : [...prev, id]));

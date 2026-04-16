@@ -19,31 +19,47 @@ interface Props {
 }
 // --------------------------------------------
 
-const HOLIDAY_OPTIONS = [
-  { label: "Philippines", value: "PH" },
-  { label: "United States", value: "US" },
-  { label: "Company", value: "COMPANY" },
-];
-
 const AddDepartment: React.FC<Props> = ({ open, onClose, initialValues }) => {
   const [shifts, setShifts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const [holidayOptions, setHolidayOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   // Fetch shifts
   useEffect(() => {
     if (!open) return;
 
-    const fetchShifts = async () => {
+    const fetchData = async () => {
       try {
-        const res = await api.get("/employees/shifts/");
-        setShifts(res.data);
+        // Fetch shifts
+        const shiftRes = await api.get("/employees/shifts/");
+        setShifts(shiftRes.data);
+
+        // Fetch holiday options
+        const holidayRes = await api.get(
+          "/employees/departments/holiday_base_choices/"
+        );
+        setHolidayOptions(holidayRes.data);
+
       } catch (err) {
         console.error(err);
-        message.error("Failed to load shifts");
+        message.error("Failed to load data");
       }
     };
-    fetchShifts();
+
+    fetchData();
   }, [open]);
+
+  const handleHolidayChange = (values: string[]) => {
+    // If all selected → close dropdown
+    if (values.length === holidayOptions.length) {
+      setTimeout(() => setDropdownOpen(false), 150);
+    }
+  };
 
   // Handle submit: create or update
   const onFinish = async (values: any) => {
@@ -130,13 +146,15 @@ const AddDepartment: React.FC<Props> = ({ open, onClose, initialValues }) => {
           name="holiday_base"
           rules={[{ required: true, message: "Please select a holiday base" }]}
         >
-          <Select mode="multiple" placeholder="Choose">
-            {HOLIDAY_OPTIONS.map((option) => (
-              <Select.Option key={option.value} value={option.value}>
-                {option.label}
-              </Select.Option>
-            ))}
-          </Select>
+          <Select
+            mode="multiple"
+            maxTagCount="responsive"
+            placeholder="Choose"
+            options={holidayOptions}
+            open={dropdownOpen}
+            onDropdownVisibleChange={(open) => setDropdownOpen(open)}
+            onChange={handleHolidayChange}
+          />
         </Form.Item>
 
         <div className={styles.actions}>

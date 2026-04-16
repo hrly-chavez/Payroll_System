@@ -2,11 +2,14 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Modal, Descriptions, Tag, Table, Button, Alert, Spin, message, Row, Col, Space, Divider, Typography, Card } from "antd";
+import { Modal, Descriptions, Tag, Table, Button, Alert, Spin, message, Row, Col, Space, Divider, Typography, Card, Popconfirm } from "antd";
 import api from "../../../../api/axios";
 import AddCommission from "./AddCommission";
+import AdditionalAllowanceModal from "./AdditionalAllowanceModal";
 import { formatBackendTime } from "../../../helpers";
 import dayjs from "dayjs";
+import AddDeductionModal from "./AddDeductionModal";
+import AddEarnings from "./AddEarnings";
 
 const { Text } = Typography;
 
@@ -64,9 +67,29 @@ type Deduction = {
   status: "Active" | "Inactive";
   deduction_type?: DeductionType | null;
 
-  total_loan_amount?: string | null;
-  balance?: string | null;
-  amortization_per_period?: string | null;
+  // run-specific
+  is_excluded_for_run?: boolean;
+  exclusion_id?: number | null;
+  exclusion_remarks?: string | null;
+};
+
+type Loan = {
+  id: number;
+  name: string;
+  principal_amount: string;
+  remaining_balance: string;
+  deduction_mode?: "FIXED" | "PERCENT" | null;
+  deduction_value?: string | null;
+  apply_to_cutoff?: "FIRST" | "SECOND" | "BOTH" | null;
+  effective_from: string;
+  effective_to?: string | null;
+  status: "Pending" | "Approved" | "Active" | "Completed" | "Cancelled";
+  remarks?: string | null;
+  declined_reason?: string | null;
+  rule?: number | null;
+  rule_name?: string | null;
+  approved_at?: string | null;
+  created_at?: string | null;
 };
 
 type AllowanceType = {
@@ -84,6 +107,43 @@ type Allowance = {
   status: "Active" | "Inactive";
   allowance_type: AllowanceType;
 };
+type AdditionalAllowance = {
+  id: number;
+  allowance_type: AllowanceType;
+  allowance_date: string;
+  amount: string;
+  remarks?: string | null;
+  created_at: string;
+
+  // optional future support if serializer is upgraded
+  is_excluded_for_run?: boolean;
+  exclusion_id?: number | null;
+  exclusion_remarks?: string | null;
+};
+
+type Fine = {
+  id: number;
+  name: string;
+  amount: string;
+  remarks?: string | null;
+  created_at: string;
+
+  is_excluded_for_run?: boolean;
+  exclusion_id?: number | null;
+  exclusion_remarks?: string | null;
+};
+
+type AdditionalEarning = {
+  id: number;
+  name: string;
+  amount: string;
+  remarks?: string | null;
+  created_at: string;
+
+  is_excluded_for_run?: boolean;
+  exclusion_id?: number | null;
+  exclusion_remarks?: string | null;
+};
 
 type CommissionType = {
   id: number;
@@ -99,6 +159,11 @@ type Commission = {
   amount: string;
   remarks?: string | null;
   created_at: string;
+
+  // NEW
+  is_excluded_for_run?: boolean;
+  exclusion_id?: number | null;
+  exclusion_remarks?: string | null;
 };
 
 type AttendanceEvent = {
@@ -151,10 +216,14 @@ type Snapshot = {
   shift: Shift | null;
   salary: Salary | null;
   taxes: Deduction[];
-  loans: Deduction[];
+  loans: Loan[];
   allowances: Allowance[];
+  additional_allowances: AdditionalAllowance[];
   attendances: AttendanceRow[];
-  leaves: LeaveDayRow[];
+  leave_days: LeaveDayRow[];
+  commissions: Commission[];
+  fines: Fine[];
+  additional_earnings: AdditionalEarning[];
   warnings?: string[];
 };
 
@@ -187,8 +256,14 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [openCommissionModal, setOpenCommissionModal] = useState(false);
 
+  // additional allowances, fine, earning
+  const [openAdditionalAllowanceModal, setOpenAdditionalAllowanceModal] = useState(false);
+  const [openFineModal, setOpenFineModal] = useState(false);
+  const [showAddEarning, setShowAddEarning] = useState(false);
+
   const canVerify = status === "Pending";
   const canAddCommission = status === "Pending";
+  const canAddAdditionalAllowance = status === "Pending";
 
   const canGenerateEmployee =
     status === "Verified" && (period?.status === "Open" || period?.status === "Processing");
@@ -208,6 +283,25 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
       message.error(msg);
     } finally {
       setLoading(false);
+    }
+  };
+
+   const handleDeleteAdditionalAllowance = async (row: AdditionalAllowance) => {
+    if (!employee || !period) return;
+
+    try {
+      const res = await api.delete(
+        `/payroll/periods/${period.id}/employees/${employee.id}/allowances/${row.id}/delete/`
+      );
+
+      message.success(res?.data?.detail || "Additional allowance deleted successfully.");
+      loadSnapshot();
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to delete additional allowance";
+      message.error(msg);
     }
   };
 
@@ -250,26 +344,209 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
   };
 
   const handleGenerateEmployeePayroll = async () => {
-    if (!employee || !period) return;
-    if (!canGenerateEmployee) {
-      message.error("Generate is allowed only when employee is Verified and period is Open.");
-      return;
-    }
+      if (!employee || !period) return;
+      if (!canGenerateEmployee) {
+        message.error("Generate is allowed only when employee is Verified and period is Open.");
+        return;
+      }
 
-    setGenerating(true);
+      setGenerating(true);
+      try {
+        const res = await api.post(`/payroll/periods/${period.id}/employees/${employee.id}/generate/`);
+        message.success(res?.data?.detail || "Payroll generated for this employee.");
+        onVerified();
+        onClose();
+      } catch (err: any) {
+        const msg =
+          err?.response?.data?.detail ||
+          err?.response?.data?.message ||
+          "Generate payroll failed";
+        message.error(msg);
+      } finally {
+        setGenerating(false);
+      }
+    };
+    const handleExcludeTax = async (row: Deduction) => {
+    if (!employee || !period) return;
+
     try {
-      const res = await api.post(`/payroll/periods/${period.id}/employees/${employee.id}/generate/`);
-      message.success(res?.data?.detail || "Payroll generated for this employee.");
-      onVerified();
-      onClose();
+      await api.post(
+        `/payroll/periods/${period.id}/employees/${employee.id}/exclude-input/`,
+        {
+          source_type: "DEDUCTION",
+          source_id: row.id,
+        }
+      );
+
+      message.success("Tax excluded for this payroll run.");
+      loadSnapshot(); // refresh UI
     } catch (err: any) {
       const msg =
         err?.response?.data?.detail ||
         err?.response?.data?.message ||
-        "Generate payroll failed";
+        "Failed to exclude tax";
       message.error(msg);
-    } finally {
-      setGenerating(false);
+    }
+  };
+
+  const handleIncludeTax = async (row: Deduction) => {
+    if (!employee || !period) return;
+
+    try {
+      await api.post(
+        `/payroll/periods/${period.id}/employees/${employee.id}/include-input/`,
+        {
+          source_type: "DEDUCTION",
+          source_id: row.id,
+        }
+      );
+
+      message.success("Tax restored for this payroll run.");
+      loadSnapshot();
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to restore tax";
+      message.error(msg);
+    }
+  };
+
+  const handleExcludeCommission = async (row: Commission) => {
+  if (!employee || !period) return;
+
+  try {
+    await api.post(
+      `/payroll/periods/${period.id}/employees/${employee.id}/exclude-input/`,
+      {
+        source_type: "COMMISSION",
+        source_id: row.id,
+      }
+    );
+
+    message.success("Commission excluded for this payroll run.");
+    loadCommissions();
+  } catch (err: any) {
+    const msg =
+      err?.response?.data?.detail ||
+      err?.response?.data?.message ||
+      "Failed to exclude commission";
+    message.error(msg);
+  }
+  };
+
+  const handleExcludeFine = async (row: Fine) => {
+  if (!employee || !period) return;
+
+  try {
+    await api.post(
+      `/payroll/periods/${period.id}/employees/${employee.id}/exclude-input/`,
+      {
+        source_type: "FINE",
+        source_id: row.id,
+      }
+    );
+
+    message.success("Fine excluded for this payroll run.");
+    loadSnapshot();
+  } catch (err: any) {
+    const msg =
+      err?.response?.data?.detail ||
+      err?.response?.data?.message ||
+      "Failed to exclude fine";
+    message.error(msg);
+  }
+};
+
+const handleIncludeFine = async (row: Fine) => {
+  if (!employee || !period) return;
+
+  try {
+    await api.post(
+      `/payroll/periods/${period.id}/employees/${employee.id}/include-input/`,
+      {
+        source_type: "FINE",
+        source_id: row.id,
+      }
+    );
+
+    message.success("Fine restored for this payroll run.");
+    loadSnapshot();
+  } catch (err: any) {
+    const msg =
+      err?.response?.data?.detail ||
+      err?.response?.data?.message ||
+      "Failed to restore fine";
+    message.error(msg);
+  }
+};
+
+const handleExcludeEarning = async (row: AdditionalEarning) => {
+    if (!employee || !period) return;
+
+    try {
+      await api.post(
+        `/payroll/periods/${period.id}/employees/${employee.id}/exclude-input/`,
+        {
+          source_type: "ADDITIONAL_EARNING",
+          source_id: row.id,
+        }
+      );
+
+      message.success("Earning excluded for this payroll run.");
+      loadSnapshot();
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to exclude earning";
+      message.error(msg);
+    }
+  };
+
+  const handleIncludeEarning = async (row: AdditionalEarning) => {
+    if (!employee || !period) return;
+
+    try {
+      await api.post(
+        `/payroll/periods/${period.id}/employees/${employee.id}/include-input/`,
+        {
+          source_type: "ADDITIONAL_EARNING",
+          source_id: row.id,
+        }
+      );
+
+      message.success("Earning restored for this payroll run.");
+      loadSnapshot();
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to restore earning";
+      message.error(msg);
+    }
+  };
+
+  const handleIncludeCommission = async (row: Commission) => {
+    if (!employee || !period) return;
+
+    try {
+      await api.post(
+        `/payroll/periods/${period.id}/employees/${employee.id}/include-input/`,
+        {
+          source_type: "COMMISSION",
+          source_id: row.id,
+        }
+      );
+
+      message.success("Commission restored for this payroll run.");
+      loadCommissions();
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to restore commission";
+      message.error(msg);
     }
   };
 
@@ -299,28 +576,293 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
     { title: "Amount", dataIndex: "amount", render: (v: string) => v || "0.00" },
     { title: "Frequency", dataIndex: "frequency", render: (v: string) => v || "-" },
   ];
+  const additionalAllowanceColumns = [
+    {
+      title: "Allowance",
+      dataIndex: ["allowance_type", "name"],
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Date",
+      dataIndex: "allowance_date",
+      render: (v: string) => (v ? dayjs(v).format("YYYY-MM-DD") : "-"),
+    },
+    {
+      title: "Amount",
+      dataIndex: "amount",
+      render: (v: string) => v || "0.00",
+    },
+    {
+      title: "Remarks",
+      dataIndex: "remarks",
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Action",
+      render: (_: any, row: AdditionalAllowance) => (
+        <Popconfirm
+          title="Delete additional allowance?"
+          description="This will remove the additional allowance from this payroll period."
+          onConfirm={() => handleDeleteAdditionalAllowance(row)}
+          okText="Delete"
+          cancelText="Cancel"
+          disabled={status !== "Pending"}
+        >
+          <Button danger size="small" disabled={status !== "Pending"}>
+            Delete
+          </Button>
+        </Popconfirm>
+      ),
+    },
+  ];
 
   const taxColumns = [
-    { title: "Tax Type", dataIndex: ["deduction_type", "code"], render: (v: string) => v || "-" },
-    { title: "Amount", dataIndex: "amount", render: (v: string) => v || "0.00" },
-    { title: "Frequency", dataIndex: "frequency", render: (v: string) => v || "-" },
+    {
+      title: "Tax Type",
+      dataIndex: ["deduction_type", "code"],
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Amount",
+      dataIndex: "amount",
+      render: (v: string) => v || "0.00",
+    },
+    {
+      title: "Frequency",
+      dataIndex: "frequency",
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Status",
+      render: (_: any, row: Deduction) =>
+        row.is_excluded_for_run ? (
+          <Tag color="red">Excluded</Tag>
+        ) : (
+          <Tag color="green">Included</Tag>
+        ),
+    },
+    {
+      title: "Action",
+      render: (_: any, row: Deduction) => {
+        if (row.is_excluded_for_run) {
+          return (
+            <Button size="small" onClick={() => handleIncludeTax(row)}>
+              Restore
+            </Button>
+          );
+        }
+
+        return (
+          <Button danger size="small" onClick={() => handleExcludeTax(row)}>
+            X
+          </Button>
+        );
+      },
+    },
   ];
 
-  const loanColumns = [
-    {
-      title: "Loan",
-      dataIndex: ["deduction_type", "code"],
-      render: (_: any, row: Deduction) => row?.deduction_type?.code || "Loan",
-    },
-    { title: "Amort/Period", dataIndex: "amortization_per_period", render: (v: string) => v || "-" },
-    { title: "Balance", dataIndex: "balance", render: (v: string) => v || "-" },
-  ];
+   const loanColumns = [
+      {
+        title: "Loan",
+        dataIndex: "name",
+        render: (v: string) => v || "-",
+      },
+      {
+        title: "Rule",
+        dataIndex: "rule_name",
+        render: (v: string | null) => v || "-",
+      },
+      {
+        title: "Deduction",
+        render: (_: any, row: Loan) =>
+          row.deduction_mode ? `${row.deduction_mode} - ${formatLoanDeductionValue(row)}` : "-",
+      },
+      {
+        title: "Cutoff",
+        dataIndex: "apply_to_cutoff",
+        render: (v: Loan["apply_to_cutoff"]) => formatCutoff(v),
+      },
+      {
+        title: "Remaining Balance",
+        dataIndex: "remaining_balance",
+        render: (v: string) => formatMoney(v),
+      },
+      {
+        title: "Status",
+        dataIndex: "status",
+        render: (v: Loan["status"]) => {
+          const colorMap: Record<Loan["status"], string> = {
+            Pending: "gold",
+            Approved: "blue",
+            Active: "green",
+            Completed: "default",
+            Cancelled: "red",
+          };
+          return <Tag color={colorMap[v] || "default"}>{v}</Tag>;
+        },
+      },
+    ];
 
   const commissionColumns = [
-    { title: "Type", dataIndex: ["commission_type", "name"], render: (v: string) => v || "-" },
-    // { title: "Code", dataIndex: ["commission_type", "code"], render: (v: string) => v || "-" },
-    { title: "Amount", dataIndex: "amount", render: (v: string) => v || "0.00" },
-    { title: "Remarks", dataIndex: "remarks", render: (v: string) => v || "-" },
+    {
+      title: "Type",
+      dataIndex: ["commission_type", "name"],
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Amount",
+      dataIndex: "amount",
+      render: (v: string) => v || "0.00",
+    },
+    {
+      title: "Remarks",
+      dataIndex: "remarks",
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Status",
+      render: (_: any, row: Commission) =>
+        row.is_excluded_for_run ? (
+          <Tag color="red">Excluded</Tag>
+        ) : (
+          <Tag color="green">Included</Tag>
+        ),
+    },
+    {
+      title: "Action",
+      render: (_: any, row: Commission) => {
+        if (row.is_excluded_for_run) {
+          return (
+            <Button
+              size="small"
+              onClick={() => handleIncludeCommission(row)}
+              disabled={status !== "Pending"}
+            >
+              Restore
+            </Button>
+          );
+        }
+
+        return (
+          <Button
+            danger
+            size="small"
+            onClick={() => handleExcludeCommission(row)}
+            disabled={status !== "Pending"}
+          >
+            X
+          </Button>
+        );
+      },
+    },
+  ];
+
+  const fineColumns = [
+  {
+    title: "Name",
+    dataIndex: "name",
+    render: (v: string) => v || "-",
+  },
+  {
+    title: "Amount",
+    dataIndex: "amount",
+    render: (v: string) => v || "0.00",
+  },
+  {
+    title: "Remarks",
+    dataIndex: "remarks",
+    render: (v: string) => v || "-",
+  },
+  {
+    title: "Status",
+    render: (_: any, row: Fine) =>
+      row.is_excluded_for_run ? (
+        <Tag color="red">Excluded</Tag>
+      ) : (
+        <Tag color="green">Included</Tag>
+      ),
+  },
+  {
+    title: "Action",
+    render: (_: any, row: Fine) => {
+      if (row.is_excluded_for_run) {
+        return (
+          <Button
+            size="small"
+            onClick={() => handleIncludeFine(row)}
+            disabled={status !== "Pending"}
+          >
+            Restore
+          </Button>
+        );
+      }
+
+      return (
+        <Button
+          danger
+          size="small"
+          onClick={() => handleExcludeFine(row)}
+          disabled={status !== "Pending"}
+        >
+          X
+        </Button>
+      );
+    },
+  },
+];
+
+  const additionalEarningColumns = [
+    {
+      title: "Name",
+      dataIndex: "name",
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Amount",
+      dataIndex: "amount",
+      render: (v: string) => v || "0.00",
+    },
+    {
+      title: "Remarks",
+      dataIndex: "remarks",
+      render: (v: string) => v || "-",
+    },
+    {
+      title: "Status",
+      render: (_: any, row: AdditionalEarning) =>
+        row.is_excluded_for_run ? (
+          <Tag color="red">Excluded</Tag>
+        ) : (
+          <Tag color="green">Included</Tag>
+        ),
+    },
+    {
+      title: "Action",
+      render: (_: any, row: AdditionalEarning) => {
+        if (row.is_excluded_for_run) {
+          return (
+            <Button
+              size="small"
+              onClick={() => handleIncludeEarning(row)}
+              disabled={status !== "Pending"}
+            >
+              Restore
+            </Button>
+          );
+        }
+
+        return (
+          <Button
+            danger
+            size="small"
+            onClick={() => handleExcludeEarning(row)}
+            disabled={status !== "Pending"}
+          >
+            X
+          </Button>
+        );
+      },
+    },
   ];
 
   const attendanceColumns = [
@@ -363,6 +905,34 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
     if (!period) return "-";
     return `${dayjs(period.start_date).format("YYYY-MM-DD")} to ${dayjs(period.end_date).format("YYYY-MM-DD")}`;
   }, [period]);
+    const formatMoney = (value?: string | number | null) => {
+    const num = Number(value ?? 0);
+    if (!Number.isFinite(num)) return String(value ?? "-");
+    return `₱${num.toFixed(2)}`;
+  };
+
+  const formatLoanDeductionValue = (loan: Loan) => {
+    if (!loan.deduction_mode || loan.deduction_value === null || loan.deduction_value === undefined) {
+      return "-";
+    }
+
+    const num = Number(loan.deduction_value);
+    if (!Number.isFinite(num)) return String(loan.deduction_value ?? "-");
+
+    if (loan.deduction_mode === "PERCENT") {
+      return `${(num * 100).toFixed(2)}%`;
+    }
+
+    return formatMoney(num);
+  };
+
+  const formatCutoff = (value?: Loan["apply_to_cutoff"]) => {
+    if (!value) return "-";
+    if (value === "FIRST") return "First Cutoff";
+    if (value === "SECOND") return "Second Cutoff";
+    if (value === "BOTH") return "Both";
+    return value;
+  };
 
   return (
     <Modal
@@ -399,6 +969,22 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
                   <Button block onClick={() => setOpenCommissionModal(true)} disabled={!canAddCommission || !period}>
                     Add Commission
                   </Button>
+
+                   <Button
+                    block
+                    onClick={() => setOpenAdditionalAllowanceModal(true)}
+                    disabled={!canAddAdditionalAllowance || !period}>
+                    Add Additional Allowance
+                  </Button>
+
+                  <Button
+                    block
+                    onClick={() => setShowAddEarning(true)}
+                    disabled={status !== "Pending" || !period}
+                  >
+                    Add Additional Earning
+                  </Button>
+              
 
                   <Button
                     type="primary"
@@ -520,6 +1106,33 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
                   />
                 </div>
               </Card>
+                {/* Fine */}
+              <Card title="Fines" style={sectionCardStyle} bodyStyle={{ padding: 14 }}>
+                <div style={tableBoxStyle}>
+                  <Table
+                    columns={fineColumns}
+                    dataSource={snapshot?.fines || []}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    locale={{ emptyText: "No fines added" }}
+                  />
+                </div>
+              </Card>
+              
+              {/* EARNING */}
+              <Card title="Additional Earnings" style={sectionCardStyle} bodyStyle={{ padding: 14 }}>
+                <div style={tableBoxStyle}>
+                  <Table
+                    columns={additionalEarningColumns}
+                    dataSource={snapshot?.additional_earnings || []}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    locale={{ emptyText: "No additional earnings added" }}
+                  />
+                </div>
+              </Card>
 
               {/* Allowances */}
               <Card title="Allowances" style={sectionCardStyle} bodyStyle={{ padding: 14 }}>
@@ -535,12 +1148,26 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
                 </div>
               </Card>
 
+                {/* Additional Allowances */}
+              <Card title="Additional Allowances" style={sectionCardStyle} bodyStyle={{ padding: 14 }}>
+                <div style={tableBoxStyle}>
+                  <Table
+                    columns={additionalAllowanceColumns}
+                    dataSource={snapshot?.additional_allowances || []}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    locale={{ emptyText: "No additional allowances added" }}
+                  />
+                </div>
+              </Card>
+
               {/* Leaves */}
               <Card title="Approved Leaves (This Payroll Period)" style={sectionCardStyle} bodyStyle={{ padding: 14 }}>
                 <div style={tableBoxStyle}>
                   <Table
                     columns={leaveColumns as any}
-                    dataSource={snapshot?.leaves || []}
+                    dataSource={snapshot?.leave_days || []}
                     rowKey="id"
                     pagination={false}
                     size="small"
@@ -590,6 +1217,36 @@ export default function VerifyEmployeeModal({ open, employee, period, onClose, o
                   loadCommissions();
                 }}
               />
+              {period && employee && (
+                <AddDeductionModal
+                  open={openFineModal}
+                  periodId={period.id}
+                  employeeId={employee.id}
+                  onClose={() => setOpenFineModal(false)}
+                  onSuccess={loadSnapshot}
+                />
+              )}
+
+              {period && employee && (
+                <AddEarnings
+                  open={showAddEarning}
+                  onClose={() => setShowAddEarning(false)}
+                  periodId={period.id}
+                  employeeId={employee.id}
+                  onSuccess={loadSnapshot}
+                />
+              )}
+
+              <AdditionalAllowanceModal
+                  open={openAdditionalAllowanceModal}
+                  period={period}
+                  employee={employee}
+                  onClose={() => setOpenAdditionalAllowanceModal(false)}
+                  onSaved={() => {
+                    loadSnapshot();
+                  }}
+                />
+
             </>
           )}
         </>

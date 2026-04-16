@@ -48,11 +48,12 @@ interface AddressData {
 }
 
 interface EmployeeData {
-  id: number;
+  id_no: number;
   name: string;
   department_name: string;
   position: string;
   status: string;
+  employment_status: string;
   shift_info: string | null;
   hired_date: string;
   bank_info: string;
@@ -60,6 +61,7 @@ interface EmployeeData {
   contact_no: string;
   address: AddressData;
   role: "EMPLOYEE" | "ADMIN" | "SUPER_ADMIN";
+  profile_picture?: string;
 }
 
 interface DeductionRow {
@@ -286,6 +288,11 @@ const EmployeeDetailsPage: React.FC = () => {
     fetchAuditLogs();
   }, [employeeId]);
 
+  /* =========================
+      EMPLOYMENT STATUS RETRIEVE STATE
+  ========================== */
+  const [isEditEmploymentStatusOpen, setIsEditEmploymentStatusOpen] = useState(false);
+
 
   const salaryColumns = [
     {
@@ -309,9 +316,6 @@ const EmployeeDetailsPage: React.FC = () => {
   if (loading) return <Spin tip="Loading..." style={{ marginTop: 100 }} />;
   if (!employee) return <p style={{ marginTop: 100 }}>Employee not found.</p>;
 
-  const employeeStatus: "active" | "deactivated" =
-    employee.status.toLowerCase() === "active" ? "active" : "deactivated";
-
   return (
     <Layout className={styles.layout}>
       <Sidebar />
@@ -324,13 +328,17 @@ const EmployeeDetailsPage: React.FC = () => {
             {/* LEFT PROFILE CARD */}
             <Card className={styles.profileCard}>
               <div className={styles.profileHeader}>
-                <img src="/avatar.jpg" className={styles.avatar} alt="avatar" />
+                <img
+                  src={employee.profile_picture || "/avatar.jpg"}
+                  className={styles.avatar}
+                  alt={employee.name}
+                />
 
                 <div className={styles.nameSection}>
                   <div className={styles.nameTop}>
                     <h3 className={styles.name}>{employee.name}</h3>
                   </div>
-                  <span className={styles.empId}>ID : {employee.id}</span>
+                  <span className={styles.empId}>ID : {employee.id_no}</span>
                 </div>
               </div>
 
@@ -428,24 +436,29 @@ const EmployeeDetailsPage: React.FC = () => {
 
                 </div>
 
-                <div className={styles.statusRow}>
+                <div className={styles.infoRow}>
                   <div className={styles.iconBox}>
-                    {employeeStatus === "active" ? (
-                      <CheckCircleOutlined className={styles.activeIcon} />
-                    ) : (
-                      <StopOutlined className={styles.inactiveIcon} />
-                    )}
+                    <UserOutlined />
                   </div>
-                  <div>
-                    <span className={styles.label}>Status</span>
+                  <div className={styles.nameSection}>
+                    <div className={styles.nameTop}>
+                      <span className={styles.label}>Employment Status</span>
+                    </div>
+
                     <p
-                      className={
-                        employeeStatus === "active"
-                          ? styles.activeText
-                          : styles.inactiveText
-                      }
+                      style={{
+                        fontWeight: 600,
+                        color:
+                          employee.employment_status === "REGULAR"
+                            ? "green"
+                            : employee.employment_status === "PROBATION"
+                            ? "orange"
+                            : employee.employment_status === "NEW_HIRE"
+                            ? "blue"
+                            : "purple",
+                      }}
                     >
-                      {employeeStatus === "active" ? "Active" : "Deactivated"}
+                      {employee.employment_status.replace("_", " ")}
                     </p>
                   </div>
                 </div>

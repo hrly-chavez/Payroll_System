@@ -693,7 +693,9 @@ class Leave_Type(models.Model):
     is_paid = models.BooleanField(default=True)
     requires_approval = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True) 
+    max_days = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(default=timezone.now)
+    
 
     def __str__(self):
         return f"{self.name} {self.is_paid}"
@@ -733,7 +735,7 @@ class Leave_Day(models.Model):
     units = models.DecimalField(max_digits=3,decimal_places=2,default=1.00)
     is_paid = models.BooleanField(default=False)
     pay_rate = models.DecimalField(max_digits=4,decimal_places=2,default=0.00)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)    
     leave_request = models.ForeignKey(Leave_Request,on_delete=models.CASCADE, related_name="days")
     employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="leave_days")
 

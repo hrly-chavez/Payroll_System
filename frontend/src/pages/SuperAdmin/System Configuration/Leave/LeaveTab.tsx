@@ -1,4 +1,3 @@
-// src/pages/SuperAdmin/System Configuration/Leave/LeaveTab.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -29,7 +28,6 @@ export default function LeaveTab({ active }: Props) {
 
     if (!data) return fallback;
 
-    // DRF common styles
     if (typeof data === "string") return data;
     if (data.detail) return data.detail;
     if (data.message) return data.message;
@@ -43,7 +41,6 @@ export default function LeaveTab({ active }: Props) {
 
     return fallback;
   };
-
 
   const fetchLeaveTypes = async () => {
     setLoading(true);
@@ -95,13 +92,20 @@ export default function LeaveTab({ active }: Props) {
         is_paid: values.is_paid ?? false,
         requires_approval: values.requires_approval ?? true,
         is_active: values.is_active ?? true,
+        max_days: values.max_days ? Number(values.max_days) : undefined,
       };
 
       if (leaveEditMode && editingLeaveId) {
-        await API.put(`/approvals/superadmin/leave-types/${editingLeaveId}/`, payload);
+        await API.put(
+          `/approvals/superadmin/leave-types/${editingLeaveId}/`,
+          payload
+        );
         message.success("Leave type updated successfully");
       } else {
-        await API.post("/approvals/superadmin/leave-types/create/", payload);
+        await API.post(
+          "/approvals/superadmin/leave-types/create/",
+          payload
+        );
         message.success("Leave type added successfully");
       }
 
@@ -115,7 +119,13 @@ export default function LeaveTab({ active }: Props) {
 
   return (
     <div className="table-wrapper">
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          marginBottom: 12,
+        }}
+      >
         <Button type="primary" onClick={openLeaveModal}>
           Add New Leave Type
         </Button>
@@ -128,6 +138,7 @@ export default function LeaveTab({ active }: Props) {
           <thead>
             <tr>
               <th>Name</th>
+              <th>Max Days</th> {/* ✅ NEW */}
               <th>Paid?</th>
               <th>Requires Approval</th>
               <th>Active</th>
@@ -138,8 +149,8 @@ export default function LeaveTab({ active }: Props) {
             {leaveTypes.map((leave) => (
               <tr key={leave.id}>
                 <td>{leave.name}</td>
+                <td>{leave.max_days}</td> {/* ✅ NEW */}
                 <td>{leave.is_paid ? "Yes" : "No"}</td>
-                
                 <td>{leave.requires_approval ? "Yes" : "No"}</td>
                 <td>{leave.is_active ? "Yes" : "No"}</td>
                 <td className="actions">

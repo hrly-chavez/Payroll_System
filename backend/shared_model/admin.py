@@ -399,13 +399,15 @@ class LeaveTypeAdmin(admin.ModelAdmin):
         
         'requires_approval',
         'is_active',
+        'max_days',
         'created_at'
     )
 
     list_filter = (
         'is_paid',
         'requires_approval',
-        'is_active'
+        'is_active',
+        'max_days'
     )
 
     search_fields = ['name']

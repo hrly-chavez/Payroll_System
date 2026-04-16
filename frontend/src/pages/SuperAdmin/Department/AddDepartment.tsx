@@ -1,179 +1,171 @@
 import React, { useEffect, useState } from "react";
-import { Layout, Table, Input, Button, message, Tooltip, Switch, Tag } from "antd";
-import type { TableProps } from "antd";
-import { PlusOutlined, SearchOutlined, EditOutlined } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
-import Sidebar from "../../../components/Sidebar/Sidebar";
-import Topbar from "../../../components/Topbar/Topbar";
-import AddDepartment, { DepartmentType } from "./AddDepartment";
-import styles from "../../HR/Department/Department.module.css";
+import { Modal, Form, Input, Select, Button, message } from "antd";
+import styles from "./Add_department.module.css";
 import api from "../../../api/axios";
 
-const Department: React.FC = () => {
-  const navigate = useNavigate();
-  const [departments, setDepartments] = useState<DepartmentType[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [editingDept, setEditingDept] = useState<DepartmentType | null>(null);
+// ---------------- Interfaces ----------------
+export interface DepartmentType {
+  id?: number;
+  name: string;
+  shift?: number;
+  holiday_base: string[];
+  is_active?: boolean;
+}
 
-  const fetchDepartments = async () => {
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  initialValues?: DepartmentType; // optional for editing
+}
+// --------------------------------------------
+
+const AddDepartment: React.FC<Props> = ({ open, onClose, initialValues }) => {
+  const [shifts, setShifts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const [holidayOptions, setHolidayOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  // Fetch shifts
+  useEffect(() => {
+    if (!open) return;
+
+    const fetchData = async () => {
+      try {
+        // Fetch shifts
+        const shiftRes = await api.get("/employees/shifts/");
+        setShifts(shiftRes.data);
+
+        // Fetch holiday options
+        const holidayRes = await api.get(
+          "/employees/departments/holiday_base_choices/"
+        );
+        setHolidayOptions(holidayRes.data);
+
+      } catch (err) {
+        console.error(err);
+        message.error("Failed to load data");
+      }
+    };
+
+    fetchData();
+  }, [open]);
+
+  const handleHolidayChange = (values: string[]) => {
+    // If all selected → close dropdown
+    if (values.length === holidayOptions.length) {
+      setTimeout(() => setDropdownOpen(false), 150);
+    }
+  };
+
+  // Handle submit: create or update
+  const onFinish = async (values: any) => {
     setLoading(true);
+    const sanitizedName = values.name.trim();
+
     try {
-      const res = await api.get("/employees/departments/");
-      setDepartments(res.data);
-    } catch (err) {
-      console.error(err);
-      message.error("Failed to load departments");
+      if (initialValues?.id) {
+        // Update existing
+        await api.patch(`/employees/departments/${initialValues.id}/`, {
+          name: sanitizedName,
+          shift_id: values.shift,
+          holiday_base: values.holiday_base,
+        });
+        message.success("Department updated successfully");
+      } else {
+        // Create new
+        await api.post("/employees/departments/", {
+          name: sanitizedName,
+          shift_id: values.shift,
+          holiday_base: values.holiday_base,
+        });
+        message.success("Department created successfully");
+      }
+      onClose();
+    } catch (error: any) {
+      console.error(error);
+      message.error(error.response?.data?.message || "Error saving department");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchDepartments();
-  }, []);
-
-  const filteredDepartments = departments.filter((dept) =>
-    dept.name.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const handleToggleActive = async (dept: DepartmentType) => {
-    try {
-      await api.patch(`/employees/departments/${dept.id}/`, {
-        is_active: !dept.is_active,
-      });
-      message.success(`${dept.name} is now ${!dept.is_active ? "active" : "inactive"}`);
-      fetchDepartments();
-    } catch (err) {
-      console.error(err);
-      message.error("Failed to update status");
-    }
-  };
-
-  const columns: TableProps<DepartmentType>["columns"] = [
-    { title: "ID", dataIndex: "id", key: "id", width: 80 },
-    {
-      title: "Department",
-      dataIndex: "name",
-      key: "name",
-      sorter: (a, b) => a.name.localeCompare(b.name), // alphabetical sort
-      sortDirections: ["ascend", "descend"],
-      render: (text) => (
-        <span className={styles.rowLink}>{text}</span>
-      ),
-    },
-    {
-      title: "Workshift",
-      dataIndex: "shift",
-      key: "shift",
-      render: (shift) => {
-        if (!shift) return "—";
-        if (typeof shift === "object") return `${shift.start_time} - ${shift.end_time}`;
-        return shift;
-      },
-    },
-    {
-      title: "Holiday Base",
-      dataIndex: "holiday_base",
-      key: "holiday_base",
-      render: (bases: string[]) => {
-        if (!bases || bases.length === 0) return "—";
-        return bases.map((base) => (
-          <Tag key={base}>{base}</Tag>
-        ));
-      },
-    },
-    {
-      title: "Actions",
-      key: "actions",
-      render: (_, record) => (
-        <div style={{ display: "flex", gap: "0.5rem" }}>
-          <Tooltip title="Edit">
-            <Button
-              type="default"
-              icon={<EditOutlined />}
-              onClick={(e) => {
-                e.stopPropagation();
-                setEditingDept(record);
-                setOpen(true);
-              }}
-            />
-          </Tooltip>
-          <Tooltip title={record.is_active ? "Deactivate" : "Activate"}>
-            <Switch
-              checked={record.is_active}
-              onClick={(checked, e) => {
-                e.stopPropagation();
-                handleToggleActive(record);
-              }}
-            />
-          </Tooltip>
-        </div>
-      ),
-    },
-  ];
-
   return (
-    <Layout className={styles.layout} style={{ minHeight: "100vh" }}>
-      <Sidebar />
-      <Layout>
-        <Topbar title="Department" />
-        <Layout.Content className={styles.content}>
-          <div className={styles.topBar}>
-            <div className={styles.leftControls}>
-              <Input
-                placeholder="Search"
-                prefix={<SearchOutlined />}
-                className={styles.searchInput}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
+    <Modal
+      title={initialValues?.id ? "Edit Department" : "Add Department & Shift"}
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      centered
+      className={styles.modal}
+    >
+      <Form
+        layout="vertical"
+        className={styles.form}
+        onFinish={onFinish}
+        initialValues={{
+          name: initialValues?.name,
+          shift: initialValues?.shift,
+          holiday_base: initialValues?.holiday_base,
+        }}
+      >
+        <Form.Item
+          label="Name"
+          name="name"
+          rules={[
+            { required: true, message: "Please enter a department name" },
+            { max: 50, message: "Department name cannot exceed 50 characters" },
+            {
+              pattern: /^[A-Za-z0-9\s]+$/,
+              message: "Name can only contain letters, numbers, and spaces",
+            },
+          ]}
+        >
+          <Input placeholder="Name" />
+        </Form.Item>
 
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              className={styles.addBtn}
-              onClick={() => {
-                setEditingDept(null);
-                setOpen(true);
-              }}
-            >
-              Add Department
-            </Button>
-          </div>
+        <Form.Item
+          label="Work Shift"
+          name="shift"
+          rules={[{ required: true, message: "Please select a shift" }]}
+        >
+          <Select placeholder="Choose" loading={shifts.length === 0}>
+            {shifts.map((shift) => (
+              <Select.Option key={shift.id} value={shift.id}>
+                {shift.start_time} - {shift.end_time}
+              </Select.Option>
+            ))}
+          </Select>
+        </Form.Item>
 
-          <Table<DepartmentType>
-            columns={columns}
-            dataSource={filteredDepartments}
-            rowKey="id"
-            loading={loading}
-            pagination={false}
-            scroll={{ x: "max-content" }}
-            className={styles.table}
-            onRow={(record) => ({
-              onClick: () =>
-                navigate(`/super-admin/department-employee/${record.id}`, {
-                  state: { deptName: record.name },
-                }),
-              style: { cursor: "pointer" },
-            })}
+        <Form.Item
+          label="Holiday Base"
+          name="holiday_base"
+          rules={[{ required: true, message: "Please select a holiday base" }]}
+        >
+          <Select
+            mode="multiple"
+            maxTagCount="responsive"
+            placeholder="Choose"
+            options={holidayOptions}
+            open={dropdownOpen}
+            onDropdownVisibleChange={(open) => setDropdownOpen(open)}
+            onChange={handleHolidayChange}
           />
+        </Form.Item>
 
-          <AddDepartment
-            open={open}
-            onClose={() => {
-              setOpen(false);
-              fetchDepartments();
-              setEditingDept(null);
-            }}
-            initialValues={editingDept || undefined}
-          />
-        </Layout.Content>
-      </Layout>
-    </Layout>
+        <div className={styles.actions}>
+          <Button type="primary" htmlType="submit" className={styles.saveBtn} loading={loading}>
+            Save
+          </Button>
+          <Button onClick={onClose}>Cancel</Button>
+        </div>
+      </Form>
+    </Modal>
   );
 };
 
-export default Department;
+export default AddDepartment;

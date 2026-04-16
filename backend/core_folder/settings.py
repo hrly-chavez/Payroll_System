@@ -34,7 +34,7 @@ SECRET_KEY = 'django-insecure-5y)_r+#--6qx9#2ez%*6^gfs4*bogq2abe#sr4sl0xp9hxs^7q
 DEBUG = True
 
 ALLOWED_HOSTS = ["192.168.68.12","localhost", "127.0.0.1"]
-ALLOWED_HOSTS = ["192.168.68.12","localhost", "127.0.0.1"]
+
 
 AUTH_USER_MODEL = "shared_model.User"
 

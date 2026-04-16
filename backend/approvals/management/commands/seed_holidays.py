@@ -8,13 +8,13 @@ from urllib.error import URLError, HTTPError
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from shared_model.models import Holiday  # ✅ change to your actual import
+from shared_model.models import Holiday  #  change to your actual import
 
 
 NAGER_URL = "https://date.nager.at/api/v3/PublicHolidays/{year}/{country}"
 
 # =========================
-# ✅ GLOBAL (hardcoded) DATA
+#  GLOBAL (hardcoded) DATA
 # =========================
 # Use real "global" dates your org wants (these are SAFE placeholders you can edit).
 # If you don't want placeholders, just replace with your exact global list.
@@ -25,7 +25,7 @@ GLOBAL_HOLIDAYS = [
 ]
 
 # ========================
-# ✅ FIXED (hardcoded) DATA
+#  FIXED (hardcoded) DATA
 # ========================
 # "Fixed" = recurring company-specific dates (same month/day every year).
 # Replace with your actual fixed company holidays.

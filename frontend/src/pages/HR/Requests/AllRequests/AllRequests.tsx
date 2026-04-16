@@ -25,7 +25,7 @@ const AllRequests: React.FC = () => {
       const attendanceData = resAttendance.data.results.map((r: any) => ({
         ...r,
         model: "attendance", // mark as attendance request
-        employee: r.employee_name,
+        employee: r.employee_name || r.requested_by?.user?.user_name,
         type: "Attendance Correction",
         details: r.issue_type,
         reason: r.reason || r.decline_reason || "",

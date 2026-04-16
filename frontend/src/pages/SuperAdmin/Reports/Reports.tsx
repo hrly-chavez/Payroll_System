@@ -203,13 +203,6 @@ const Reports: React.FC = () => {
             </Tabs>
 
             <div className="reports-filters">
-              <Input.Search
-                placeholder="Search"
-                allowClear
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-
               <div className="filters-right">
                 <DatePicker picker="month" onChange={(d) => setMonth(d ? d.format("YYYY-MM") : null)} />
 

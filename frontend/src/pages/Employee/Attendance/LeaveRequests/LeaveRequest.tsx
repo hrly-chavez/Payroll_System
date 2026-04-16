@@ -110,51 +110,115 @@ const LeaveRequest: React.FC<LeaveRequestProps> = ({
           name="date_range"
           rules={[{ required: true, message: "Please select date range" }]}
         >
-          <RangePicker
-            style={{ width: "100%" }}
-            onCalendarChange={(dates) => {
-              if (dates?.[0]) setStartDate(dates[0]);
-              else setStartDate(null);
-            }}
-            disabledDate={(current) => {
-              if (!current) return false;
+        <RangePicker
+          style={{ width: "100%" }}
+          onCalendarChange={(dates) => {
+            if (dates?.[0]) setStartDate(dates[0]);
+            else setStartDate(null);
+          }}
+          disabledDate={(current) => {
+            if (!current) return false;
 
-              const today = dayjs().startOf("day");
+            const today = dayjs().startOf("day");
+            const isSickLeave =
+              selectedLeaveType?.name?.toLowerCase() === "sick leave";
 
-              // block past dates
-              if (current < today) return true;
+            if (isSickLeave) {
+              const minDate = today.subtract(5, "day");
 
-              if (!selectedLeaveType) return false;
+              // allow only last 5 days + today
+              if (current < minDate || current > today) return true;
+              return false;
+            }
 
-              if (!startDate) return false;
+            // normal leave: no past dates
+            if (current < today) return true;
 
-              const start = dayjs(startDate).startOf("day");
-              const diff = current.startOf("day").diff(start, "day");
+            return false;
+          }}
+          onChange={(dates) => {
+            if (!dates) return;
 
-              return diff < 0 || diff > (maxDays - 1);
-            }}
-            onChange={(dates) => {
-              if (!dates) return;
+            const [from, to] = dates;
 
-              const [from, to] = dates;
+            const isSickLeave =
+              selectedLeaveType?.name?.toLowerCase() === "sick leave";
 
-              if (from && to && maxDays) {
-                const diff = to.diff(from, "day") + 1;
+            const today = dayjs().startOf("day");
+            const yesterday = today.subtract(1, "day");
 
-                if (diff > maxDays) {
+            if (!from) return;
+
+            // =========================
+            // 🟢 SICK LEAVE LOGIC
+            // =========================
+            if (isSickLeave) {
+              const isBackdated = from.isBefore(today);
+
+              // =========================
+              // 🟢 BACKDATED SICK LEAVE
+              // =========================
+              if (isBackdated) {
+                const cappedEnd = yesterday;
+
+                form.setFieldsValue({
+                  date_range: [from, cappedEnd],
+                });
+
+                if (to && to.isAfter(cappedEnd)) {
                   message.warning(
-                    `Maximum ${maxDays} day(s) allowed for this leave type`
+                    "Backdated sick leave can only go up to yesterday"
                   );
-
-                  form.setFieldsValue({
-                    date_range: [from, null],
-                  });
-
-                  setStartDate(from);
                 }
+
+                return;
               }
-            }}
-          />
+
+              // =========================
+              // 🟢 TODAY SICK LEAVE → APPLY maxDays FORWARD
+              // =========================
+              if (from.isSame(today, "day")) {
+                if (!maxDays) return;
+
+                const maxEnd = from.add(maxDays - 1, "day"); 
+                // example: maxDays = 3 → today + 2 days
+
+                if (to && to.isAfter(maxEnd)) {
+                  message.warning(
+                    `Sick leave allows up to ${maxDays} day(s) starting today`
+                  );
+                }
+
+                form.setFieldsValue({
+                  date_range: [from, to && to.isAfter(maxEnd) ? maxEnd : to],
+                });
+
+                return;
+              }
+
+              return;
+            }
+
+            // =========================
+            // 🟡 NORMAL LEAVE
+            // =========================
+            if (!to || !maxDays) return;
+
+            const diff = to.diff(from, "day") + 1;
+
+            if (diff > maxDays) {
+              message.warning(
+                `Maximum ${maxDays} day(s) allowed for this leave type`
+              );
+
+              form.setFieldsValue({
+                date_range: [from, null],
+              });
+
+              setStartDate(from);
+            }
+          }}
+        />
         </Form.Item>
 
         {/* Reason */}

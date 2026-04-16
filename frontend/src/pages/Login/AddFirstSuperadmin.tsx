@@ -178,11 +178,14 @@ const AddFirstSuperadmin: React.FC<Props> = ({ open, onNext, onClose, mode }) =>
   return (
     <Modal
       title="Create First SUPER_ADMIN"
-      open={open}
-      onCancel={onClose}
-      footer={null}
       centered
-      width={800}
+      width="90%"
+      style={{ maxWidth: 900 }}
+      bodyStyle={{
+        maxHeight: "75vh",
+        overflowY: "auto",
+        overflowX: "hidden", 
+      }}
       className={styles.modal}
       closable={false}
     >

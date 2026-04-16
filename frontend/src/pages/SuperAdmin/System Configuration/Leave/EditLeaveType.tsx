@@ -22,6 +22,7 @@ export function editLeaveType({
     is_paid: leave.is_paid,
     requires_approval: leave.requires_approval,
     is_active: leave.is_active,
+    max_days: Number(leave.max_days ?? 1),
   });
 
   setLeaveModalOpen(true);

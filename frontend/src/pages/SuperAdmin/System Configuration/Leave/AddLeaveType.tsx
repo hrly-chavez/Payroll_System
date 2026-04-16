@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Modal, Form, Input, Checkbox, Row, Col } from "antd";
+import { Modal, Form, Input, Checkbox, Row, Col, InputNumber } from "antd";
 
 type Props = {
   open: boolean;
@@ -11,12 +11,12 @@ type Props = {
   form: any;
 };
 
-// ✅ Allow only letters, numbers, space, hyphen
+// ✅ Allow only letters and spaces
 const sanitizeLeaveName = (value: string) => {
   return value
-    .replace(/[^A-Za-z ]/g, "")   // ❌ remove numbers + special characters
-    .replace(/\s+/g, " ")         // collapse multiple spaces
-    .replace(/^\s+/g, "");        // remove leading spaces
+    .replace(/[^A-Za-z ]/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/^\s+/g, "");
 };
 
 const leaveNameValidator = (_: any, value: string) => {
@@ -61,31 +61,48 @@ export default function AddLeaveType({
         labelAlign="left"
         wrapperCol={{ span: 24 }}
       >
-      <Form.Item
-        label="Leave Name"
-        name="name"
-        rules={[
-          { required: true, message: "Please enter leave name" },
-          { validator: leaveNameValidator },
-        ]}
-      >
-        <Input
-          placeholder="Enter leave name"
-          maxLength={50}
-          onChange={(e) => {
-            const cleaned = sanitizeLeaveName(e.target.value);
-            form.setFieldsValue({ name: cleaned });
-          }}
-          onPaste={(e) => {
-            e.preventDefault();
-            const pasted = e.clipboardData.getData("text");
-            const cleaned = sanitizeLeaveName(pasted);
-            const current = form.getFieldValue("name") || "";
-            form.setFieldsValue({ name: sanitizeLeaveName(current + cleaned) });
-          }}
-        />
-      </Form.Item>
+        {/* ✅ Leave Name */}
+        <Form.Item
+          label="Leave Name"
+          name="name"
+          rules={[
+            { required: true, message: "Please enter leave name" },
+            { validator: leaveNameValidator },
+          ]}
+        >
+          <Input
+            placeholder="Enter leave name"
+            maxLength={50}
+            onChange={(e) => {
+              const cleaned = sanitizeLeaveName(e.target.value);
+              form.setFieldsValue({ name: cleaned });
+            }}
+            onPaste={(e) => {
+              e.preventDefault();
+              const pasted = e.clipboardData.getData("text");
+              const cleaned = sanitizeLeaveName(pasted);
+              const current = form.getFieldValue("name") || "";
+              form.setFieldsValue({
+                name: sanitizeLeaveName(current + cleaned),
+              });
+            }}
+          />
+        </Form.Item>
 
+        {/* ✅ NEW: Max Days */}
+        <Form.Item
+          label="Max Days"
+          name="max_days"
+          rules={[{ required: true, message: "Please enter max days" }]}
+        >
+          <InputNumber
+            min={1}
+            style={{ width: "100%" }}
+            placeholder="Enter maximum leave days"
+          />
+        </Form.Item>
+
+        {/* ✅ Options */}
         <Form.Item label="Options">
           <Row gutter={16}>
             <Col>

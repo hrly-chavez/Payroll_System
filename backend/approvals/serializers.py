@@ -26,6 +26,7 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
             "is_paid",
             "requires_approval",
             "is_active",
+            "max_days",
             "created_at",
         ]
         read_only_fields = ["created_at"]

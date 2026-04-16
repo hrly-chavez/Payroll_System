@@ -12,15 +12,25 @@ type LeaveRequestProps = {
   onSuccess?: () => void;
 };
 
-const LeaveRequest: React.FC<LeaveRequestProps> = ({ open, onClose, onSuccess }) => {
+const LeaveRequest: React.FC<LeaveRequestProps> = ({
+  open,
+  onClose,
+  onSuccess,
+}) => {
   const [form] = Form.useForm();
   const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  /*Fetch leave types from backend */
+  const [selectedLeaveType, setSelectedLeaveType] = useState<any>(null);
+  const [startDate, setStartDate] = useState<any>(null);
+
+  const maxDays = selectedLeaveType?.max_days;
+
+  /* Fetch leave types */
   useEffect(() => {
     if (open) {
-      api.get("/approvals/superadmin/leave-types/")
+      api
+        .get("/approvals/superadmin/leave-types/")
         .then((res) => setLeaveTypes(res.data))
         .catch(() => message.error("Failed to load leave types"));
     }
@@ -32,29 +42,28 @@ const LeaveRequest: React.FC<LeaveRequestProps> = ({ open, onClose, onSuccess })
     setLoading(true);
 
     try {
-    const payload = {
-      leave_type_id: values.leave_type,
-      date_range: [
-        values.date_range[0].format("YYYY-MM-DD"),
-        values.date_range[1].format("YYYY-MM-DD"),
-      ],
-      reason: values.reason || "",
-    };
-
-
+      const payload = {
+        leave_type_id: values.leave_type,
+        date_range: [
+          values.date_range[0].format("YYYY-MM-DD"),
+          values.date_range[1].format("YYYY-MM-DD"),
+        ],
+        reason: values.reason || "",
+      };
 
       await api.post("/approvals/leaves/", payload);
 
       message.success("Leave request submitted successfully");
       form.resetFields();
+      setSelectedLeaveType(null);
+      setStartDate(null);
       onSuccess?.();
       onClose();
-
     } catch (error: any) {
       message.error(
         error.response?.data?.detail ||
-        error.response?.data?.non_field_errors?.[0] ||
-        "Failed to submit leave request"
+          error.response?.data?.non_field_errors?.[0] ||
+          "Failed to submit leave request"
       );
     } finally {
       setLoading(false);
@@ -63,22 +72,30 @@ const LeaveRequest: React.FC<LeaveRequestProps> = ({ open, onClose, onSuccess })
 
   return (
     <Modal
-        title="Request Leave"
-        open={open}
-        onCancel={onClose}
-        footer={null}
-        destroyOnClose
-        centered
-      >
+      title="Request Leave"
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      destroyOnClose
+      centered
+    >
       <Form layout="vertical" form={form} onFinish={onFinish}>
-        
         {/* Leave Type */}
         <Form.Item
           label="Leave Type"
           name="leave_type"
           rules={[{ required: true, message: "Please select leave type" }]}
         >
-          <Select placeholder="Select leave type" loading={!leaveTypes.length}>
+          <Select
+            placeholder="Select leave type"
+            loading={!leaveTypes.length}
+            onChange={(value) => {
+              const type = leaveTypes.find((t) => t.id === value);
+              setSelectedLeaveType(type);
+              setStartDate(null);
+              form.setFieldsValue({ date_range: null });
+            }}
+          >
             {leaveTypes.map((type) => (
               <Select.Option key={type.id} value={type.id}>
                 {type.name}
@@ -95,11 +112,49 @@ const LeaveRequest: React.FC<LeaveRequestProps> = ({ open, onClose, onSuccess })
         >
           <RangePicker
             style={{ width: "100%" }}
+            onCalendarChange={(dates) => {
+              if (dates?.[0]) setStartDate(dates[0]);
+              else setStartDate(null);
+            }}
             disabledDate={(current) => {
-              return current && current.startOf("day") < dayjs().startOf("day");
+              if (!current) return false;
+
+              const today = dayjs().startOf("day");
+
+              // block past dates
+              if (current < today) return true;
+
+              if (!selectedLeaveType) return false;
+
+              if (!startDate) return false;
+
+              const start = dayjs(startDate).startOf("day");
+              const diff = current.startOf("day").diff(start, "day");
+
+              return diff < 0 || diff > (maxDays - 1);
+            }}
+            onChange={(dates) => {
+              if (!dates) return;
+
+              const [from, to] = dates;
+
+              if (from && to && maxDays) {
+                const diff = to.diff(from, "day") + 1;
+
+                if (diff > maxDays) {
+                  message.warning(
+                    `Maximum ${maxDays} day(s) allowed for this leave type`
+                  );
+
+                  form.setFieldsValue({
+                    date_range: [from, null],
+                  });
+
+                  setStartDate(from);
+                }
+              }
             }}
           />
-
         </Form.Item>
 
         {/* Reason */}
@@ -114,7 +169,7 @@ const LeaveRequest: React.FC<LeaveRequestProps> = ({ open, onClose, onSuccess })
           loading={loading}
           className={styles.submitBtn}
         >
-          Submit Request  
+          Submit Request
         </Button>
       </Form>
     </Modal>

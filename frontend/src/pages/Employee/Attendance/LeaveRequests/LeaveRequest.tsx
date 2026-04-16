@@ -161,19 +161,27 @@ const LeaveRequest: React.FC<LeaveRequestProps> = ({
               if (isBackdated) {
                 const cappedEnd = yesterday;
 
-                form.setFieldsValue({
-                  date_range: [from, cappedEnd],
-                });
+                // If user hasn't selected end date yet → don't force anything
+                if (!to) return;
 
-                if (to && to.isAfter(cappedEnd)) {
+                // Only adjust if invalid
+                if (to.isAfter(cappedEnd)) {
+                  form.setFieldsValue({
+                    date_range: [from, cappedEnd],
+                  });
+
                   message.warning(
                     "Backdated sick leave can only go up to yesterday"
                   );
+                } else {
+                  // ✅ keep user's selected end date
+                  form.setFieldsValue({
+                    date_range: [from, to],
+                  });
                 }
 
                 return;
               }
-
               // =========================
               // 🟢 TODAY SICK LEAVE → APPLY maxDays FORWARD
               // =========================
@@ -222,7 +230,8 @@ const LeaveRequest: React.FC<LeaveRequestProps> = ({
         </Form.Item>
 
         {/* Reason */}
-        <Form.Item label="Reason" name="reason">
+        <Form.Item label="Reason" name="reason"
+        rules={[{ required: true, message: "Please enter a reason" }]}>
           <Input.TextArea rows={4} />
         </Form.Item>
 

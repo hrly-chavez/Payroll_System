@@ -7,6 +7,7 @@ import styles from "./Requests.module.css";
 import AllRequests from "./AllRequests/AllRequests";
 import LeaveRequests from "./LeaveRequest/LeaveRequest"; 
 import AttendanceCorrectionRequest from "./AttendanceCorrectionRequest/AttendanceCorrectionRequest";
+import HolidayRequests from "./HolidayRequest/HolidayRequest";
 
 const { Content } = Layout;
 const { TabPane } = Tabs;
@@ -27,19 +28,19 @@ const Requests: React.FC = () => {
               onChange={setActiveTab}
               className={styles.tabs}
             >
-              <TabPane tab="All Requests" key="all">
-                <AllRequests />
-              </TabPane>
 
               <TabPane tab="Leave Request" key="leave">
                 <LeaveRequests /> 
               </TabPane>
 
               <TabPane
-                tab="Attendance Correction Request"
-                key="attendance"
-              >
+                tab="Attendance Correction Request"key="attendance">
                 <AttendanceCorrectionRequest />
+              </TabPane>
+
+              <TabPane
+                tab="Holiday Request"key="holiday">
+                <HolidayRequests />
               </TabPane>
             </Tabs>
           </div>

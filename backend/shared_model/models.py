@@ -505,7 +505,6 @@ class DepartmentHolidayCalendar(models.Model):
                                           name="unique_dept_holiday_base") 
                                           ]
   
-
 class Attendance(models.Model):
     STATUS_CHOICES = [
         ("PRESENT", "Present"),
@@ -561,7 +560,7 @@ class Attendance_Event(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_attendance_events")
     attendance = models.ForeignKey(Attendance,on_delete=models.CASCADE,related_name="events")
-    holiday = models.ForeignKey(Holiday, on_delete=models.SET_NULL, null=True, blank=True, related_name="attendance_events")
+    holiday = models.ForeignKey(Holiday, on_delete=models.SET_NULL, null=True, blank=True, related_name="attendance_events") #not used
 
     def __str__(self):
         return self.type

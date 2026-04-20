@@ -26,14 +26,16 @@ environ.Env.read_env(BASE_DIR / '.env')
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-5y)_r+#--6qx9#2ez%*6^gfs4*bogq2abe#sr4sl0xp9hxs^7q'
+SECRET_KEY = env("SECRET_KEY")
 
 
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env.bool("DEBUG", default=False)
 
-ALLOWED_HOSTS = ["192.168.68.12","localhost", "127.0.0.1"]
+ALLOWED_HOSTS = env.list(
+    "ALLOWED_HOSTS",
+    default=["localhost", "127.0.0.1"]
+)
 
 
 AUTH_USER_MODEL = "shared_model.User"
@@ -65,7 +67,6 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -120,17 +121,12 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
     },
     {
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
+   
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
         'OPTIONS': {'min_length': 8},
@@ -166,15 +162,15 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,    # Automatically blacklist used refresh tokens
 }
 
-# NOTE: FRONTEND AND BACKEND CAN CONNECT
-CORS_ALLOWED_ORIGINS = env.list(
-    'CORS_ALLOWED_ORIGINS',
-    default=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://192.168.68.12:3000",
-    ]
-)
+CSRF_TRUSTED_ORIGINS = [
+    "http://192.168.68.200",
+    "http://payroll.local",
+]
+
+#block everything external
+CORS_ALLOW_ALL_ORIGINS = False
+#NO external site is allowed
+CORS_ALLOWED_ORIGINS = []
 
 
 MEDIA_URL = "/media/"
@@ -183,6 +179,13 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 CORS_ALLOW_CREDENTIALS = True
 
+#if True (cookies ONLY sent over HTTPS) if false (cookies allowed over HTTP)
+CSRF_COOKIE_SECURE = False
+SESSION_COOKIE_SECURE = False
+
+#FLagged
+# CSRF_COOKIE_SECURE = False   # for HTTP (local network)
+# SESSION_COOKIE_SECURE = False
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
@@ -200,7 +203,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
-
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 #EMAIL
 # Email settings using environment variables

@@ -1,17 +1,5 @@
 import React, { useEffect, useState } from "react";
-import {
-  Layout,
-  Card,
-  Tabs,
-  Button,
-  Table,
-  message,
-  Spin,
-  Modal,
-  Form,
-  Input,
-  Select,
-} from "antd";
+import {Layout,Card,Tabs,Button,Table,message,Spin,Modal,Form,Input,Select,} from "antd";
 import { useParams } from "react-router-dom";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
@@ -28,7 +16,7 @@ import {
   StopOutlined,
   EditOutlined,
 } from "@ant-design/icons";
-import api from "api/axios";
+import api from "../../../api/axios";
 
 import PayslipsTab from "../../HR/EmployeeDetailsPage/Tabs/PayslipsTab";
 

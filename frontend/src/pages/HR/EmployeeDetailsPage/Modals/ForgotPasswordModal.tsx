@@ -1,7 +1,7 @@
 // src/pages/HR/EmployeeDetailPage/Modals/ForgotPasswordModal.tsx
 import React, { useState } from "react";
 import { Modal, Button, message, Form, Input } from "antd";
-import api from "api/axios";
+import api from "../../../../api/axios"; 
 
 interface Props {
   open: boolean;

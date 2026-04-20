@@ -9,7 +9,7 @@ import {
   message,
   Input,
 } from "antd";
-import api from "api/axios";
+import api from "../../../../api/axios";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import EditEmployeeContributionsModal from "./EditEmployeeDeductionsModal";

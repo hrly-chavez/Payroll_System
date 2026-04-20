@@ -6,7 +6,7 @@
     "checkJs": false,
     "jsx": "react-jsx",
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "types": ["node", "react", "react-dom"],
     "resolveJsonModule": true,
     "isolatedModules": true,
@@ -16,7 +16,7 @@
     "esModuleInterop": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
-    "baseUrl": "src"
+    
   },
   "include": ["src"],
   "exclude": ["node_modules", "build"]

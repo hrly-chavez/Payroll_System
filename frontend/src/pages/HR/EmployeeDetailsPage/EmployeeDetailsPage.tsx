@@ -6,7 +6,7 @@ import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 import styles from "./EmployeeDetPage.module.css";
 import {UserOutlined,BankOutlined,ClockCircleOutlined,CalendarOutlined,MailOutlined,PhoneOutlined,HomeOutlined,CheckCircleOutlined,StopOutlined,EditOutlined,} from "@ant-design/icons";
-import api from "api/axios";
+import api from "../../../api/axios";
 
 //tabs
 import BaseSalaryTab from "./Tabs/BaseSalaryTab";

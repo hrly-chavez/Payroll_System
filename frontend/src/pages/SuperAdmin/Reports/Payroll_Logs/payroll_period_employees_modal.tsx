@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Modal, Table, Tag, message, Input, Select } from "antd";
 import dayjs from "dayjs";
-import api from "api/axios";
+import api from "../../../../api/axios";
 import "./payroll_period_employees_modal.css";
 
 const { Option } = Select;

@@ -8,7 +8,7 @@ import {
   message,
 } from "antd";
 import { useEffect, useState } from "react";
-import api from "api/axios";
+import api from "../../../../api/axios";
 import dayjs from "dayjs";
 
 interface ExistingAllowance {

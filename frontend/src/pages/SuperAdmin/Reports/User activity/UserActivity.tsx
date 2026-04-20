@@ -1,7 +1,7 @@
 // src/pages/Reports/UserActivity.tsx
 import React, { useEffect, useState } from "react";
 import { Table, message, Spin } from "antd";
-import api from "api/axios"; // your axios instance
+import api from "../../../../api/axios";
 
 interface AuditLog {
   id: number;

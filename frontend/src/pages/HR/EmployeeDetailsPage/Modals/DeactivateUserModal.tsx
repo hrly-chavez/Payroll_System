@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Modal, Form, Input, Button, message } from "antd";
-import api from "api/axios";
+import api from "../../../../api/axios";
 
 interface Props {
   open: boolean;

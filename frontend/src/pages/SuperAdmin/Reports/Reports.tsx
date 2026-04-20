@@ -4,12 +4,12 @@ import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 import "./Reports.css";
 
-import api from "api/axios";
+import api from "../../../api/axios";
 import UserActivity from "./User activity/UserActivity";
 import AttendaceLogs from "./AttendanceLogs/attendance_logs";
 import PayrollReleaseLogs from "./Payroll_Logs/payroll_release_logs";
 
-// ✅ NEW
+//  NEW
 import AttendanceReportModal from "./AttendanceLogs/attendance_report_modal";
 
 const { Content } = Layout;

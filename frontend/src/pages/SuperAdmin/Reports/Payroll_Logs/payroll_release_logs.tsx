@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Table, Tag, message, Button } from "antd";
 import dayjs from "dayjs";
-import api from "api/axios";
+import api from "../../../../api/axios";
 import PayrollPeriodEmployeesModal from "./payroll_period_employees_modal";
 import "./payroll_release_logs.css";
 

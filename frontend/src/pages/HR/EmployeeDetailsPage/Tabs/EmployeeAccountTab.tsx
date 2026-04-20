@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Table, Button, message, Spin } from "antd";
-import api from "api/axios";
+import api from "../../../../api/axios";
 import ForgotPasswordModal from "../Modals/ForgotPasswordModal";
 import DeactivateUserModal from "../Modals/DeactivateUserModal";
 

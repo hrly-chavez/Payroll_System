@@ -9,7 +9,7 @@ import Topbar from "../../../components/Topbar/Topbar";
 import styles from "./Admin_DepartmentEmployee.module.css";
 // import AddAddDeptEmployee from "./AddAdDeptEmployee";
 import AddEmployeeFlow from "./AddEmployee/AddEmployeeFlow";
-import api from "api/axios";
+import api from "../../../api/axios";
 
 interface EmployeeType {
   id: number;

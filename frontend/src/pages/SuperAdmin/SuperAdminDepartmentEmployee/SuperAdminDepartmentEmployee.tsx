@@ -7,7 +7,7 @@ import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 import AddEmployeeFlow from "../../HR/AdminDepartmentEmployee/AddEmployee/AddEmployeeFlow";
 import styles from "../../HR/AdminDepartmentEmployee/Admin_DepartmentEmployee.module.css";
-import api from "api/axios";
+import api from "../../../api/axios";
 
 interface EmployeeType {
   id: number;

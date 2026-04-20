@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Modal, Form, Select, Input, message } from "antd";
-import api from "api/axios";
+import api from "../../../../api/axios";
 
 const { Option } = Select;
 

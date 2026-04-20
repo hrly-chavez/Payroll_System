@@ -1,7 +1,7 @@
 //src/pages/HR/EmployeeDetailPage/Modals/EditEmployeeAllowanceModal.tsx
 import React, { useEffect } from "react";
 import { Modal, Form, Input, Select, DatePicker, message, Switch } from "antd";
-import api from "api/axios";
+import api from "../../../../api/axios";
 import dayjs from "dayjs";
 
 interface Props {

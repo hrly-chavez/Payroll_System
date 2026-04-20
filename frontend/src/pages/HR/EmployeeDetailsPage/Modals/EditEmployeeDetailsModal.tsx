@@ -3,7 +3,7 @@ import React, { useEffect } from "react";
 import { Modal, Form, Input, DatePicker, Select, message, Row, Col, Upload } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
-import api from "api/axios";
+import api from "../../../../api/axios";
 const { TextArea } = Input;
 
 

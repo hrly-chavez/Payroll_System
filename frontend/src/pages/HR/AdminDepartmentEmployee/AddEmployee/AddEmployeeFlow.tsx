@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { message } from "antd";
-import api from "api/axios";
+import api from "../../../../api/axios";
 
 import EmployeeDetailsModal from "./EmployeeDetailsModal";
 import EmployeeSalaryModal from "./EmployeeSalaryModal";

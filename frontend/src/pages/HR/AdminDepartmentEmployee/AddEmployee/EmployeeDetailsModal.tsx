@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Modal, Form, Input, Select, Button, DatePicker, Row, Col, message, Upload } from "antd";
-import api from "api/axios";
+import api from "../../../../api/axios";
 import styles from "../AddAdDeptEmployee.module.css";
 import dayjs from "dayjs";
 import { UploadOutlined, EyeOutlined, DeleteOutlined } from "@ant-design/icons";

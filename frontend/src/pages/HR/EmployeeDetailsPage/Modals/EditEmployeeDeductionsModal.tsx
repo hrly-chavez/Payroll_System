@@ -9,7 +9,7 @@ import {
   Select,
 } from "antd";
 import React, { useEffect, useState, useRef } from "react";
-import api from "api/axios";
+import api from "../../../../api/axios";
 import dayjs from "dayjs";
 
 const { Option } = Select;

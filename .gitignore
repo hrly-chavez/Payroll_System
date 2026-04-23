@@ -45,10 +45,13 @@ vaw_app/yarn-error.log*
 vaw_app/package-lock.json
 
 .env
-
+backend/.env
 
 # Django static collect output
 backend/staticfiles/
+
+#Ignore SQL backup
+*.sql
 
 
 # # === Sensitive Backups (Fernet key rotations) ===

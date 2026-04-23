@@ -6,6 +6,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Card, Table, Tag, Button, Space, Modal, Descriptions, Alert, Spin} from "antd";
 import dayjs from "dayjs";
 import api from "../../../../api/axios";
+import { resolveFileUrl } from "../../../../utils/fileUrl";
 
 type CorrectionRow = {
   id: number;
@@ -88,14 +89,15 @@ const AttendanceCorrectionLogs: React.FC<Props> = ({ title = "Attendance Correct
       {
         title: "Attachment",
         dataIndex: "file_attached",
-        render: (v: string | null) =>
-          v ? (
-            <a href={v} target="_blank" rel="noreferrer">
+        render: (v: string | null) => {
+          const url = resolveFileUrl(v);
+
+          return url ? (
+            <a href={url} target="_blank" rel="noreferrer">
               View
             </a>
-          ) : (
-            "—"
-          ),
+          ) : "—";
+        },
       },
       {
         title: "Status",
@@ -221,7 +223,7 @@ return (
           <Descriptions.Item label="Attachment">
             {selected.file_attached ? (
               <a
-                href={selected.file_attached}
+                href={resolveFileUrl(selected.file_attached)}
                 target="_blank"
                 rel="noreferrer"
               >

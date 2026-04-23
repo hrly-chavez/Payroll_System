@@ -1,17 +1,19 @@
 //src/utils/fileUrl.ts
-export const resolveFileUrl = (url?: string | null): string | undefined => {
+export const resolveFileUrl = (url?: string | null) => {
   if (!url) return undefined;
 
-  // If absolute URL (like 127.0.0.1:8000), normalize to current host
+  const API_BASE = process.env.REACT_APP_API_BASE_URL?.replace("/api", "");
+
+  // absolute URL (normalize host)
   if (url.startsWith("http")) {
     try {
       const parsed = new URL(url);
-      return `${window.location.origin}${parsed.pathname}`;
+      return `${API_BASE}${parsed.pathname}`;
     } catch {
       return url;
     }
   }
 
-  // If already relative (/media/...)
-  return `${window.location.origin}${url}`;
+  // relative (/media/...)
+  return `${API_BASE}${url}`;
 };

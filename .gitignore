@@ -47,6 +47,10 @@ vaw_app/package-lock.json
 .env
 
 
+# Django static collect output
+backend/staticfiles/
+
+
 # # === Sensitive Backups (Fernet key rotations) ===
 # .env
 # backend/.env

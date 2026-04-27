@@ -230,7 +230,7 @@ const Attendance: React.FC = () => {
                 <LeaveRequestLogs refreshKey={leaveRefreshKey} />
               </Tabs.TabPane>
 
-              <Tabs.TabPane tab="Correction Request(s)" key="corrections">
+              <Tabs.TabPane tab="Attendance Correction Request(s)" key="corrections">
                 <AttendanceCorrectionLogs />
               </Tabs.TabPane>
 

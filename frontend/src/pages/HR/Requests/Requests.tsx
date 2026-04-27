@@ -13,7 +13,7 @@ const { Content } = Layout;
 const { TabPane } = Tabs;
 
 const Requests: React.FC = () => {
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState("leave");
 
   return (
     <Layout style={{ minHeight: "100vh" }}>

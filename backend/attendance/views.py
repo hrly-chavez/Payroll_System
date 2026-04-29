@@ -2,7 +2,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
@@ -32,6 +32,7 @@ from .services import (
     get_monthly_attendance_stats,
     get_admin_attendance_analytics_for_range,
     _is_workday_for_shift,
+    import_biometrics_file,
 )
 
 #Helpers
@@ -1422,3 +1423,30 @@ class AttendanceLogsListView(APIView):
             "results": results
         })
 
+#==============Import .xlxs file for bio ============================
+class ImportBiometricsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = BiometricsUploadSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        file = serializer.validated_data["file"]
+
+        try:
+            count = import_biometrics_file(file)
+
+            return Response(
+                {
+                    "message": "Biometrics imported successfully.",
+                    "records_processed": count,
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"message": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

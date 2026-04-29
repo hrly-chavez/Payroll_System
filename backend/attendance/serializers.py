@@ -550,3 +550,12 @@ class AttendanceLogRowSerializer(serializers.Serializer):
     department_name = serializers.CharField(allow_null=True)
     shift_name = serializers.CharField(allow_null=True)
     event_types = serializers.CharField(allow_blank=True, allow_null=True)
+
+# import biometrics file
+class BiometricsUploadSerializer(serializers.Serializer):
+    file = serializers.FileField()
+
+    def validate_file(self, value):
+        if not value.name.endswith(".xlsx"):
+            raise serializers.ValidationError("Only .xlsx files are allowed.")
+        return value

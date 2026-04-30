@@ -280,7 +280,7 @@ export default function AddPayRules({
             <Select
               placeholder="Select scope"
               options={[
-                { value: "ALL", label: "All Employees" },
+                { value: "ALL", label: "All " },
                 { value: "DEPARTMENT", label: "Department" },
                 { value: "EMPLOYEE", label: "Employee" },
               ]}

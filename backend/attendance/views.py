@@ -22,6 +22,7 @@ from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from datetime import datetime
 from .services import (
     punch_in,
     punch_out,
@@ -278,6 +279,7 @@ class TodayAttendanceView(APIView):
             "has_attendance": True,
             "attendance": AttendanceSerializer(attendance).data,
         })
+
 #Attendance Logs
 class AttendanceLogsView(APIView):
     permission_classes = [IsAuthenticated]
@@ -285,17 +287,28 @@ class AttendanceLogsView(APIView):
     def get(self, request):
         employee = _get_employee_or_400(request.user)
 
-        year = request.query_params.get("year")
-        month = request.query_params.get("month")
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
 
-        today = timezone.localdate()
-        year = int(year) if year else today.year
-        month = int(month) if month else today.month
+        if start_date and end_date:
+            try:
+                date_from = datetime.strptime(start_date, "%Y-%m-%d").date()
+                date_to = datetime.strptime(end_date, "%Y-%m-%d").date()
+            except ValueError:
+                raise ValidationError({"detail": "Invalid date format. Use YYYY-MM-DD"})
+        else:
+            # fallback (old behavior)
+            year = request.query_params.get("year")
+            month = request.query_params.get("month")
 
-        if month < 1 or month > 12:
-            raise ValidationError({"detail": "Invalid month. Must be 1-12."})
+            today = timezone.localdate()
+            year = int(year) if year else today.year
+            month = int(month) if month else today.month
 
-        date_from, date_to = _month_date_range(year, month)
+            if month < 1 or month > 12:
+                raise ValidationError({"detail": "Invalid month. Must be 1-12."})
+
+            date_from, date_to = _month_date_range(year, month)
 
         qs = (
             Attendance.objects
@@ -306,12 +319,11 @@ class AttendanceLogsView(APIView):
         )
 
         return Response({
-            "year": year,
-            "month": month,
+            "start_date": date_from,
+            "end_date": date_to,
             "count": qs.count(),
             "results": AttendanceLogSerializer(qs, many=True).data,
         })
-
 #Attendance Logs for admin & superadmin
 class CEOandHRAttendanceLogsView(APIView):
     permission_classes = [IsAuthenticated, IsRole]

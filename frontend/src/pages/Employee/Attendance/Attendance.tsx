@@ -1,11 +1,11 @@
 // src/pages/Employee/Attendance/Attendance.tsx
+//employee
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import {Layout,Card,Calendar,Tooltip,Button,Row,Select,Tabs,Spin,Table,Tag,} from "antd";
+import {Layout,Card,Calendar,Tooltip,Button,Row,Select,Tabs,Spin,Table,Tag, DatePicker, Segmented} from "antd";
 import type { Dayjs } from "dayjs";
-import dayjs from "dayjs";
 import { CalendarOutlined, FileSearchOutlined } from "@ant-design/icons";
 import AttendanceCorrectionLogs from "./AttendanceCorrection/AttendanceCorrectionLogs";
 import Sidebar from "../../../components/Sidebar/Sidebar";
@@ -26,6 +26,10 @@ import CalendarLegendDisplay from "../../../components/SharedCalendar/CalendarLe
 import LeaveRequestLogs from "./LeaveRequests/LeaveRequestLogs";
 import RequestLoan from "./LoanRequest/RequestLoan";
 import RequestLoanLogs from "./LoanRequest/RequestLoanLogs";
+import dayjs from "dayjs";
+import isoWeek from "dayjs/plugin/isoWeek";
+
+dayjs.extend(isoWeek);
 
 const { Content } = Layout;
 
@@ -60,6 +64,8 @@ const Attendance: React.FC = () => {
     time_in: string | null;
     time_out: string | null;
   };
+  type RangeMode = "Month" | "Week" | "Day";
+  const [rangeMode, setRangeMode] = useState<RangeMode>("Month");
 
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
 
@@ -77,10 +83,24 @@ const Attendance: React.FC = () => {
 
   const loadAttendance = async () => {
     try {
+      let start: Dayjs;
+      let end: Dayjs;
+
+      if (rangeMode === "Month") {
+        start = selectedMonth.startOf("month");
+        end = selectedMonth.endOf("month");
+     } else if (rangeMode === "Week") {
+        start = selectedMonth.startOf("isoWeek");
+        end = selectedMonth.endOf("isoWeek");
+      } else {
+        start = selectedMonth.startOf("day");
+        end = selectedMonth.endOf("day");
+      }
+
       const res = await api.get("/attendance/logs/", {
         params: {
-          year: calendarValue.year(),
-          month: calendarValue.month() + 1,
+          start_date: start.format("YYYY-MM-DD"),
+          end_date: end.format("YYYY-MM-DD"),
         },
       });
 
@@ -104,15 +124,20 @@ const Attendance: React.FC = () => {
   const [isLeaveOpen, setIsLeaveOpen] = useState(false);
   const [isLoanOpen, setIsLoanOpen] = useState(false);
   const [calendarValue, setCalendarValue] = useState<Dayjs>(dayjs());
+  const [selectedMonth, setSelectedMonth] = useState<Dayjs>(dayjs());
   const [leaveRefreshKey, setLeaveRefreshKey] = useState(0);
   const [loanRefreshKey, setLoanRefreshKey] = useState(0);
 
 
   useEffect(() => {
-  loadHolidays();
-  loadPayrollPeriods();
-  loadAttendance();   
-}, []);
+    loadHolidays();
+    loadPayrollPeriods();
+    loadAttendance();   
+  }, []);
+
+  useEffect(() => {
+    setSelectedMonth(calendarValue);
+  }, [calendarValue]);
 
   useEffect(() => {
     console.log("Calendar Attendance:", attendanceRecords);
@@ -120,7 +145,7 @@ const Attendance: React.FC = () => {
 
   useEffect(() => {
     loadAttendance();
-  }, [calendarValue]);
+  }, [selectedMonth, rangeMode]);
 
 
     /* =========================
@@ -157,8 +182,8 @@ const Attendance: React.FC = () => {
 
 
 
-  const year = calendarValue.year();
-  const month = calendarValue.month();
+  const year = selectedMonth.year();
+  const month = selectedMonth.month();
 
 
   return (
@@ -218,10 +243,38 @@ const Attendance: React.FC = () => {
             </div>
             
           </Card>
-
-          {/* ===== Logs & Requests ===== */}
+                  
+        
+            
+          {/* ===== Logs & Requests & Filter by Date ===== */}
           <Card className={styles.historyCard}>
-            <Tabs defaultActiveKey="logs" className={styles.pillTabs}>
+            <Tabs
+              defaultActiveKey="logs"
+              className={styles.pillTabs}
+              tabBarExtraContent={
+                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                  
+                  <Segmented
+                    value={rangeMode}
+                    onChange={(val) => setRangeMode(val as RangeMode)}
+                    options={["Month", "Week", "Day"]}
+                  />
+
+                  {rangeMode === "Month" ? (
+                    <DatePicker
+                      picker="month"
+                      value={selectedMonth}
+                      onChange={(d) => d && setSelectedMonth(d)}
+                    />
+                  ) : (
+                    <DatePicker
+                      value={selectedMonth}
+                      onChange={(d) => d && setSelectedMonth(d)}
+                    />
+                  )}
+                </div>
+              }
+            >
               <Tabs.TabPane tab="Attendance Logs" key="logs">
                 <AttendaceLogs year={year} month={month + 1} />
               </Tabs.TabPane>
@@ -233,13 +286,9 @@ const Attendance: React.FC = () => {
               <Tabs.TabPane tab="Attendance Correction Request(s)" key="corrections">
                 <AttendanceCorrectionLogs />
               </Tabs.TabPane>
-
-              {/* <Tabs.TabPane tab="Loan Request(s)" key="loans">
-                <RequestLoanLogs refreshKey={loanRefreshKey} />
-              </Tabs.TabPane> */}
-
             </Tabs>
           </Card>
+          
 
           {/* ===== Modals ===== */}
           <AttendanceCorrection

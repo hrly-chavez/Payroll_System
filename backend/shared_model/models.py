@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 import uuid, re
 from datetime import datetime
-
+from django.db.models import Q 
 
 class Province(models.Model):
     name = models.CharField(max_length=100)
@@ -1178,7 +1178,7 @@ class Pay_Rule(models.Model):
         ("PER_DAY", "Per Day"),
     ]
     id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=100,unique=True)
+    name = models.CharField(max_length=100)
     event_type = models.CharField(max_length=40,choices=event_type_choices)
     category = models.CharField(max_length=20,choices=categories)
     rate_type = models.CharField(max_length=20, choices=RATE_TYPE_CHOICES)
@@ -1191,8 +1191,17 @@ class Pay_Rule(models.Model):
     applies_to = models.ForeignKey(Department,on_delete=models.CASCADE,null=True,blank=True,related_name="pay_rules")
     employee = models.ForeignKey("Employee",on_delete=models.SET_NULL,null=True,blank=True,related_name="pay_rules")
     
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=~Q(employee__isnull=False, applies_to__isnull=False),
+                name="payrule_not_both_employee_and_department",
+            )
+        ]
+
     def __str__(self):
-        return f"{self.name} - {self.event_type}"
+        scope = "Employee" if self.employee_id else ("Department" if self.applies_to_id else "All")
+        return f"{self.name} [{scope}] - {self.event_type}"
 
 class Commission_Tax_Rule(models.Model):
     """

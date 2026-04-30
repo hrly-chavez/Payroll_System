@@ -132,7 +132,10 @@ export default function PayRulesTab({ active }: Props) {
     setPayRuleEditMode(false);
     setEditingPayRuleId(null);
     payrollForm.resetFields();
-    payrollForm.setFieldsValue({ is_active: true }); // default for add
+    payrollForm.setFieldsValue({
+      is_active: true,
+      scope: "ALL",
+    });
   };
 
   const closePayrollModal = () => {

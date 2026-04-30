@@ -44,7 +44,7 @@ export default function AddPayRules({
   const [categories, setCategories] = useState<Choice[]>([]);
   const [rateTypes, setRateTypes] = useState<Choice[]>([]);
   const [loadingChoices, setLoadingChoices] = useState(false);
-
+  const scope = Form.useWatch("scope", form);
   const rateType = Form.useWatch("rate_type", form);
   const isMultiplier = rateType === "MULTIPLIER";
 
@@ -76,6 +76,8 @@ export default function AddPayRules({
 
     return false;
   };
+
+  
 
   useEffect(() => {
     const fetchChoices = async () => {
@@ -270,75 +272,80 @@ export default function AddPayRules({
           </Col>
         </Row>
 
-        <Row gutter={12}>
-          <Col span={12}>
-            <Form.Item
-              label="Applies To (Department)"
-              name="applies_to"
-              rules={[
-                ({ getFieldValue }) => ({
-                  validator(_, value) {
-                    if (value && getFieldValue("employee")) {
-                      return Promise.reject(
-                        new Error(
-                          "Choose either Department or Employee, not both."
-                        )
-                      );
-                    }
-                    return Promise.resolve();
-                  },
-                }),
+        <Form.Item
+            label="Scope"
+            name="scope"
+            rules={[{ required: true, message: "Scope is required" }]}
+          >
+            <Select
+              placeholder="Select scope"
+              options={[
+                { value: "ALL", label: "All Employees" },
+                { value: "DEPARTMENT", label: "Department" },
+                { value: "EMPLOYEE", label: "Employee" },
               ]}
-            >
-              <Select
-                allowClear
-                placeholder="All departments"
-                onChange={(value) => {
-                  if (value) form.setFieldsValue({ employee: null });
-                }}
-                options={departments.map((d) => ({
-                  value: d.id,
-                  label: d.name,
-                }))}
-              />
-            </Form.Item>
-          </Col>
+              onChange={(value) => {
+                if (value === "ALL") {
+                  form.setFieldsValue({
+                    applies_to: null,
+                    employee: null,
+                  });
+                }
 
-          <Col span={12}>
-            <Form.Item
-              label="Applies To (Employee)"
-              name="employee"
-              rules={[
-                ({ getFieldValue }) => ({
-                  validator(_, value) {
-                    if (value && getFieldValue("applies_to")) {
-                      return Promise.reject(
-                        new Error(
-                          "Choose either Department or Employee, not both."
-                        )
-                      );
-                    }
-                    return Promise.resolve();
-                  },
-                }),
-              ]}
-            >
-              <Select
-                allowClear
-                placeholder="All employees"
-                onChange={(value) => {
-                  if (value) form.setFieldsValue({ applies_to: null });
-                }}
-                options={employees.map((e) => ({
-                  value: e.id,
-                  label:
-                    e.full_name ||
-                    `${e.fname || ""} ${e.lname || ""}`.trim() ||
-                    `Employee #${e.id}`,
-                }))}
-              />
-            </Form.Item>
-          </Col>
+                if (value === "DEPARTMENT") {
+                  form.setFieldsValue({
+                    employee: null,
+                  });
+                }
+
+                if (value === "EMPLOYEE") {
+                  form.setFieldsValue({
+                    applies_to: null,
+                  });
+                }
+              }}
+            />
+          </Form.Item>
+          
+        <Row gutter={12}>
+          {scope === "DEPARTMENT" && (
+            <Col span={12}>
+              <Form.Item
+                label="Department"
+                name="applies_to"
+                rules={[{ required: true, message: "Department is required" }]}
+              >
+                <Select
+                  placeholder="Select department"
+                  options={departments.map((d) => ({
+                    value: d.id,
+                    label: d.name,
+                  }))}
+                />
+              </Form.Item>
+            </Col>
+          )}
+
+          {scope === "EMPLOYEE" && (
+            <Col span={12}>
+              <Form.Item
+                label="Employee"
+                name="employee"
+                rules={[{ required: true, message: "Employee is required" }]}
+              >
+                <Select
+                  placeholder="Select employee"
+                  options={employees.map((e) => ({
+                    value: e.id,
+                    label:
+                      e.full_name ||
+                      `${e.fname || ""} ${e.lname || ""}`.trim() ||
+                      `Employee #${e.id}`,
+                  }))}
+                />
+              </Form.Item>
+            </Col>
+          )}
         </Row>
 
         <Row gutter={12}>

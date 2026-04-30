@@ -19,7 +19,9 @@ import {
   Select,
   Space,
   Divider,
+  Upload,
 } from "antd";
+import type { UploadProps } from "antd";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";
 import styles from "./Attendance.module.css";
@@ -97,6 +99,11 @@ const Attendance: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState<Dayjs>(dayjs());
 
   const [allRows, setAllRows] = useState<HRLogRow[]>([]);
+
+  // import file for biometric
+  const [biometricOpen, setBiometricOpen] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
 
   // PDF modal state (same concept as attendance correction)
   const [pdfOpen, setPdfOpen] = useState(false);
@@ -238,6 +245,57 @@ const columns = [
     render: (v: string) => (v && v.trim() ? v : "-"),
   },
 ];
+  //import .xlsx file
+  const uploadProps: UploadProps = {
+    beforeUpload: (file) => {
+      const isXlsx =
+        file.type ===
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+        file.name.endsWith(".xlsx");
+
+      if (!isXlsx) {
+        message.error("Only .xlsx files are allowed!");
+        return Upload.LIST_IGNORE;
+      }
+
+      setFile(file);
+      return false; // prevent auto upload
+    },
+    maxCount: 1,
+  };
+
+  const handleImportBiometrics = async () => {
+    if (!file) {
+      message.warning("Please select an Excel (.xlsx) file.");
+      return;
+    }
+
+    try {
+      setBiometricLoading(true);
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      await api.post("/attendance/import-biometrics/", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      message.success("Biometrics imported successfully!");
+      setBiometricOpen(false);
+      setFile(null);
+
+      // refresh table after import
+      fetchLogs({ keyword: search });
+    } catch (err: any) {
+      console.error(err);
+      message.error("Failed to import biometrics.");
+    } finally {
+      setBiometricLoading(false);
+    }
+  };
+
   const handleOpenPDFModal = () => {
     // prefill modal based on current UI selection (nice UX)
     if (rangeMode === "Day") {
@@ -391,9 +449,15 @@ const columns = [
                   />
                 )}
 
-                <Button type="primary" onClick={handleOpenPDFModal}>
-                  Generate PDF
-                </Button>
+                <Space>
+                  <Button type="primary" onClick={handleOpenPDFModal}>
+                    Generate PDF
+                  </Button>
+
+                  <Button type="primary" onClick={() => setBiometricOpen(true)}>
+                    Import Biometrics
+                  </Button>
+                </Space>
               </div>
 
               <Search
@@ -417,6 +481,31 @@ const columns = [
             />
           </Card>
         </Content>
+
+        <Modal
+          title="Import Biometrics"
+          open={biometricOpen}
+          onCancel={() => {
+            setBiometricOpen(false);
+            setFile(null);
+          }}
+          onOk={handleImportBiometrics}
+          okText="Import"
+          confirmLoading={biometricLoading}
+          destroyOnClose
+        >
+          <Space direction="vertical" style={{ width: "100%" }}>
+            <Upload {...uploadProps}>
+              <Button>Select Excel File (.xlsx)</Button>
+            </Upload>
+
+            {file && (
+              <div>
+                Selected file: <strong>{file.name}</strong>
+              </div>
+            )}
+          </Space>
+        </Modal>
 
         <Modal
           title="Generate Attendance Report"

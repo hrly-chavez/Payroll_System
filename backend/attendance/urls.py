@@ -34,6 +34,9 @@ urlpatterns = [
     path("admin/analytics/", AttendanceAdminAnalyticsView.as_view(), name="attendance-admin-analytics"),
     path("super_admin/analytics/", AttendanceAdminAnalyticsView.as_view(), name="attendance-super_admin-analytics"),
 
+    #import file for biometrics
+    path("import-biometrics/", ImportBiometricsView.as_view()),
+
     #pdf generation
     path("attendance-logs/pdf/", AttendanceLogsPDFView.as_view(), name="attendance_logs_pdf"),
     path("attendance-logs/employees/dropdown/", AttendanceEmployeesDropdownView.as_view(), name="attendance_logs_employee_dropdown"),

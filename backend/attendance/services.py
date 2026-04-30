@@ -3,9 +3,13 @@ from calendar import monthrange
 
 from django.db import transaction
 from django.utils import timezone
+from django.utils.timezone import make_aware
 from rest_framework.exceptions import ValidationError
 from django.db.models import Q
 from shared_model.models import *
+from django.contrib.auth import get_user_model
+import re
+import pandas as pd
 
 #==============PIE CHART DISPLAY HELPERS============================
 
@@ -756,3 +760,163 @@ def punch_in_eligibility(user):
     return resp
 
 
+# import biometrics .xlxs file
+User = get_user_model()
+
+
+def import_biometrics_file(file):
+    df = pd.read_excel(file, engine="openpyxl", header=None)
+
+    shift = Shift.objects.get(id=1)
+    department = Department.objects.get(id=2)
+
+    i = 0
+
+    header_raw = str(df.iloc[0, 0])
+    year_match = re.search(r"(\d{4})", header_raw)
+    IMPORT_YEAR = int(year_match.group(1)) if year_match else 2026
+
+    start_match = re.search(r"(\d{1,2})/(\d{1,2})", header_raw)
+    start_month = int(start_match.group(1)) if start_match else 1
+
+    created_count = 0
+
+    while i < len(df):
+        raw = str(df.iloc[i, 0])
+        if "ID:" not in raw:
+            i += 1
+            continue
+
+        match = re.search(r"ID:(\S+)\s+Name:(.*?)\s+Dept:(\S+)\s+Shift:(\S+)", raw)
+        if not match:
+            i += 1
+            continue
+
+        id_no, full_name, dept_name, shift_name = match.groups()
+
+        name_parts = full_name.strip().split()
+        if not name_parts:
+            i += 3
+            continue
+
+        fname = name_parts[0]
+        lname = name_parts[-1] if len(name_parts) > 1 else ""
+
+        employee, _ = Employee.objects.get_or_create(
+            id_no=id_no,
+            defaults={
+                "fname": fname,
+                "lname": lname,
+                "contact_no": "09123456789",
+                "hired_date": date.today(),
+                "position": "Agent",
+                "email": f"{id_no}@payroll.local",
+                "shift": shift,
+                "department": department,
+                "is_active": True,
+            },
+        )
+
+        # USER CREATION
+        if not hasattr(employee, "user"):
+            base_username = fname.lower()
+            username = base_username
+            counter = 1
+            while User.objects.filter(user_name=username).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
+
+            User.objects.create_user(
+                user_name=username,
+                password=f"{fname.lower()}123",
+                role="EMPLOYEE",
+                employee=employee,
+                is_active=True,
+            )
+
+        # Prevent out-of-bounds error
+        if i + 2 >= len(df):
+            i += 1
+            continue
+
+        dates_row = df.iloc[i + 1]
+        times_row = df.iloc[i + 2]
+
+        current_year = IMPORT_YEAR
+        current_month = None
+        previous_day = None
+
+        all_punches = []
+
+        for col in range(1, len(dates_row)):
+            day_cell = dates_row[col]
+            if pd.isna(day_cell):
+                continue
+
+            try:
+                day = int(float(day_cell))
+            except:
+                continue
+
+            if current_month is None:
+                current_month = start_month
+
+            if previous_day is not None and day < previous_day:
+                current_month = 1 if current_month == 12 else current_month + 1
+
+            max_days = monthrange(current_year, current_month)[1]
+            if day > max_days:
+                current_month += 1
+                day = 1
+
+            attendance_date = date(current_year, current_month, day)
+            previous_day = day
+
+            raw_times = str(times_row[col]).strip()
+            if raw_times == "0":
+                continue
+
+            times = re.findall(r"\d{2}:\d{2}", raw_times)
+            parsed = sorted([datetime.strptime(t, "%H:%M").time() for t in times])
+
+            for t in parsed:
+                dt = make_aware(datetime.combine(attendance_date, t))
+                all_punches.append(dt)
+
+        all_punches = sorted(all_punches)
+
+        idx = 0
+        while idx < len(all_punches):
+            time_in = all_punches[idx]
+            time_out = None
+
+            if idx + 1 < len(all_punches):
+                next_punch = all_punches[idx + 1]
+                if (next_punch - time_in).total_seconds() <= 16 * 3600:
+                    time_out = next_punch
+                    idx += 2
+                else:
+                    idx += 1
+            else:
+                idx += 1
+
+            attendance_date = time_in.date()
+
+            attendance, _ = Attendance.objects.update_or_create(
+                employee=employee,
+                date=attendance_date,
+                defaults={"status": "PRESENT"},
+            )
+
+            if not attendance.time_in:
+                attendance.time_in = time_in
+
+            if time_out and not attendance.time_out:
+                attendance.time_out = time_out
+
+            attendance.save()
+            created_count += 1
+
+        i += 3
+
+    return created_count

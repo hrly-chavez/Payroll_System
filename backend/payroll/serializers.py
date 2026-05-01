@@ -704,12 +704,24 @@ class PayRuleSerializer(serializers.ModelSerializer):
                 "effective_to": ["effective_to cannot be earlier than effective_from."],
             })
 
-        if rate_value is not None:
-            try:
-                if Decimal(str(rate_value)) < 0:
-                    raise ValidationError({"rate_value": ["Rate value cannot be negative."]})
-            except Exception:
-                raise ValidationError({"rate_value": ["Invalid rate value."]})
+        # enforce uniqueness per scope + event_type + category
+        qs = Pay_Rule.objects.filter(
+            event_type=attrs.get("event_type", getattr(self.instance, "event_type", None)),
+            category=attrs.get("category", getattr(self.instance, "category", None)),
+            employee=employee,
+            applies_to=applies_to,
+        )
+
+        # exclude self during update
+        if self.instance:
+            qs = qs.exclude(id=self.instance.id)
+
+        if qs.exists():
+            raise ValidationError({
+                "non_field_errors": [
+                    "A rule for this event, category, and scope already exists."
+                ]
+            })
 
         return attrs
     

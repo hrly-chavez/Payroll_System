@@ -35,6 +35,18 @@ const AddEmployeeAllowanceModal: React.FC<Props> = ({
   const [allowanceTypes, setAllowanceTypes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // resetting the forms
+  const handleCancel = () => {
+    form.resetFields();   // clear all inputs
+    onClose();            // close modal
+  };
+
+  useEffect(() => {
+    if (open) {
+      form.resetFields();
+    }
+  }, [open]);
+
   /* =========================
      LOAD ALLOWANCE TYPES
   ========================== */
@@ -98,7 +110,7 @@ const AddEmployeeAllowanceModal: React.FC<Props> = ({
     <Modal
       open={open}
       title="Add Employee Allowance"
-      onCancel={onClose}
+      onCancel={handleCancel}
       footer={null}
       destroyOnClose
     >

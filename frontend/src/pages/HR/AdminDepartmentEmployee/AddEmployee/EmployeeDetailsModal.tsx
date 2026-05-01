@@ -55,16 +55,34 @@ interface Barangay {
 const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRoles, initialValues, onNext, onClose }) => {
   const [form] = Form.useForm();
 
+  const getDefaultValues = () => {
+    if (!departmentId || departments.length === 0) return {};
+
+    const dept = departments.find(d => d.id === departmentId);
+
+    return {
+      department: departmentId,
+      shift: dept?.shift?.id ?? undefined,
+    };
+  };
+
   useEffect(() => {
-    if (open && initialValues) {
-      const formattedValues = { ...initialValues };
+    if (open) {
+      if (initialValues) {
+        const formattedValues = { ...initialValues };
 
-      // Convert hired_date string to Dayjs if it exists
-      if (formattedValues.hired_date) {
-        formattedValues.hired_date = dayjs(formattedValues.hired_date);
+        // Convert hired_date string to Dayjs if it exists
+        if (formattedValues.hired_date) {
+          formattedValues.hired_date = dayjs(formattedValues.hired_date);
+        }
+
+        form.setFieldsValue(formattedValues);
+      } else {
+        form.resetFields(); //  THIS is what you're missing
+        setFileList([]);    //  also reset upload
+
+        form.setFieldsValue(getDefaultValues());
       }
-
-      form.setFieldsValue(formattedValues);
     }
   }, [open, initialValues]);
 
@@ -82,6 +100,13 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
   const [fileList, setFileList] = useState<any[]>([]);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewImage, setPreviewImage] = useState<string>("");
+
+  // resetting forms 
+  const handleCancel = () => {
+    form.resetFields();
+    setFileList([]);
+    onClose();
+  };
 
   // ------------------------
   // Handle Upload Change
@@ -210,7 +235,7 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
     <Modal
       title="Employee Details"
       open={open}
-      onCancel={onClose}
+      onCancel={handleCancel}
       footer={null}
       centered
       width={1000}
@@ -474,10 +499,10 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
         </Row>
 
         <div className={styles.actions}>
+          <Button onClick={handleCancel}>Cancel</Button>
           <Button type="primary" onClick={handleNext}>
             Next
           </Button>
-          <Button onClick={onClose}>Cancel</Button>
         </div>
       </Form>
     </Modal>

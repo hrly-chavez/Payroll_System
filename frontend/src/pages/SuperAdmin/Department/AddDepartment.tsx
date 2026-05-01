@@ -23,6 +23,8 @@ const AddDepartment: React.FC<Props> = ({ open, onClose, initialValues }) => {
   const [shifts, setShifts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const [form] = Form.useForm();
+
   const [holidayOptions, setHolidayOptions] = useState<
     { label: string; value: string }[]
   >([]);
@@ -61,6 +63,26 @@ const AddDepartment: React.FC<Props> = ({ open, onClose, initialValues }) => {
     }
   };
 
+  // for resetting value in modal
+  useEffect(() => {
+    if (open) {
+      if (initialValues) {
+        form.setFieldsValue({
+          name: initialValues.name,
+          shift: initialValues.shift,
+          holiday_base: initialValues.holiday_base,
+        });
+      } else {
+        form.resetFields(); //  fresh form when adding
+      }
+    }
+  }, [open, initialValues]);
+
+  const handleCancel = () => {
+    form.resetFields();   //  clear form
+    onClose();            // close modal
+  };
+
   // Handle submit: create or update
   const onFinish = async (values: any) => {
     setLoading(true);
@@ -97,20 +119,16 @@ const AddDepartment: React.FC<Props> = ({ open, onClose, initialValues }) => {
     <Modal
       title={initialValues?.id ? "Edit Department" : "Add Department & Shift"}
       open={open}
-      onCancel={onClose}
+      onCancel={handleCancel}
       footer={null}
       centered
       className={styles.modal}
     >
       <Form
+        form={form}
         layout="vertical"
         className={styles.form}
         onFinish={onFinish}
-        initialValues={{
-          name: initialValues?.name,
-          shift: initialValues?.shift,
-          holiday_base: initialValues?.holiday_base,
-        }}
       >
         <Form.Item
           label="Name"
@@ -161,7 +179,7 @@ const AddDepartment: React.FC<Props> = ({ open, onClose, initialValues }) => {
           <Button type="primary" htmlType="submit" className={styles.saveBtn} loading={loading}>
             Save
           </Button>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={handleCancel}>Cancel</Button>
         </div>
       </Form>
     </Modal>

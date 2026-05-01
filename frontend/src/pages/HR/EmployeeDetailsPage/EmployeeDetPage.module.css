@@ -150,6 +150,11 @@
   margin-bottom: 2px;
 }
 
+.infoRow p {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
 
 /* ================= STATUS ================= */
 .statusRow {

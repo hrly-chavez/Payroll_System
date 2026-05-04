@@ -132,6 +132,9 @@ const AttendanceCorrection: React.FC<Props> = ({ open, onClose, onSuccess }) => 
           className={styles.input}
           value={date}
           onChange={(val) => setDate(val)}
+          disabledDate={(current) => {
+            return current && current > dayjs().endOf("day");
+          }}
         />
 
         <label>Issue Type</label>

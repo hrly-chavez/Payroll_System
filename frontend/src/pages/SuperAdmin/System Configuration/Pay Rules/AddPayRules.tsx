@@ -56,21 +56,13 @@ export default function AddPayRules({
   //  detect edit mode based on modal title (simple + no prop changes)
   const isEditMode = title.toLowerCase().includes("edit");
 
-  //  Date disabling logic
-  const today = dayjs().startOf("day");
+  
 
-  // Disable past dates (already done)
-  const disablePastDates = (current: Dayjs) => {
-    // Optional: allow any dates when editing existing records
-    // if (isEditMode) return false;
-    return current && current.startOf("day").isBefore(today);
-  };
+  
 
   // Disable effective_to past dates AND dates before effective_from
   const disableEffectiveTo = (current: Dayjs) => {
     const from = form.getFieldValue("effective_from") as Dayjs | null;
-
-    if (current && current.startOf("day").isBefore(today)) return true;
 
     if (from) return current.isBefore(from.startOf("day"));
 
@@ -358,7 +350,6 @@ export default function AddPayRules({
               <DatePicker
                 style={{ width: "100%" }}
                 format="YYYY-MM-DD"
-                disabledDate={disablePastDates}
                 onChange={() => {
                   // if effective_from changes and effective_to becomes invalid, clear it
                   const from = form.getFieldValue("effective_from");

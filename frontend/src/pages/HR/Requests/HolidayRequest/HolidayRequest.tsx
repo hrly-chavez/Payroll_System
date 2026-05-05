@@ -4,8 +4,18 @@ import React, { useEffect, useState } from "react";
 import { Table, Tag, Button, Space, message, Modal, Input } from "antd";
 import api from "../../../../api/axios";
 import styles from "./HolidayRequest.css";
+import type { ColumnsType } from "antd/es/table";
 
 const { TextArea } = Input;
+
+interface HolidayRequest {
+  id: number;
+  employee: string;
+  details: string;
+  reason: string;
+  status: string;
+  created_at: string;
+}
 
 const HolidayRequests: React.FC = () => {
   const [dataSource, setDataSource] = useState<any[]>([]);
@@ -20,7 +30,7 @@ const HolidayRequests: React.FC = () => {
     try {
       const res = await api.get("/approvals/all-requests/");
       
-      // ✅ filter only holiday
+      
       const holidayRequests = res.data.filter(
         (r: any) => r.model === "holiday"
       );
@@ -85,27 +95,31 @@ const HolidayRequests: React.FC = () => {
     }
   };
 
-  const columns = [
-    {
+  const columns: ColumnsType<HolidayRequest> = [    {
       title: "Employee",
       dataIndex: "employee",
+      responsive: ["xs", "sm", "md", "lg"],
     },
     {
       title: "Request Type",
       dataIndex: "type",
+      responsive: ["xs", "sm", "md", "lg"],
       render: () => <Tag color="purple">Holiday</Tag>,
     },
     {
       title: "Details",
       dataIndex: "details",
+      responsive: ["xs", "sm", "md", "lg"],
     },
     {
       title: "Reason",
       dataIndex: "reason",
+      responsive: ["xs", "sm", "md", "lg"],
     },
     {
       title: "Status",
       dataIndex: "status",
+      responsive: ["xs", "sm", "md", "lg"],
       render: (status: string) => {
         const color =
           status === "Pending"
@@ -118,11 +132,21 @@ const HolidayRequests: React.FC = () => {
     },
     {
       title: "Action",
+      width: 160,
       render: (_: any, record: any) => {
         if (record.status !== "Pending") return null;
 
         return (
-          <Space>
+          <div
+            onClick={(e: React.MouseEvent<HTMLDivElement>) =>
+              e.stopPropagation()
+            }
+            style={{
+              display: "flex",
+              flexWrap: "wrap", 
+              minWidth: 140, 
+            }}
+          >
             <Button
               type="primary"
               size="small"
@@ -130,6 +154,7 @@ const HolidayRequests: React.FC = () => {
             >
               Approve
             </Button>
+
             <Button
               danger
               size="small"
@@ -137,11 +162,12 @@ const HolidayRequests: React.FC = () => {
             >
               Decline
             </Button>
-          </Space>
+          </div>
         );
       },
     },
   ];
+
 
   const sortedData = [...dataSource].sort(
     (a, b) =>
@@ -152,16 +178,49 @@ const HolidayRequests: React.FC = () => {
   return (
     <div className={styles.wrapper}>
       <Table
-        columns={columns}
+        columns={columns}        
         rowKey={(record) => `holiday-${record.id}`}
         loading={loading}
         dataSource={sortedData}
+        onRow={(record) => ({
+          onClick: () => {
+            setSelectedRecord(record); // open modal
+          },
+          style: { cursor: "pointer" },
+        })}
         scroll={{ x: "max-content" }}
+
         pagination={{
           pageSize: 10,
           showSizeChanger: true,
         }}
       />
+
+      <Modal
+        title="Holiday Request Details"
+        open={!!selectedRecord && !declineModalOpen}
+        onCancel={() => setSelectedRecord(null)}
+        footer={null}
+        centered
+        destroyOnClose
+      >
+        {selectedRecord && (
+          <div className={styles.modalGrid}>
+            <div>
+              <strong>Employee:</strong> {selectedRecord.employee}
+            </div>
+            <div>
+              <strong>Details:</strong> {selectedRecord.details}
+            </div>
+            <div>
+              <strong>Reason:</strong> {selectedRecord.reason}
+            </div>
+            <div>
+              <strong>Status:</strong> {selectedRecord.status}
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* DECLINE MODAL */}
       <Modal

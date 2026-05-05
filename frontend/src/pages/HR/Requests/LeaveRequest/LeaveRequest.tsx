@@ -11,11 +11,24 @@ import {
   Button,
 } from "antd";
 import api from "../../../../api/axios";
+import styles from "./LeaveRequest.module.css";
+import type { ColumnsType } from "antd/es/table";
 
 const { TextArea } = Input;
 
+interface LeaveRequest {
+  id: number;
+  employee_name: string;
+  leave_type: string;
+  date_from: string;
+  date_to: string;
+  reason: string;
+  status: string;
+  requested_at: string;
+}
+
 const LeaveRequests = () => {
-  const [requests, setRequests] = useState<any[]>([]);
+  const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [declineModalOpen, setDeclineModalOpen] = useState(false);
@@ -23,7 +36,7 @@ const LeaveRequests = () => {
   const [declineReason, setDeclineReason] = useState("");
 
   const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<any>(null);
+  const [selectedRecord, setSelectedRecord] = useState<LeaveRequest | null>(null);
 
   const fetchLeaveRequests = async () => {
     setLoading(true);
@@ -85,42 +98,45 @@ const LeaveRequests = () => {
     }
   };
 
-  const columns = [
+  const columns: ColumnsType<LeaveRequest> = [
     {
       title: "Employee",
       dataIndex: "employee_name",
       key: "employee_name",
+      responsive: ["xs", "sm", "md", "lg"],
     },
     {
       title: "Leave Type",
       dataIndex: "leave_type",
       key: "leave_type",
+      responsive: ["xs", "sm", "md", "lg"],    
     },
     {
       title: "Start Date",
       dataIndex: "date_from",
       key: "date_from",
+      responsive: ["xs", "sm", "md", "lg"],    
     },
     {
       title: "End Date",
       dataIndex: "date_to",
       key: "date_to",
+      responsive: ["xs", "sm", "md", "lg"],
     },
     {
       title: "Reason",
       dataIndex: "reason",
       key: "reason",
-      render: (text: string, record: any) => {
+      responsive: ["xs", "sm", "md", "lg"],
+       render: (text: string, record: any) => {
         const isLong =
           (text?.split(" ").length > 10) || (text?.length > 20);
 
         return (
-          <div
-            className={isLong ? "clamp-text clickable" : "clamp-text"}
-            style={{
-              cursor: isLong ? "pointer" : "default",
-              maxWidth: 300,
-            }}
+           <div
+            className={`${styles.clampText} ${
+              isLong ? styles.clickable : ""
+            }`} 
             onClick={() => {
               if (isLong) {
                 setSelectedRecord(record);
@@ -171,7 +187,12 @@ const LeaveRequests = () => {
         if (record.status !== "Pending") return null;
 
         return (
-          <div style={{ display: "flex", gap: "8px" }}>
+          <div
+            className={styles.actions}
+            onClick={(e: React.MouseEvent<HTMLDivElement>) =>
+              e.stopPropagation()
+            } // prevents row click from triggering modal
+          >
             <Button
               type="primary"
               size="small"
@@ -204,13 +225,23 @@ const LeaveRequests = () => {
   });
 
   return (
-    <>
+   <div className={styles.wrapper}>
       <Spin spinning={loading}>
         <Table
           columns={columns}
           rowKey="id"
           dataSource={sortedRequests}
-          scroll={{ x: "max-content" }}
+
+          onRow={(record) => {
+            return {
+              onClick: () => {
+                setSelectedRecord(record);   
+                setViewModalOpen(true);      
+              },
+              style: { cursor: "pointer" },   
+            };
+          }}
+
           pagination={{
             pageSize: 10,
             showSizeChanger: true,
@@ -244,9 +275,11 @@ const LeaveRequests = () => {
         open={viewModalOpen}
         onCancel={() => setViewModalOpen(false)}
         footer={null}
+        centered
+        destroyOnClose
       >
         {selectedRecord && (
-          <div style={{ display: "grid", rowGap: "8px" }}>
+          <div className={styles.modalGrid}> 
             <div>
               <strong>Employee:</strong> {selectedRecord.employee_name}
             </div>
@@ -261,37 +294,14 @@ const LeaveRequests = () => {
             </div>
             <div>
               <strong>Reason:</strong>
-              <p
-                style={{
-                  marginTop: "6px",
-                  wordBreak: "break-word",
-                  overflowWrap: "anywhere",
-                  whiteSpace: "pre-wrap",
-                }}
-              >
+              <p className={styles.reasonText}>
                 {selectedRecord.reason}
               </p>
             </div>
           </div>
         )}
       </Modal>
-
-      {/* CLAMP STYLES */}
-      <style jsx>{`
-        .clamp-text {
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          word-break: break-word;
-        }
-
-        .clickable:hover {
-          text-decoration: underline;
-        }
-      `}</style>
-    </>
+    </div>
   );
 };
 

@@ -6,12 +6,24 @@ import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import api from "../../../../api/axios";
 import CreateAttendance, { type EventRow } from "./CreateAttendance";
+
+
+type AttendanceEvent = {
+  type: string;
+  minutes: number;
+  start_time: string | null;
+  end_time: string | null;
+  approval_status: "Pending" | "Approved" | "Declined";
+  event_remarks: string;
+};
+
 type AttendanceMini = {
   id: number;
   date: string;
   status: "PRESENT" | "ABSENT" | "HALF_DAY" | "REST_DAY" | "HOLIDAY";
   time_in: string | null;
   time_out: string | null;
+  events?: AttendanceEvent[];
 };
 
 type CorrectionDetail = {
@@ -68,6 +80,17 @@ const EditAttendance: React.FC<Props> = ({ open, correctionId, onClose, onApplie
         setStatus(data.attendance.status);
         setTimeIn(data.attendance.time_in ? dayjs(data.attendance.time_in) : null);
         setTimeOut(data.attendance.time_out ? dayjs(data.attendance.time_out) : null);
+
+        const mappedEvents: EventRow[] = (data.attendance.events || []).map((e) => ({
+          type: e.type,
+          minutes: e.minutes ?? 0,
+          start_time: e.start_time ? dayjs(e.start_time, "HH:mm:ss") : null,
+          end_time: e.end_time ? dayjs(e.end_time, "HH:mm:ss") : null,
+          approval_status: e.approval_status || "Approved",
+          event_remarks: e.event_remarks || "",
+        }));
+
+        setEvents(mappedEvents);
       } catch (err: any) {
         setDetail(null);
         setErrorMsg(err?.response?.data?.detail || "Failed to load correction detail.");
@@ -173,6 +196,7 @@ const EditAttendance: React.FC<Props> = ({ open, correctionId, onClose, onApplie
         <Form.Item label="Time In">
           <DatePicker
             showTime
+            format="YYYY-MM-DD  |  HH:mm:ss"
             style={{ width: "100%" }}
             value={timeIn}
             onChange={(v) => setTimeIn(v)}
@@ -193,18 +217,41 @@ const EditAttendance: React.FC<Props> = ({ open, correctionId, onClose, onApplie
         </Form.Item>
         <Divider />
 
-            <Form.Item label="Attendance Events">
+            <Form.Item
+                label={<span style={{ fontWeight: 600 }}>Attendance Events</span>}
+              >
             <Checkbox
                 checked={replaceEvents}
                 onChange={(e) => setReplaceEvents(e.target.checked)}
                 disabled={loading}
             >
-                Replace existing events
+                Replace existing events (edit/remove current events)
             </Checkbox>
-
+            <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+            <div style={{ marginBottom: 2 }}>
+              If unchecked: new events will be added on top of existing ones.
+            </div>
+            <div>
+              If checked: existing events will be replaced by the list below.
+            </div>
+          </div>
+            
+            <div style={{ marginTop: 12, fontWeight: 500 }}>
+              {replaceEvents ? "Editing events" : "Adding new events"}
+            </div>
+            
+            {events.length > 0 && !replaceEvents && (
+              <Alert
+                type="info"
+                showIcon
+                message="You are adding new events. Existing events will NOT be changed."
+                style={{ marginTop: 8 }}
+              />
+            )}
             <div style={{ marginTop: 12 }}>
                 <CreateAttendance
                 disabled={loading}
+                value={events}  
                 onChange={setEvents}
                 />
             </div>

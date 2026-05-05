@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from shared_model.models import *
-
+from datetime import datetime, time
 
 class AttendanceSerializer(serializers.ModelSerializer):
     class Meta:
@@ -359,11 +359,25 @@ class AttendanceCorrectionReviewSerializer(serializers.Serializer):
         attrs["decline_reason"] = decline_reason
         return attrs
 
+class AttendanceEventSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Attendance_Event
+        fields = [
+            "id",
+            "type",
+            "minutes",
+            "start_time",
+            "end_time",
+            "approval_status",
+            "event_remarks",
+        ]
+
 class AttendanceMiniSerializer(serializers.ModelSerializer):
+    events = AttendanceEventSerializer(many=True, read_only=True)
+
     class Meta:
         model = Attendance
-        fields = ["id", "date", "status", "time_in", "time_out"]
-
+        fields = ["id", "date", "status", "time_in", "time_out", "events"]
 
 class AttendanceCorrectionDetailSerializer(serializers.ModelSerializer):
     attendance = AttendanceMiniSerializer(read_only=True)
@@ -436,6 +450,28 @@ class AttendanceEventCreateSerializer(serializers.Serializer):
 # =========================
 # Attendance Correction (Apply)
 # =========================
+
+#helper
+def compute_late_undertime(date, time_in, time_out):
+    if not time_in or not time_out:
+        return 0, 0
+
+    shift_start = time(9, 0, 0)
+    shift_end = time(18, 0, 0)
+
+    late_minutes = 0
+    undertime_minutes = 0
+
+    if time_in.time() > shift_start:
+        diff = datetime.combine(date, time_in.time()) - datetime.combine(date, shift_start)
+        late_minutes = int(diff.total_seconds() // 60)
+
+    if time_out.time() < shift_end:
+        diff = datetime.combine(date, shift_end) - datetime.combine(date, time_out.time())
+        undertime_minutes = int(diff.total_seconds() // 60)
+
+    return late_minutes, undertime_minutes
+
 class AttendanceCorrectionApplySerializer(serializers.Serializer):
     status = serializers.ChoiceField(
         choices=["PRESENT", "ABSENT", "HALF_DAY", "REST_DAY", "HOLIDAY"],
@@ -469,7 +505,44 @@ class AttendanceCorrectionApplySerializer(serializers.Serializer):
         correction = self.context.get("correction")
         if correction and getattr(correction, "issue_type", None) == "Missing Both":
             return attrs
+        
+        events = attrs.get("events") or []
 
+        correction = self.context.get("correction")
+        attendance = getattr(correction, "attendance", None)
+
+        if attendance and events:
+            actual_time_in = attrs.get("time_in") or attendance.time_in
+            actual_time_out = attrs.get("time_out") or attendance.time_out
+
+            if not actual_time_in or not actual_time_out:
+                return attrs
+
+            late_expected, ut_expected = compute_late_undertime(
+                attendance.date,
+                actual_time_in,
+                actual_time_out
+            )
+
+            for e in events:
+                event_type = e.get("type")
+
+                if "minutes" not in e:
+                    raise serializers.ValidationError({
+                        "events": f"{event_type} requires minutes."
+                    })
+
+                minutes = e["minutes"]
+
+                if event_type == "Late" and minutes != late_expected:
+                    raise serializers.ValidationError({
+                        "events": f"Late minutes mismatch. Expected {late_expected}, got {minutes}."
+                    })
+
+                if event_type == "Undertime" and minutes != ut_expected:
+                    raise serializers.ValidationError({
+                        "events": f"Undertime minutes mismatch. Expected {ut_expected}, got {minutes}."
+                    })
         return attrs
 
 

@@ -627,6 +627,7 @@ class AdminAttendanceCorrectionDetailView(APIView):
                     "requested_by",
                     "requested_by__department",
                 )
+                .prefetch_related("attendance__events")
                 .get(pk=pk)
             )
         except Attendance_Correction.DoesNotExist:

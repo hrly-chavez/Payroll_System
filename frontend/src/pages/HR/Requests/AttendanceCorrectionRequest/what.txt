@@ -1,0 +1,31 @@
+AttendanceCorrectionRequest 
+    List and manage attendance correction requests (HR/Admin side)
+
+    What it actually does:
+        Fetch pending correction requests
+        Display in table
+        Actions:
+        Open EditAttendance (Apply) modal
+        Decline request
+
+CreateAttendance
+    Manage attendance events UI (Late, OT, etc.)
+
+    What it actually does:
+        - Handles UI for creating and editing attendance events (Late, OT, etc.)
+        - Used inside EditAttendance
+        - Does not create attendance records (UI only)
+
+
+EditAttendance
+    Apply attendance correction + manage events
+
+    What it actually does:
+        Fetch correction details
+        Load:
+        attendance data
+        events (after your fix)
+        Allow admin to:
+        edit status
+        edit time_in/time_out
+        add/edit/remove events

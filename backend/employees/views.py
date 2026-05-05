@@ -257,15 +257,28 @@ class UserViewSet(viewsets.ModelViewSet):
         if reason:
             user._audit_reason = reason  # attach reason to instance
 
+        # Get related employee safely
+        employee = getattr(user, "employee", None)
+
         # Toggle active status
         if user.is_active:
             user.is_active = False
             user.user_status = "INACTIVE"  # update user_status if you added the field
             action_name = "DEACTIVATED"
+
+            if employee:
+                employee.is_active = False
+                employee.save()
+
         else:
             user.is_active = True
             user.user_status = "ACTIVE"
             action_name = "REACTIVATED"
+
+            if employee:
+                employee.is_active = True
+                employee.save()
+
 
         user.save()  # signals will now pick up _audit_reason
 
@@ -301,9 +314,13 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        queryset = super().get_queryset()
+        # KEY CHANGE: decide base queryset per action
+        if self.action in ["list"]:
+            queryset = Employee.objects.filter(is_active=True)
+        else:
+            queryset = Employee.objects.all()  # includes inactive
 
-        # If ADMIN → hide SUPER_ADMIN employees
+        # Apply role restriction
         if user.role == "ADMIN":
             queryset = queryset.exclude(user__role="SUPER_ADMIN")
 
@@ -318,13 +335,24 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"], url_path=r"by-department/(?P<dept_id>\d+)")
     def by_department(self, request, dept_id=None):
         user = request.user
-        employees = self.queryset.filter(department_id=dept_id)
 
-        # If logged-in user is ADMIN, exclude SUPER_ADMIN employees
+        # Optional filter param (?status=active/inactive/all)
+        status_filter = request.query_params.get("status", "active")
+
+        queryset = Employee.objects.filter(department_id=dept_id)
+
+        if status_filter == "active":
+            queryset = queryset.filter(is_active=True)
+        elif status_filter == "inactive":
+            queryset = queryset.filter(is_active=False)
+        elif status_filter == "all":
+            pass  # no filter
+
+        # Apply role restriction
         if user.role == "ADMIN":
-            employees = employees.exclude(user__role="SUPER_ADMIN")
+            queryset = queryset.exclude(user__role="SUPER_ADMIN")
 
-        serializer = self.get_serializer(employees, many=True)
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
     
     # -------------------

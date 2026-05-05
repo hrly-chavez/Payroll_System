@@ -385,7 +385,6 @@ const EmployeeDetailsPage: React.FC = () => {
 
                       <Button
                         type="text"
-                        icon={<EditOutlined />}
                         className={styles.editBtn}
                         onClick={() => setIsEditEmploymentStatusOpen(true)}
                       />
@@ -394,17 +393,42 @@ const EmployeeDetailsPage: React.FC = () => {
                     <p
                       style={{
                         fontWeight: 600,
-                        color:
-                          employee.employment_status === "REGULAR"
-                            ? "green"
-                            : employee.employment_status === "PROBATION"
-                            ? "orange"
-                            : employee.employment_status === "NEW_HIRE"
-                            ? "blue"
-                            : "purple",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
                       }}
                     >
-                      {employee.employment_status.replace("_", " ")}
+                      {/* Employment Status */}
+                      <span
+                        style={{
+                          color:
+                            employee.employment_status === "REGULAR"
+                              ? "green"
+                              : employee.employment_status === "PROBATION"
+                              ? "orange"
+                              : employee.employment_status === "NEW_HIRE"
+                              ? "blue"
+                              : "purple",
+                        }}
+                      >
+                        {employee.employment_status.replace("_", " ")}
+                      </span>
+
+                      {/* Separator */}
+                      <span>|</span>
+
+                      {/* Active / Deactivated */}
+                      <span
+                        style={{
+                          color: employee.is_active ? "green" : "red",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                      >
+                        {employee.is_active ? <CheckCircleOutlined /> : <StopOutlined />}
+                        {employee.is_active ? "Active" : "Deactivated"}
+                      </span>
                     </p>
                   </div>
                 </div>

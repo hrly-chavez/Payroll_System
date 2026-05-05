@@ -466,9 +466,6 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                             IMPORTANT:
                             Please login immediately and change your password.
 
-                            Login here:
-                            http://localhost:3000/
-
                             If you did not expect this email, please contact system support.
 
                             Regards,
@@ -763,7 +760,7 @@ class ForgotPasswordView(APIView):
             expires_at=timezone.now() + timedelta(minutes=5)
         )
 
-        reset_url = f"http://192.168.68.21:3000/reset-password/{token}/"
+        reset_url = f"{settings.FRONTEND_URL}/reset-password/{token}/"
 
         send_mail(
             subject="Payroll System Password Reset",

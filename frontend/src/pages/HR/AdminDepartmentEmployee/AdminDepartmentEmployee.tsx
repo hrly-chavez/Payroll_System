@@ -21,6 +21,7 @@ interface EmployeeType {
   shift: string;
   hired_date: string;
   profile_picture?: string;
+  is_active: boolean;
 }
 
 const AdminDepartmentEmployee: React.FC = () => {
@@ -36,6 +37,9 @@ const AdminDepartmentEmployee: React.FC = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeType | null>(null);
   
   const [departments, setDepartments] = useState<any[]>([]);
+
+  //employee status (deactivated or active)
+  const [statusFilter, setStatusFilter] = useState("active");
 
   const location = useLocation();
   const deptName = (location.state as { deptName?: string })?.deptName || "Employees";
@@ -60,7 +64,13 @@ const AdminDepartmentEmployee: React.FC = () => {
 
     setLoading(true);
     try {
-      const res = await api.get(`/employees/employees/by-department/${deptId}/`);
+      const res = await api.get(
+        `/employees/employees/by-department/${deptId}/`,
+        {
+          params: { status: statusFilter }, // key line
+        }
+      );
+
       setEmployees(res.data); // axios already parses JSON
     } catch (err: any) {
       console.error(err);
@@ -72,15 +82,24 @@ const AdminDepartmentEmployee: React.FC = () => {
 
   useEffect(() => {
     fetchEmployees();
-  }, [deptId]);
+  }, [deptId, statusFilter]);
 
   const filteredEmployees = [...employees]
-  .filter((emp) =>
-    emp.name.toLowerCase().includes(search.toLowerCase())
-  )
-  .sort((a, b) => {
-    return new Date(b.hired_date).getTime() - new Date(a.hired_date).getTime();
-  });
+    .filter((emp) =>
+      emp.name.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      //  Step 1: Active first
+      if (a.is_active !== b.is_active) {
+        return a.is_active ? -1 : 1;
+      }
+
+      //  Step 2: Then sort by hired date (latest first)
+      return (
+        new Date(b.hired_date).getTime() -
+        new Date(a.hired_date).getTime()
+      );
+    });
 
   const columns: TableProps<EmployeeType>["columns"] = [
     {
@@ -116,6 +135,21 @@ const AdminDepartmentEmployee: React.FC = () => {
     { title: "Shift", dataIndex: "shift_info", key: "shift" },
     { title: "Hired Date", dataIndex: "hired_date", key: "hired_date" },
     {
+      title: "Account Status",
+      dataIndex: "is_active",
+      key: "is_active",
+      render: (is_active: boolean) => (
+        <span
+          style={{
+            color: is_active ? "#52c41a" : "#ff4d4f",
+            fontWeight: 600,
+          }}
+        >
+          {is_active ? "Active" : "Deactivated"}
+        </span>
+      ),
+    },
+    {
       title: "Actions",
       key: "actions",
       render: (_, record) => (
@@ -147,6 +181,16 @@ const AdminDepartmentEmployee: React.FC = () => {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
+
+              <Select
+                value={statusFilter}
+                onChange={(value) => setStatusFilter(value)}
+                style={{ width: 180 }}
+              >
+                <Select.Option value="active">Active Employees</Select.Option>
+                <Select.Option value="inactive">Deactivated Employees</Select.Option>
+                <Select.Option value="all">All Employees</Select.Option>
+              </Select>
             </div>
 
             <Button

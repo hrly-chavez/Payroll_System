@@ -99,6 +99,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "contact_no",
             "address",
             "profile_picture",
+            "is_active",
         ]
 
     def get_name(self, obj):

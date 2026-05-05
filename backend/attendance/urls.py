@@ -15,7 +15,8 @@ urlpatterns = [
     path("super_admin/excess-time/<int:pk>/resolve/", SuperAdminResolveExcessTimeView.as_view(), name="superadmin-excess-time-resolve"),
 
     path("shifts/", ShiftListCreateView.as_view(), name="shift-list-create"),
-    path("shifts/<int:pk>/", ShiftRetrieveUpdateDestroyView.as_view(), name="shift-detail"),    
+    path("shifts/<int:pk>/", ShiftRetrieveUpdateDestroyView.as_view(), name="shift-detail"),   
+     
     # Attendance Correction (Employee)
     path("corrections/", EmployeeAttendanceCorrectionCreateView.as_view(), name="attendance-correction-create"),
     path("corrections/my/", EmployeeAttendanceCorrectionListView.as_view(), name="attendance-correction-my"),

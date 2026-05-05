@@ -33,14 +33,14 @@ const APPROVAL_OPTIONS = ["Pending", "Approved", "Declined"].map((v) => ({
 
 interface Props {
   disabled?: boolean;
+  value: EventRow[]; 
   onChange: (events: EventRow[]) => void;
 }
 
-const CreateAttendance: React.FC<Props> = ({ disabled, onChange }) => {
-  const [events, setEvents] = useState<EventRow[]>([]);
+const CreateAttendance: React.FC<Props> = ({ disabled, value, onChange }) => {
+  
 
   const pushChange = (next: EventRow[]) => {
-    setEvents(next);
     onChange(next);
   };
 
@@ -54,17 +54,17 @@ const CreateAttendance: React.FC<Props> = ({ disabled, onChange }) => {
         event_remarks: "",
     };
 
-    const next: EventRow[] = [...events, newRow];
+    const next: EventRow[] = [...value, newRow];
     pushChange(next);
     };
 
   const removeEvent = (idx: number) => {
-    const next = events.filter((_, i) => i !== idx);
+    const next = value.filter((_, i) => i !== idx);
     pushChange(next);
   };
 
   const updateEvent = (idx: number, patch: Partial<EventRow>) => {
-    const next = events.map((e, i) => (i === idx ? { ...e, ...patch } : e));
+    const next = value.map((e, i) => (i === idx ? { ...e, ...patch } : e));
     pushChange(next);
   };
 
@@ -76,7 +76,7 @@ const CreateAttendance: React.FC<Props> = ({ disabled, onChange }) => {
         </Button>
       </Space>
 
-      {events.map((e, idx) => (
+      {value.map((e, idx) => (
         <Card key={idx} size="small" style={{ marginBottom: 12 }}>
           <Form layout="vertical">
             <Form.Item label="Type" required>

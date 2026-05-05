@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Layout, Table, Input, Button, message } from "antd";
+import { Layout, Table, Input, Button, message, Select } from "antd";
 import type { TableProps } from "antd";
 import { PlusOutlined, SearchOutlined, SlidersOutlined } from "@ant-design/icons";
 import Sidebar from "../../../components/Sidebar/Sidebar";
@@ -18,6 +18,7 @@ interface EmployeeType {
   department: string;
   shift: string;
   hired_date: string;
+  is_active: boolean;
 }
 
 const SuperAdminDepartmentEmployee: React.FC = () => {
@@ -30,6 +31,9 @@ const SuperAdminDepartmentEmployee: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
+  //employee status (deactivated or active)
+  const [statusFilter, setStatusFilter] = useState("active");
+
   const deptName =
     (location.state as { deptName?: string })?.deptName || "Employees";
 
@@ -39,7 +43,10 @@ const SuperAdminDepartmentEmployee: React.FC = () => {
     setLoading(true);
     try {
       const res = await api.get(
-        `/employees/employees/by-department/${deptId}/`
+        `/employees/employees/by-department/${deptId}/`,
+        {
+          params: { status: statusFilter }, // key line
+        }
       );
       setEmployees(res.data);
     } catch (err: any) {
@@ -54,15 +61,24 @@ const SuperAdminDepartmentEmployee: React.FC = () => {
 
   useEffect(() => {
     fetchEmployees();
-  }, [deptId]);
+  }, [deptId, statusFilter]);
 
   const filteredEmployees = [...employees]
-  .filter((emp) =>
-    emp.name.toLowerCase().includes(search.toLowerCase())
-  )
-  .sort((a, b) => {
-    return new Date(b.hired_date).getTime() - new Date(a.hired_date).getTime();
-  });
+    .filter((emp) =>
+      emp.name.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      //  Step 1: Active first
+      if (a.is_active !== b.is_active) {
+        return a.is_active ? -1 : 1;
+      }
+
+      //  Step 2: Then sort by hired date (latest first)
+      return (
+        new Date(b.hired_date).getTime() -
+        new Date(a.hired_date).getTime()
+      );
+    });
 
   const columns: TableProps<EmployeeType>["columns"] = [
     {
@@ -75,6 +91,21 @@ const SuperAdminDepartmentEmployee: React.FC = () => {
     { title: "Status", dataIndex: "status", key: "status" },
     { title: "Shift", dataIndex: "shift_info", key: "shift" },
     { title: "Hired Date", dataIndex: "hired_date", key: "hired_date" },
+    {
+      title: "Account Status",
+      dataIndex: "is_active",
+      key: "is_active",
+      render: (is_active: boolean) => (
+        <span
+          style={{
+            color: is_active ? "#52c41a" : "#ff4d4f",
+            fontWeight: 600,
+          }}
+        >
+          {is_active ? "Active" : "Deactivated"}
+        </span>
+      ),
+    },
   ];
 
   return (
@@ -93,9 +124,15 @@ const SuperAdminDepartmentEmployee: React.FC = () => {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              <Button icon={<SlidersOutlined />} className={styles.filterBtn}>
-                Filter
-              </Button>
+              <Select
+                value={statusFilter}
+                onChange={(value) => setStatusFilter(value)}
+                style={{ width: 180 }}
+              >
+                <Select.Option value="active">Active Employees</Select.Option>
+                <Select.Option value="inactive">Deactivated Employees</Select.Option>
+                <Select.Option value="all">All Employees</Select.Option>
+              </Select>
             </div>
 
             <Button

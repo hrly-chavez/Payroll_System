@@ -18,11 +18,12 @@ interface HolidayRequest {
 }
 
 const HolidayRequests: React.FC = () => {
-  const [dataSource, setDataSource] = useState<any[]>([]);
+  const [dataSource, setDataSource] = useState<HolidayRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [declineModalOpen, setDeclineModalOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<any>(null);
+  const [selectedRecord, setSelectedRecord] = useState<HolidayRequest | null>(null);
   const [declineReason, setDeclineReason] = useState("");
+  const [viewModalOpen, setViewModalOpen] = useState(false);
 
   // FETCH ONLY HOLIDAY REQUESTS
   const fetchHolidayRequests = async () => {
@@ -82,13 +83,15 @@ const HolidayRequests: React.FC = () => {
 
     try {
       await api.patch(
-        `/approvals/superadmin/holidays/${selectedRecord.id}/status/`,
+        `/approvals/superadmin/holidays/${selectedRecord?.id}/status/`,
         { status: "Declined", remarks: declineReason }
       );
 
       message.success("Declined successfully");
+
       setDeclineModalOpen(false);
       setDeclineReason("");
+      setSelectedRecord(null);
       fetchHolidayRequests();
     } catch {
       message.error("Decline failed");
@@ -138,9 +141,7 @@ const HolidayRequests: React.FC = () => {
 
         return (
           <div
-            onClick={(e: React.MouseEvent<HTMLDivElement>) =>
-              e.stopPropagation()
-            }
+            onClick={(e) => e.stopPropagation()}
             style={{
               display: "flex",
               flexWrap: "wrap", 
@@ -150,7 +151,10 @@ const HolidayRequests: React.FC = () => {
             <Button
               type="primary"
               size="small"
-              onClick={() => handleApprove(record)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleApprove(record)
+              }}
             >
               Approve
             </Button>
@@ -158,7 +162,10 @@ const HolidayRequests: React.FC = () => {
             <Button
               danger
               size="small"
-              onClick={() => handleDeclineClick(record)}
+              onClick={(e) => {
+                 e.stopPropagation();
+                handleDeclineClick(record);
+              }}
             >
               Decline
             </Button>
@@ -184,7 +191,8 @@ const HolidayRequests: React.FC = () => {
         dataSource={sortedData}
         onRow={(record) => ({
           onClick: () => {
-            setSelectedRecord(record); // open modal
+            setSelectedRecord(record);
+            setViewModalOpen(true); // open modal
           },
           style: { cursor: "pointer" },
         })}
@@ -198,7 +206,7 @@ const HolidayRequests: React.FC = () => {
 
       <Modal
         title="Holiday Request Details"
-        open={!!selectedRecord && !declineModalOpen}
+        open={viewModalOpen}
         onCancel={() => setSelectedRecord(null)}
         footer={null}
         centered

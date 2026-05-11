@@ -1,6 +1,16 @@
 // src/pages/HR/Requests/AttendanceCorrectionRequest/AttendanceCorrectionRequest.tsx
+
 import React, { useEffect, useMemo, useState } from "react";
-import { Table, Tag, Button, Space, message, Modal, Input, Alert } from "antd";
+import {
+  Table,
+  Tag,
+  Button,
+  message,
+  Modal,
+  Input,
+  Alert,
+} from "antd";
+
 import api from "../../../../api/axios";
 import dayjs from "dayjs";
 import styles from "./AttendanceCorrectionRequest.module.css";
@@ -17,7 +27,6 @@ type CorrectionRow = {
   status: "Pending" | "Verified" | "Declined";
   decline_reason?: string | null;
 
-  // if your serializer doesn't include these yet, we can add them later
   employee_name?: string;
   department_name?: string;
 };
@@ -31,21 +40,34 @@ const AttendanceCorrectionRequest: React.FC = () => {
   const [declineOpen, setDeclineOpen] = useState(false);
   const [declineId, setDeclineId] = useState<number | null>(null);
   const [declineReason, setDeclineReason] = useState("");
+
   const [actionLoading, setActionLoading] = useState(false);
+
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const [editOpen, setEditOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
 
   const [viewOpen, setViewOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<CorrectionRow | null>(null);
 
+  const [selectedRecord, setSelectedRecord] =
+    useState<CorrectionRow | null>(null);
+
+  // FETCH DATA
   const fetchPending = async () => {
     try {
       setLoading(true);
-      const res = await api.get("/attendance/admin/corrections/pending/");
+
+      const res = await api.get(
+        "/attendance/admin/corrections/pending/"
+      );
+
       setRows(res.data?.results || []);
     } catch (err: any) {
-      message.error(err?.response?.data?.detail || "Failed to load requests.");
+      message.error(
+        err?.response?.data?.detail ||
+          "Failed to load requests."
+      );
     } finally {
       setLoading(false);
     }
@@ -55,16 +77,27 @@ const AttendanceCorrectionRequest: React.FC = () => {
     fetchPending();
   }, []);
 
-  const statusTag = (status: CorrectionRow["status"]) => {
-    const color = status === "Pending" ? "gold" : status === "Verified" ? "green" : "red";
+  // STATUS TAG
+  const statusTag = (
+    status: CorrectionRow["status"]
+  ) => {
+    const color =
+      status === "Pending"
+        ? "gold"
+        : status === "Verified"
+        ? "green"
+        : "red";
+
     return <Tag color={color}>{status}</Tag>;
   };
 
-    const openEdit = (id: number) => {
-      setEditId(id);
-      setEditOpen(true);
-    };
+  // OPEN EDIT
+  const openEdit = (id: number) => {
+    setEditId(id);
+    setEditOpen(true);
+  };
 
+  // OPEN DECLINE
   const openDecline = (id: number) => {
     setErrorMsg(null);
     setDeclineReason("");
@@ -72,6 +105,7 @@ const AttendanceCorrectionRequest: React.FC = () => {
     setDeclineOpen(true);
   };
 
+  // SUBMIT DECLINE
   const submitDecline = async () => {
     setErrorMsg(null);
 
@@ -84,77 +118,126 @@ const AttendanceCorrectionRequest: React.FC = () => {
 
     try {
       setActionLoading(true);
-      await api.post(`/attendance/admin/corrections/${declineId}/review/`, {
-        status: "Declined",
-        decline_reason: declineReason.trim(),
-      });
+
+      await api.post(
+        `/attendance/admin/corrections/${declineId}/review/`,
+        {
+          status: "Declined",
+          decline_reason: declineReason.trim(),
+        }
+      );
+
       message.success("Request declined.");
+
       setDeclineOpen(false);
+
       fetchPending();
     } catch (err: any) {
       const data = err?.response?.data;
-      setErrorMsg(data?.detail || data?.decline_reason?.[0] || "Failed to decline request.");
+
+      setErrorMsg(
+        data?.detail ||
+          data?.decline_reason?.[0] ||
+          "Failed to decline request."
+      );
     } finally {
       setActionLoading(false);
     }
   };
 
+  // TABLE COLUMNS
   const columns = useMemo(
     () => [
       {
         title: "Employee",
         dataIndex: "employee_name",
         responsive: ["xs", "sm", "md", "lg"],
-        render: (_: any, record: CorrectionRow) => record.employee_name || "—",
+
+        render: (_: any, record: CorrectionRow) =>
+          record.employee_name || "—",
       },
+
       {
         title: "Date",
         dataIndex: "date",
         responsive: ["xs", "sm", "md", "lg"],
-        render: (v: string | null) => (v ? dayjs(v).format("MMM DD, YYYY") : "—"),
+
+        render: (v: string | null) =>
+          v
+            ? dayjs(v).format("MMM DD, YYYY")
+            : "—",
       },
+
       {
         title: "Issue Type",
         dataIndex: "issue_type",
         responsive: ["xs", "sm", "md", "lg"],
+
       },
+
       {
         title: "Reason",
         dataIndex: "reason",
         responsive: ["xs", "sm", "md", "lg"],
+
+        // keeps long text neat
         ellipsis: true,
       },
+
       {
         title: "Attachment",
         dataIndex: "file_attached",
         responsive: ["xs", "sm", "md", "lg"],
-        render: (v: string | null) => (v ? <a href={v} target="_blank" rel="noreferrer">View</a> : "—"),
+
+        render: (v: string | null) =>
+          v ? (
+            <a
+              href={v}
+              target="_blank"
+              rel="noreferrer"
+            >
+              View
+            </a>
+          ) : (
+            "—"
+          ),
       },
+
       {
         title: "Status",
         dataIndex: "status",
         responsive: ["xs", "sm", "md", "lg"],
-        render: (status: CorrectionRow["status"]) => statusTag(status),
+
+        render: (
+          status: CorrectionRow["status"]
+        ) => statusTag(status),
       },
+
       {
         title: "Action",
+        width: 160,
+        responsive: ["xs", "sm", "md", "lg"],
+
         render: (_: any, record: CorrectionRow) => (
-          <div
+           <div
+            onClick={(e) => e.stopPropagation()}
             style={{
               display: "flex",
-              flexWrap: "wrap",
-              gap: 8,
-              minWidth: 140, 
-              width: 160,
+              flexDirection: "row",
+              gap: 6, 
             }}
-            onClick={(e) => e.stopPropagation()}
           >
             <Button
               type="primary"
               size="small"
               loading={actionLoading}
-              disabled={record.status !== "Pending" || editOpen}
-              onClick={() => openEdit(record.id)}
+              disabled={
+                record.status !== "Pending" ||
+                editOpen
+              }
+              onClick={() =>
+                openEdit(record.id)
+              }
             >
               Edit / Apply
             </Button>
@@ -163,8 +246,12 @@ const AttendanceCorrectionRequest: React.FC = () => {
               danger
               size="small"
               loading={actionLoading}
-              disabled={record.status !== "Pending"}
-              onClick={() => openDecline(record.id)}
+              disabled={
+                record.status !== "Pending"
+              }
+              onClick={() =>
+                openDecline(record.id)
+              }
             >
               Decline
             </Button>
@@ -175,9 +262,11 @@ const AttendanceCorrectionRequest: React.FC = () => {
     [actionLoading, editOpen]
   );
 
+  // SORT DATA
   const sortedRows = [...rows].sort(
     (a, b) =>
-      new Date(b.date).getTime() - new Date(a.date).getTime()
+      new Date(b.date).getTime() -
+      new Date(a.date).getTime()
   );
 
   return (
@@ -185,16 +274,26 @@ const AttendanceCorrectionRequest: React.FC = () => {
       <Table
         rowKey="id"
         columns={columns as any}
-        dataSource={rows}
+        dataSource={sortedRows}
         loading={loading}
+
+        // responsive horizontal scroll
         scroll={{ x: "max-content" }}
+
+        className={styles.responsiveTable}
+
         onRow={(record) => ({
-            onClick: () => {
+          onClick: () => {
             setSelectedRecord(record);
+
             setViewOpen(true);
-            },
-          style: { cursor: "pointer" },
-        })} 
+          },
+
+          style: {
+            cursor: "pointer",
+          },
+        })}
+
         pagination={{
           pageSize: 5,
           showSizeChanger: true,
@@ -202,79 +301,120 @@ const AttendanceCorrectionRequest: React.FC = () => {
         }}
       />
 
+      {/* DECLINE MODAL */}
       <Modal
         title="Decline Request"
         open={declineOpen}
         onCancel={() => {
           setDeclineOpen(false);
+
           setDeclineId(null);
+
           setDeclineReason("");
+
           setErrorMsg(null);
         }}
         onOk={submitDecline}
         okText="Decline"
-        okButtonProps={{ danger: true, loading: actionLoading }}
-        cancelButtonProps={{ disabled: actionLoading }}
+        okButtonProps={{
+          danger: true,
+          loading: actionLoading,
+        }}
+        cancelButtonProps={{
+          disabled: actionLoading,
+        }}
       >
         {errorMsg && (
-          <Alert type="error" showIcon message={errorMsg} style={{ marginBottom: 12 }} />
+          <Alert
+            type="error"
+            showIcon
+            message={errorMsg}
+            style={{
+              marginBottom: 12,
+            }}
+          />
         )}
+
         <label>Reason</label>
+
         <TextArea
           rows={4}
           value={declineReason}
-          onChange={(e) => setDeclineReason(e.target.value)}
+          onChange={(e) =>
+            setDeclineReason(e.target.value)
+          }
           placeholder="Enter decline reason..."
         />
       </Modal>
-       {editId !== null && (
+
+      {/* EDIT MODAL */}
+      {editId !== null && (
         <EditAttendance
-            key={editId}
-            open={editOpen}
-            correctionId={editId}
-            onClose={() => {
-              setEditOpen(false);
-              setEditId(null);
-            }}
-            onApplied={() => {
-              setEditOpen(false);
-              setEditId(null);
-              fetchPending();
-            }}
-          />
+          key={editId}
+          open={editOpen}
+          correctionId={editId}
+          onClose={() => {
+            setEditOpen(false);
+
+            setEditId(null);
+          }}
+          onApplied={() => {
+            setEditOpen(false);
+
+            setEditId(null);
+
+            fetchPending();
+          }}
+        />
       )}
-    <Modal
+
+      {/* VIEW MODAL */}
+      <Modal
         title="Attendance Correction Details"
         open={viewOpen}
-        onCancel={() => setViewOpen(false)}
+        onCancel={() => {
+          setViewOpen(false);
+
+          setSelectedRecord(null);
+        }}
         footer={null}
-        centered   
+        centered
       >
         {selectedRecord && (
           <div className={styles.modalGrid}>
             <div>
               <strong>Employee:</strong>{" "}
-              {selectedRecord.employee_name || "—"}
+              {selectedRecord.employee_name ||
+                "—"}
             </div>
+
             <div>
               <strong>Date:</strong>{" "}
               {selectedRecord.date
-                ? dayjs(selectedRecord.date).format("MMM DD, YYYY")
+                ? dayjs(
+                    selectedRecord.date
+                  ).format("MMM DD, YYYY")
                 : "—"}
             </div>
+
             <div>
               <strong>Issue Type:</strong>{" "}
               {selectedRecord.issue_type}
             </div>
+
             <div>
               <strong>Reason:</strong>
+
               <p className={styles.reasonText}>
                 {selectedRecord.reason}
               </p>
             </div>
+
             <div>
               <strong>Status:</strong>{" "}
-              {statusTag(selectedRecord.status)}
+              {statusTag(
+                selectedRecord.status
+              )}
             </div>
           </div>
         )}

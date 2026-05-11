@@ -1,21 +1,39 @@
 .wrapper {
   margin-top: 12px;
+  overflow-x: auto;
+  width: 100%;
+  min-width: 0;
 }
 
+/* table wrapper */
+.wrapper :global(.ant-table-wrapper) {
+  width: 100%;
+  overflow-x: auto;
+
+}
+
+/* table */
 .wrapper :global(.ant-table) {
   border-radius: 10px;
+
 }
 
+
+/* table header */
 .wrapper :global(.ant-table-thead > tr > th) {
   background: #f9fafb;
   font-weight: 600;
   color: #374151;
+  white-space: nowrap;
 }
 
+/* table body */
 .wrapper :global(.ant-table-tbody > tr > td) {
   border-bottom: 1px solid #f0f0f0;
+  vertical-align: top;
 }
 
+/* primary button */
 .wrapper :global(.ant-btn-primary) {
   background-color: #386fa4;
   border-color: #386fa4;
@@ -24,4 +42,34 @@
 .wrapper :global(.ant-btn-primary:hover) {
   background-color: #2f5d8c;
   border-color: #2f5d8c;
+}
+.modalGrid {
+  display: grid;
+  row-gap: 10px;
+}
+
+.reasonText {
+  margin-top: 6px;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+
+/* mobile responsiveness */
+@media (max-width: 768px) {
+  .actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .actions button {
+    width: 100%;
+  }
 }

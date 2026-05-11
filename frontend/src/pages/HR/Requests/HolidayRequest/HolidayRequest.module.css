@@ -1,9 +1,15 @@
 .wrapper {
   margin-top: 12px;
+  overflow-x: auto;
+
 }
 
 .wrapper :global(.ant-table) {
   border-radius: 10px;
+}
+
+.wrapper :global(.ant-table-cell) {
+  white-space: nowrap;
 }
 
 .wrapper :global(.ant-table-thead > tr > th) {

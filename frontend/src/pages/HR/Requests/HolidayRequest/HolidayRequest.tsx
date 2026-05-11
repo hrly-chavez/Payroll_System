@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Table, Tag, Button, Space, message, Modal, Input } from "antd";
 import api from "../../../../api/axios";
-import styles from "./HolidayRequest.css";
+import styles from "./HolidayRequest.module.css";
 import type { ColumnsType } from "antd/es/table";
 
 const { TextArea } = Input;
@@ -144,8 +144,8 @@ const HolidayRequests: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
             style={{
               display: "flex",
-              flexWrap: "wrap", 
-              minWidth: 140, 
+              flexDirection: "row",
+              gap: 6, 
             }}
           >
             <Button
@@ -207,7 +207,10 @@ const HolidayRequests: React.FC = () => {
       <Modal
         title="Holiday Request Details"
         open={viewModalOpen}
-        onCancel={() => setSelectedRecord(null)}
+        onCancel={() => {
+          setViewModalOpen(false);
+          setSelectedRecord(null);
+        }}
         footer={null}
         centered
         destroyOnClose

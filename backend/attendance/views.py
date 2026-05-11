@@ -1306,7 +1306,17 @@ class AttendanceLogsPDFView(APIView):
             dept_name = getattr(getattr(emp, "department", None), "name", None)
             shift_name = getattr(getattr(emp, "shift", None), "name", None)
 
-            events = [str(e.type) for e in a.events.all()]
+            events = []
+
+            for e in a.events.all():
+                label = str(e.type)
+
+                # include minutes only for minute-based events
+                if e.type in ["Late", "Undertime"]:
+                    label = f"{e.type} ({e.minutes} mins)"
+
+                events.append(label)
+
             event_types = ", ".join(events) if events else "-"
 
             data.append([
@@ -1406,7 +1416,17 @@ class AttendanceLogsListView(APIView):
         for a in qs:
             emp = a.employee
 
-            event_types = ", ".join([e.type for e in a.events.all()]) or "-"
+            events = []
+
+            for e in a.events.all():
+                label = e.type
+
+                if e.type in ["Late", "Undertime"]:
+                    label = f"{e.type} ({e.minutes} mins)"
+
+                events.append(label)
+
+            event_types = ", ".join(events) if events else "-"
 
             results.append({
                 "id": a.id,

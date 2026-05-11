@@ -594,6 +594,7 @@ class AttendanceAnalyticsRangeSerializer(serializers.Serializer):
     leave = serializers.IntegerField()
     undertime = serializers.IntegerField()
     overtime = serializers.IntegerField() 
+
 class EmployeeDropdownSerializer(serializers.ModelSerializer):
     value = serializers.IntegerField(source="id")
     label = serializers.SerializerMethodField()

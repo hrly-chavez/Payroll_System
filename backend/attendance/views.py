@@ -23,8 +23,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from datetime import datetime
-from .services import (
-    punch_in,
+from .services import (punch_in,
     punch_out,
     get_today_status,
     _get_employee_or_400,

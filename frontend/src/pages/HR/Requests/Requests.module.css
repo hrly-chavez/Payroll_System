@@ -1,5 +1,6 @@
 .content {
   margin: 16px;
+  min-width: 0;
 }
 
 .card {
@@ -9,6 +10,11 @@
   min-height: 500px;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+}
+
+.tabs :global(.ant-tabs-content) {
+  overflow: visible; 
 }
 
 .tabs :global(.ant-tabs-nav) {

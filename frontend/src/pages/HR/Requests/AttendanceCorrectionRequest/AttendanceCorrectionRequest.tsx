@@ -36,6 +36,9 @@ const AttendanceCorrectionRequest: React.FC = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
 
+  const [viewOpen, setViewOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<CorrectionRow | null>(null);
+
   const fetchPending = async () => {
     try {
       setLoading(true);
@@ -101,36 +104,51 @@ const AttendanceCorrectionRequest: React.FC = () => {
       {
         title: "Employee",
         dataIndex: "employee_name",
+        responsive: ["xs", "sm", "md", "lg"],
         render: (_: any, record: CorrectionRow) => record.employee_name || "—",
       },
       {
         title: "Date",
         dataIndex: "date",
+        responsive: ["xs", "sm", "md", "lg"],
         render: (v: string | null) => (v ? dayjs(v).format("MMM DD, YYYY") : "—"),
       },
       {
         title: "Issue Type",
         dataIndex: "issue_type",
+        responsive: ["xs", "sm", "md", "lg"],
       },
       {
         title: "Reason",
         dataIndex: "reason",
+        responsive: ["xs", "sm", "md", "lg"],
         ellipsis: true,
       },
       {
         title: "Attachment",
         dataIndex: "file_attached",
+        responsive: ["xs", "sm", "md", "lg"],
         render: (v: string | null) => (v ? <a href={v} target="_blank" rel="noreferrer">View</a> : "—"),
       },
       {
         title: "Status",
         dataIndex: "status",
+        responsive: ["xs", "sm", "md", "lg"],
         render: (status: CorrectionRow["status"]) => statusTag(status),
       },
       {
         title: "Action",
         render: (_: any, record: CorrectionRow) => (
-          <Space>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              minWidth: 140, 
+              width: 160,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <Button
               type="primary"
               size="small"
@@ -140,6 +158,7 @@ const AttendanceCorrectionRequest: React.FC = () => {
             >
               Edit / Apply
             </Button>
+
             <Button
               danger
               size="small"
@@ -149,11 +168,16 @@ const AttendanceCorrectionRequest: React.FC = () => {
             >
               Decline
             </Button>
-          </Space>
+          </div>
         ),
       },
     ],
-    [actionLoading]
+    [actionLoading, editOpen]
+  );
+
+  const sortedRows = [...rows].sort(
+    (a, b) =>
+      new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 
   return (
@@ -164,6 +188,13 @@ const AttendanceCorrectionRequest: React.FC = () => {
         dataSource={rows}
         loading={loading}
         scroll={{ x: "max-content" }}
+        onRow={(record) => ({
+            onClick: () => {
+            setSelectedRecord(record);
+            setViewOpen(true);
+            },
+          style: { cursor: "pointer" },
+        })} 
         pagination={{
           pageSize: 5,
           showSizeChanger: true,
@@ -212,8 +243,43 @@ const AttendanceCorrectionRequest: React.FC = () => {
             }}
           />
       )}
+    <Modal
+        title="Attendance Correction Details"
+        open={viewOpen}
+        onCancel={() => setViewOpen(false)}
+        footer={null}
+        centered   
+      >
+        {selectedRecord && (
+          <div className={styles.modalGrid}>
+            <div>
+              <strong>Employee:</strong>{" "}
+              {selectedRecord.employee_name || "—"}
+            </div>
+            <div>
+              <strong>Date:</strong>{" "}
+              {selectedRecord.date
+                ? dayjs(selectedRecord.date).format("MMM DD, YYYY")
+                : "—"}
+            </div>
+            <div>
+              <strong>Issue Type:</strong>{" "}
+              {selectedRecord.issue_type}
+            </div>
+            <div>
+              <strong>Reason:</strong>
+              <p className={styles.reasonText}>
+                {selectedRecord.reason}
+              </p>
+            </div>
+            <div>
+              <strong>Status:</strong>{" "}
+              {statusTag(selectedRecord.status)}
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
-    
   );
 };
 

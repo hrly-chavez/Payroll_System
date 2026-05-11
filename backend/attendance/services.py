@@ -307,7 +307,7 @@ def _get_today_local_date():
 
 def _get_now_local_dt():
     # local timezone-aware datetime
-    return timezone.localtime()
+    return timezone.localtime(timezone.now())
 
 def _month_date_range(year: int, month: int):
     last_day = monthrange(year, month)[1]

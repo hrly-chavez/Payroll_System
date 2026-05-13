@@ -1,26 +1,6 @@
 // src/pages/HR/Attendance/Attendance.tsx
 import React, { useEffect, useState } from "react";
-import {
-  Layout,
-  Card,
-  Row,
-  Col,
-  Input,
-  Table,
-  Avatar,
-  Tag,
-  Statistic,
-  message,
-  DatePicker,
-  Segmented,
-  Button,
-  Modal,
-  Radio,
-  Select,
-  Space,
-  Divider,
-  Upload,
-} from "antd";
+import {Layout,Card,Row,Col,Input,Table,Avatar,Tag,Statistic,message,DatePicker,Segmented,Button,Modal,Radio,Select,Space,Divider,Upload,} from "antd";
 import type { UploadProps } from "antd";
 import Sidebar from "../../../components/Sidebar/Sidebar";
 import Topbar from "../../../components/Topbar/Topbar";

@@ -208,6 +208,7 @@ const EditAttendance: React.FC<Props> = ({ open, correctionId, onClose, onApplie
         <Form.Item label="Time Out">
           <DatePicker
             showTime
+            format="YYYY-MM-DD  |  HH:mm:ss"
             style={{ width: "100%" }}
             value={timeOut}
             onChange={(v) => setTimeOut(v)}

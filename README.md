@@ -1,8 +1,3 @@
-# Payroll_System
-Interactive Payroll System of AttiTech
-
-# TODO: PLEASE KUNG NAA MOY I ADD NA LIBRARY I UPDATE ANG REQUIREMENTS
-
 
 What to do after cloning
 
@@ -16,9 +11,9 @@ What to do after cloning
 4. npm install 
 
 
-#Project Description
+#Project Description(not updated)
 
-Automated Enterprise Payroll & Workforce Management System
+Attendance & Payroll System (Automated payroll)
 
 The system is a sophisticated web-based platform engineered to bridge the gap between raw workforce data and automated financial disbursement. At its core, the architecture features a high-precision relational schema designed in MySQL that ensures strict data integrity across employee profiles, granular attendance logs, and complex financial transactions. The database is structured to support "point-in-time" reporting, allowing the system to preserve the historical accuracy of payslips even as tax brackets, holiday policies, or individual salary rates evolve over time.
 

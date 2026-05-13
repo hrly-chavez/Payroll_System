@@ -13,11 +13,15 @@ const Greeting: React.FC = () => {
   useEffect(() => {
     const fetchAttendanceStatus = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/attendance/today-status/", {
+              const res = await fetch(
+        `${process.env.REACT_APP_API_BASE_URL}/attendance/today-status/`,
+        {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("authToken")}`,
           },
-        });
+          credentials: "include",
+        }
+      );
 
         const data = await res.json();
 

@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 from shared_model.models import *
 from .serializers import *
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from accounts.permissions import IsRole
 from django.utils import timezone
 from django.utils.timezone import now
 from django.shortcuts import get_object_or_404
@@ -251,10 +252,14 @@ def _reverse_loan_payments_for_voided_payroll(payroll: Payroll):
 class DeductionListCreateView(generics.ListCreateAPIView):
     queryset = Deduction_Type.objects.all().order_by('-create_at')
     serializer_class = DeductionTypeSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
 # Retrieve, Update, Delete
 class DeductionDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     queryset = Deduction_Type.objects.all()
     serializer_class = DeductionTypeSerializer
 
@@ -402,7 +407,9 @@ class DeductionUpdateStatusView(APIView):
 #==========================================PAYROLL PERIOD========================================
 #Making Payroll Period
 class PayrollPeriodListCreateView(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     serializer_class = PayrollPeriodCreateSerializer
     queryset = Payroll_Period.objects.all().order_by("-start_date")
 
@@ -421,7 +428,8 @@ class PayrollPeriodListCreateView(generics.ListCreateAPIView):
 
 # for clicking the payroll period (shows modal with employees) fetch
 class PayrollPeriodEligibleEmployeesView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request, period_id):
         period = get_object_or_404(Payroll_Period, id=period_id)
@@ -499,8 +507,9 @@ class PayrollPeriodEligibleEmployeesView(APIView):
         })
 
 class DepartmentListView(APIView):
-    permission_classes = [IsAuthenticated]
-
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+    
     def get(self, request):
         qs = Department.objects.filter(is_active=True).order_by("name")
 
@@ -511,7 +520,8 @@ class DepartmentListView(APIView):
 #Verify Snapshot
 # Returns salary, shift, taxes, loans, and allowances for employee verification preview
 class PayrollVerifyEmployeeSnapshotView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request, period_id, employee_id):
         period = get_object_or_404(Payroll_Period, id=period_id)
@@ -719,7 +729,8 @@ class PayrollVerifyEmployeeSnapshotView(APIView):
         return Response(serializer.data, status=http_status.HTTP_200_OK)
 
 class PayrollRunExcludeInputView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     @transaction.atomic
     def post(self, request, period_id, employee_id):
@@ -777,7 +788,8 @@ class PayrollRunExcludeInputView(APIView):
         )
  
 class PayrollRunIncludeInputView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     @transaction.atomic
     def post(self, request, period_id, employee_id):
@@ -838,7 +850,8 @@ class PayrollRunIncludeInputView(APIView):
 
 # Marks an employee as verified for a payroll period
 class PayrollVerifyEmployeeView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def post(self, request, period_id, employee_id):
         period = get_object_or_404(Payroll_Period, id=period_id)
@@ -883,7 +896,9 @@ class PayrollVerifyEmployeeView(APIView):
 
 #===========================ADD COMMISSION========================
 class CommissionTypeListView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     serializer_class = CommissionTypeSerializer
 
     def get_queryset(self):
@@ -892,7 +907,8 @@ class CommissionTypeListView(generics.ListAPIView):
 
 
 class PayrollPeriodEmployeeCommissionListCreateView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def _guard_locked(self, period, employee):
         # block when payroll already exists
@@ -979,7 +995,8 @@ class PayrollPeriodEmployeeCommissionListCreateView(APIView):
 
 #===========================ADD CUSTOM ALLOWANCE========================
 class PayrollPeriodEmployeeAllowanceListCreateView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def _guard_locked(self, period, employee):
         # block when payroll already exists
@@ -1064,7 +1081,8 @@ class PayrollPeriodEmployeeAllowanceListCreateView(APIView):
         )
 
 class PayrollPeriodEmployeeAllowanceDeleteView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     @transaction.atomic
     def delete(self, request, period_id, employee_id, allowance_id):
@@ -1105,7 +1123,8 @@ class PayrollPeriodEmployeeAllowanceDeleteView(APIView):
 
 #===========================ADD FINE========================(#Now used as Additional Deduction)
 class PayrollPeriodEmployeeFineListCreateView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def _guard_locked(self, period, employee):
         # block when payroll already exists
@@ -1187,7 +1206,8 @@ class PayrollPeriodEmployeeFineListCreateView(APIView):
         )
 
 class PayrollPeriodEmployeeFineDeleteView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     @transaction.atomic
     def delete(self, request, period_id, employee_id, fine_id):
@@ -1228,7 +1248,8 @@ class PayrollPeriodEmployeeFineDeleteView(APIView):
 
 #===========================ADDITIONAL EARNING========================
 class PayrollPeriodEmployeeAdditionalEarningListCreateView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def _guard_locked(self, period, employee):
         if Payroll.objects.filter(payroll_period=period, employee=employee).exclude(status="Void").exists():
@@ -1310,7 +1331,8 @@ class PayrollPeriodEmployeeAdditionalEarningListCreateView(APIView):
     
 
 class PayrollPeriodEmployeeAdditionalEarningDeleteView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     @transaction.atomic
     def delete(self, request, period_id, employee_id, earning_id):
@@ -1352,7 +1374,9 @@ class PayrollPeriodEmployeeAdditionalEarningDeleteView(APIView):
 #==========================================PAYRULE========================================
 
 class SuperAdminPayRuleListCreateView(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     serializer_class = PayRuleSerializer
 
     def get_queryset(self):
@@ -1369,9 +1393,10 @@ class SuperAdminPayRuleListCreateView(generics.ListCreateAPIView):
 
         serializer.save()
 
-
 class SuperAdminPayRuleRetrieveUpdateView(generics.RetrieveUpdateAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     serializer_class = PayRuleSerializer
     queryset = Pay_Rule.objects.all()
 
@@ -1385,7 +1410,8 @@ class SuperAdminPayRuleRetrieveUpdateView(generics.RetrieveUpdateAPIView):
         serializer.save()
     
 class PayRuleChoicesView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request):
         event_type_choices = [
@@ -1415,7 +1441,9 @@ class CommissionTypeAllActiveView(generics.ListAPIView):
     """
     If you want a dropdown for choosing which commission_type the rule applies to.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     serializer_class = CommissionTypeMiniSerializer
 
     def get_queryset(self):
@@ -1423,7 +1451,8 @@ class CommissionTypeAllActiveView(generics.ListAPIView):
 
 
 class SuperAdminCommissionTaxRuleListCreateView(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
     serializer_class = CommissionTaxRuleSerializer
 
     def get_queryset(self):
@@ -1435,7 +1464,8 @@ class SuperAdminCommissionTaxRuleListCreateView(generics.ListCreateAPIView):
 
 
 class SuperAdminCommissionTaxRuleRetrieveUpdateView(generics.RetrieveUpdateAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
     serializer_class = CommissionTaxRuleSerializer
 
     queryset = Commission_Tax_Rule.objects.select_related(
@@ -1444,7 +1474,8 @@ class SuperAdminCommissionTaxRuleRetrieveUpdateView(generics.RetrieveUpdateAPIVi
 
 
 class CommissionTaxRuleChoicesView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request):
         return Response({
@@ -1456,7 +1487,8 @@ class CommissionTaxRuleChoicesView(APIView):
 
 #==========================================LOAN RULE========================================
 class LoanRuleListCreateView(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
     serializer_class = LoanRuleSerializer
 
     def get_queryset(self):
@@ -1477,7 +1509,9 @@ class LoanRuleListCreateView(generics.ListCreateAPIView):
         serializer.save()
 
 class LoanRuleRetrieveUpdateView(generics.RetrieveUpdateAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     serializer_class = LoanRuleSerializer
     queryset = LoanRule.objects.select_related("department", "employee").all()
 
@@ -1497,7 +1531,8 @@ class LoanRuleRetrieveUpdateView(generics.RetrieveUpdateAPIView):
         serializer.save()
 
 class LoanRuleChoicesView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request):
         return Response({
@@ -1512,7 +1547,8 @@ class LoanRuleChoicesView(APIView):
         }, status=http_status.HTTP_200_OK)
 
 class LoanRuleUpdateStatusView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def patch(self, request, pk):
         try:
@@ -1532,7 +1568,9 @@ class LoanRuleUpdateStatusView(APIView):
 #==========================================PAYROLL TAX RULE========================================
 
 class SuperAdminPayrollTaxBracketListCreateView(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     serializer_class = PayrollTaxBracketSerializer
 
     def get_queryset(self):
@@ -1553,7 +1591,9 @@ class SuperAdminPayrollTaxBracketListCreateView(generics.ListCreateAPIView):
         serializer.save()
 
 class SuperAdminPayrollTaxBracketRetrieveUpdateView(generics.RetrieveUpdateAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     serializer_class = PayrollTaxBracketSerializer
     queryset = Payroll_Tax_Bracket.objects.all()
 
@@ -1573,7 +1613,8 @@ class SuperAdminPayrollTaxBracketRetrieveUpdateView(generics.RetrieveUpdateAPIVi
         serializer.save()
 
 class PayrollTaxBracketChoicesView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request):
         rate_type_choices = [
@@ -1596,7 +1637,8 @@ class PayrollTaxBracketChoicesView(APIView):
 #======================================PAYROLL GENERATION========================================
 
 class GeneratePayrollForPeriodView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def _stringify_error(self, exc) -> str:
         detail = getattr(exc, "detail", None)
@@ -1667,7 +1709,8 @@ class GeneratePayrollForPeriodView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 class GeneratePayrollForEmployeeView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def post(self, request, period_id: int, employee_id: int):
         svc = PayrollGenerationService()
@@ -1730,7 +1773,8 @@ class GeneratePayrollForEmployeeView(APIView):
 #==========================================PAYROLL PAYSLIP OUTPUT===========================
 
 class PayrollEmployeeResultView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request, period_id: int, employee_id: int):
         # EMPLOYEE users can only view their own payroll
@@ -1820,7 +1864,8 @@ class AdminEmployeePayrollListView(APIView):
     """
     Admin/SuperAdmin endpoint to fetch payrolls for any employee by ID.
     """
-    permission_classes = [AllowAny]  # Adjust to IsAdminUser or custom role permission
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request):
         employee_id = request.query_params.get("employee_id")
@@ -1879,7 +1924,8 @@ class AdminEmployeePayrollListView(APIView):
     
 #For employee dashboard payroll(rows & columns)
 class EmployeePayrollListView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request):
         # Employee-only endpoint (HR/Admin can be allowed too if you want)
@@ -1947,7 +1993,8 @@ class EmployeePayrollListView(APIView):
 #==========================================CEO / SUPERADMIN APPROVAL===========================
 
 class PayrollPeriodApprovalQueueView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request, period_id: int):
         _require_approver(request.user)
@@ -2021,7 +2068,8 @@ class PayrollPeriodApprovalQueueView(APIView):
     
 #this is where the admin approve
 class PayrollApproveEmployeeView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     @transaction.atomic
     def post(self, request, period_id: int, employee_id: int):
@@ -2111,7 +2159,8 @@ class PayrollApproveEmployeeView(APIView):
         return Response({"detail": "Payroll approved."}, status=http_status.HTTP_200_OK)
 
 class PayrollDeclineEmployeeView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     @transaction.atomic
     def post(self, request, period_id: int, employee_id: int):
@@ -2198,7 +2247,8 @@ class PayrollDeclineEmployeeView(APIView):
 
 # ===================== BULK CEO / SUPERADMIN APPROVAL =====================
 class PayrollBulkDecisionView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     @transaction.atomic
     def post(self, request, period_id: int):
@@ -2376,7 +2426,8 @@ class PayrollBulkDecisionView(APIView):
 
 #============================RESETING PAYROLL===========================
 class PayrollResetAfterDeclineView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     @transaction.atomic
     def post(self, request, period_id: int, employee_id: int):
@@ -2453,7 +2504,8 @@ class PayrollResetAfterDeclineView(APIView):
 
 #========================UPDATE STATUS OF PAYROLL PERIOD TO PAID=====================
 class PayrollPeriodMarkPaidView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def _require_hr_or_admin(self, user):
         # Adjust this if you have a better role policy.
@@ -2513,7 +2565,8 @@ class PayrollPeriodMarkPaidView(APIView):
 #========================DOWNLOAD PAYROLL EACH EMPLOYEE=====================
 
 class AdminEmployeePayrollDownloadPDFView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request, period_id: int, employee_id: int):
         # Optional role protection
@@ -3059,7 +3112,9 @@ class AdminEmployeePayrollDownloadPDFView(APIView):
 #payroll logs
 #list of payroll periods
 class PayrollPeriodReportListView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     serializer_class = PayrollPeriodListSerializer
 
     def get_queryset(self):
@@ -3089,7 +3144,9 @@ class PayrollPeriodReportListView(generics.ListAPIView):
 
 #list sa employee
 class PayrollPeriodEmployeeReportListView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     serializer_class = PayrollPeriodEmployeeSerializer
 
     def get_queryset(self):
@@ -3119,7 +3176,8 @@ class PayrollPeriodEmployeeReportListView(generics.ListAPIView):
     
 #para sa generated nga pdf sa payroll logs
 class PayrollPeriodReleaseLogsPDFView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request, period_id: int):
         period = get_object_or_404(Payroll_Period, id=period_id)

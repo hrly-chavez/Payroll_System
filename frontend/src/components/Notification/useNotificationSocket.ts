@@ -5,8 +5,11 @@ export default function useNotificationSocket(onNewNotification: () => void) {
     const token = localStorage.getItem("authToken");
     if (!token) return;
 
+    const wsProtocol =
+      window.location.protocol === "https:" ? "wss:" : "ws:";
+
     const socket = new WebSocket(
-      `ws://127.0.0.1:8000/ws/notifications/?token=${token}`
+      `${wsProtocol}//api.payroll.attitech.ph/ws/notifications/?token=${token}`
     );
 
     socket.onmessage = () => {

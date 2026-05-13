@@ -180,14 +180,7 @@ class Employee(models.Model):
 
         super().save(*args, **kwargs)
     
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["email"],
-                condition=models.Q(is_active=True),
-                name="unique_active_employee_email"
-            )
-        ]
+    
     
 class UserManager(BaseUserManager):
     #Mao ni ang makita na UI sa django-admin kung mag og User

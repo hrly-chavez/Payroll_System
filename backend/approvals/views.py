@@ -22,13 +22,17 @@ from django.db.models import Q
 
 #===========================Holiday =====================
 class HolidayListView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     queryset = Holiday.objects.filter(is_active=True).order_by("-date")
     serializer_class = HolidaySerializer
     # public access → no permission_classes
 
 class HolidayCreateView(generics.CreateAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     queryset = Holiday.objects.all()
     serializer_class = HolidaySerializer
 
@@ -69,7 +73,8 @@ class HolidayCreateView(generics.CreateAPIView):
         Notification.objects.bulk_create(notifications)
 
 class HolidayUpdateStatusView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     """
     Update the status of a single holiday,
@@ -132,18 +137,27 @@ class HolidayUpdateStatusView(APIView):
 
 #holiday policy
 class HolidayPolicyListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     queryset = HolidayPolicy.objects.all().order_by("-created_at")  # adjust ordering
     serializer_class = HolidayPolicySerializer
     permission_classes = [IsAuthenticated]
 
 class HolidayPolicyRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     queryset = HolidayPolicy.objects.all()
     serializer_class = HolidayPolicySerializer
     permission_classes = [IsAuthenticated]
 
 class HolidayPolicyListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+    
     serializer_class = HolidayPolicySerializer
-    permission_classes = [IsAuthenticated]
+    
 
     def get_queryset(self):
         qs = HolidayPolicy.objects.select_related("department").order_by("-created_at")
@@ -163,6 +177,9 @@ class HolidayPolicyListCreateView(generics.ListCreateAPIView):
         return qs
 
 class HolidayPolicyRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     queryset = HolidayPolicy.objects.select_related("department")
     serializer_class = HolidayPolicySerializer
     permission_classes = [IsAuthenticated]
@@ -172,7 +189,8 @@ class DepartmentActiveHolidayBasesView(APIView):
     Returns active holiday bases for a department (PH/US/COMPANY).
     Frontend will use this later for the Base dropdown.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request, department_id: int):
         rows = DepartmentHolidayCalendar.objects.filter(
@@ -193,7 +211,8 @@ class HolidayPolicyEnsureView(APIView):
     Default requires_work=True is the safest default for payroll (won’t accidentally “forgive” absences).
     You can override with payload { "default_requires_work": false } if you want.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     @transaction.atomic
     def post(self, request):
@@ -243,17 +262,23 @@ class HolidayPolicyEnsureView(APIView):
 #===========================Leave Type & Request=====================
 
 class LeaveTypeListView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     queryset = Leave_Type.objects.all().order_by('-created_at')
     serializer_class = LeaveTypeSerializer
 
 class LeaveTypeCreateView(generics.CreateAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     queryset = Leave_Type.objects.all()
     serializer_class = LeaveTypeSerializer
 
 class LeaveTypeUpdateView(generics.RetrieveUpdateAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     queryset = Leave_Type.objects.all()
     serializer_class = LeaveTypeSerializer
 
@@ -270,7 +295,7 @@ class LeaveTypeUpdateView(generics.RetrieveUpdateAPIView):
 class LeaveRequestListCreateView(generics.ListCreateAPIView):
     serializer_class = LeaveRequestSerializer
     permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["EMPLOYEE", "ADMIN"]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get_queryset(self):
         try:
@@ -357,6 +382,7 @@ class AdminLeaveRequestListView(generics.ListAPIView):
 @api_view(["POST"])
 @transaction.atomic
 def admin_update_leave_status(request, pk):
+    
     """
     Admin can approve or decline a leave request.
     Payload example:
@@ -470,7 +496,9 @@ def admin_update_leave_status(request, pk):
 
 #=====================All Request====================
 class AllRequestsListCreateView(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     serializer_class = LeaveRequestSerializer
 
     def get_queryset(self):
@@ -559,7 +587,7 @@ class AllRequestsListCreateView(generics.ListCreateAPIView):
 #=====================Commissions ====================
 class CommissionTypeListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["SUPER_ADMIN"]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     queryset = Commission_Type.objects.all().order_by("-created_at")
     serializer_class = CommissionTypeSerializer
@@ -567,7 +595,7 @@ class CommissionTypeListView(generics.ListAPIView):
 #Create
 class CommissionTypeCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["SUPER_ADMIN"]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     queryset = Commission_Type.objects.all()
     serializer_class = CommissionTypeSerializer
@@ -575,14 +603,16 @@ class CommissionTypeCreateView(generics.CreateAPIView):
 #Update
 class CommissionTypeUpdateView(generics.UpdateAPIView):
     permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["SUPER_ADMIN"]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     queryset = Commission_Type.objects.all()
     serializer_class = CommissionTypeSerializer
 
 #=====================Allowance ====================
 class AllowanceTypeCreateView(generics.CreateAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     queryset = Allowance_Type.objects.all()
     serializer_class = AllowanceTypeSerializer
 
@@ -595,12 +625,15 @@ class AllowanceTypeCreateView(generics.CreateAPIView):
         instance.save()
 
 class AllowanceTypeListView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     queryset = Allowance_Type.objects.all()
     serializer_class = AllowanceTypeSerializer
 
 class AllowanceTypeUpdateView(generics.RetrieveUpdateAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
     queryset = Allowance_Type.objects.all()
     serializer_class = AllowanceTypeSerializer
 

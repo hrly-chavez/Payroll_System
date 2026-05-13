@@ -62,7 +62,8 @@ def _get_next_offset_target_date(employee: Employee, source_date: date) -> date:
 
 
 class PunchInView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def post(self, request):
         serializer = PunchInSerializer(data=request.data)
@@ -75,14 +76,16 @@ class PunchInView(APIView):
         })
 
 class PunchInEligibilityView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request):
         result = punch_in_eligibility(request.user)
         return Response(PunchInEligibilitySerializer(result).data)
 
 class PunchOutView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def post(self, request):
         serializer = PunchOutSerializer(data=request.data)
@@ -97,7 +100,7 @@ class PunchOutView(APIView):
 # Excess Time
 class SuperAdminPendingExcessTimeView(APIView):
     permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["SUPER_ADMIN"]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request):
         year = request.query_params.get("year")
@@ -145,7 +148,7 @@ class SuperAdminPendingExcessTimeView(APIView):
 #Approve as Overtime or Offset
 class SuperAdminResolveExcessTimeView(APIView):
     permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["SUPER_ADMIN"]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     @transaction.atomic
     def post(self, request, pk):
@@ -266,7 +269,8 @@ class SuperAdminResolveExcessTimeView(APIView):
     
 #Attendance Status
 class TodayAttendanceView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request):
         attendance = get_today_status(request.user)
@@ -281,7 +285,8 @@ class TodayAttendanceView(APIView):
 
 #Attendance Logs
 class AttendanceLogsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request):
         employee = _get_employee_or_400(request.user)
@@ -326,7 +331,7 @@ class AttendanceLogsView(APIView):
 #Attendance Logs for admin & superadmin
 class CEOandHRAttendanceLogsView(APIView):
     permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["ADMIN", "SUPER_ADMIN"]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request):
         year = request.query_params.get("year")
@@ -378,11 +383,17 @@ class CEOandHRAttendanceLogsView(APIView):
 
 #=========================================SHIFTS
 class ShiftListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     queryset = Shift.objects.all().order_by("start_time")
     serializer_class = ShiftSerializer
     permission_classes = [IsAuthenticated]
 
 class ShiftRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     queryset = Shift.objects.all()
     serializer_class = ShiftSerializer
     permission_classes = [IsAuthenticated]
@@ -394,7 +405,9 @@ class EmployeeAttendanceCorrectionCreateView(APIView):
     Employee creates a correction request (multipart for attachment).
     POST /api/attendance/corrections/
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
@@ -466,7 +479,8 @@ class EmployeeAttendanceCorrectionListView(APIView):
     Employee lists their own correction requests.
     GET /api/attendance/corrections/my/
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request):
         emp = getattr(request.user, "employee", None)
@@ -491,7 +505,7 @@ class AdminPendingAttendanceCorrectionsView(APIView):
     GET /api/attendance/admin/corrections/pending/
     """
     permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["ADMIN", "SUPER_ADMIN"]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request):
         qs = (
@@ -518,7 +532,7 @@ class AdminReviewAttendanceCorrectionView(APIView):
     Body: { "status": "Verified" | "Declined", "decline_reason": "..." }
     """
     permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["ADMIN", "SUPER_ADMIN"]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def post(self, request, pk: int):
         data_ser = AttendanceCorrectionReviewSerializer(data=request.data)
@@ -591,7 +605,8 @@ class AttendanceCorrectionMetaView(APIView):
     """
     Returns dropdown choices for Attendance_Correction.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request):
         issue_types = [
@@ -615,7 +630,7 @@ class AdminAttendanceCorrectionDetailView(APIView):
     GET /api/attendance/admin/corrections/<id>/
     """
     permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["ADMIN", "SUPER_ADMIN"]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request, pk: int):
         try:
@@ -649,7 +664,7 @@ class AdminApplyAttendanceCorrectionView(APIView):
     Body: { status?, time_in?, time_out?, replace_events?, events?: [] }
     """
     permission_classes = [IsAuthenticated, IsRole]
-    allowed_roles = ["ADMIN", "SUPER_ADMIN"]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def post(self, request, pk: int):
         try:
@@ -775,7 +790,8 @@ class AdminApplyAttendanceCorrectionView(APIView):
 #==============PIE CHART DISPLAY============================
 #Each Employee
 class AttendanceStatsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request):
         employee = _get_employee_or_400(request.user)
@@ -795,7 +811,8 @@ class AttendanceStatsView(APIView):
     
 #Admin dashboard
 class AttendanceAdminMonthlyStatsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request):
         role = (getattr(request.user, "role", "") or "").strip().upper()
@@ -973,6 +990,9 @@ class AttendanceAdminMonthlyStatsView(APIView):
 
 
 class AttendanceAdminAnalyticsView(APIView):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     """
     Admin/SuperAdmin attendance analytics for bar chart.
 
@@ -1034,6 +1054,9 @@ class AttendanceAdminAnalyticsView(APIView):
     
 
 class AttendanceAdminAnalyticsView(APIView):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     """
     Admin/SuperAdmin attendance analytics for bar chart.
 
@@ -1095,7 +1118,9 @@ class AttendanceAdminAnalyticsView(APIView):
     
 
 class AttendanceEmployeesDropdownView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
+
     serializer_class = EmployeeDropdownSerializer
 
     def get_queryset(self):
@@ -1103,7 +1128,8 @@ class AttendanceEmployeesDropdownView(generics.ListAPIView):
     
 #===============Generates and downloads a PDF report of attendance logs===============
 class AttendanceLogsPDFView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request):
         """
@@ -1373,7 +1399,8 @@ class AttendanceLogsPDFView(APIView):
         return FileResponse(buffer, as_attachment=True, filename=filename, content_type="application/pdf")
     
 class AttendanceLogsListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def get(self, request):
         """
@@ -1458,7 +1485,8 @@ class AttendanceLogsListView(APIView):
 
 #==============Import .xlxs file for bio ============================
 class ImportBiometricsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
     def post(self, request):
         serializer = BiometricsUploadSerializer(data=request.data)

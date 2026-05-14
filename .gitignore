@@ -31,8 +31,7 @@ yarn-error.log*
 
 # custom
 backend/media/
-**/migrations/*.py
-!**/migrations/__init__.py
+
 
 # === React Native (Expo) ===
 vaw_app/node_modules/

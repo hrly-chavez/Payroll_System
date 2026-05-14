@@ -25,7 +25,7 @@ PRE-DEPLOYMENT CHECKLIST
 [✔] Database restore tested
 [✔] Migration state clean
 [✔] No pending migrations
-[✔] No localhost URLs remain
+[✔] No hardcoded localhost production URLs remain
 [✔] AllowAny endpoints reviewed
 [ ] DEBUG=False ready for production
 [ ] Environment variables configured
@@ -117,3 +117,4 @@ IMPORTANT PRODUCTION NOTES
 - Verify Railway logs after every deployment
 - Test payroll generation after backend updates
 - Test authentication after security changes
+

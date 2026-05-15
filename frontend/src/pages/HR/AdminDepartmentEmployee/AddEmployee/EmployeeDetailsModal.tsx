@@ -388,9 +388,18 @@ const EmployeeDetailsModal: React.FC<Props> = ({ open, departmentId , allowedRol
           </Col>
 
           <Col xs={24} md={8}>
-            <Form.Item name="hired_date" label="Hired Date" rules={[{ required: true }]}>
-              <DatePicker style={{ width: "100%" }} />
-            </Form.Item>
+            <Form.Item
+            name="hired_date"
+            label="Hired Date"
+            rules={[{ required: true, message: "Hired date is required" }]}
+          >
+            <DatePicker
+              style={{ width: "100%" }}
+              disabledDate={(current) =>
+                current && current > dayjs().endOf("day")
+              }
+            />
+          </Form.Item>
           </Col>
 
           <Col xs={24} md={8}>

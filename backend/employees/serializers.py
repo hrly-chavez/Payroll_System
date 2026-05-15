@@ -237,8 +237,8 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
         return value
 
     def validate_hired_date(self, value):
-        if value < date.today():
-            raise serializers.ValidationError("Hired date cannot be in the past.")
+        if value > date.today():
+            raise serializers.ValidationError("Hired date cannot be in the future.")
         return value
 
     # -------------------------

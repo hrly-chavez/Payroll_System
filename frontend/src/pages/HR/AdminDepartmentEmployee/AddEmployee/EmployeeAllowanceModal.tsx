@@ -251,10 +251,16 @@ export default function EmployeeAllowanceModal({
           </Select>
         </Form.Item>
 
-        <Form.Item name="effective_from" label="Effective From" rules={[{ required: true }]}>
+        <Form.Item
+          name="effective_from"
+          label="Effective From"
+          rules={[{ required: true }]}
+        >
           <DatePicker
             style={{ width: "100%" }}
-            disabledDate={(current) => current && current < dayjs().startOf("day")}
+            disabledDate={(current) =>
+              current && current > dayjs().endOf("day")
+            }
           />
         </Form.Item>
 

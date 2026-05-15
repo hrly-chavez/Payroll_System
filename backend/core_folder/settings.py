@@ -166,8 +166,7 @@ SIMPLE_JWT = {
 }
 
 CSRF_TRUSTED_ORIGINS = [
-    "http://192.168.68.38",
-    "http://payroll.local",
+    
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
@@ -175,7 +174,9 @@ CSRF_TRUSTED_ORIGINS = [
 #block everything external
 CORS_ALLOW_ALL_ORIGINS = False
 #NO external site is allowed
+
 CORS_ALLOWED_ORIGINS = [
+    
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]

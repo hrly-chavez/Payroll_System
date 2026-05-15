@@ -8,43 +8,48 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 
-
 @api_view(["GET"])
-
+@permission_classes([IsAuthenticated])
 def me(request):
-    user = request.user
-    if not user or not user.is_authenticated:
-        return Response(
-            {"detail": "Not authenticated"},
-            status=status.HTTP_401_UNAUTHORIZED
-        )
+    try:
+        user = request.user
 
-    return Response({
-        "user_name": getattr(user, "user_name", user.user_name),
-        "role": getattr(user, "role", None),
-    })
+        return Response({
+            "user_id": str(user.user_id),
+            "user_name": str(user.user_name),
+            "role": str(user.role),
+        })
+
+    except Exception as e:
+        return Response({
+            "error": str(e),
+            "user_type": str(type(request.user)),
+        }, status=500)
 
 #this is for login endpoint
 class CookieTokenObtainPairView(TokenObtainPairView):
     permission_classes = [AllowAny]
-    def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
 
-        access = response.data.get("access")
-        refresh = response.data.get("refresh")
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        access = serializer.validated_data["access"]
+        refresh = serializer.validated_data["refresh"]
+
+        user = serializer.user
 
         res = Response({
-            "access": access,
-            "refresh": refresh,
-            "message": "Login successful"
+            "message": "Login successful",
+            "user_name": user.user_name,
+            "role": user.role,
         }, status=status.HTTP_200_OK)
 
         res.set_cookie(
             key="access_token",
             value=access,
             httponly=True,
-            secure=False,  # True in production / Gi true lang for switch sa https
-            # samesite="Lax",
+            secure=False,
             samesite="Lax",
         )
 
@@ -52,9 +57,8 @@ class CookieTokenObtainPairView(TokenObtainPairView):
             key="refresh_token",
             value=refresh,
             httponly=True,
-            secure=False,   #True if HTTPS
-            # samesite="Lax", #Strict para prevent CSRF
-            samesite="Lax", #kani gi gamit para sa cross site origin
+            secure=False,
+            samesite="Lax",
         )
 
         return res

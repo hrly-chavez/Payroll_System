@@ -1,6 +1,7 @@
+//src/components/ProtectedRoute.tsx
 import React, { useEffect, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
-import api from "../api/axios";
+
 import { Spin } from "antd";
 
 interface Props {
@@ -13,24 +14,19 @@ const ProtectedRoute: React.FC<Props> = ({ allowedRoles }) => {
 
   useEffect(() => {
     const isAuth = localStorage.getItem("isAuthenticated");
+    const role = localStorage.getItem("role");
+    const userName = localStorage.getItem("user_name");
 
-    if (!isAuth) {
+    if (!isAuth || !role) {
       setUser(null);
-      setLoading(false);
-      return;
+    } else {
+      setUser({
+        role,
+        user_name: userName,
+      });
     }
 
-    api.get("/accounts/me/")
-      .then((res) => {
-        setUser(res.data);
-      })
-      .catch(() => {
-        setUser(null);
-        localStorage.removeItem("isAuthenticated"); // cleanup
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    setLoading(false);
   }, []);
 
   if (loading) return <Spin fullscreen />;

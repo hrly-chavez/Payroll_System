@@ -1,7 +1,8 @@
+//src/components/PublicRoute.tsx
 import React, { useEffect, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { Spin, message } from "antd";
-import api from "../api/axios";
+
 
 const PublicRoute: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -10,42 +11,38 @@ const PublicRoute: React.FC = () => {
   // Fetch user info
   useEffect(() => {
     const isAuth = localStorage.getItem("isAuthenticated");
+    const role = localStorage.getItem("role");
 
-    if (!isAuth) {
+    if (!isAuth || !role) {
       setLoading(false);
       return;
+    } 
+
+    if (role === "EMPLOYEE") {
+      setRedirectPath("/employee_dashboard");
+    } else if (role === "ADMIN") {
+      setRedirectPath("/admin/dashboard");
+    } else if (role === "SUPER_ADMIN") {
+      setRedirectPath("/super-admin/dashboard");
     }
 
-    api.get("/accounts/me/")
-      .then((res) => {
-        const role = res.data.role;
-
-        if (role === "EMPLOYEE") setRedirectPath("/employee_dashboard");
-        else if (role === "ADMIN") setRedirectPath("/admin/dashboard");
-        else if (role === "SUPER_ADMIN") setRedirectPath("/super-admin/dashboard");
-        else setRedirectPath("/");
-      })
-      .catch(() => {
-        localStorage.removeItem("isAuthenticated");
-        setRedirectPath(null);
-      })
-      .finally(() => setLoading(false));
+    setLoading(false);
   }, []);
 
-  // Show redirect message only when redirectPath changes
-  useEffect(() => {
+    // Show redirect message only when redirectPath changes
+    useEffect(() => {
+      if (redirectPath) {
+        message.info("You are already logged in. Redirecting...");
+      }
+    }, [redirectPath]);
+
+    if (loading) return <Spin size="large" style={{ width: "100%", marginTop: "50px" }} />;
+
     if (redirectPath) {
-      message.info("You are already logged in. Redirecting...");
+      return <Navigate to={redirectPath} replace />;
     }
-  }, [redirectPath]);
 
-  if (loading) return <Spin size="large" style={{ width: "100%", marginTop: "50px" }} />;
-
-  if (redirectPath) {
-    return <Navigate to={redirectPath} replace />;
-  }
-
-  return <Outlet />;
-};
+    return <Outlet />;
+  };
 
 export default PublicRoute;

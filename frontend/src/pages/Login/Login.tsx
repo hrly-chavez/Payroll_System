@@ -97,12 +97,10 @@ export default function Login() {
         return;
       }
 
-      const tokenRes = await api.post("/accounts/login/", {
+      const loginRes = await api.post("/accounts/login/", {
         user_name: sanitizedUsername,
         password: sanitizedPassword,
       });
-
-      const meRes = await api.get("/accounts/me/");
 
       const rememberMe = values.remember || false;
 
@@ -120,8 +118,8 @@ export default function Login() {
       
       localStorage.setItem("isAuthenticated", "true");
 
-      const userName = meRes.data.user_name;
-      const role = meRes.data.role;
+      const userName = loginRes.data.user_name;
+      const role = loginRes.data.role;
 
       localStorage.setItem("user_name", userName);
       localStorage.setItem("role", role);

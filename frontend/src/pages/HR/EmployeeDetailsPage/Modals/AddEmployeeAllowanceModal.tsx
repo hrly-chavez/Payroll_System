@@ -161,7 +161,7 @@ const AddEmployeeAllowanceModal: React.FC<Props> = ({
           <DatePicker
             style={{ width: "100%" }}
             disabledDate={(current) =>
-              current && current < dayjs().startOf("day")
+              current && current > dayjs().startOf("day")
             }
           />
         </Form.Item>

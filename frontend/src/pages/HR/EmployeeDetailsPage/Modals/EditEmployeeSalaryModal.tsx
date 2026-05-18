@@ -238,10 +238,6 @@ const EditEmployeeSalaryModal: React.FC<Props> = ({
           >
             <DatePicker
               style={{ width: "100%" }}
-              disabledDate={(current) => {
-                // Disable all dates before today
-                return current && current < dayjs().startOf("day");
-              }}
             />
           </Form.Item>
 

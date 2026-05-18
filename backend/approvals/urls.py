@@ -41,4 +41,10 @@ urlpatterns = [
     path("superadmin/loans/<int:pk>/approve/", SuperAdminLoanApproveView.as_view(), name="superadmin-loan-approve"),
     path("superadmin/loans/<int:pk>/decline/", SuperAdminLoanDeclineView.as_view(), name="superadmin-loan-decline"),
     path("superadmin/loans/<int:pk>/activate/", SuperAdminLoanActivateView.as_view(), name="superadmin-loan-activate"),
+
+    #Leave Credit Max
+    path("superadmin/leave-credit-max/",LeaveCreditMaxListView.as_view(),name="leave-credit-max-list"),
+    path("superadmin/leave-credit-max/create/",LeaveCreditMaxCreateView.as_view(),name="leave-credit-max-create"),
+    path("superadmin/leave-credit-max/<int:pk>/",LeaveCreditMaxDetailView.as_view(),name="leave-credit-max-detail"),
+    path("leave-types-with-credit/",EmployeeLeaveTypeCreditListView.as_view(),name="leave-types-with-credit"),
 ]

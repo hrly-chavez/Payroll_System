@@ -1,34 +1,86 @@
 .wrapper {
+  width: 100%;
+  max-width: 100%;
   margin-top: 12px;
-  min-width: 0; 
+  min-width: 0;
+  overflow: hidden;
+  padding: 16px;
 }
 
 .tableContainer {
   width: 100%;
-  overflow-x: auto;
+  max-width: 100%;
+  overflow: hidden !important;
 }
 
-.expandRow {
-  display: grid;
-  gap: 8px;
-  padding: 8px 0;
+/* FULLY REMOVE ALL SCROLLBARS */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-/* Existing styles */
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* TABLE */
+.wrapper :global(.ant-table-wrapper) {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden !important;
+}
+
+.wrapper :global(.ant-spin-container) {
+  overflow: hidden !important;
+}
+
 .wrapper :global(.ant-table) {
+  width: 100%;
   border-radius: 10px;
+  overflow: hidden !important;
 }
 
+.wrapper :global(.ant-table-container) {
+  overflow: hidden !important;
+}
+
+.wrapper :global(.ant-table-content) {
+  overflow: hidden !important;
+}
+
+.wrapper :global(.ant-table-body) {
+  overflow: hidden !important;
+}
+
+/* HEADERS */
 .wrapper :global(.ant-table-thead > tr > th) {
   background: #f9fafb;
   font-weight: 600;
   color: #374151;
+
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+
+  padding: 10px 8px;
+  font-size: 13px;
 }
 
+/* CELLS */
 .wrapper :global(.ant-table-tbody > tr > td) {
   border-bottom: 1px solid #f0f0f0;
+
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
+
+  vertical-align: top;
+
+  padding: 10px 8px;
+  font-size: 13px;
 }
 
+/* BUTTONS */
 .wrapper :global(.ant-btn-primary) {
   background-color: #386fa4;
   border-color: #386fa4;
@@ -39,19 +91,23 @@
   border-color: #2f5d8c;
 }
 
+/* TEXT */
 .clampText {
-  display: -webkit-box;
+  width: 100%;
 
+  display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 
-  line-clamp: 2;
-
   overflow: hidden;
   text-overflow: ellipsis;
+
+  white-space: normal;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
+/* CLICKABLE */
 .clickable {
   cursor: pointer;
 }
@@ -60,19 +116,55 @@
   text-decoration: underline;
 }
 
+/* ACTIONS */
 .actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
+/* MODAL */
 .modalGrid {
   display: grid;
   row-gap: 8px;
+
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .reasonText {
   margin-top: 6px;
+
   word-break: break-word;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+  .wrapper {
+    padding: 6px;
+  }
+
+  .wrapper :global(.ant-table) {
+    font-size: 11px;
+  }
+
+  .wrapper :global(.ant-table-thead > tr > th),
+  .wrapper :global(.ant-table-tbody > tr > td) {
+    padding: 6px 4px;
+  }
+
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .actions button {
+    width: 100%;
+  }
+
+  .modalGrid {
+    font-size: 12px;
+  }
 }

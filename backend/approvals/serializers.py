@@ -7,7 +7,109 @@ from django.db.models import Q
 
 LEAVE_NAME_REGEX = re.compile(r"^[A-Za-z0-9 _-]+$")
 
+#=========Leave Credit Max============
+class LeaveCreditMaxSerializer(serializers.ModelSerializer):
+    leave_type_name = serializers.CharField(
+        source="leave_type.name",
+        read_only=True
+    )
 
+    class Meta:
+        model = Leave_Credit_Max
+        fields = [
+            "id",
+            "leave_type",
+            "leave_type_name",
+            "max_credit",
+            "is_active",
+            "created_at",
+        ]
+
+    def validate_max_credit(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Max credit must be greater than 0.")
+        return value
+
+    def validate(self, attrs):
+        leave_type = attrs.get("leave_type")
+
+        if self.instance:
+            exists = Leave_Credit_Max.objects.filter(
+                leave_type=leave_type
+            ).exclude(id=self.instance.id).exists()
+        else:
+            exists = Leave_Credit_Max.objects.filter(
+                leave_type=leave_type
+            ).exists()
+
+        if exists:
+            raise serializers.ValidationError({
+                "leave_type": "This leave type already has a credit max."
+            })
+
+        return attrs
+    
+#Leave Credit  Display  
+class EmployeeLeaveCreditSerializer(serializers.ModelSerializer):
+    credit_limit = serializers.SerializerMethodField()
+    used_credit = serializers.SerializerMethodField()
+    remaining_credit = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Leave_Type
+        fields = [
+            "id",
+            "name",
+            "credit_limit",
+            "used_credit",
+            "remaining_credit",
+            "is_active",
+        ]
+
+    def get_credit_limit(self, obj):
+        credit_max = Leave_Credit_Max.objects.filter(
+            leave_type=obj,
+            is_active=True
+        ).first()
+
+        return credit_max.max_credit if credit_max else obj.max_days
+
+    def get_used_credit(self, obj):
+        request = self.context.get("request")
+
+        if not request or not request.user.is_authenticated:
+            return 0
+
+        employee = getattr(request.user, "employee", None)
+
+        if not employee:
+            return 0
+
+        approved_leaves = Leave_Request.objects.filter(
+            employee=employee,
+            leave_type=obj,
+            status="Approved"
+        )
+
+        total_used = 0
+
+        for leave in approved_leaves:
+            if leave.is_half_day:
+                total_used += 0.5
+            else:
+                days = (leave.date_to - leave.date_from).days + 1
+                total_used += days
+
+        return total_used
+
+    def get_remaining_credit(self, obj):
+        credit_limit = self.get_credit_limit(obj)
+        used_credit = self.get_used_credit(obj)
+
+        remaining = credit_limit - used_credit
+
+        return remaining if remaining > 0 else 0
+    
 #=========Leave Type & Request============
 class LeaveTypeSerializer(serializers.ModelSerializer):
     name = serializers.CharField(
@@ -82,6 +184,11 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
         if emp.suffix:
             parts.append(emp.suffix)
         return " ".join(parts)
+    
+    def validate_attachment_proof(self, value):
+        if not value:
+            raise serializers.ValidationError("Attachment proof is required.")
+        return value
 
     class Meta:
         model = Leave_Request
@@ -96,7 +203,9 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
             "date_to",
             "reason",
             "status",
+            "decline_reason",
             "requested_at",
+            "attachment_proof",
         ]
 
 #=========Commission Type============

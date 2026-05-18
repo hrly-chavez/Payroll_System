@@ -25,6 +25,8 @@ interface LeaveRequest {
   reason: string;
   status: string;
   requested_at: string;
+  attachment_proof: string | null;
+  decline_reason: string | null;
 }
 
 const LeaveRequests = () => {
@@ -40,6 +42,7 @@ const LeaveRequests = () => {
 
   const fetchLeaveRequests = async () => {
     setLoading(true);
+
     try {
       const response = await api.get("/approvals/admin/leaves/");
       setRequests(response.data);
@@ -60,15 +63,29 @@ const LeaveRequests = () => {
       content: "Are you sure you want to approve this leave request?",
       okText: "Approve",
       okType: "primary",
+
       onOk: async () => {
         try {
           await api.post(`/approvals/admin/leaves/${id}/status/`, {
             status: "Approved",
           });
+
           message.success("Leave request approved");
           fetchLeaveRequests();
-        } catch {
-          message.error("Failed to approve request");
+        } catch (error: any) {
+          console.error(error);
+
+          const data = error?.response?.data;
+
+          const errorMessage =
+            typeof data?.detail === "string"
+              ? data.detail
+              : Array.isArray(data?.detail)
+              ? data.detail[0]
+              : data?.non_field_errors?.[0] ||
+                "Failed to approve request";
+
+          message.error(errorMessage);
         }
       },
     });
@@ -90,8 +107,10 @@ const LeaveRequests = () => {
       );
 
       message.success("Leave request declined");
+
       setDeclineModalOpen(false);
       setDeclineReason("");
+
       fetchLeaveRequests();
     } catch {
       message.error("Failed to decline request");
@@ -103,49 +122,77 @@ const LeaveRequests = () => {
       title: "Employee",
       dataIndex: "employee_name",
       key: "employee_name",
+      width: 180,
       responsive: ["xs", "sm", "md", "lg"],
     },
     {
       title: "Leave Type",
       dataIndex: "leave_type",
       key: "leave_type",
-      responsive: ["xs", "sm", "md", "lg"],    
+      width: 160,
+      responsive: ["sm", "md", "lg"],
     },
     {
       title: "Start Date",
       dataIndex: "date_from",
       key: "date_from",
-      responsive: ["xs", "sm", "md", "lg"],    
+      width: 130,
+      responsive: ["md", "lg"],
     },
     {
       title: "End Date",
       dataIndex: "date_to",
       key: "date_to",
-      responsive: ["xs", "sm", "md", "lg"],
+      width: 130,
+      responsive: ["md", "lg"],
     },
     {
       title: "Reason",
       dataIndex: "reason",
       key: "reason",
-      responsive: ["xs", "sm", "md", "lg"],
-       render: (text: string, record: any) => {
-        const isLong =
-          (text?.split(" ").length > 10) || (text?.length > 20);
+      width: 220,
+      ellipsis: true,
+      responsive: ["md", "lg"],
 
+      render: (text: string, record: LeaveRequest) => {
         return (
-           <div
-            className={`${styles.clampText} ${
-              isLong ? styles.clickable : ""
-            }`} 
-            onClick={() => {
-              if (isLong) {
-                setSelectedRecord(record);
-                setViewModalOpen(true);
-              }
+          <div
+            className={styles.clampText}
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedRecord(record);
+              setViewModalOpen(true);
             }}
           >
-            {text}
+            {text || "-"}
           </div>
+        );
+      },
+    },
+    {
+      title: "Attachment",
+      dataIndex: "attachment_proof",
+      key: "attachment_proof",
+      width: 150,
+      responsive: ["md", "lg"],
+
+      render: (fileUrl: string | null) => {
+        if (!fileUrl) return "-";
+
+        const fullUrl = fileUrl.startsWith("http")
+          ? fileUrl
+          : `http://localhost:8000${fileUrl}`;
+
+        return (
+          <Button
+            type="link"
+            href={fullUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+          >
+            View Proof
+          </Button>
         );
       },
     },
@@ -153,8 +200,11 @@ const LeaveRequests = () => {
       title: "Status",
       dataIndex: "status",
       key: "status",
+      width: 130,
+
       render: (status: string) => {
         let color = "orange";
+
         if (status === "Approved") color = "green";
         else if (status === "Declined") color = "red";
         else if (status === "Cancelled") color = "gray";
@@ -163,35 +213,57 @@ const LeaveRequests = () => {
       },
     },
     {
-  title: "Requested At",
-  dataIndex: "requested_at",
-  key: "requested_at",
-  render: (value: string) => {
-    if (!value) return "-";
+      title: "Decline Reason",
+      dataIndex: "decline_reason",
+      key: "decline_reason",
+      width: 220,
+      responsive: ["lg"],
 
-    const date = new Date(value);
+      render: (value: string | null, record: LeaveRequest) => {
+        if (record.status !== "Declined") return "-";
 
-    return date.toLocaleString("en-PH", {
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  },
-},
+        return (
+          <div className={styles.clampText}>
+            {value || "No decline reason provided."}
+          </div>
+        );
+      },
+    },
+    {
+      title: "Requested At",
+      dataIndex: "requested_at",
+      key: "requested_at",
+      width: 180,
+      responsive: ["lg"],
+
+      render: (value: string) => {
+        if (!value) return "-";
+
+        const date = new Date(value);
+
+        return date.toLocaleString("en-PH", {
+          year: "numeric",
+          month: "short",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      },
+    },
     {
       title: "Action",
       key: "action",
-      render: (_: any, record: any) => {
-        if (record.status !== "Pending") return null;
+      width: 180,
+
+      render: (_: any, record: LeaveRequest) => {
+        if (record.status !== "Pending") return "-";
 
         return (
           <div
             className={styles.actions}
             onClick={(e: React.MouseEvent<HTMLDivElement>) =>
               e.stopPropagation()
-            } // prevents row click from triggering modal
+            }
           >
             <Button
               type="primary"
@@ -219,39 +291,38 @@ const LeaveRequests = () => {
 
   const sortedRequests = [...requests].sort((a, b) => {
     return (
-      new Date(b.date_from).getTime() -
-      new Date(a.date_from).getTime()
+      new Date(b.requested_at).getTime() -
+      new Date(a.requested_at).getTime()
     );
   });
 
   return (
-   <div className={styles.wrapper}>
+    <div className={styles.wrapper}>
       <Spin spinning={loading}>
-        <Table
-          columns={columns}
-          rowKey="id"
-          dataSource={sortedRequests}
-
-          onRow={(record) => {
-            return {
+        <div className={styles.tableContainer}>
+          <Table
+            columns={columns}
+            rowKey="id"
+            dataSource={sortedRequests}
+            tableLayout="auto"
+            size="middle"
+            onRow={(record) => ({
               onClick: () => {
-                setSelectedRecord(record);   
-                setViewModalOpen(true);      
+                setSelectedRecord(record);
+                setViewModalOpen(true);
               },
-              style: { cursor: "pointer" },   
-            };
-          }}
-
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            pageSizeOptions: ["5", "10"],
-            showTotal: (total) => `Total ${total} leave requests`,
-          }}
-        />
+              style: { cursor: "pointer" },
+            })}
+            pagination={{
+              pageSize: 10,
+              showSizeChanger: true,
+              pageSizeOptions: ["5", "10"],
+              showTotal: (total) => `Total ${total} leave requests`,
+            }}
+          />
+        </div>
       </Spin>
 
-      {/* Decline Modal */}
       <Modal
         title="Decline Leave Request"
         open={declineModalOpen}
@@ -261,6 +332,7 @@ const LeaveRequests = () => {
         okButtonProps={{ danger: true }}
       >
         <p>Please provide a reason for declining:</p>
+
         <TextArea
           rows={4}
           value={declineReason}
@@ -269,7 +341,6 @@ const LeaveRequests = () => {
         />
       </Modal>
 
-      {/* View Modal */}
       <Modal
         title="Leave Request Details"
         open={viewModalOpen}
@@ -277,27 +348,70 @@ const LeaveRequests = () => {
         footer={null}
         centered
         destroyOnClose
+        width={700}
       >
         {selectedRecord && (
-          <div className={styles.modalGrid}> 
+          <div
+            className={styles.modalGrid}
+            style={{
+              fontSize: "clamp(13px, 2vw, 16px)",
+              wordBreak: "break-word",
+              overflowWrap: "break-word",
+            }}
+          >
             <div>
               <strong>Employee:</strong> {selectedRecord.employee_name}
             </div>
+
             <div>
               <strong>Leave Type:</strong> {selectedRecord.leave_type}
             </div>
+
             <div>
               <strong>Start Date:</strong> {selectedRecord.date_from}
             </div>
+
             <div>
               <strong>End Date:</strong> {selectedRecord.date_to}
             </div>
+
+            <div>
+              <strong>Attachment:</strong>{" "}
+              {selectedRecord.attachment_proof ? (
+                <a
+                  href={
+                    selectedRecord.attachment_proof.startsWith("http")
+                      ? selectedRecord.attachment_proof
+                      : `http://localhost:8000${selectedRecord.attachment_proof}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  View Proof
+                </a>
+              ) : (
+                "-"
+              )}
+            </div>
+
             <div>
               <strong>Reason:</strong>
+
               <p className={styles.reasonText}>
                 {selectedRecord.reason}
               </p>
             </div>
+
+            {selectedRecord.status === "Declined" && (
+              <div>
+                <strong>Decline Reason:</strong>
+
+                <p className={styles.reasonText}>
+                  {selectedRecord.decline_reason ||
+                    "No decline reason provided."}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </Modal>
@@ -306,4 +420,3 @@ const LeaveRequests = () => {
 };
 
 export default LeaveRequests;
-

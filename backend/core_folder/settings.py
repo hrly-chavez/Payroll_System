@@ -167,20 +167,26 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,    # Automatically blacklist used refresh tokens
 }
 
-CSRF_TRUSTED_ORIGINS = [
-    "http://192.168.68.38",
-    "http://payroll.local",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+CSRF_TRUSTED_ORIGINS = env.list(
+    "CSRF_TRUSTED_ORIGINS",
+    default=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+)
+
+CORS_ALLOWED_ORIGINS = env.list(
+    "CORS_ALLOWED_ORIGINS",
+    default=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+)
 
 #block everything external
 CORS_ALLOW_ALL_ORIGINS = False
 #NO external site is allowed
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+
 
 
 MEDIA_URL = "/media/"

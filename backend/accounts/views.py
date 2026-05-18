@@ -7,6 +7,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from django.conf import settings
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -49,7 +50,7 @@ class CookieTokenObtainPairView(TokenObtainPairView):
             key="access_token",
             value=access,
             httponly=True,
-            secure=False,
+            secure=not settings.DEBUG,
             samesite="Lax",
         )
 
@@ -57,7 +58,7 @@ class CookieTokenObtainPairView(TokenObtainPairView):
             key="refresh_token",
             value=refresh,
             httponly=True,
-            secure=False,
+            secure=not settings.DEBUG,
             samesite="Lax",
         )
 
@@ -83,7 +84,7 @@ class CookieTokenRefreshView(TokenRefreshView):
             key="access_token",
             value=access,
             httponly=True,
-            secure=False,  # True in production
+            secure=not settings.DEBUG,
             samesite="Lax",
         )
 
@@ -92,7 +93,7 @@ class CookieTokenRefreshView(TokenRefreshView):
                 key="refresh_token",
                 value=refresh,
                 httponly=True,
-                secure=False,
+                secure=not settings.DEBUG,
                 samesite="Lax",
             )
 

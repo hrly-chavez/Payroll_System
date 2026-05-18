@@ -373,11 +373,18 @@ const EmployeeContributionsModal: React.FC<Props> = ({
         <Form.Item
           name="effective_from"
           label="Effective From"
-          rules={[{ required: true, message: "Please select Effective From date" }]}
+          rules={[
+            {
+              required: true,
+              message: "Please select Effective From date",
+            },
+          ]}
         >
           <DatePicker
             style={{ width: "100%" }}
-            disabledDate={(current) => current && current < dayjs().startOf("day")}
+            disabledDate={(current) =>
+              current && current > dayjs().endOf("day")
+            }
           />
         </Form.Item>
 

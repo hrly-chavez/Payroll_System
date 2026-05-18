@@ -158,7 +158,12 @@ const AddEmployeeAllowanceModal: React.FC<Props> = ({
           label="Effective From"
           rules={[{ required: true }]}
         >
-          <DatePicker style={{ width: "100%" }} />
+          <DatePicker
+            style={{ width: "100%" }}
+            disabledDate={(current) =>
+              current && current > dayjs().startOf("day")
+            }
+          />
         </Form.Item>
 
         <Button

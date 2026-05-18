@@ -245,7 +245,9 @@ const EmployeeSalaryModal: React.FC<Props> = ({
         >
           <DatePicker
             style={{ width: "100%" }}
-            disabledDate={(current) => current && current < dayjs().startOf("day")}
+            disabledDate={(current) =>
+              current && current > dayjs().endOf("day")
+            }
           />
         </Form.Item>
 

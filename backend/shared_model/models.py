@@ -692,6 +692,30 @@ class Leave_Type(models.Model):
     def __str__(self):
         return f"{self.name} {self.is_paid}"
 
+class Leave_Credit_Max(models.Model):
+    id = models.AutoField(primary_key=True)
+
+    leave_type = models.ForeignKey(
+        Leave_Type,
+        on_delete=models.CASCADE,
+        related_name="leave_credit_max"
+    )
+
+    max_credit = models.PositiveIntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["leave_type"],
+                name="unique_leave_credit_max_per_leave_type"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.leave_type.name} - {self.max_credit}"
+    
 class Leave_Request(models.Model):
     half_day_choices = [
         ("AM","AM"),
@@ -711,12 +735,15 @@ class Leave_Request(models.Model):
     half_day_part = models.CharField(max_length=5, choices=half_day_choices, null=True, blank=True)
     reason = models.TextField()
     status = models.CharField(max_length=15,choices=STATUS_CHOICES,default="Pending")
+    decline_reason = models.TextField(null=True, blank=True)
     requested_at = models.DateTimeField(default=timezone.now)
     approved_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name="approved_leave_requests")
     approved_at = models.DateTimeField(null=True, blank=True)
     employee = models.ForeignKey(Employee,on_delete=models.CASCADE,related_name="leave_requests")
     leave_type = models.ForeignKey(Leave_Type,on_delete=models.PROTECT,related_name="leave_requests")
-    
+    attachment_proof = models.FileField(
+        upload_to="leave_proofs/",
+    )
 
     def __str__(self):
         return f"{self.date_from} to {self.date_to}" 

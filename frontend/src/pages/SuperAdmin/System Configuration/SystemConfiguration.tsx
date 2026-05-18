@@ -16,6 +16,7 @@ import AllowanceTypeTab from "./AllowanceType/AllowanceType";
 import HolidayPolicy from "./HolidayPolicy/HolidayPolicy";
 import TaxRulesTab from "./TaxRules/TaxRulesTab";
 import LoanRulesTab from "./LoanRules/LoanRulesTab";
+import LeaveCreditMaxTab from "./LeaveCredit/LeaveCreditTab";
 
 import CommissionRuleTab from "./Commission Rules/CommissionRuleTab";
 
@@ -25,6 +26,7 @@ type TabType =
   | "contribution"
   | "payroll"
   | "leave"
+  | "leave_credit_max"
   | "commission"          
   | "commission_rules" 
   | "tax_rules"
@@ -68,6 +70,11 @@ const SystemConfiguration: React.FC = () => {
       label: "Loan Rules",
       key: "loan_rules",
       children: <LoanRulesTab active />,
+    },
+    {
+      label: "Leave Credit Max",
+      key: "leave_credit_max",
+      children: <LeaveCreditMaxTab active />,
     },
     {
       label: "Leave Types",

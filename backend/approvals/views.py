@@ -17,7 +17,7 @@ from datetime import timedelta
 from decimal import Decimal
 from rest_framework import status as http_status
 from django.db.models import Q
-
+from rest_framework.parsers import MultiPartParser, FormParser
 
 
 #===========================Holiday =====================
@@ -297,6 +297,8 @@ class LeaveRequestListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated, IsRole]
     allowed_roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"]
 
+    parser_classes = [MultiPartParser, FormParser]
+
     def get_queryset(self):
         try:
             employee = Employee.objects.get(user=self.request.user)
@@ -312,9 +314,12 @@ class LeaveRequestListCreateView(generics.ListCreateAPIView):
         except Employee.DoesNotExist:
             raise ValidationError({"detail": "Employee profile not found."})
 
-        date_range = request.data.get("date_range")
+        date_range = request.data.getlist("date_range")
+
         if not date_range or len(date_range) != 2:
-            raise ValidationError({"date_range": "Start and end date are required."})
+            raise ValidationError({
+                "date_range": "Start and end date are required."
+            })
 
         data = request.data.copy()
         data["date_from"] = date_range[0]
@@ -323,12 +328,16 @@ class LeaveRequestListCreateView(generics.ListCreateAPIView):
 
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
-        leave_request = serializer.save(employee=employee)
+
+        leave_request = serializer.save(
+            employee=employee,
+            attachment_proof=request.FILES.get("attachment_proof")
+        )
 
         # --- Manual AuditLog for "Pending Leave Request" ---
         AuditLog.objects.create(
             user=request.user,
-            action="Pending Leave Request",  # your custom action
+            action="Pending Leave Request",
             model_name="Leave_Request",
             object_id=str(leave_request.id),
             old_data=None,
@@ -340,18 +349,23 @@ class LeaveRequestListCreateView(generics.ListCreateAPIView):
                 "reason": leave_request.reason,
                 "status": leave_request.status,
                 "requested_at": leave_request.requested_at.isoformat(),
+                "attachment_proof": (
+                    leave_request.attachment_proof.url
+                    if leave_request.attachment_proof else None
+                ),
             },
         )
 
         # Notify Admins
         admins = User.objects.filter(role="ADMIN")
+
         for admin in admins:
             Notification.objects.create(
                 user=admin,
                 title="New Leave Request",
                 description=f"{employee.fname} {employee.lname} submitted a leave request.",
                 category="leave",
-                redirect_url="/admin/requests"   #  UPDATED HERE
+                redirect_url="/admin/requests"
             )
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -407,9 +421,22 @@ def admin_update_leave_status(request, pk):
     leave_request.status = new_status
     leave_request.approved_by = user
     leave_request.approved_at = timezone.now()
-    # Prevent signals from creating duplicate AuditLog
+
+    if new_status == "Declined":
+        decline_reason = request.data.get("reason", "")
+        leave_request.decline_reason = decline_reason
+    else:
+        leave_request.decline_reason = None
+
     leave_request._skip_audit_log = True
-    leave_request.save(update_fields=["status", "approved_by", "approved_at"])
+    leave_request.save(
+        update_fields=[
+            "status",
+            "approved_by",
+            "approved_at",
+            "decline_reason",
+        ]
+    )
 
     # --- Manual AuditLog ---
     action_label = (
@@ -435,7 +462,10 @@ def admin_update_leave_status(request, pk):
     start = leave_request.date_from
     end = leave_request.date_to
     if end < start:
-        raise ValidationError({"detail": "Invalid leave date range."})
+        return Response(
+            {"detail": "Invalid leave date range."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     dates = []
     d = start
@@ -452,7 +482,12 @@ def admin_update_leave_status(request, pk):
             .exists()
         )
         if conflict:
-            raise ValidationError({"detail": "Cannot approve. One or more dates already have a leave day for this employee."})
+            return Response(
+                {
+                    "detail": "Cannot approve. One or more dates already have a leave day for this employee."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # 2) Idempotent approve: remove old days for this request then recreate
         Leave_Day.objects.filter(leave_request=leave_request).delete()
@@ -493,6 +528,45 @@ def admin_update_leave_status(request, pk):
 
     serializer = LeaveRequestSerializer(leave_request)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+# -----------------------------
+# Supad Action setting leave credit max for a leave type
+# -----------------------------
+
+class LeaveCreditMaxListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN"]
+
+    queryset = Leave_Credit_Max.objects.select_related("leave_type").all().order_by("-created_at")
+    serializer_class = LeaveCreditMaxSerializer
+
+
+class LeaveCreditMaxCreateView(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN"]
+
+    queryset = Leave_Credit_Max.objects.all()
+    serializer_class = LeaveCreditMaxSerializer
+
+
+class LeaveCreditMaxDetailView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated, IsRole]
+    allowed_roles = ["SUPER_ADMIN", "ADMIN"]
+
+    queryset = Leave_Credit_Max.objects.all()
+    serializer_class = LeaveCreditMaxSerializer
+
+class EmployeeLeaveTypeCreditListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = EmployeeLeaveCreditSerializer
+
+    def get_queryset(self):
+        return Leave_Type.objects.filter(is_active=True).order_by("name")
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
 
 #=====================All Request====================
 class AllRequestsListCreateView(generics.ListCreateAPIView):

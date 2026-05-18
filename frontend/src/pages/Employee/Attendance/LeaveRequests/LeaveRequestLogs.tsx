@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Spin, Table, Tag, Alert, Button, Space } from "antd";
+import { Spin, Table, Tag, Alert, Button } from "antd";
 import dayjs from "dayjs";
 import api from "../../../../api/axios";
 
@@ -14,8 +14,11 @@ type LeaveRow = {
   reason: string;
   date_from: string;
   date_to: string;
-  status: string; // approved | rejected | pending (based on your backend)
+  status: string;
+  attachment_proof: string | null;
+  decline_reason: string | null;
 };
+
 type LeaveRequestLogsProps = {
   refreshKey?: number;
 };
@@ -33,7 +36,9 @@ const LeaveRequestLogs: React.FC<LeaveRequestLogsProps> = ({ refreshKey }) => {
       setLeaveRequests(res.data || []);
     } catch (err: any) {
       setLeaveRequests([]);
-      setErrorMsg(err?.response?.data?.detail || "Failed to fetch leave requests.");
+      setErrorMsg(
+        err?.response?.data?.detail || "Failed to fetch leave requests."
+      );
     } finally {
       setLoading(false);
     }
@@ -81,11 +86,35 @@ const LeaveRequestLogs: React.FC<LeaveRequestLogsProps> = ({ refreshKey }) => {
         render: (val: string) => dayjs(val).format("DD MMM YYYY"),
       },
       {
+        title: "Attachment",
+        dataIndex: "attachment_proof",
+        key: "attachment_proof",
+        render: (fileUrl: string | null) => {
+          if (!fileUrl) return "-";
+
+          const fullUrl = fileUrl.startsWith("http")
+            ? fileUrl
+            : `http://localhost:8000${fileUrl}`;
+
+          return (
+            <Button
+              type="link"
+              href={fullUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              View Proof
+            </Button>
+          );
+        },
+      },
+      {
         title: "Status",
         dataIndex: "status",
         key: "status",
         render: (status: string) => {
           const normalized = (status || "").toLowerCase();
+
           const color =
             normalized === "approved"
               ? "green"
@@ -96,14 +125,26 @@ const LeaveRequestLogs: React.FC<LeaveRequestLogsProps> = ({ refreshKey }) => {
           return <Tag color={color}>{String(status).toUpperCase()}</Tag>;
         },
       },
+      {
+        title: "Decline Reason",
+        dataIndex: "decline_reason",
+        key: "decline_reason",
+        ellipsis: true,
+      },
     ],
     []
   );
 
   return (
     <div>
-      
-      {errorMsg && <Alert type="error" showIcon message={errorMsg} style={{ marginBottom: 12 }} />}
+      {errorMsg && (
+        <Alert
+          type="error"
+          showIcon
+          message={errorMsg}
+          style={{ marginBottom: 12 }}
+        />
+      )}
 
       <Spin spinning={loading}>
         <Table

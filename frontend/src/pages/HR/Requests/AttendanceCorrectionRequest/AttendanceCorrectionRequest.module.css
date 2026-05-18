@@ -15,6 +15,7 @@
 /* table */
 .wrapper :global(.ant-table) {
   border-radius: 10px;
+  min-width: 900px;
 
 }
 
@@ -58,18 +59,31 @@
 .actions {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
-
-/* mobile responsiveness */
+/* MOBILE */
 @media (max-width: 768px) {
   .actions {
     flex-direction: column;
     width: 100%;
   }
 
-  .actions button {
+  .actions :global(.ant-btn) {
     width: 100%;
   }
 }
+
+@media (max-width: 768px) {
+  .wrapper :global(.ant-table) {
+    min-width: 900px;
+  }
+
+  .actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .actions :global(.ant-btn) {
+    width: 100%;
+  }}

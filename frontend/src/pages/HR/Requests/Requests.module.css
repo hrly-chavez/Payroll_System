@@ -1,6 +1,9 @@
 .content {
   margin: 16px;
   min-width: 0;
+  width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .card {
@@ -11,27 +14,58 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  width: 100%;
+  overflow-x: auto;
+  box-sizing: border-box;
 }
 
-.tabs :global(.ant-tabs-content) {
-  overflow: visible; 
+.tabs {
+  width: 100%;
 }
 
-.tabs :global(.ant-tabs-nav) {
-  margin-bottom: 16px;  
-}
-
-/* Allow tabs to scroll horizontally on small devices */
-.tabs :global(.ant-tabs-nav-wrap) {
+/* Prevent content overflow */
+.tabs :global(.ant-tabs-content),
+.tabs :global(.ant-tabs-content-holder) {
+  width: 100%;
   overflow-x: auto;
 }
 
+/* Tabs spacing */
+.tabs :global(.ant-tabs-nav) {
+  margin-bottom: 16px;
+}
+
+/* Responsive tab navigation */
+.tabs :global(.ant-tabs-nav-wrap) {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Allow tabs to wrap properly */
+.tabs :global(.ant-tabs-nav-list) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Individual tab buttons */
 .tabs :global(.ant-tabs-tab) {
   font-weight: 500;
   color: #6b7280;
   padding: 8px 16px;
+  white-space: nowrap;
+  border-radius: 8px;
+  margin: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
+.tabs :global(.ant-tabs-tab-btn) {
+  text-align: center;
+}
+
+/* Active tab */
 .tabs :global(.ant-tabs-tab-active .ant-tabs-tab-btn) {
   color: #386fa4;
 }
@@ -40,6 +74,7 @@
   background: #386fa4;
 }
 
+/* Placeholder */
 .placeholder {
   padding: 40px;
   text-align: center;
@@ -47,40 +82,19 @@
   font-size: 14px;
 }
 
-/*---------- RESPONSIVENESS ------*/
-/* Reduce margin on small screens */
-@media (max-width: 768px) {
-  .content {
-    margin: 12px;
-  }
-}
+/* ---------- RESPONSIVENESS ---------- */
 
 /* Tablet */
 @media (max-width: 1024px) {
+  .content {
+    margin: 14px;
+  }
+
   .card {
     padding: 18px 20px 20px;
     min-height: auto;
   }
-}
 
-/* Mobile */
-@media (max-width: 768px) {
-  .card {
-    padding: 16px;
-    min-height: auto;
-  }
-}
-
-/* Slightly tighter tabs on mobile */
-@media (max-width: 768px) {
-  .tabs :global(.ant-tabs-tab) {
-    padding: 6px 12px;
-    font-size: 13px;
-  }
-}
-
-/* Tablet */
-@media (max-width: 1024px) {
   .placeholder {
     padding: 30px;
   }
@@ -88,8 +102,47 @@
 
 /* Mobile */
 @media (max-width: 768px) {
+  .content {
+    margin: 10px;
+  }
+
+  .card {
+    padding: 14px;
+    min-height: auto;
+    border-radius: 10px;
+  }
+
+  /* Stack tabs vertically on small screens */
+  .tabs :global(.ant-tabs-nav-list) {
+    width: 100%;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .tabs :global(.ant-tabs-tab) {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
   .placeholder {
     padding: 24px 16px;
     font-size: 13px;
+  }
+}
+
+/* Small mobile devices */
+@media (max-width: 480px) {
+  .content {
+    margin: 8px;
+  }
+
+  .card {
+    padding: 12px;
+  }
+
+  .tabs :global(.ant-tabs-tab) {
+    font-size: 12px;
+    padding: 9px 10px;
   }
 }

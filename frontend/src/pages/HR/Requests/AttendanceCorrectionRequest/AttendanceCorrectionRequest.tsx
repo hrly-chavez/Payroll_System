@@ -220,12 +220,8 @@ const AttendanceCorrectionRequest: React.FC = () => {
 
         render: (_: any, record: CorrectionRow) => (
            <div
+            className={styles.actions}
             onClick={(e) => e.stopPropagation()}
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              gap: 6, 
-            }}
           >
             <Button
               type="primary"

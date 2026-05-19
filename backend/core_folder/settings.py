@@ -223,7 +223,13 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = '/django-static/'
+
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+import os
+os.makedirs(STATIC_ROOT, exist_ok=True)
+
+STATICFILES_DIRS = []
 
 STORAGES = {
     "default": {

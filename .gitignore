@@ -43,8 +43,11 @@ vaw_app/yarn-debug.log*
 vaw_app/yarn-error.log*
 vaw_app/package-lock.json
 
+# Environment files
 .env
-backend/.env
+.env.*
+**/.env
+**/.env.*
 
 # Django static collect output
 backend/staticfiles/

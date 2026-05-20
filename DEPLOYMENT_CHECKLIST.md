@@ -9,7 +9,7 @@ Backend Domain:
 - api.payroll.attitech.ph
 
 Frontend Hosting:
-- Hostinger
+- Bluehost
 
 Backend Hosting:
 - Railway
@@ -67,7 +67,7 @@ FRONTEND DEPLOYMENT FLOW
 1. Build frontend:
 npm run build
 
-2. Upload build files to Hostinger
+2. Upload build files to Bluehost
 
 3. Verify React routing
 

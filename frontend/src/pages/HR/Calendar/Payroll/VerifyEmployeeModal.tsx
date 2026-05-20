@@ -966,16 +966,25 @@ const handleExcludeEarning = async (row: AdditionalEarning) => {
                     Verify Employee
                   </Button>
 
-                  <Button block onClick={() => setOpenCommissionModal(true)} disabled={!canAddCommission || !period}>
+                  {/* <Button block onClick={() => setOpenCommissionModal(true)} disabled={!canAddCommission || !period}>
                     Add Commission
+                  </Button> */}
+
+
+                  <Button
+                    block
+                    onClick={() => setOpenFineModal(true)}
+                    disabled={status !== "Pending" || !period}
+                  >
+                    Add Deduction
                   </Button>
 
-                   <Button
+                   {/* <Button
                     block
                     onClick={() => setOpenAdditionalAllowanceModal(true)}
                     disabled={!canAddAdditionalAllowance || !period}>
                     Add Additional Allowance
-                  </Button>
+                  </Button> */}
 
                   <Button
                     block

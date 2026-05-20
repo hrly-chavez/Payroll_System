@@ -66,11 +66,11 @@ const SystemConfiguration: React.FC = () => {
       key: "tax_rules",
       children: <TaxRulesTab active />,
     },
-    {
-      label: "Loan Rules",
-      key: "loan_rules",
-      children: <LoanRulesTab active />,
-    },
+    // {
+    //   label: "Loan Rules",
+    //   key: "loan_rules",
+    //   children: <LoanRulesTab active />,
+    // },
     {
       label: "Leave Credit Max",
       key: "leave_credit_max",
@@ -81,11 +81,11 @@ const SystemConfiguration: React.FC = () => {
       key: "leave",
       children: <LeaveTab active />,
     },
-    {
-      label: "Commission Types",
-      key: "commission",
-      children: <CommissionTypeTab active />,
-    },
+    // {
+    //   label: "Commission Types",
+    //   key: "commission",
+    //   children: <CommissionTypeTab active />,
+    // },
     // Optional
     // {
     //   label: "Commission Rules",

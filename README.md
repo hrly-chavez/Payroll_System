@@ -1,16 +1,3 @@
-
-What to do after cloning
-
-1. make venv(sample root folder)
- >backend
- >frontend
- >venv
-
-2. pip install requirements.txt 
-3. cd frontend
-4. npm install 
-
-
 #Project Description(not updated)
 
 Attendance & Payroll System (Automated payroll)

@@ -35,8 +35,8 @@ PRE-DEPLOYMENT CHECKLIST
 [✔] Regeneration flow verified
 [✔] Role permissions verified
 [✔] PDF generation verified
-[] Frontend production build tested
-[ ] Railway backend tested
+[✔] Frontend production build tested
+[✔] Railway backend tested
 [ ] API endpoints verified
 [ ] HTTPS/SSL verified
 [ ] CORS verified

@@ -6,7 +6,7 @@ What to do after cloning
  >frontend
  >venv
 
-2. pip install requirements.txt 
+2. cd backend > pip install requirements.txt 
 3. cd frontend
 4. npm install 
 5. make envs

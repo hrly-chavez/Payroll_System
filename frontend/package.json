@@ -1,6 +1,7 @@
 {
   "name": "frontend",
   "version": "0.1.0",
+  "homepage": "https://payroll.attitech.ph",
   "private": true,
   "dependencies": {
     "@ant-design/plots": "^2.6.8",

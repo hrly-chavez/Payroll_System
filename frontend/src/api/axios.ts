@@ -3,6 +3,8 @@ import axios from "axios";
 
 const baseURL = process.env.REACT_APP_API_BASE_URL || "/api";
 
+console.log("BASE URL:", baseURL);
+
 const api = axios.create({
   baseURL,
   withCredentials: true,
@@ -63,8 +65,13 @@ api.interceptors.response.use(
         isRefreshing = false;
         processQueue(refreshError);
 
-        //  Important: return ORIGINAL error, not refresh error
-        return Promise.reject(error);
+        localStorage.removeItem("isAuthenticated");
+        localStorage.removeItem("role");
+        localStorage.removeItem("user_name");
+
+        window.location.href = "/";
+
+        return Promise.reject(refreshError);
       }
     }
 

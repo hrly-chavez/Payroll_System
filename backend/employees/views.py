@@ -17,6 +17,8 @@ from django.utils.http import urlsafe_base64_encode
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_bytes
 from django.core.mail import EmailMultiAlternatives
+import resend
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils.http import urlsafe_base64_decode
@@ -39,6 +41,9 @@ import secrets
 from .serializers import CompanyNoteSerializer
 from rest_framework import generics
 
+
+resend.api_key = settings.RESEND_API_KEY
+User = get_user_model()
 
 #--------------------------Address
 # List all provinces
@@ -220,14 +225,17 @@ class UserViewSet(viewsets.ModelViewSet):
         # Attempt to send email
         email_sent = False
         try:
-            send_mail(
-                subject="Your New Account Password",
-                message=f"Hello {user.employee.fname} {user.employee.lname},\n\nYour password has been reset by HR.\n\n"
-                        f"New password: {new_password}\n\nPlease log in and change it immediately.",
-                from_email=None,  # will use DEFAULT_FROM_EMAIL from settings.py
-                recipient_list=[user.employee.email],
-                fail_silently=False,
-            )
+            resend.Emails.send({
+                "from": settings.DEFAULT_FROM_EMAIL,
+                "to": [user.employee.email],
+                "subject": "Your New Account Password",
+                "text": (
+                    f"Hello {user.employee.fname} {user.employee.lname},\n\n"
+                    f"Your password has been reset by HR.\n\n"
+                    f"New password: {new_password}\n\n"
+                    f"Please log in and change it immediately."
+                ),
+            })
             email_sent = True
             logger.info(f"Reset password email sent to '{user.employee.email}'.")
         except Exception as e:
@@ -594,14 +602,13 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             <p>Regards,<br>Payroll System Admin</p>
             """
 
-            email = EmailMultiAlternatives(
-                subject,
-                text_content,
-                settings.DEFAULT_FROM_EMAIL,
-                [employee.email],  # send to employee email
-            )
-            email.attach_alternative(html_content, "text/html")
-            email.send(fail_silently=False)
+            resend.Emails.send({
+                "from": settings.DEFAULT_FROM_EMAIL,
+                "to": [employee.email],
+                "subject": subject,
+                "html": html_content,
+                "text": text_content,
+            })
 
         except Exception as e:
             print("Email sending failed:", str(e))
@@ -723,9 +730,8 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
     
-#forgot pass
-#undone logs
-User = get_user_model()
+
+
 
 class ForgotPasswordView(APIView):
     permission_classes = []
@@ -762,24 +768,26 @@ class ForgotPasswordView(APIView):
 
         reset_url = f"{settings.FRONTEND_URL}/reset-password/{token}/"
 
-        send_mail(
-            subject="Payroll System Password Reset",
-            message=f"""
-Hello {user.user_name},
+        message = f"""
+        Hello {user.employee.fname} {user.employee.lname},
 
-Click the link below to reset your password:
+        Click the link below to reset your password:
 
-{reset_url}
+        {reset_url}
 
-This link expires in 5 minutes.
-""",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[email],
-        )
+        This link will expire in 5 minutes.
+        """
+
+        resend.Emails.send({
+            "from": settings.DEFAULT_FROM_EMAIL,
+            "to": [email],
+            "subject": "Payroll System Password Reset",
+            "text": message,
+        })
 
         return Response({"detail": "Password reset link sent."}, status=200)
     
-User = get_user_model()
+
 
 class CheckResetTokenView(APIView):
     permission_classes = []

@@ -4,4 +4,5 @@
 | Backend API      | Railway   |
 | Database         | Railway   |
 | DNS Authority    | Bluehost  |
-| Email            | Bluehost  |
+| Email DNS        | Bluehost  |
+| Email Sender     | Resend    |

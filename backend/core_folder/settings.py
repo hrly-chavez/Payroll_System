@@ -267,6 +267,6 @@ EMAIL_HOST_USER = env('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = env(
     "DEFAULT_FROM_EMAIL",
-    default="onboarding@resend.dev"
+    default="noreply@attitech.ph"
 )
 RESEND_API_KEY = env("RESEND_API_KEY")

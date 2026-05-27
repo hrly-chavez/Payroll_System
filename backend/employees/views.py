@@ -226,7 +226,7 @@ class UserViewSet(viewsets.ModelViewSet):
         email_sent = False
         try:
             resend.Emails.send({
-                "from": "onboarding@resend.dev",
+                "from": settings.DEFAULT_FROM_EMAIL,
                 "to": [user.employee.email],
                 "subject": "Your New Account Password",
                 "text": (
@@ -603,7 +603,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             """
 
             resend.Emails.send({
-                "from": "onboarding@resend.dev",
+                "from": settings.DEFAULT_FROM_EMAIL,
                 "to": [employee.email],
                 "subject": subject,
                 "html": html_content,
@@ -779,7 +779,7 @@ class ForgotPasswordView(APIView):
         """
 
         resend.Emails.send({
-            "from": "onboarding@resend.dev",
+            "from": settings.DEFAULT_FROM_EMAIL,
             "to": [email],
             "subject": "Payroll System Password Reset",
             "text": message,

@@ -18,6 +18,7 @@ from decimal import Decimal
 from rest_framework import status as http_status
 from django.db.models import Q
 from rest_framework.parsers import MultiPartParser, FormParser
+from approvals.services.holiday_services import generate_holidays
 
 
 #===========================Holiday =====================
@@ -134,6 +135,66 @@ class HolidayUpdateStatusView(APIView):
             'detail': 'Status updated',
             'holiday': serializer.data
         }, status=status.HTTP_200_OK)
+
+# holiday edit and delete
+class HolidayUpdateDeleteView(APIView):
+
+    def get(self, request, pk):
+        try:
+            holiday = Holiday.objects.get(pk=pk)
+        except Holiday.DoesNotExist:
+            return Response(
+                {"error": "Holiday not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = HolidaySerializer(holiday)
+
+        return Response(serializer.data)
+
+    def patch(self, request, pk):
+        try:
+            holiday = Holiday.objects.get(pk=pk)
+        except Holiday.DoesNotExist:
+            return Response(
+                {"error": "Holiday not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = HolidaySerializer(
+            holiday,
+            data=request.data,
+            partial=True
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+
+            return Response(
+                serializer.data,
+                status=status.HTTP_200_OK
+            )
+
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    def delete(self, request, pk):
+        try:
+            holiday = Holiday.objects.get(pk=pk)
+        except Holiday.DoesNotExist:
+            return Response(
+                {"error": "Holiday not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        holiday.delete()
+
+        return Response(
+            {"message": "Holiday deleted successfully"},
+            status=status.HTTP_204_NO_CONTENT
+        )
 
 #holiday policy
 class HolidayPolicyListCreateView(generics.ListCreateAPIView):
@@ -1071,3 +1132,31 @@ class SuperAdminLoanActivateView(APIView):
 
         return Response(LoanRequestSerializer(loan).data, status=status.HTTP_200_OK)
     
+#this is my generate holiday
+class GenerateHolidayView(APIView):
+
+    def post(self, request):
+
+        year = request.data.get("year")
+
+        if not year:
+            return Response(
+                {"error": "Year is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            year = int(year)
+
+            created = generate_holidays(year)
+
+            return Response({
+                "message": f"Holidays generated for {year}",
+                "created": created,
+            })
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

@@ -5,6 +5,8 @@ urlpatterns = [
     path('holidays/', HolidayListView.as_view()),
     path('superadmin/holidays/', HolidayListView.as_view()),
     path('holidays/create/', HolidayCreateView.as_view()),
+    path("superadmin/holidays/<int:pk>/", HolidayUpdateDeleteView.as_view(), name="holiday-update-delete"),
+    path("generate-holidays/", GenerateHolidayView.as_view(), name="generate-holidays"),
  
     # Leave Types
     path('superadmin/leave-types/', LeaveTypeListView.as_view(), name='leave-list'),

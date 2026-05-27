@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Table, Tag, Button, Space, message, Modal, Input } from "antd";
+import { Table, Tag, Button, Space, message, Modal, Input, Select } from "antd";
 import api from "../../../../api/axios";
 import styles from "./HolidayRequest.module.css";
 import type { ColumnsType } from "antd/es/table";
@@ -10,9 +10,17 @@ const { TextArea } = Input;
 
 interface HolidayRequest {
   id: number;
-  employee: string;
-  details: string;
-  reason: string;
+
+  employee?: string;
+  details?: string;
+  reason?: string;
+
+  name: string;
+  date: string;
+  type: string;
+  base: string;
+  remarks?: string;
+
   status: string;
   created_at: string;
 }
@@ -20,10 +28,18 @@ interface HolidayRequest {
 const HolidayRequests: React.FC = () => {
   const [dataSource, setDataSource] = useState<HolidayRequest[]>([]);
   const [loading, setLoading] = useState(false);
-  const [declineModalOpen, setDeclineModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<HolidayRequest | null>(null);
-  const [declineReason, setDeclineReason] = useState("");
   const [viewModalOpen, setViewModalOpen] = useState(false);
+
+  const [editModalOpen, setEditModalOpen] = useState(false);
+
+  const [editForm, setEditForm] = useState({
+    name: "",
+    date: "",
+    type: "",
+    base: "",
+    remarks: "",
+  });
 
   // FETCH ONLY HOLIDAY REQUESTS
   const fetchHolidayRequests = async () => {
@@ -48,57 +64,8 @@ const HolidayRequests: React.FC = () => {
     fetchHolidayRequests();
   }, []);
 
-  // APPROVE
-  const handleApprove = async (record: any) => {
-    Modal.confirm({
-      title: "Approve Holiday Request",
-      content: "Are you sure you want to approve this holiday request?",
-      onOk: async () => {
-        try {
-          await api.patch(
-            `/approvals/superadmin/holidays/${record.id}/status/`,
-            { status: "Approved" }
-          );
-
-          message.success("Approved successfully");
-          fetchHolidayRequests();
-        } catch {
-          message.error("Approval failed");
-        }
-      },
-    });
-  };
-
-  // DECLINE
-  const handleDeclineClick = (record: any) => {
-    setSelectedRecord(record);
-    setDeclineModalOpen(true);
-  };
-
-  const handleDeclineSubmit = async () => {
-    if (!declineReason.trim()) {
-      message.error("Please provide a reason for declining.");
-      return;
-    }
-
-    try {
-      await api.patch(
-        `/approvals/superadmin/holidays/${selectedRecord?.id}/status/`,
-        { status: "Declined", remarks: declineReason }
-      );
-
-      message.success("Declined successfully");
-
-      setDeclineModalOpen(false);
-      setDeclineReason("");
-      setSelectedRecord(null);
-      fetchHolidayRequests();
-    } catch {
-      message.error("Decline failed");
-    }
-  };
-
-  const columns: ColumnsType<HolidayRequest> = [    {
+  const columns: ColumnsType<HolidayRequest> = [
+    {
       title: "Employee",
       dataIndex: "employee",
       responsive: ["xs", "sm", "md", "lg"],
@@ -130,49 +97,104 @@ const HolidayRequests: React.FC = () => {
             : status === "Approved"
             ? "green"
             : "red";
+
         return <Tag color={color}>{status}</Tag>;
       },
     },
-    {
-      title: "Action",
-      width: 160,
-      render: (_: any, record: any) => {
-        if (record.status !== "Pending") return null;
 
-        return (
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              gap: 6, 
-            }}
-          >
-            <Button
-              type="primary"
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleApprove(record)
-              }}
-            >
-              Approve
-            </Button>
+    // SHOW ACTION COLUMN ONLY IF THERE IS AN APPROVED RECORD
+    ...(dataSource.some((item) => item.status === "Approved")
+      ? [
+          {
+            title: "Action",
+            width: 160,
+            render: (_: any, record: any) => {
+              // ONLY SHOW BUTTONS IF APPROVED
+              if (record.status !== "Approved") return null;
 
-            <Button
-              danger
-              size="small"
-              onClick={(e) => {
-                 e.stopPropagation();
-                handleDeclineClick(record);
-              }}
-            >
-              Decline
-            </Button>
-          </div>
-        );
-      },
-    },
+              return (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    gap: 6,
+                  }}
+                >
+                  <Button
+                    type="primary"
+                    size="small"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+
+                      try {
+                        // FETCH ACTUAL HOLIDAY DATA
+                        const res = await api.get(
+                          `/approvals/superadmin/holidays/${record.id}/`
+                        );
+
+                        const holiday = res.data;
+
+                        setSelectedRecord(holiday);
+
+                        // POPULATE MODAL
+                        setEditForm({
+                          name: holiday.name || "",
+                          date: holiday.date || "",
+                          type: holiday.type || "",
+                          base: holiday.base || "",
+                          remarks: holiday.remarks || "",
+                        });
+
+                        setEditModalOpen(true);
+
+                      } catch (err) {
+                        console.log(err);
+
+                        message.error("Failed to fetch holiday data");
+                      }
+                    }}
+                  >
+                    Edit
+                  </Button>
+
+                  <Button
+                    danger
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+
+                      Modal.confirm({
+                        title: "Delete Holiday Request",
+                        content:
+                          "Are you sure you want to delete this request?",
+                        okText: "Delete",
+                        okButtonProps: { danger: true },
+
+                        onOk: async () => {
+                          try {
+                            await api.delete(
+                              `/approvals/superadmin/holidays/${record.id}/`
+                            );
+
+                            message.success("Deleted successfully");
+
+                            fetchHolidayRequests();
+                          } catch {
+                            message.error("Delete failed");
+                          }
+                        },
+                      });
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              );
+            },
+          },
+        ]
+      : []),
   ];
 
 
@@ -182,8 +204,81 @@ const HolidayRequests: React.FC = () => {
       new Date(a.created_at).getTime()
   );
 
+  const handleEditSubmit = async () => {
+    try {
+      await api.patch(
+        `/approvals/superadmin/holidays/${selectedRecord?.id}/`,
+        editForm
+      );
+
+      message.success("Holiday updated successfully");
+
+      setEditModalOpen(false);
+
+      fetchHolidayRequests();
+
+    } catch (err: any) {
+      console.log(err);
+
+      message.error("Update failed");
+    }
+  };
+
   return (
     <div className={styles.wrapper}>
+      {/* GENERATE HOLIDAYS BUTTON */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          marginBottom: 16,
+        }}
+      >
+        <Button
+          type="primary"
+          onClick={() => {
+            Modal.confirm({
+              title: "Generate Holidays",
+              content:
+                "Generate holidays for next year?",
+
+              okText: "Generate",
+
+              onOk: async () => {
+                try {
+
+                  const nextYear =
+                    new Date().getFullYear() + 1;
+
+                  const res = await api.post(
+                    "/approvals/generate-holidays/",
+                    {
+                      year: nextYear,
+                    }
+                  );
+
+                  message.success(
+                    res.data.message ||
+                    "Holidays generated successfully"
+                  );
+
+                  fetchHolidayRequests();
+
+                } catch (err) {
+                  console.log(err);
+
+                  message.error(
+                    "Failed to generate holidays"
+                  );
+                }
+              },
+            });
+          }}
+        >
+          Generate Next Year Holidays
+        </Button>
+      </div>
+
       <Table
         columns={columns}        
         rowKey={(record) => `holiday-${record.id}`}
@@ -233,22 +328,106 @@ const HolidayRequests: React.FC = () => {
         )}
       </Modal>
 
-      {/* DECLINE MODAL */}
       <Modal
-        title="Decline Holiday Request"
-        open={declineModalOpen}
-        onCancel={() => setDeclineModalOpen(false)}
-        onOk={handleDeclineSubmit}
-        okText="Decline"
-        okButtonProps={{ danger: true }}
+        title="Edit Holiday"
+        open={editModalOpen}
+        onCancel={() => setEditModalOpen(false)}
+        onOk={handleEditSubmit}
+        okText="Save"
+        centered
       >
-        <p>Please provide a reason for declining:</p>
-        <TextArea
-          rows={4}
-          value={declineReason}
-          onChange={(e) => setDeclineReason(e.target.value)}
-        />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+          }}
+        >
+          {/* HOLIDAY NAME */}
+          <Input
+            placeholder="Holiday Name"
+            value={editForm.name}
+            onChange={(e) =>
+              setEditForm({
+                ...editForm,
+                name: e.target.value,
+              })
+            }
+          />
+
+          {/* DATE */}
+          <Input
+            type="date"
+            value={editForm.date}
+            onChange={(e) =>
+              setEditForm({
+                ...editForm,
+                date: e.target.value,
+              })
+            }
+          />
+
+          {/* TYPE */}
+          <Select
+            placeholder="Select Holiday Type"
+            value={editForm.type}
+            onChange={(value) =>
+              setEditForm({
+                ...editForm,
+                type: value,
+              })
+            }
+            options={[
+              { value: "Regular", label: "Regular" },
+              {
+                value: "Special Non-Working",
+                label: "Special Non-Working",
+              },
+              {
+                value: "Special Working",
+                label: "Special Working",
+              },
+              {
+                value: "Company Holiday",
+                label: "Company Holiday",
+              },
+            ]}
+          />
+
+          {/* BASE */}
+          <Select
+            placeholder="Select Base"
+            value={editForm.base}
+            onChange={(value) =>
+              setEditForm({
+                ...editForm,
+                base: value,
+              })
+            }
+            options={[
+              { value: "PH", label: "Philippines" },
+              { value: "US", label: "United States" },
+              { value: "COMPANY", label: "Company" },
+            ]}
+          />
+
+          {/* REMARKS */}
+          <Input.TextArea
+            rows={4}
+            placeholder="Remarks"
+            value={editForm.remarks}
+            onChange={(e) =>
+              setEditForm({
+                ...editForm,
+                remarks: e.target.value,
+              })
+            }
+          />
+
+        </div>
       </Modal>
+
+  
     </div>
   );
 };

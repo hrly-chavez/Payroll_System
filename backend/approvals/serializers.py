@@ -297,6 +297,7 @@ class HolidaySerializer(serializers.ModelSerializer):
             'date',
             'type',
             'base',
+            'remarks',
             'status',
         )
     def validate(self, attrs):

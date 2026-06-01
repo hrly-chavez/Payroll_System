@@ -10,4 +10,10 @@ class ApprovalsConfig(AppConfig):
             auto_generate_next_year_holidays
         )
 
-        auto_generate_next_year_holidays()
+        try:
+            auto_generate_next_year_holidays()
+        except Exception:
+            # Database may not be available during build-time commands
+            # (e.g., collectstatic). This is safe to skip — holidays
+            # will be generated on the next runtime startup.
+            pass
